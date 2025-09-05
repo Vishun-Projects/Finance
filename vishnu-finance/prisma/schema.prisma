@@ -1,15 +1,387 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
-  output   = "../src/generated/prisma"
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "mysql"
   url      = env("DATABASE_URL")
+}
+
+model UserPreferences {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Navigation preferences
+  navigationLayout String @default("sidebar") // "sidebar" or "top"
+  
+  // Theme preferences
+  theme String @default("light") // "light", "dark", or "auto"
+  
+  // Other UI preferences
+  colorScheme String @default("default") // "default", "high-contrast", etc.
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("user_preferences")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  password  String
+  isActive  Boolean  @default(true)
+  lastLogin DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  expenses         Expense[]
+  incomeSources    IncomeSource[]
+  goals            Goal[]
+  deadlines        Deadline[]
+  wishlistItems    WishlistItem[]
+  salaryStructures SalaryStructure[]
+  salaryHistories  SalaryHistory[]
+  categories       Category[]
+  newsPreferences  NewsPreference[]
+  financialReports FinancialReport[]
+  recurringItems   RecurringItem[]
+  preferences      UserPreferences?
+
+  @@map("users")
+}
+
+model Category {
+  id          String   @id @default(cuid())
+  name        String
+  type        CategoryType
+  color       String?  @default("#3B82F6")
+  icon        String?
+  isDefault   Boolean  @default(false)
+  userId      String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  user        User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  incomeSources IncomeSource[]
+  expenses    Expense[]
+
+  @@map("categories")
+}
+
+model IncomeSource {
+  id          String        @id @default(cuid())
+  name        String
+  amount      Decimal       @db.Decimal(10, 2)
+  frequency   IncomeFrequency
+  categoryId  String?
+  startDate   DateTime
+  endDate     DateTime?
+  notes       String?
+  isActive    Boolean       @default(true)
+  userId      String
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  // Relations
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category    Category?     @relation(fields: [categoryId], references: [id])
+
+  @@map("income_sources")
+}
+
+model Expense {
+  id          String        @id @default(cuid())
+  amount      Decimal       @db.Decimal(10, 2)
+  description String?
+  date        DateTime
+  categoryId  String?
+  isRecurring Boolean       @default(false)
+  frequency   ExpenseFrequency?
+  notes       String?
+  receiptUrl  String?
+  userId      String
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  // Relations
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category    Category?     @relation(fields: [categoryId], references: [id])
+
+  @@map("expenses")
+}
+
+model Deadline {
+  id            String           @id @default(cuid())
+  title         String
+  description   String?
+  amount        Decimal?         @db.Decimal(10, 2)
+  dueDate       DateTime
+  isRecurring   Boolean          @default(false)
+  frequency     DeadlineFrequency?
+  status        DeadlineStatus   @default(PENDING)
+  isCompleted   Boolean          @default(false)
+  completedDate DateTime?
+  category      String?
+  paymentMethod String?
+  accountDetails String?
+  notes         String?
+  userId        String
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  // Relations
+  user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("deadlines")
+}
+
+model Goal {
+  id              String        @id @default(cuid())
+  title           String
+  targetAmount    Decimal       @db.Decimal(10, 2)
+  currentAmount   Decimal       @db.Decimal(10, 2) @default(0)
+  targetDate      DateTime?
+  priority        GoalPriority  @default(MEDIUM)
+  category        String?
+  description     String?
+  imageUrl        String?
+  isActive        Boolean       @default(true)
+  userId          String
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  // Relations
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("goals")
+}
+
+model WishlistItem {
+  id              String           @id @default(cuid())
+  title           String
+  description     String?
+  estimatedCost   Decimal          @db.Decimal(10, 2)
+  priority        WishlistPriority @default(MEDIUM)
+  category        String?
+  targetDate      DateTime?
+  isCompleted     Boolean          @default(false)
+  completedDate   DateTime?
+  imageUrl        String?
+  notes           String?
+  tags            String?          // JSON array of tags
+  userId          String
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  // Relations
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("wishlist_items")
+}
+
+model SalaryStructure {
+  id              String           @id @default(cuid())
+  jobTitle        String
+  company         String
+  baseSalary      Decimal          @db.Decimal(10, 2)
+  allowances      String?          // JSON object of allowances
+  deductions      String?          // JSON object of deductions
+  effectiveDate   DateTime
+  endDate         DateTime?
+  isActive        Boolean          @default(true)
+  currency        String           @default("INR")
+  location        String?
+  department      String?
+  grade           String?
+  notes           String?
+  userId          String
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  // Relations
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  salaryHistory   SalaryHistory[]
+
+  @@map("salary_structures")
+}
+
+model SalaryHistory {
+  id              String           @id @default(cuid())
+  salaryStructureId String
+  jobTitle        String
+  company         String
+  baseSalary      Decimal          @db.Decimal(10, 2)
+  allowances      String?          // JSON object of allowances
+  deductions      String?          // JSON object of deductions
+  effectiveDate   DateTime
+  endDate         DateTime?
+  currency        String           @default("INR")
+  location        String?
+  department      String?
+  grade           String?
+  changeType      SalaryChangeType
+  changeReason    String?
+  userId          String
+  createdAt       DateTime         @default(now())
+
+  // Relations
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  salaryStructure SalaryStructure  @relation(fields: [salaryStructureId], references: [id], onDelete: Cascade)
+
+  @@map("salary_history")
+}
+
+model RecurringItem {
+  id              String           @id @default(cuid())
+  type            RecurringType
+  title           String
+  amount          Decimal          @db.Decimal(10, 2)
+  frequency       RecurringFrequency
+  startDate       DateTime
+  endDate         DateTime?
+  category        String?
+  description     String?
+  isActive        Boolean          @default(true)
+  lastProcessed   DateTime?
+  nextDueDate     DateTime
+  userId          String
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  // Relations
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("recurring_items")
+}
+
+model NewsPreference {
+  id        String   @id @default(cuid())
+  keywords  String   // JSON array of keywords
+  sources   String?  // JSON array of news sources
+  frequency String   @default("daily") // daily, weekly, real-time
+  userId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("news_preferences")
+}
+
+model NewsCache {
+  id          String   @id @default(cuid())
+  title       String
+  content     String   @db.Text
+  source      String
+  url         String
+  publishedAt DateTime
+  relevance   Float    @default(0) // 0-1 score of relevance to user
+  keywords    String   // JSON array of matched keywords
+  createdAt   DateTime @default(now())
+
+  @@map("news_cache")
+}
+
+model FinancialReport {
+  id          String   @id @default(cuid())
+  type        ReportType
+  period      String   // e.g., "2024-01", "2024-Q1"
+  data        String   @db.Text // JSON data of the report
+  insights    String?  @db.Text // AI-generated insights
+  userId      String
+  createdAt   DateTime @default(now())
+
+  // Relations
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("financial_reports")
+}
+
+// Enums
+enum CategoryType {
+  INCOME
+  EXPENSE
+}
+
+enum IncomeFrequency {
+  ONE_TIME
+  DAILY
+  WEEKLY
+  MONTHLY
+  YEARLY
+}
+
+enum ExpenseFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+  YEARLY
+}
+
+enum DeadlineFrequency {
+  ONE_TIME
+  MONTHLY
+  QUARTERLY
+  YEARLY
+}
+
+enum DeadlineStatus {
+  PENDING
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+enum GoalPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum ReportType {
+  DAILY
+  WEEKLY
+  MONTHLY
+  YEARLY
+}
+
+enum WishlistPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum SalaryChangeType {
+  PROMOTION
+  TRANSFER
+  COMPANY_CHANGE
+  LOCATION_CHANGE
+  DEPARTMENT_CHANGE
+  SALARY_REVISION
+  OTHER
+}
+
+enum RecurringType {
+  INCOME
+  EXPENSE
+  DEADLINE
+}
+
+enum RecurringFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+  YEARLY
 }

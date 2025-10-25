@@ -18,6 +18,14 @@ import {
 import { formatCurrency, calculatePercentage } from '@/lib/utils'
 import { DashboardStats, CashFlowData, ExpenseByCategory } from '@/types'
 
+/**
+ * The main dashboard component.
+ *
+ * This component displays an overview of the user's financial status,
+ * including key statistics, cash flow, expense breakdown, upcoming deadlines, and recent news.
+ *
+ * @returns {JSX.Element} The rendered dashboard component.
+ */
 export default function Dashboard() {
   const [stats, setStats] = useState<DashboardStats>({
     totalIncome: 75000,
@@ -59,6 +67,17 @@ export default function Dashboard() {
     { id: '3', title: 'New tax benefits for home loans announced', source: 'Financial Express', relevance: 0.7 },
   ])
 
+  /**
+ * A card component to display a single statistic.
+ *
+ * @param {object} props - The component props.
+ * @param {string} props.title - The title of the statistic.
+ * @param {string} props.value - The value of the statistic.
+ * @param {React.ElementType} props.icon - The icon component to display.
+ * @param {number} props.trend - The trend of the statistic (positive or negative).
+ * @param {string} props.color - The background color of the icon.
+ * @returns {JSX.Element} The rendered statistic card.
+ */
   const StatCard = ({ title, value, icon: Icon, trend, color }: any) => (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow">
       <div className="flex items-center justify-between">
@@ -81,6 +100,16 @@ export default function Dashboard() {
     </div>
   )
 
+  /**
+ * A button component for quick actions.
+ *
+ * @param {object} props - The component props.
+ * @param {string} props.title - The title of the action.
+ * @param {React.ElementType} props.icon - The icon component to display.
+ * @param {string} props.color - The background color of the icon.
+ * @param {() => void} props.onClick - The function to call when the button is clicked.
+ * @returns {JSX.Element} The rendered quick action button.
+ */
   const QuickAction = ({ title, icon: Icon, color, onClick }: any) => (
     <button
       onClick={onClick}

@@ -7,6 +7,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { formatCurrency, formatDate, calculatePercentage } from '@/lib/utils'
 import { Goal, CreateGoalForm } from '@/types'
 
+/**
+ * Renders the goals page, which allows users to set and track their financial goals.
+ *
+ * @returns {JSX.Element} The rendered goals page.
+ */
 export default function GoalsPage() {
   const [goals, setGoals] = useState<Goal[]>([])
   const [showForm, setShowForm] = useState(false)

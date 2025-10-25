@@ -1,6 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 
+/**
+ * @swagger
+ * /api/income:
+ *   get:
+ *     summary: Fetches income sources.
+ *     description: Retrieves a list of active income sources for a user.
+ *     parameters:
+ *       - in: query
+ *         name: userId
+ *         required: true
+ *         description: The ID of the user to fetch income sources for.
+ *         schema:
+ *           type: string
+ *     responses:
+ *       '200':
+ *         description: Successful response with a list of income sources.
+ *       '400':
+ *         description: Bad request, missing user ID.
+ *       '500':
+ *         description: Internal server error.
+ */
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
@@ -39,6 +60,43 @@ export async function GET(request: NextRequest) {
   }
 }
 
+/**
+ * @swagger
+ * /api/income:
+ *   post:
+ *     summary: Creates a new income source.
+ *     description: Adds a new income source record to the database.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *               amount:
+ *                 type: number
+ *               frequency:
+ *                 type: string
+ *               categoryId:
+ *                 type: string
+ *               startDate:
+ *                 type: string
+ *               endDate:
+ *                 type: string
+ *               notes:
+ *                 type: string
+ *               userId:
+ *                 type: string
+ *     responses:
+ *       '200':
+ *         description: Successful response with the created income source.
+ *       '400':
+ *         description: Bad request, missing required fields.
+ *       '500':
+ *         description: Internal server error.
+ */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()

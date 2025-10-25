@@ -9,31 +9,30 @@ Vishnu's Finance is a **personal finance web platform** that centralizes financi
 ## ✨ Key Features
 
 ### Core Financial Management
-- **Income Tracking**: Monitor salary, side hustles, passive income, and investments
-- **Expense Management**: Categorize and track all expenses with detailed analytics
-- **Cash Flow Analysis**: Visual dashboards showing income vs expenses trends
-- **Deadline Management**: Track bills, EMIs, subscriptions with smart reminders
+- **Income Tracking**: Monitor all sources of income, including salary, investments, and side hustles.
+- **Expense Management**: Categorize and track expenses to understand spending habits.
+- **Cash Flow Analysis**: Visualize income vs. expenses with interactive charts and reports.
+- **Deadline Management**: Keep track of upcoming bills, subscriptions, and other financial deadlines.
 
 ### Intelligent Insights
-- **News Integration**: Real-time financial news impacting personal finances
-- **AI-Driven Prioritization**: Smart suggestions for saving, investing, and spending
-- **Financial Health Reports**: Daily/weekly summaries with actionable insights
+- **News Integration**: Stay informed with a curated feed of financial news that may impact your finances.
+- **AI-Driven Prioritization**: Receive smart suggestions for saving, investing, and spending based on your financial data.
+- **Financial Health Reports**: Get daily, weekly, or monthly summaries of your financial health with actionable insights.
 
 ### Goal Setting & Tracking
-- **Bucket List Management**: Set personal financial goals with real-time cost tracking
-- **Progress Visualization**: Track savings progress towards goals
-- **Timeline Prioritization**: Align savings with deadlines and opportunities
+- **Bucket List Management**: Set and track personal financial goals, such as saving for a vacation or a new car.
+- **Progress Visualization**: Visualize your progress towards your goals with charts and graphs.
+- **Timeline Prioritization**: Align your savings with your deadlines and opportunities to make the most of your money.
 
 ## 🏗️ Architecture
 
-### Technology Stack
-- **Frontend**: Next.js 14 (React framework) with TypeScript
-- **Backend**: Node.js with Express.js API layer
-- **Database**: MySQL for data persistence
-- **External APIs**: News API, Google News RSS for financial news
-- **AI/NLP**: Local lightweight LLM or API-based summarizer
-- **Styling**: Tailwind CSS for modern, responsive UI
-- **Charts**: Chart.js or Recharts for data visualization
+### Technologies Used
+- **Frontend**: Next.js, React, TypeScript
+- **Backend**: Next.js API Routes
+- **Database**: MySQL with Prisma
+- **Styling**: Tailwind CSS
+- **Charting**: Chart.js
+- **Linting**: ESLint
 
 ### Project Structure
 ```
@@ -52,7 +51,7 @@ vishnu-finance/
 ## 🚀 Getting Started
 
 ### Prerequisites
-- Node.js 18+ 
+- Node.js 18+
 - MySQL 8.0+
 - npm or yarn
 
@@ -63,6 +62,7 @@ vishnu-finance/
    git clone <repository-url>
    cd vishnu-finance
    ```
+   **Note**: The frontend application is located in the `vishnu-finance` directory.
 
 2. **Install dependencies**
    ```bash
@@ -70,12 +70,14 @@ vishnu-finance/
    ```
 
 3. **Environment Setup**
+   Create a `.env.local` file by copying the `.env.example` file:
    ```bash
    cp .env.example .env.local
    ```
-   Update the `.env.local` file with your database credentials and API keys.
+   Update the `.env.local` file with your database credentials and any necessary API keys.
 
 4. **Database Setup**
+   Run the following commands to generate the Prisma client and push the database schema:
    ```bash
    npx prisma generate
    npx prisma db push
@@ -87,58 +89,29 @@ vishnu-finance/
    ```
 
 6. **Open your browser**
-   Navigate to [http://localhost:3000](http://localhost:3000)
+   Navigate to [http://localhost:3000](http://localhost:3000) to view the application.
 
 ## 📊 Database Schema
 
-### Core Tables
-- **users**: User profile and preferences
-- **income_sources**: Income tracking with categories
-- **expenses**: Expense tracking with categorization
-- **categories**: Expense and income categories
-- **deadlines**: Bills, EMIs, and financial obligations
-- **goals**: Personal financial goals and bucket list items
-- **news_cache**: Cached financial news and insights
-- **financial_reports**: Generated financial health reports
+The database schema is defined in the `prisma/schema.prisma` file. The core tables include:
+- `User`: Stores user information.
+- `Category`: Stores income and expense categories.
+- `IncomeSource`: Stores information about sources of income.
+- `Expense`: Stores expense records.
+- `Deadline`: Stores financial deadlines.
+- `Goal`: Stores financial goals.
+- `NewsPreference`: Stores user preferences for news.
+- `NewsCache`: Caches news articles.
+- `FinancialReport`: Stores generated financial reports.
 
 ## 🔧 Configuration
 
-### Environment Variables
-```env
-# Database
-DATABASE_URL="mysql://user:password@localhost:3306/vishnu_finance"
-
-# News API
-NEWS_API_KEY="your_news_api_key"
-GOOGLE_NEWS_RSS_URL="https://news.google.com/rss"
-
-# AI/LLM (Optional)
-OPENAI_API_KEY="your_openai_api_key"
-
-# Security
-JWT_SECRET="your_jwt_secret"
-NEXTAUTH_SECRET="your_nextauth_secret"
-```
-
-## 📈 Development Roadmap
-
-### Phase 1: MVP (Week 1-2)
-- [x] Project setup and basic architecture
-- [ ] Database schema and migrations
-- [ ] Basic CRUD operations for income/expenses
-- [ ] Simple dashboard with charts
-
-### Phase 2: Core Features (Week 3-4)
-- [ ] News integration and filtering
-- [ ] Deadline management with reminders
-- [ ] Enhanced analytics and reporting
-- [ ] Goal setting and tracking
-
-### Phase 3: Advanced Features (Week 5-6)
-- [ ] AI-powered insights and suggestions
-- [ ] Advanced financial health scoring
-- [ ] Predictive analytics
-- [ ] Mobile responsiveness
+The application is configured using environment variables. The following variables are required:
+- `DATABASE_URL`: The connection string for the MySQL database.
+- `NEWS_API_KEY`: Your API key for the News API.
+- `GOOGLE_NEWS_RSS_URL`: The URL for the Google News RSS feed.
+- `JWT_SECRET`: A secret key for signing JWTs.
+- `NEXTAUTH_SECRET`: A secret key for NextAuth.
 
 ## 🤝 Contributing
 

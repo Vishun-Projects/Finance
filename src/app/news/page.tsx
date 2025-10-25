@@ -3,6 +3,11 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Newspaper, TrendingUp, Globe } from 'lucide-react'
 
+/**
+ * Renders the news page, which is currently a "Coming Soon" placeholder.
+ *
+ * @returns {JSX.Element} The rendered news page.
+ */
 export default function NewsPage() {
   return (
     <div className="min-h-screen bg-gray-50">

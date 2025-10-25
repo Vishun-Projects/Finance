@@ -7,6 +7,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { Expense, CreateExpenseForm } from '@/types'
 
+/**
+ * Renders the expenses page, which allows users to track and manage their expenses.
+ *
+ * @returns {JSX.Element} The rendered expenses page.
+ */
 export default function ExpensesPage() {
   const [expenses, setExpenses] = useState<Expense[]>([])
   const [showForm, setShowForm] = useState(false)

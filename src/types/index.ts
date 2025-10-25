@@ -1,12 +1,24 @@
 // Database Types
+/**
+ * Represents a user in the database.
+ */
 export interface User {
+  /**
+   * The unique identifier for the user.
+   */
   id: string
+  /**
+   * The user's email address.
+   */
   email: string
   name?: string
   createdAt: Date
   updatedAt: Date
 }
 
+/**
+ * Represents a category for income or expenses.
+ */
 export interface Category {
   id: string
   name: string
@@ -19,6 +31,9 @@ export interface Category {
   updatedAt: Date
 }
 
+/**
+ * Represents a source of income.
+ */
 export interface IncomeSource {
   id: string
   name: string
@@ -35,6 +50,9 @@ export interface IncomeSource {
   category?: Category
 }
 
+/**
+ * Represents an expense.
+ */
 export interface Expense {
   id: string
   amount: number
@@ -51,6 +69,9 @@ export interface Expense {
   category?: Category
 }
 
+/**
+ * Represents a financial deadline.
+ */
 export interface Deadline {
   id: string
   title: string
@@ -67,6 +88,9 @@ export interface Deadline {
   updatedAt: Date
 }
 
+/**
+ * Represents a financial goal.
+ */
 export interface Goal {
   id: string
   title: string
@@ -83,6 +107,9 @@ export interface Goal {
   updatedAt: Date
 }
 
+/**
+ * Represents a user's news preferences.
+ */
 export interface NewsPreference {
   id: string
   keywords: string
@@ -93,6 +120,9 @@ export interface NewsPreference {
   updatedAt: Date
 }
 
+/**
+ * Represents a cached news item.
+ */
 export interface NewsCache {
   id: string
   title: string
@@ -105,6 +135,9 @@ export interface NewsCache {
   createdAt: Date
 }
 
+/**
+ * Represents a financial report.
+ */
 export interface FinancialReport {
   id: string
   type: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'YEARLY'
@@ -116,6 +149,9 @@ export interface FinancialReport {
 }
 
 // API Response Types
+/**
+ * Represents a standard API response.
+ */
 export interface ApiResponse<T = any> {
   success: boolean
   data?: T
@@ -123,6 +159,9 @@ export interface ApiResponse<T = any> {
   message?: string
 }
 
+/**
+ * Represents a paginated API response.
+ */
 export interface PaginatedResponse<T> {
   data: T[]
   total: number
@@ -132,6 +171,9 @@ export interface PaginatedResponse<T> {
 }
 
 // Form Types
+/**
+ * Represents the form for creating an income source.
+ */
 export interface CreateIncomeSourceForm {
   name: string
   amount: number
@@ -142,6 +184,9 @@ export interface CreateIncomeSourceForm {
   notes?: string
 }
 
+/**
+ * Represents the form for creating an expense.
+ */
 export interface CreateExpenseForm {
   amount: number
   description?: string
@@ -152,6 +197,9 @@ export interface CreateExpenseForm {
   notes?: string
 }
 
+/**
+ * Represents the form for creating a deadline.
+ */
 export interface CreateDeadlineForm {
   title: string
   amount: number
@@ -163,6 +211,9 @@ export interface CreateDeadlineForm {
   notes?: string
 }
 
+/**
+ * Represents the form for creating a goal.
+ */
 export interface CreateGoalForm {
   title: string
   targetAmount: number
@@ -173,6 +224,9 @@ export interface CreateGoalForm {
 }
 
 // Dashboard Types
+/**
+ * Represents the statistics displayed on the dashboard.
+ */
 export interface DashboardStats {
   totalIncome: number
   totalExpenses: number
@@ -183,6 +237,9 @@ export interface DashboardStats {
   financialHealthScore: number
 }
 
+/**
+ * Represents the data for the cash flow chart.
+ */
 export interface CashFlowData {
   month: string
   income: number
@@ -190,6 +247,9 @@ export interface CashFlowData {
   netFlow: number
 }
 
+/**
+ * Represents the data for the expense by category chart.
+ */
 export interface ExpenseByCategory {
   category: string
   amount: number
@@ -197,6 +257,9 @@ export interface ExpenseByCategory {
   color: string
 }
 
+/**
+ * Represents the data for the income by category chart.
+ */
 export interface IncomeByCategory {
   category: string
   amount: number
@@ -205,6 +268,9 @@ export interface IncomeByCategory {
 }
 
 // Chart Types
+/**
+ * Represents the data for a chart.
+ */
 export interface ChartData {
   labels: string[]
   datasets: {
@@ -217,6 +283,9 @@ export interface ChartData {
 }
 
 // News Types
+/**
+ * Represents a news item.
+ */
 export interface NewsItem {
   id: string
   title: string
@@ -229,6 +298,9 @@ export interface NewsItem {
 }
 
 // Financial Health Types
+/**
+ * Represents the metrics for financial health.
+ */
 export interface FinancialHealthMetrics {
   savingsRate: number
   debtToIncomeRatio: number
@@ -238,6 +310,9 @@ export interface FinancialHealthMetrics {
 }
 
 // Notification Types
+/**
+ * Represents a notification.
+ */
 export interface Notification {
   id: string
   type: 'info' | 'warning' | 'error' | 'success'
@@ -248,11 +323,17 @@ export interface Notification {
 }
 
 // Filter Types
+/**
+ * Represents a date range for filtering.
+ */
 export interface DateRange {
   startDate: Date
   endDate: Date
 }
 
+/**
+ * Represents the filters for transactions.
+ */
 export interface TransactionFilters {
   dateRange?: DateRange
   categoryId?: string
@@ -262,6 +343,9 @@ export interface TransactionFilters {
 }
 
 // Export Types
+/**
+ * Represents the options for exporting data.
+ */
 export interface ExportOptions {
   format: 'csv' | 'pdf' | 'excel'
   dateRange?: DateRange

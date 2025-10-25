@@ -28,6 +28,15 @@ const navigation = [
   { name: 'Settings', href: '/settings', icon: Settings },
 ]
 
+/**
+ * Renders the navigation sidebar for the application.
+ *
+ * This component displays a responsive navigation menu that adapts to both desktop and mobile viewports.
+ * It includes a desktop sidebar that is always visible and a mobile sidebar that can be toggled.
+ * The navigation links are dynamically generated from the `navigation` array.
+ *
+ * @returns {JSX.Element} The rendered navigation component.
+ */
 export default function Navigation() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const pathname = usePathname()

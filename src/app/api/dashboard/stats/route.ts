@@ -1,6 +1,42 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 
+/**
+ * @swagger
+ * /api/dashboard/stats:
+ *   get:
+ *     summary: Fetches dashboard statistics.
+ *     description: Retrieves key financial statistics for a user's dashboard based on a specified period.
+ *     parameters:
+ *       - in: query
+ *         name: userId
+ *         required: true
+ *         description: The ID of the user to fetch stats for.
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: period
+ *         required: false
+ *         description: The period to calculate stats for (e.g., 'current_month', 'last_month', 'current_year').
+ *         schema:
+ *           type: string
+ *     responses:
+ *       '200':
+ *         description: Successful response with dashboard stats.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *       '400':
+ *         description: Bad request, missing user ID.
+ *       '500':
+ *         description: Internal server error.
+ */
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
@@ -131,6 +167,14 @@ export async function GET(request: NextRequest) {
   }
 }
 
+/**
+ * Calculates a multiplier based on the frequency of an income source.
+ *
+ * @param {string} frequency - The frequency of the income source.
+ * @param {Date} startDate - The start date of the period.
+ * @param {Date} endDate - The end date of the period.
+ * @returns {number} The multiplier to use for the income source.
+ */
 function getFrequencyMultiplier(frequency: string, startDate: Date, endDate: Date): number {
   const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
   
@@ -150,6 +194,15 @@ function getFrequencyMultiplier(frequency: string, startDate: Date, endDate: Dat
   }
 }
 
+/**
+ * Calculates the financial health score.
+ *
+ * @param {number} income - The total income.
+ * @param {number} expenses - The total expenses.
+ * @param {number} savingsRate - The savings rate.
+ * @param {number} upcomingDeadlines - The number of upcoming deadlines.
+ * @returns {number} The financial health score.
+ */
 function calculateFinancialHealthScore(
   income: number,
   expenses: number,

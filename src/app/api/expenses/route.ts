@@ -1,6 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 
+/**
+ * @swagger
+ * /api/expenses:
+ *   get:
+ *     summary: Fetches expenses.
+ *     description: Retrieves a list of expenses for a user within a specified date range.
+ *     parameters:
+ *       - in: query
+ *         name: userId
+ *         required: true
+ *         description: The ID of the user to fetch expenses for.
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: startDate
+ *         required: false
+ *         description: The start date of the period to fetch expenses for.
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: endDate
+ *         required: false
+ *         description: The end date of the period to fetch expenses for.
+ *         schema:
+ *           type: string
+ *     responses:
+ *       '200':
+ *         description: Successful response with a list of expenses.
+ *       '400':
+ *         description: Bad request, missing user ID.
+ *       '500':
+ *         description: Internal server error.
+ */
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
@@ -49,6 +82,43 @@ export async function GET(request: NextRequest) {
   }
 }
 
+/**
+ * @swagger
+ * /api/expenses:
+ *   post:
+ *     summary: Creates a new expense.
+ *     description: Adds a new expense record to the database.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               amount:
+ *                 type: number
+ *               description:
+ *                 type: string
+ *               date:
+ *                 type: string
+ *               categoryId:
+ *                 type: string
+ *               isRecurring:
+ *                 type: boolean
+ *               frequency:
+ *                 type: string
+ *               notes:
+ *                 type: string
+ *               userId:
+ *                 type: string
+ *     responses:
+ *       '200':
+ *         description: Successful response with the created expense.
+ *       '400':
+ *         description: Bad request, missing required fields.
+ *       '500':
+ *         description: Internal server error.
+ */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()

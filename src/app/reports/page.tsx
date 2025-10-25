@@ -3,6 +3,11 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { BarChart3, TrendingUp, PieChart } from 'lucide-react'
 
+/**
+ * Renders the reports page, which is currently a "Coming Soon" placeholder.
+ *
+ * @returns {JSX.Element} The rendered reports page.
+ */
 export default function ReportsPage() {
   return (
     <div className="min-h-screen bg-gray-50">

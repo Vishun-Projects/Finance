@@ -3,6 +3,11 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Calendar, Clock, AlertTriangle } from 'lucide-react'
 
+/**
+ * Renders the deadlines page, which is currently a "Coming Soon" placeholder.
+ *
+ * @returns {JSX.Element} The rendered deadlines page.
+ */
 export default function DeadlinesPage() {
   return (
     <div className="min-h-screen bg-gray-50">

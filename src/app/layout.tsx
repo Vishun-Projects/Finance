@@ -20,6 +20,16 @@ export const metadata: Metadata = {
   },
 }
 
+/**
+ * The root layout for the application.
+ *
+ * This component wraps the entire application with a common structure,
+ * including the navigation sidebar and the main content area.
+ *
+ * @param {object} props - The component props.
+ * @param {React.ReactNode} props.children - The child components to render within the layout.
+ * @returns {JSX.Element} The rendered root layout.
+ */
 export default function RootLayout({
   children,
 }: {

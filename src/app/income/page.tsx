@@ -7,6 +7,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { IncomeSource, CreateIncomeSourceForm } from '@/types'
 
+/**
+ * Renders the income page, which allows users to manage their income sources.
+ *
+ * @returns {JSX.Element} The rendered income page.
+ */
 export default function IncomePage() {
   const [incomeSources, setIncomeSources] = useState<IncomeSource[]>([])
   const [showForm, setShowForm] = useState(false)

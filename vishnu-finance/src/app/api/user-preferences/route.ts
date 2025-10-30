@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { userId, navigationLayout, theme, colorScheme } = body;
+    const { userId, navigationLayout, theme, colorScheme, currency, language, timezone, dateFormat } = body;
 
     if (!userId) {
       return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
@@ -49,13 +49,21 @@ export async function POST(request: NextRequest) {
         navigationLayout,
         theme,
         colorScheme,
+        currency,
+        language,
+        timezone,
+        dateFormat,
         updatedAt: new Date()
       },
       create: {
         userId,
         navigationLayout: navigationLayout || 'sidebar',
         theme: theme || 'light',
-        colorScheme: colorScheme || 'default'
+        colorScheme: colorScheme || 'default',
+        currency: currency || 'INR',
+        language: language || 'en',
+        timezone: timezone || 'Asia/Kolkata',
+        dateFormat: dateFormat || 'DD/MM/YYYY'
       }
     });
 

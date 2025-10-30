@@ -4,16 +4,16 @@ const nextConfig: NextConfig = {
   // Performance optimizations
   experimental: {
     // Enable modern React features
-    optimizePackageImports: ['lucide-react'],
-    // Faster builds
-    turbo: {
-      rules: {
-        '*.svg': {
-          loaders: ['@svgr/webpack'],
-          as: '*.js',
-        },
-      },
-    },
+    optimizePackageImports: ['lucide-react', '@tanstack/react-query'],
+    // Faster builds (moved to turbopack)
+    // turbo: {
+    //   rules: {
+    //     '*.svg': {
+    //       loaders: ['@svgr/webpack'],
+    //       as: '*.js',
+    //     },
+    //   },
+    // },
   },
   
   // Image optimization
@@ -50,11 +50,11 @@ const nextConfig: NextConfig = {
     return config;
   },
   
-  // Enable SWC minification for faster builds
-  swcMinify: true,
+  // Enable SWC minification for faster builds (default in Next.js 15)
+  // swcMinify: true,
   
-  // Optimize CSS
-  optimizeFonts: true,
+  // Optimize CSS (default in Next.js 15)
+  // optimizeFonts: true,
   
   // Enable compression
   compress: true,
@@ -64,6 +64,16 @@ const nextConfig: NextConfig = {
   
   // Faster development
   reactStrictMode: false, // Disable in dev for faster reloads
+  
+  // Turbopack configuration (Next.js 15)
+  turbopack: {
+    rules: {
+      '*.svg': {
+        loaders: ['@svgr/webpack'],
+        as: '*.js',
+      },
+    },
+  },
 };
 
 export default nextConfig;

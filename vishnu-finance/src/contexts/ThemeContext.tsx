@@ -22,18 +22,32 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   // Apply theme changes
   useEffect(() => {
+    console.log('Applying theme:', theme); // Debug log
+    console.log('Document classes before:', document.documentElement.className);
+    
     if (theme === 'high-contrast') {
       document.documentElement.classList.add('high-contrast');
       document.documentElement.classList.remove('dark');
+      document.body.style.backgroundColor = '#000000';
+      document.body.style.color = '#FFFFFF';
       setIsDark(false);
+      console.log('Applied high-contrast theme');
     } else if (theme === 'dark') {
       document.documentElement.classList.add('dark');
       document.documentElement.classList.remove('high-contrast');
+      document.body.style.backgroundColor = '';
+      document.body.style.color = '';
       setIsDark(true);
+      console.log('Applied dark theme');
     } else {
       document.documentElement.classList.remove('dark', 'high-contrast');
+      document.body.style.backgroundColor = '';
+      document.body.style.color = '';
       setIsDark(false);
+      console.log('Applied light theme');
     }
+    
+    console.log('Document classes after:', document.documentElement.className);
   }, [theme]);
 
   // Load theme from API on mount

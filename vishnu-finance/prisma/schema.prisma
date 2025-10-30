@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -11,269 +8,262 @@ datasource db {
 }
 
 model UserPreferences {
-  id        String   @id @default(cuid())
-  userId    String   @unique
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  // Navigation preferences
-  navigationLayout String @default("sidebar") // "sidebar" or "top"
-  
-  // Theme preferences
-  theme String @default("light") // "light", "dark", or "auto"
-  
-  // Other UI preferences
-  colorScheme String @default("default") // "default", "high-contrast", etc.
-  
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  navigationLayout String   @default("sidebar")
+  theme            String   @default("light")
+  colorScheme      String   @default("default")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  currency         String   @default("INR")
+  dateFormat       String   @default("DD/MM/YYYY")
+  language         String   @default("en")
+  timezone         String   @default("Asia/Kolkata")
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("user_preferences")
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  password  String
-  isActive  Boolean  @default(true)
-  lastLogin DateTime?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  
-  // Relations
-  expenses         Expense[]
-  incomeSources    IncomeSource[]
-  goals            Goal[]
-  deadlines        Deadline[]
-  wishlistItems    WishlistItem[]
-  salaryStructures SalaryStructure[]
-  salaryHistories  SalaryHistory[]
+  id               String            @id @default(cuid())
+  email            String            @unique
+  password         String
+  name             String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  isActive         Boolean           @default(true)
+  lastLogin        DateTime?
   categories       Category[]
-  newsPreferences  NewsPreference[]
+  courseProgress   CourseProgress[]
+  deadlines        Deadline[]
+  expenses         Expense[]
   financialReports FinancialReport[]
+  goals            Goal[]
+  incomeSources    IncomeSource[]
+  moduleProgress   ModuleProgress[]
+  newsPreferences  NewsPreference[]
   recurringItems   RecurringItem[]
+  refreshTokens    RefreshToken[]
+  salaryHistories  SalaryHistory[]
+  salaryStructures SalaryStructure[]
   preferences      UserPreferences?
+  wishlistItems    WishlistItem[]
 
   @@map("users")
 }
 
 model Category {
-  id          String   @id @default(cuid())
-  name        String
-  type        CategoryType
-  color       String?  @default("#3B82F6")
-  icon        String?
-  isDefault   Boolean  @default(false)
-  userId      String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  // Relations
-  user        User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id            String         @id @default(cuid())
+  name          String
+  type          CategoryType
+  color         String?        @default("#3B82F6")
+  icon          String?
+  isDefault     Boolean        @default(false)
+  userId        String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  user          User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expenses      Expense[]
   incomeSources IncomeSource[]
-  expenses    Expense[]
 
+  @@index([userId], map: "categories_userId_fkey")
   @@map("categories")
 }
 
 model IncomeSource {
-  id          String        @id @default(cuid())
-  name        String
-  amount      Decimal       @db.Decimal(10, 2)
-  frequency   IncomeFrequency
-  categoryId  String?
-  startDate   DateTime
-  endDate     DateTime?
-  notes       String?
-  isActive    Boolean       @default(true)
-  userId      String
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  id         String          @id @default(cuid())
+  name       String
+  amount     Decimal         @db.Decimal(10, 2)
+  frequency  IncomeFrequency
+  categoryId String?
+  startDate  DateTime
+  endDate    DateTime?
+  notes      String?
+  isActive   Boolean         @default(true)
+  userId     String
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+  store      String?
+  category   Category?       @relation(fields: [categoryId], references: [id])
+  user       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // Relations
-  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  category    Category?     @relation(fields: [categoryId], references: [id])
-
+  @@index([categoryId], map: "income_sources_categoryId_fkey")
+  @@index([userId], map: "income_sources_userId_fkey")
   @@map("income_sources")
 }
 
 model Expense {
-  id          String        @id @default(cuid())
-  amount      Decimal       @db.Decimal(10, 2)
+  id          String            @id @default(cuid())
+  amount      Decimal           @db.Decimal(10, 2)
   description String?
   date        DateTime
   categoryId  String?
-  isRecurring Boolean       @default(false)
+  isRecurring Boolean           @default(false)
   frequency   ExpenseFrequency?
   notes       String?
   receiptUrl  String?
   userId      String
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  store       String?
+  category    Category?         @relation(fields: [categoryId], references: [id])
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // Relations
-  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  category    Category?     @relation(fields: [categoryId], references: [id])
-
+  @@index([categoryId], map: "expenses_categoryId_fkey")
+  @@index([userId], map: "expenses_userId_fkey")
   @@map("expenses")
 }
 
 model Deadline {
-  id            String           @id @default(cuid())
-  title         String
-  description   String?
-  amount        Decimal?         @db.Decimal(10, 2)
-  dueDate       DateTime
-  isRecurring   Boolean          @default(false)
-  frequency     DeadlineFrequency?
-  status        DeadlineStatus   @default(PENDING)
-  isCompleted   Boolean          @default(false)
-  completedDate DateTime?
-  category      String?
-  paymentMethod String?
+  id             String             @id @default(cuid())
+  title          String
+  amount         Decimal?           @db.Decimal(10, 2)
+  dueDate        DateTime
+  isRecurring    Boolean            @default(false)
+  frequency      DeadlineFrequency?
+  status         DeadlineStatus     @default(PENDING)
+  paymentMethod  String?
   accountDetails String?
-  notes         String?
-  userId        String
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
+  notes          String?
+  userId         String
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  category       String?
+  completedDate  DateTime?
+  description    String?
+  isCompleted    Boolean            @default(false)
+  user           User               @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // Relations
-  user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-
+  @@index([userId], map: "deadlines_userId_fkey")
   @@map("deadlines")
 }
 
 model Goal {
-  id              String        @id @default(cuid())
-  title           String
-  targetAmount    Decimal       @db.Decimal(10, 2)
-  currentAmount   Decimal       @db.Decimal(10, 2) @default(0)
-  targetDate      DateTime?
-  priority        GoalPriority  @default(MEDIUM)
-  category        String?
-  description     String?
-  imageUrl        String?
-  isActive        Boolean       @default(true)
-  userId          String
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  id            String       @id @default(cuid())
+  title         String
+  targetAmount  Decimal      @db.Decimal(10, 2)
+  currentAmount Decimal      @default(0.00) @db.Decimal(10, 2)
+  targetDate    DateTime?
+  priority      GoalPriority @default(MEDIUM)
+  category      String?
+  description   String?
+  imageUrl      String?
+  isActive      Boolean      @default(true)
+  userId        String
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // Relations
-  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-
+  @@index([userId], map: "goals_userId_fkey")
   @@map("goals")
 }
 
 model WishlistItem {
-  id              String           @id @default(cuid())
-  title           String
-  description     String?
-  estimatedCost   Decimal          @db.Decimal(10, 2)
-  priority        WishlistPriority @default(MEDIUM)
-  category        String?
-  targetDate      DateTime?
-  isCompleted     Boolean          @default(false)
-  completedDate   DateTime?
-  imageUrl        String?
-  notes           String?
-  tags            String?          // JSON array of tags
-  userId          String
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  id            String           @id @default(cuid())
+  title         String
+  description   String?
+  estimatedCost Decimal          @db.Decimal(10, 2)
+  priority      WishlistPriority @default(MEDIUM)
+  category      String?
+  targetDate    DateTime?
+  isCompleted   Boolean          @default(false)
+  completedDate DateTime?
+  imageUrl      String?
+  notes         String?
+  tags          String?
+  userId        String
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // Relations
-  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-
+  @@index([userId], map: "wishlist_items_userId_fkey")
   @@map("wishlist_items")
 }
 
 model SalaryStructure {
-  id              String           @id @default(cuid())
-  jobTitle        String
-  company         String
-  baseSalary      Decimal          @db.Decimal(10, 2)
-  allowances      String?          // JSON object of allowances
-  deductions      String?          // JSON object of deductions
-  effectiveDate   DateTime
-  endDate         DateTime?
-  isActive        Boolean          @default(true)
-  currency        String           @default("INR")
-  location        String?
-  department      String?
-  grade           String?
-  notes           String?
-  userId          String
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  id            String          @id @default(cuid())
+  jobTitle      String
+  company       String
+  baseSalary    Decimal         @db.Decimal(10, 2)
+  allowances    String?
+  deductions    String?
+  effectiveDate DateTime
+  endDate       DateTime?
+  isActive      Boolean         @default(true)
+  currency      String          @default("INR")
+  location      String?
+  department    String?
+  grade         String?
+  notes         String?
+  userId        String
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  salaryHistory SalaryHistory[]
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // Relations
-  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  salaryHistory   SalaryHistory[]
-
+  @@index([userId], map: "salary_structures_userId_fkey")
   @@map("salary_structures")
 }
 
 model SalaryHistory {
-  id              String           @id @default(cuid())
+  id                String           @id @default(cuid())
   salaryStructureId String
-  jobTitle        String
-  company         String
-  baseSalary      Decimal          @db.Decimal(10, 2)
-  allowances      String?          // JSON object of allowances
-  deductions      String?          // JSON object of deductions
-  effectiveDate   DateTime
-  endDate         DateTime?
-  currency        String           @default("INR")
-  location        String?
-  department      String?
-  grade           String?
-  changeType      SalaryChangeType
-  changeReason    String?
-  userId          String
-  createdAt       DateTime         @default(now())
+  jobTitle          String
+  company           String
+  baseSalary        Decimal          @db.Decimal(10, 2)
+  allowances        String?
+  deductions        String?
+  effectiveDate     DateTime
+  endDate           DateTime?
+  currency          String           @default("INR")
+  location          String?
+  department        String?
+  grade             String?
+  changeType        SalaryChangeType
+  changeReason      String?
+  userId            String
+  createdAt         DateTime         @default(now())
+  salaryStructure   SalaryStructure  @relation(fields: [salaryStructureId], references: [id], onDelete: Cascade)
+  user              User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // Relations
-  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  salaryStructure SalaryStructure  @relation(fields: [salaryStructureId], references: [id], onDelete: Cascade)
-
+  @@index([salaryStructureId], map: "salary_history_salaryStructureId_fkey")
+  @@index([userId], map: "salary_history_userId_fkey")
   @@map("salary_history")
 }
 
 model RecurringItem {
-  id              String           @id @default(cuid())
-  type            RecurringType
-  title           String
-  amount          Decimal          @db.Decimal(10, 2)
-  frequency       RecurringFrequency
-  startDate       DateTime
-  endDate         DateTime?
-  category        String?
-  description     String?
-  isActive        Boolean          @default(true)
-  lastProcessed   DateTime?
-  nextDueDate     DateTime
-  userId          String
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  id            String             @id @default(cuid())
+  type          RecurringType
+  title         String
+  amount        Decimal            @db.Decimal(10, 2)
+  frequency     RecurringFrequency
+  startDate     DateTime
+  endDate       DateTime?
+  category      String?
+  description   String?
+  isActive      Boolean            @default(true)
+  lastProcessed DateTime?
+  nextDueDate   DateTime
+  userId        String
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  user          User               @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // Relations
-  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-
+  @@index([userId], map: "recurring_items_userId_fkey")
   @@map("recurring_items")
 }
 
 model NewsPreference {
   id        String   @id @default(cuid())
-  keywords  String   // JSON array of keywords
-  sources   String?  // JSON array of news sources
-  frequency String   @default("daily") // daily, weekly, real-time
+  keywords  String
+  sources   String?
+  frequency String   @default("daily")
   userId    String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  // Relations
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId], map: "news_preferences_userId_fkey")
   @@map("news_preferences")
 }
 
@@ -284,29 +274,112 @@ model NewsCache {
   source      String
   url         String
   publishedAt DateTime
-  relevance   Float    @default(0) // 0-1 score of relevance to user
-  keywords    String   // JSON array of matched keywords
+  relevance   Float    @default(0)
+  keywords    String
   createdAt   DateTime @default(now())
 
   @@map("news_cache")
 }
 
 model FinancialReport {
-  id          String   @id @default(cuid())
-  type        ReportType
-  period      String   // e.g., "2024-01", "2024-Q1"
-  data        String   @db.Text // JSON data of the report
-  insights    String?  @db.Text // AI-generated insights
-  userId      String
-  createdAt   DateTime @default(now())
+  id        String     @id @default(cuid())
+  type      ReportType
+  period    String
+  data      String     @db.Text
+  insights  String?    @db.Text
+  userId    String
+  createdAt DateTime   @default(now())
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // Relations
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
+  @@index([userId], map: "financial_reports_userId_fkey")
   @@map("financial_reports")
 }
 
-// Enums
+model RefreshToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], map: "refresh_tokens_userId_fkey")
+  @@map("refresh_tokens")
+}
+
+model Course {
+  id          String           @id @default(cuid())
+  title       String
+  description String?
+  category    String
+  level       String
+  duration    Int
+  lessons     Int
+  rating      Float            @default(0)
+  isActive    Boolean          @default(true)
+  imageUrl    String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  progress    CourseProgress[]
+  modules     Module[]
+
+  @@map("courses")
+}
+
+model Module {
+  id          String           @id @default(cuid())
+  courseId    String
+  title       String
+  description String?
+  content     String
+  duration    Int
+  order       Int
+  isActive    Boolean          @default(true)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  progress    ModuleProgress[]
+  course      Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@index([courseId], map: "modules_courseId_fkey")
+  @@map("modules")
+}
+
+model CourseProgress {
+  id          String    @id @default(cuid())
+  userId      String
+  courseId    String
+  progress    Float     @default(0)
+  isCompleted Boolean   @default(false)
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  course      Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, courseId])
+  @@index([courseId], map: "course_progress_courseId_fkey")
+  @@map("course_progress")
+}
+
+model ModuleProgress {
+  id          String    @id @default(cuid())
+  userId      String
+  moduleId    String
+  progress    Float     @default(0)
+  isCompleted Boolean   @default(false)
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  module      Module    @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, moduleId])
+  @@index([moduleId], map: "module_progress_moduleId_fkey")
+  @@map("module_progress")
+}
+
 enum CategoryType {
   INCOME
   EXPENSE

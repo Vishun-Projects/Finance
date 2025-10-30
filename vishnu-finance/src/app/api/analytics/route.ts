@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { withCache, QueryOptimizer, PerformanceMonitor, CACHE_TTL } from '@/lib/api-cache';
 
-export async function GET(request: NextRequest) {
+export const GET = withCache({ ttl: CACHE_TTL.ANALYTICS })(async function (request: NextRequest) {
+  const timer = PerformanceMonitor.startTimer('analytics_api');
+
   try {
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
@@ -11,104 +14,106 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
     }
 
-    // If type is 'reports', return detailed analytics data
-    if (type === 'reports') {
-      const reportsData = {
-        monthlyTrends: {
-          monthlyIncome: [
-            { month: '2024-01', amount: 0 },
-            { month: '2024-02', amount: 0 },
-            { month: '2024-03', amount: 0 },
-            { month: '2024-04', amount: 0 },
-            { month: '2024-05', amount: 0 },
-            { month: '2024-06', amount: 0 }
-          ],
-          monthlyExpenses: [
-            { month: '2024-01', amount: 0 },
-            { month: '2024-02', amount: 0 },
-            { month: '2024-03', amount: 0 },
-            { month: '2024-04', amount: 0 },
-            { month: '2024-05', amount: 0 },
-            { month: '2024-06', amount: 0 }
-          ],
-          monthlySavings: [
-            { month: '2024-01', amount: 0 },
-            { month: '2024-02', amount: 0 },
-            { month: '2024-03', amount: 0 },
-            { month: '2024-04', amount: 0 },
-            { month: '2024-05', amount: 0 },
-            { month: '2024-06', amount: 0 }
-          ]
-        },
-        categoryBreakdown: [
-          { category: 'Food & Dining', amount: 0, percentage: 0 },
-          { category: 'Transportation', amount: 0, percentage: 0 },
-          { category: 'Entertainment', amount: 0, percentage: 0 },
-          { category: 'Shopping', amount: 0, percentage: 0 },
-          { category: 'Bills & Utilities', amount: 0, percentage: 0 }
-        ],
-        goalProgress: [
-          { goal: 'Emergency Fund', current: 0, target: 100000, percentage: 0 },
-          { goal: 'Vacation Fund', current: 0, target: 50000, percentage: 0 },
-          { goal: 'Investment Portfolio', current: 0, target: 200000, percentage: 0 }
-        ],
-        wishlistAnalysis: {
-          totalItems: 0,
-          completedItems: 0,
-          totalCost: 0,
-          priorityBreakdown: {
-            'LOW': 0,
-            'MEDIUM': 0,
-            'HIGH': 0,
-            'CRITICAL': 0
-          }
-        },
-        dashboardMetrics: {
-          totalIncome: 0,
-          totalExpenses: 0,
-          netSavings: 0,
-          savingsRate: 0,
-          upcomingDeadlines: 0,
-          activeGoals: 0,
-          wishlistItems: 0,
-          monthlyTrend: 'stable' as 'increasing' | 'decreasing' | 'stable'
-        },
-        impactAnalysis: {
-          totalMonthlyIncome: 0,
-          totalMonthlyExpenses: 0,
-          availableForGoals: 0,
-          totalGoalTargets: 0,
-          totalWishlistCost: 0,
-          goalFundingRatio: 0,
-          wishlistFundingRatio: 0,
-          recommendations: []
-        }
-      };
-      return NextResponse.json(reportsData);
-    }
+    // Use optimized dashboard data fetching
+    const dashboardData = await QueryOptimizer.optimizedDashboardData(userId);
+    
+    // Calculate analytics from the fetched data
+    const totalIncome = dashboardData.income.reduce((sum: number, item: any) => sum + parseFloat(item.amount), 0);
+    const totalExpenses = dashboardData.expenses.reduce((sum: number, item: any) => sum + parseFloat(item.amount), 0);
+    const netSavings = totalIncome - totalExpenses;
+    const savingsRate = totalIncome > 0 ? (netSavings / totalIncome) * 100 : 0;
 
-    // Default: Return data structure that matches dashboard expectations
-    const dashboardData = {
-      totalIncome: 0,
-      totalExpenses: 0,
-      netSavings: 0,
-      savingsRate: 0,
-      upcomingDeadlines: 0,
-      activeGoals: 0,
-      recentTransactions: [],
-      monthlyTrends: [
-        { month: 'Jan', income: 0, expenses: 0, savings: 0 },
-        { month: 'Feb', income: 0, expenses: 0, savings: 0 },
-        { month: 'Mar', income: 0, expenses: 0, savings: 0 },
-        { month: 'Apr', income: 0, expenses: 0, savings: 0 },
-        { month: 'May', income: 0, expenses: 0, savings: 0 },
-        { month: 'Jun', income: 0, expenses: 0, savings: 0 }
-      ]
+    // Process monthly trends
+    const monthlyTrends = processMonthlyTrends(dashboardData.income, dashboardData.expenses, parseInt(period));
+    
+    // Process category breakdown
+    const categoryBreakdown = processCategoryBreakdown(dashboardData.expenses);
+
+    const analyticsData = {
+      totalIncome,
+      totalExpenses,
+      netSavings,
+      savingsRate,
+      monthlyTrends,
+      categoryBreakdown,
+      activeGoals: dashboardData.goals.length,
+      upcomingDeadlines: dashboardData.deadlines.length,
+      recentTransactions: [
+        ...dashboardData.income.slice(0, 3).map((item: any) => ({
+          id: item.id,
+          type: 'income',
+          amount: parseFloat(item.amount),
+          description: item.name,
+          date: item.startDate
+        })),
+        ...dashboardData.expenses.slice(0, 3).map((item: any) => ({
+          id: item.id,
+          type: 'expense',
+          amount: parseFloat(item.amount),
+          description: item.description,
+          date: item.date
+        }))
+      ].sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
     };
 
-    return NextResponse.json(dashboardData);
+    timer();
+    return NextResponse.json(analyticsData);
   } catch (error) {
-    console.error('Error fetching analytics:', error);
+    timer();
+    console.error('Analytics API error:', error);
     return NextResponse.json({ error: 'Failed to fetch analytics' }, { status: 500 });
   }
+});
+
+// Helper functions for data processing
+function processMonthlyTrends(income: any[], expenses: any[], months: number) {
+  const trends: any[] = [];
+  const currentDate = new Date();
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  
+  for (let i = months - 1; i >= 0; i--) {
+    const date = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1);
+    const monthKey = `${date.getFullYear()}-${date.getMonth()}`;
+    
+    const monthIncome = income
+      .filter(item => {
+        const itemDate = new Date(item.startDate);
+        return `${itemDate.getFullYear()}-${itemDate.getMonth()}` === monthKey;
+      })
+      .reduce((sum, item) => sum + parseFloat(item.amount), 0);
+    
+    const monthExpenses = expenses
+      .filter(item => {
+        const itemDate = new Date(item.date);
+        return `${itemDate.getFullYear()}-${itemDate.getMonth()}` === monthKey;
+      })
+      .reduce((sum, item) => sum + parseFloat(item.amount), 0);
+    
+    trends.push({
+      month: monthNames[date.getMonth()],
+      income: monthIncome,
+      expenses: monthExpenses,
+      savings: monthIncome - monthExpenses
+    });
+  }
+  
+  return trends;
+}
+
+function processCategoryBreakdown(expenses: any[]) {
+  const categoryMap = new Map<string, number>();
+  
+  expenses.forEach(expense => {
+    const category = expense.description || 'Other';
+    const amount = parseFloat(expense.amount);
+    categoryMap.set(category, (categoryMap.get(category) || 0) + amount);
+  });
+  
+  const total = Array.from(categoryMap.values()).reduce((sum, amount) => sum + amount, 0);
+  
+  return Array.from(categoryMap.entries()).map(([category, amount]) => ({
+    category,
+    amount,
+    percentage: total > 0 ? (amount / total) * 100 : 0
+  })).sort((a, b) => b.amount - a.amount);
 }

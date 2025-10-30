@@ -22,6 +22,9 @@ import {
   Target
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
+import { useCurrency } from '../contexts/CurrencyContext';
+import { useToast } from '../contexts/ToastContext';
+import PageSkeleton from './PageSkeleton';
 
 interface WishlistItem {
   id: string;
@@ -43,6 +46,8 @@ interface WishlistItem {
 
 export default function WishlistManagement() {
   const { user, loading: authLoading } = useAuth();
+  const { formatCurrency } = useCurrency();
+  const { success, error: showError } = useToast();
   const [wishlistItems, setWishlistItems] = useState<WishlistItem[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editingItem, setEditingItem] = useState<WishlistItem | null>(null);
@@ -62,14 +67,7 @@ export default function WishlistManagement() {
     tags: [] as string[]
   });
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
+  // formatCurrency is now provided by the CurrencyContext
 
   useEffect(() => {
     if (user && !authLoading) {
@@ -84,15 +82,17 @@ export default function WishlistManagement() {
       const response = await fetch(`/api/wishlist?userId=${user.id}`);
       if (response.ok) {
         const data = await response.json();
-        // Parse tags from JSON strings to arrays
+        // Parse tags from JSON strings to arrays and ensure estimatedCost is a number
         const processedData = data.map((item: any) => ({
           ...item,
+          estimatedCost: Number(item.estimatedCost),
           tags: typeof item.tags === 'string' ? JSON.parse(item.tags) : item.tags || []
         }));
         setWishlistItems(processedData);
       }
     } catch (error) {
       console.error('Error fetching wishlist items:', error);
+      showError('Error', 'Failed to fetch wishlist items');
     } finally {
       setLoading(false);
     }
@@ -124,9 +124,11 @@ export default function WishlistManagement() {
         setEditingItem(null);
         resetForm();
         fetchWishlistItems();
+        success('Success', editingItem ? 'Wishlist item updated successfully!' : 'Wishlist item added successfully!');
       }
     } catch (error) {
       console.error('Error saving wishlist item:', error);
+      showError('Error', 'Failed to save wishlist item');
     }
   };
 
@@ -155,9 +157,11 @@ export default function WishlistManagement() {
 
       if (response.ok) {
         fetchWishlistItems();
+        success('Success', 'Wishlist item deleted successfully!');
       }
     } catch (error) {
       console.error('Error deleting wishlist item:', error);
+      showError('Error', 'Failed to delete wishlist item');
     }
   };
 
@@ -179,6 +183,7 @@ export default function WishlistManagement() {
       }
     } catch (error) {
       console.error('Error updating wishlist item:', error);
+      showError('Error', 'Failed to update wishlist item');
     }
   };
 
@@ -243,17 +248,13 @@ export default function WishlistManagement() {
 
   const totalCost = wishlistItems
     .filter(item => !item.isCompleted)
-    .reduce((sum, item) => sum + item.estimatedCost, 0);
+    .reduce((sum, item) => sum + Number(item.estimatedCost), 0);
 
   const completedCount = wishlistItems.filter(item => item.isCompleted).length;
   const totalCount = wishlistItems.length;
 
   if (loading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-      </div>
-    );
+    return <PageSkeleton />;
   }
 
   return (
@@ -301,7 +302,7 @@ export default function WishlistManagement() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600">Total Cost</p>
-              <p className="text-2xl font-bold">${totalCost.toLocaleString()}</p>
+              <p className="text-2xl font-bold">{formatCurrency(totalCost)}</p>
             </div>
             <div className="text-purple-600">
               <DollarSign className="w-6 h-6" />
@@ -359,11 +360,23 @@ export default function WishlistManagement() {
 
       {/* Form Modal */}
       {showForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <h3 className="text-xl font-bold mb-4">
-              {editingItem ? 'Edit Wishlist Item' : 'Add New Wishlist Item'}
-            </h3>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 modal-overlay">
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-xl modal-content">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold">
+                {editingItem ? 'Edit Wishlist Item' : 'Add New Wishlist Item'}
+              </h3>
+              <button
+                onClick={() => {
+                  setShowForm(false);
+                  setEditingItem(null);
+                  resetForm();
+                }}
+                className="text-gray-400 hover:text-gray-600 text-2xl leading-none"
+              >
+                ×
+              </button>
+            </div>
             
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -377,6 +390,7 @@ export default function WishlistManagement() {
                     value={formData.title}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData(prev => ({ ...prev, title: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Enter item title"
                   />
                 </div>
                 
@@ -392,6 +406,7 @@ export default function WishlistManagement() {
                     value={formData.estimatedCost}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData(prev => ({ ...prev, estimatedCost: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="0.00"
                   />
                 </div>
               </div>
@@ -525,7 +540,7 @@ export default function WishlistManagement() {
                 </div>
               </div>
 
-              <div className="flex justify-end gap-2 pt-4">
+              <div className="flex justify-end gap-3 pt-6 border-t border-gray-200">
                 <button
                   type="button"
                   onClick={() => {
@@ -533,11 +548,11 @@ export default function WishlistManagement() {
                     setEditingItem(null);
                     resetForm();
                   }}
-                  className="px-3 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors"
+                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors"
                 >
                   Cancel
                 </button>
-                <button type="submit" className="px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
+                <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
                   {editingItem ? 'Update' : 'Add'} Item
                 </button>
               </div>
@@ -604,7 +619,7 @@ export default function WishlistManagement() {
             <div className="space-y-2">
               <div className="flex items-center gap-2 text-sm">
                 <DollarSign className="w-4 h-4 text-green-600" />
-                <span className="font-medium">${item.estimatedCost.toLocaleString()}</span>
+                <span className="font-medium">{formatCurrency(item.estimatedCost)}</span>
               </div>
 
               {item.category && (

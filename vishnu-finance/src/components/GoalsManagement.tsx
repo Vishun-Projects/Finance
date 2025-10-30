@@ -24,6 +24,7 @@ import {
   Save
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
+import PageSkeleton from './PageSkeleton';
 
 interface Goal {
   id: string;
@@ -182,12 +183,7 @@ export default function GoalsManagement() {
   const totalCurrentAmount = goals.reduce((sum, goal) => sum + goal.currentAmount, 0);
 
   if (isFetching) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="minimal-loading"></div>
-        <span className="ml-3 text-muted">Loading goals data...</span>
-      </div>
-    );
+    return <PageSkeleton />;
   }
 
   return (

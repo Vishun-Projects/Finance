@@ -3,7 +3,9 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Eye, EyeOff, Mail, Lock, User, ArrowRight } from 'lucide-react';
+import { useLoading } from '../../../contexts/LoadingContext';
+import { Eye, EyeOff, Mail, Lock, User, ArrowRight, AlertCircle, TrendingUp } from 'lucide-react';
+import ModernCard from '../../../components/ModernCard';
 
 export default function RegisterPage() {
   const [formData, setFormData] = useState({
@@ -17,6 +19,7 @@ export default function RegisterPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const router = useRouter();
+  const { setLoading } = useLoading();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
@@ -29,11 +32,13 @@ export default function RegisterPage() {
     e.preventDefault();
     setIsLoading(true);
     setError('');
+    setLoading(true, 'Creating your account...');
 
     // Validate passwords match
     if (formData.password !== formData.confirmPassword) {
       setError('Passwords do not match');
       setIsLoading(false);
+      setLoading(false);
       return;
     }
 
@@ -41,6 +46,7 @@ export default function RegisterPage() {
     if (formData.password.length < 6) {
       setError('Password must be at least 6 characters long');
       setIsLoading(false);
+      setLoading(false);
       return;
     }
 
@@ -69,33 +75,37 @@ export default function RegisterPage() {
       setError('Network error. Please try again.');
     } finally {
       setIsLoading(false);
+      setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <div className="max-w-md w-full space-y-8">
-        {/* Header */}
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-12">
+      <div className="w-full max-w-md space-y-8">
+        {/* Logo and Title */}
         <div className="text-center">
-          <div className="mx-auto h-16 w-16 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full flex items-center justify-center mb-4">
-            <span className="text-2xl font-bold text-white">V</span>
+          <div className="w-16 h-16 bg-gray-900 rounded-xl flex items-center justify-center mx-auto mb-6 shadow-lg">
+            <TrendingUp className="w-8 h-8 text-white" />
           </div>
-          <h2 className="text-3xl font-bold text-gray-900 mb-2">
-            Create Account
-          </h2>
-          <p className="text-gray-600">
-            Join Vishnu's Finance and take control of your finances
-          </p>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Vishnu Finance</h1>
+          <p className="text-gray-600">Create your account to get started</p>
         </div>
 
         {/* Registration Form */}
-        <div className="bg-white rounded-2xl shadow-xl p-8">
+        <ModernCard padding="lg" className="w-full">
+          <div className="text-center mb-8">
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Create Account</h2>
+            <p className="text-gray-600">Join Vishnu Finance and take control of your finances</p>
+          </div>
+          
+          {error && (
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center space-x-3">
+              <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
+              <p className="text-sm text-red-700">{error}</p>
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-6">
-            {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
-                {error}
-              </div>
-            )}
 
             {/* Name Field */}
             <div>
@@ -113,7 +123,7 @@ export default function RegisterPage() {
                   autoComplete="name"
                   value={formData.name}
                   onChange={handleChange}
-                  className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                  className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-colors"
                   placeholder="Enter your full name"
                 />
               </div>
@@ -136,7 +146,7 @@ export default function RegisterPage() {
                   required
                   value={formData.email}
                   onChange={handleChange}
-                  className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                  className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-colors"
                   placeholder="Enter your email"
                 />
               </div>
@@ -159,7 +169,7 @@ export default function RegisterPage() {
                   required
                   value={formData.password}
                   onChange={handleChange}
-                  className="block w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                  className="block w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-colors"
                   placeholder="Create a password"
                 />
                 <button
@@ -196,7 +206,7 @@ export default function RegisterPage() {
                   required
                   value={formData.confirmPassword}
                   onChange={handleChange}
-                  className="block w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                  className="block w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-colors"
                   placeholder="Confirm your password"
                 />
                 <button
@@ -217,7 +227,7 @@ export default function RegisterPage() {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+              className="w-full flex justify-center items-center py-3 px-4 bg-gray-900 text-white font-semibold rounded-lg hover:bg-gray-800 focus:ring-2 focus:ring-gray-900 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {isLoading ? (
                 <div className="flex items-center">
@@ -234,22 +244,24 @@ export default function RegisterPage() {
           </form>
 
           {/* Login Link */}
-          <div className="mt-6 text-center">
+          <div className="mt-8 text-center">
             <p className="text-sm text-gray-600">
               Already have an account?{' '}
               <Link
                 href="/login"
-                className="font-medium text-blue-600 hover:text-blue-500 transition-colors"
+                className="font-medium text-gray-900 hover:text-gray-700 transition-colors"
               >
                 Sign in here
               </Link>
             </p>
           </div>
-        </div>
+        </ModernCard>
 
         {/* Footer */}
-        <div className="text-center text-sm text-gray-500">
-          <p>© 2024 Vishnu's Finance. All rights reserved.</p>
+        <div className="text-center">
+          <p className="text-sm text-gray-500">
+            © 2024 Vishnu Finance. Built with ❤️ in Mumbai, India.
+          </p>
         </div>
       </div>
     </div>

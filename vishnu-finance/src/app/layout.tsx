@@ -1,9 +1,14 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import TutorialGuide from "@/components/TutorialGuide";
+import GlobalPreloader from "@/components/GlobalPreloader";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { LayoutProvider } from "@/contexts/LayoutContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
+import { CurrencyProvider } from "@/contexts/CurrencyContext";
+import { ToastProvider } from "@/contexts/ToastContext";
+import { QueryProvider } from "@/contexts/QueryProvider";
+import { LoadingProvider } from "@/contexts/LoadingContext";
 
 export const metadata: Metadata = {
   title: "Vishnu Finance - Personal Finance Manager",
@@ -18,14 +23,23 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <AuthProvider>
-          <ThemeProvider>
-            <LayoutProvider>
-              {children}
-              <TutorialGuide />
-            </LayoutProvider>
-          </ThemeProvider>
-        </AuthProvider>
+        <QueryProvider>
+          <AuthProvider>
+            <ThemeProvider>
+              <CurrencyProvider>
+                <ToastProvider>
+                  <LoadingProvider>
+                    <LayoutProvider>
+                      {children}
+                      <TutorialGuide />
+                      <GlobalPreloader />
+                    </LayoutProvider>
+                  </LoadingProvider>
+                </ToastProvider>
+              </CurrencyProvider>
+            </ThemeProvider>
+          </AuthProvider>
+        </QueryProvider>
       </body>
     </html>
   );

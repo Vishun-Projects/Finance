@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { Deadline } from '@/types';
+import PageSkeleton from './PageSkeleton';
 
 export default function DeadlinesManagement() {
   const { user, loading: authLoading } = useAuth();
@@ -269,12 +270,7 @@ export default function DeadlinesManagement() {
   const categories = Array.from(new Set(deadlines.map(d => d.category).filter(Boolean)));
 
   if (isFetching) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="minimal-loading"></div>
-        <span className="ml-3 text-muted">Loading deadlines data...</span>
-      </div>
-    );
+    return <PageSkeleton />;
   }
 
   return (

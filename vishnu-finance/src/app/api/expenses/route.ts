@@ -44,6 +44,7 @@ export async function POST(request: NextRequest) {
       description,
       paymentMethod,
       notes,
+      store,
       userId
     } = body;
 
@@ -72,6 +73,7 @@ export async function POST(request: NextRequest) {
         description: title, // Map title to description field
         date: new Date(date),
         notes: description || notes,
+        // store: store || null, // Temporarily disabled - store info will go in notes
         isRecurring: false,
         userId: userId,
         categoryId: null // We'll handle categories later

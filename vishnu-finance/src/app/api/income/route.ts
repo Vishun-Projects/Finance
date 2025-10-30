@@ -44,6 +44,7 @@ export async function POST(request: NextRequest) {
       description,
       paymentMethod,
       notes,
+      store,
       userId
     } = body;
 
@@ -73,6 +74,7 @@ export async function POST(request: NextRequest) {
         frequency: 'ONE_TIME', // Default frequency
         startDate: new Date(date),
         notes: description || notes,
+        // store: store || null, // Temporarily disabled - store info will go in notes
         userId: userId,
         categoryId: null // We'll handle categories later
       }

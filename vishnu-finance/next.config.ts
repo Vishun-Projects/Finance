@@ -3,45 +3,74 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   // Performance optimizations
   experimental: {
-    // Enable modern React features
-    optimizePackageImports: ['lucide-react', '@tanstack/react-query'],
-    // Faster builds (moved to turbopack)
-    // turbo: {
-    //   rules: {
-    //     '*.svg': {
-    //       loaders: ['@svgr/webpack'],
-    //       as: '*.js',
-    //     },
-    //   },
-    // },
+    // Enable modern React features and tree-shaking optimizations
+    optimizePackageImports: [
+      'lucide-react', 
+      '@tanstack/react-query',
+      '@radix-ui/react-alert-dialog',
+      '@radix-ui/react-dialog',
+      '@radix-ui/react-dropdown-menu',
+      '@radix-ui/react-select',
+    ],
+    // Enable faster Fast Refresh in development
+    optimizeCss: true,
   },
   
   // Image optimization
   images: {
     formats: ['image/webp', 'image/avif'],
     minimumCacheTTL: 60,
+    dangerouslyAllowSVG: true,
+    contentDispositionType: 'attachment',
+    contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
   },
-  
-  // Bundle analyzer (optional - remove in production)
-  // bundleAnalyzer: process.env.ANALYZE === 'true',
   
   // Compiler optimizations
   compiler: {
     // Remove console.log in production
-    removeConsole: process.env.NODE_ENV === 'production',
+    removeConsole: process.env.NODE_ENV === 'production' ? {
+      exclude: ['error', 'warn'],
+    } : false,
   },
   
   // Webpack optimizations
   webpack: (config, { dev, isServer }) => {
     if (!dev && !isServer) {
       // Production optimizations
-      config.optimization.splitChunks = {
-        chunks: 'all',
-        cacheGroups: {
-          vendor: {
-            test: /[\\/]node_modules[\\/]/,
-            name: 'vendors',
-            chunks: 'all',
+      config.optimization = {
+        ...config.optimization,
+        splitChunks: {
+          chunks: 'all',
+          cacheGroups: {
+            default: false,
+            vendors: false,
+            // Vendor chunks
+            vendor: {
+              test: /[\\/]node_modules[\\/]/,
+              name: 'vendor',
+              priority: 20,
+              chunks: 'all',
+            },
+            // React, ReactDOM, and Next.js
+            framework: {
+              test: /[\\/]node_modules[\\/](react|react-dom|scheduler|next)[\\/]/,
+              name: 'framework',
+              priority: 30,
+              chunks: 'all',
+            },
+            // Common UI libraries
+            ui: {
+              test: /[\\/]node_modules[\\/](@radix-ui|lucide-react)[\\/]/,
+              name: 'ui',
+              priority: 25,
+              chunks: 'all',
+            },
+            // Common chunk for shared code
+            common: {
+              minChunks: 2,
+              priority: 10,
+              reuseExistingChunk: true,
+            },
           },
         },
       };
@@ -50,20 +79,15 @@ const nextConfig: NextConfig = {
     return config;
   },
   
-  // Enable SWC minification for faster builds (default in Next.js 15)
-  // swcMinify: true,
-  
-  // Optimize CSS (default in Next.js 15)
-  // optimizeFonts: true,
-  
   // Enable compression
   compress: true,
   
   // Cache optimization
-  generateEtags: false,
+  generateEtags: true,
   
-  // Faster development
-  reactStrictMode: false, // Disable in dev for faster reloads
+  // Enable React Strict Mode - helps catch bugs in development
+  // This is critical for production performance
+  reactStrictMode: true,
   
   // Turbopack configuration (Next.js 15)
   turbopack: {
@@ -74,6 +98,9 @@ const nextConfig: NextConfig = {
       },
     },
   },
+  
+  // Power saving for mobile devices
+  poweredByHeader: false,
 };
 
 export default nextConfig;

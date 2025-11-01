@@ -22,6 +22,7 @@ import {
   Wallet
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
+import { DateRangeFilter } from './ui/date-range-filter';
 
 interface Expense {
   id: string;
@@ -44,6 +45,14 @@ export default function ExpenseManagement() {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState<string>('all');
+  const [startDate, setStartDate] = useState(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+  });
+  const [endDate, setEndDate] = useState(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+  });
   const [formData, setFormData] = useState({
     title: '',
     amount: '',
@@ -69,7 +78,7 @@ export default function ExpenseManagement() {
     if (user && !authLoading) {
       fetchExpenses();
     }
-  }, [user, authLoading]);
+  }, [user, authLoading, startDate, endDate]);
 
   const fetchExpenses = async () => {
     console.log('🔄 EXPENSE COMPONENT - Fetching expenses...');
@@ -83,7 +92,7 @@ export default function ExpenseManagement() {
 
     try {
       console.log('🔄 EXPENSE COMPONENT - Making API call to /api/expenses...');
-      const response = await fetch(`/api/expenses?userId=${user.id}`);
+      const response = await fetch(`/api/expenses?userId=${user.id}&start=${startDate}&end=${endDate}`);
       console.log('🔄 EXPENSE COMPONENT - API Response status:', response.status);
       
       if (response.ok) {
@@ -449,23 +458,32 @@ export default function ExpenseManagement() {
       </div>
 
       {/* Search and Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted" />
-          <input
-            type="text"
-            placeholder="Search expenses..."
-            value={searchTerm}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 minimal-input"
-          />
-        </div>
-        <select
-          value={filterCategory}
-          onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFilterCategory(e.target.value)}
-          className="minimal-select"
-        >
-          <option value="all">All Categories</option>
+      <div className="flex flex-col gap-4">
+        <DateRangeFilter
+          startDate={startDate}
+          endDate={endDate}
+          onRangeChange={(start, end) => {
+            setStartDate(start);
+            setEndDate(end);
+          }}
+        />
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted" />
+            <input
+              type="text"
+              placeholder="Search expenses..."
+              value={searchTerm}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 minimal-input"
+            />
+          </div>
+          <select
+            value={filterCategory}
+            onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFilterCategory(e.target.value)}
+            className="minimal-select"
+          >
+            <option value="all">All Categories</option>
           {categories.map(category => (
             <option key={category} value={category}>{category}</option>
           ))}
@@ -473,6 +491,7 @@ export default function ExpenseManagement() {
         <button className="minimal-button-small p-2">
           <Filter className="w-4 h-4" />
         </button>
+        </div>
       </div>
 
       {/* Add Expense Form */}

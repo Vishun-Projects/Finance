@@ -48,6 +48,7 @@ model User {
   salaryStructures SalaryStructure[]
   preferences      UserPreferences?
   wishlistItems    WishlistItem[]
+  upiMappings      UpiFieldMapping[]
 
   @@map("users")
 }
@@ -84,6 +85,10 @@ model IncomeSource {
   createdAt  DateTime        @default(now())
   updatedAt  DateTime        @updatedAt
   store      String?
+  upiId      String?
+  branch     String?
+  personName String?
+  rawData    String?         @db.Text
   category   Category?       @relation(fields: [categoryId], references: [id])
   user       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -106,6 +111,10 @@ model Expense {
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
   store       String?
+  upiId       String?
+  branch      String?
+  personName  String?
+  rawData     String?           @db.Text
   category    Category?         @relation(fields: [categoryId], references: [id])
   user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -457,4 +466,19 @@ enum RecurringFrequency {
   MONTHLY
   QUARTERLY
   YEARLY
+}
+
+model UpiFieldMapping {
+  id          String   @id @default(cuid())
+  userId      String
+  ruleName    String
+  pattern     String   @db.Text
+  fieldMap    String   @db.Text
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], map: "upi_field_mappings_userId_fkey")
+  @@map("upi_field_mappings")
 }

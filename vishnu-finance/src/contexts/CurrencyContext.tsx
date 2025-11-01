@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo, useCallback } from 'react';
 import { useAuth } from './AuthContext';
 
 interface CurrencyRates {
@@ -163,7 +163,7 @@ useEffect(() => {
 }, []);
 
 
-  const formatCurrency = (amount: number, currency?: string): string => {
+  const formatCurrency = useCallback((amount: number, currency?: string): string => {
     const targetCurrency = currency || selectedCurrency;
     const symbol = getCurrencySymbol(targetCurrency);
     
@@ -189,9 +189,9 @@ useEffect(() => {
         maximumFractionDigits: 2 
       })}`;
     }
-  };
+  }, [selectedCurrency]);
 
-  const convertCurrency = (amount: number, fromCurrency: string, toCurrency: string): number => {
+  const convertCurrency = useCallback((amount: number, fromCurrency: string, toCurrency: string): number => {
     if (fromCurrency === toCurrency) return amount;
     
     // If we don't have exchange rates, return original amount
@@ -202,13 +202,13 @@ useEffect(() => {
     // Convert to USD first, then to target currency
     const usdAmount = amount / exchangeRates[fromCurrency];
     return usdAmount * exchangeRates[toCurrency];
-  };
+  }, [exchangeRates]);
 
-  const getCurrencySymbol = (currency: string): string => {
+  const getCurrencySymbol = useCallback((currency: string): string => {
     return CURRENCY_SYMBOLS[currency] || currency;
-  };
+  }, []);
 
-  const handleSetSelectedCurrency = (currency: string) => {
+  const handleSetSelectedCurrency = useCallback((currency: string) => {
     setSelectedCurrency(currency);
     
     // Save to user preferences if user is logged in
@@ -222,22 +222,23 @@ useEffect(() => {
         })
       }).catch(console.error);
     }
-  };
+  }, [user?.id]);
+
+  // Memoize context value to prevent unnecessary re-renders
+  const value = useMemo(() => ({
+    selectedCurrency,
+    setSelectedCurrency: handleSetSelectedCurrency,
+    exchangeRates,
+    isLoading,
+    error,
+    formatCurrency,
+    convertCurrency,
+    getCurrencySymbol,
+    lastUpdated
+  }), [selectedCurrency, handleSetSelectedCurrency, exchangeRates, isLoading, error, formatCurrency, convertCurrency, getCurrencySymbol, lastUpdated]);
 
   return (
-    <CurrencyContext.Provider
-      value={{
-        selectedCurrency,
-        setSelectedCurrency: handleSetSelectedCurrency,
-        exchangeRates,
-        isLoading,
-        error,
-        formatCurrency,
-        convertCurrency,
-        getCurrencySymbol,
-        lastUpdated
-      }}
-    >
+    <CurrencyContext.Provider value={value}>
       {children}
     </CurrencyContext.Provider>
   );

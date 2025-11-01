@@ -1,6 +1,6 @@
 'use client';
 
-import IncomeManagement from '../../../components/IncomeManagement';
+import IncomeManagement from '@/components/management/IncomeManagement';
 
 export default function IncomePage() {
   return <IncomeManagement />;

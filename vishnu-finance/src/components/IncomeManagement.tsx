@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { 
   DollarSign, 
   Plus, 
@@ -26,6 +26,7 @@ import {
 import { useAuth } from '../hooks/useAuth';
 import { useCurrency } from '../contexts/CurrencyContext';
 import { useToast } from '../contexts/ToastContext';
+import { DateRangeFilter } from './ui/date-range-filter';
 
 interface Income {
   id: string;
@@ -50,6 +51,14 @@ export default function IncomeManagement() {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState<string>('all');
+  const [startDate, setStartDate] = useState(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+  });
+  const [endDate, setEndDate] = useState(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+  });
   const [formData, setFormData] = useState({
     title: '',
     amount: '',
@@ -71,6 +80,59 @@ export default function IncomeManagement() {
   const [isParsingFile, setIsParsingFile] = useState(false);
   const [parsedTransactions, setParsedTransactions] = useState<any[]>([]);
   const [showCsvPreview, setShowCsvPreview] = useState(false);
+  const [selectedBank, setSelectedBank] = useState<string>('');
+  const [previewMonthOnly, setPreviewMonthOnly] = useState<boolean>(false); // Default to false to show all transactions
+  const [previewPage, setPreviewPage] = useState<number>(1);
+  const [previewPageSize, setPreviewPageSize] = useState<number>(200);
+  const [parseProgress, setParseProgress] = useState<number>(0);
+  const [importProgress, setImportProgress] = useState<number>(0);
+  const [tempFiles, setTempFiles] = useState<string[]>([]);
+
+  const filteredParsed = useMemo(() => {
+    console.log('🔍 FILTERING: parsedTransactions.length:', parsedTransactions.length);
+    console.log('🔍 FILTERING: previewMonthOnly:', previewMonthOnly);
+    
+    if (!previewMonthOnly) {
+      console.log('✅ FILTERING: Returning ALL transactions (not filtering)');
+      return parsedTransactions;
+    }
+    
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth(), 1);
+    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+    
+    console.log('🔍 FILTERING: Date range:', {
+      start: start.toISOString(),
+      end: end.toISOString(),
+      currentMonth: now.getMonth() + 1,
+      currentYear: now.getFullYear()
+    });
+    
+    const filtered = parsedTransactions.filter((t: any) => {
+      const dStr = (t.date_iso || t.date || '').toString().slice(0, 10);
+      const d = dStr ? new Date(dStr) : null;
+      const inRange = d && d >= start && d <= end;
+      
+      if (!inRange && parsedTransactions.indexOf(t) < 3) {
+        console.log('⚠️ FILTERING: Transaction filtered out:', {
+          date: dStr,
+          parsedDate: d,
+          inRange: false
+        });
+      }
+      
+      return inRange;
+    });
+    
+    console.log('✅ FILTERING: Filtered result:', filtered.length, 'transactions');
+    return filtered;
+  }, [parsedTransactions, previewMonthOnly]);
+
+  const totalPages = useMemo(() => Math.max(1, Math.ceil(filteredParsed.length / previewPageSize)), [filteredParsed.length, previewPageSize]);
+  const visibleParsed = useMemo(() => {
+    const startIdx = (previewPage - 1) * previewPageSize;
+    return filteredParsed.slice(startIdx, startIdx + previewPageSize);
+  }, [filteredParsed, previewPage, previewPageSize]);
 
   // formatCurrency is now provided by the CurrencyContext
 
@@ -78,7 +140,16 @@ export default function IncomeManagement() {
     if (user && !authLoading) {
       fetchIncomes();
     }
-  }, [user, authLoading]);
+  }, [user, authLoading, startDate, endDate]);
+
+  // Debug effect to track state changes
+  useEffect(() => {
+    console.log('🔍 STATE CHANGE: showCsvPreview =', showCsvPreview);
+    console.log('🔍 STATE CHANGE: parsedTransactions.length =', parsedTransactions.length);
+    if (parsedTransactions.length > 0) {
+      console.log('🔍 STATE CHANGE: First 3 parsed transactions:', parsedTransactions.slice(0, 3));
+    }
+  }, [showCsvPreview, parsedTransactions]);
 
   const fetchIncomes = async () => {
     console.log('🔄 INCOME COMPONENT - Fetching incomes...');
@@ -92,7 +163,7 @@ export default function IncomeManagement() {
 
     try {
       console.log('🔄 INCOME COMPONENT - Making API call to /api/income...');
-      const response = await fetch(`/api/income?userId=${user.id}`);
+      const response = await fetch(`/api/income?userId=${user.id}&start=${startDate}&end=${endDate}`);
       console.log('🔄 INCOME COMPONENT - API Response status:', response.status);
       
       if (response.ok) {
@@ -247,223 +318,173 @@ export default function IncomeManagement() {
     if (!selectedFile || !user?.id) return;
 
     setIsParsingFile(true);
+    setParseProgress(5);
     setFileError(null);
 
     try {
+      // Simulate progressive parse progress up to 90%
+      const parseTimer = setInterval(() => {
+        setParseProgress((p) => (p < 90 ? Math.min(90, p + 5) : p));
+      }, 400);
+      const lowerName = selectedFile.name.toLowerCase();
+      const isPdf = selectedFile.type === 'application/pdf' || lowerName.endsWith('.pdf');
+
+      if (isPdf) {
+        const fd = new FormData();
+        fd.append('pdf', selectedFile);
+        // Simple bank auto-detect from filename
+        const bank = ['sbi', 'hdfc', 'icici', 'axis', 'bob', 'kotak', 'yes'].find(b => lowerName.includes(b)) || '';
+        const bankToSend = (selectedBank || bank);
+        if (bankToSend) fd.append('bank', bankToSend);
+
+        console.log('🔍 FRONTEND: Starting parse-pdf fetch...');
+        const res = await fetch('/api/parse-pdf', { method: 'POST', body: fd });
+        console.log('🔍 FRONTEND: Response status:', res.ok);
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || 'Failed to parse PDF');
+        }
+        const data = await res.json();
+        console.log('🔍 FRONTEND: Received data:', {
+          success: data.success,
+          count: data.count,
+          transactionsLength: data.transactions?.length,
+          firstTransaction: data.transactions?.[0],
+          hasTempFiles: !!data.tempFiles,
+          tempFilesCount: data.tempFiles?.length
+        });
+        
+        const transactionsToSet = data.transactions || [];
+        console.log('🔍 FRONTEND: Setting parsedTransactions:', transactionsToSet.length, 'items');
+        console.log('🔍 FRONTEND: First 3 transactions:', transactionsToSet.slice(0, 3));
+        
+        setParsedTransactions(transactionsToSet);
+        setTempFiles(data.tempFiles || []);
+        console.log('🔍 FRONTEND: parsedTransactions state set');
+        
+        console.log('🔍 FRONTEND: Setting showCsvPreview to true');
+        setShowCsvPreview(true);
+        
+        console.log('🔍 FRONTEND: Closing file dialog');
+        setShowFileDialog(false);
+        
+        success('PDF Parsed', `Extracted ${data.count || transactionsToSet.length} transactions`);
+        setParseProgress(100);
+        clearInterval(parseTimer);
+        console.log('✅ FRONTEND: Parse complete');
+        return;
+      }
+
+      // Fallback to multi-format parser for non-PDF
       const formData = new FormData();
       formData.append('file', selectedFile);
-
-      const response = await fetch('/api/parse-file', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        console.log('✅ File parsing success:', data);
-        console.log('🔍 First transaction in API response:', data.transactions[0]);
-        setParsedTransactions(data.transactions);
-        setShowCsvPreview(true);
-        setShowFileDialog(false);
-        success('File Parsed', `Successfully extracted ${data.count} transactions from ${data.fileType} file`);
-      } else {
-        const errorData = await response.json();
-        console.error('❌ File parsing error details:', errorData);
-        console.error('❌ Response status:', response.status);
-        console.error('❌ Response headers:', Object.fromEntries(response.headers.entries()));
+      const response = await fetch('/api/parse-file', { method: 'POST', body: formData });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.error || `Failed to parse file (Status: ${response.status})`);
       }
+      const data = await response.json();
+      setParsedTransactions(data.transactions || []);
+      setTempFiles(data.tempFiles || []);
+      setShowCsvPreview(true);
+      setShowFileDialog(false);
+      success('File Parsed', `Extracted ${data.count || (data.transactions || []).length} transactions`);
+      setParseProgress(100);
     } catch (error) {
       console.error('Error parsing file:', error);
       setFileError(error instanceof Error ? error.message : 'Failed to parse file');
     } finally {
       setIsParsingFile(false);
+      // Ensure progress is completed/cleared shortly after
+      setTimeout(() => setParseProgress(0), 1000);
     }
   };
 
-  // Import parsed transactions with deduplication and categorization
+  // Import parsed transactions using batch API
   const handleImportParsedTransactions = async () => {
     if (!parsedTransactions.length || !user?.id) return;
 
     setIsImporting(true);
+    setImportProgress(5);
     setFileError(null);
 
     try {
-      // Fetch existing incomes and expenses to check for duplicates
-      const [incomeResponse, expenseResponse] = await Promise.all([
-        fetch(`/api/income?userId=${user.id}`),
-        fetch(`/api/expenses?userId=${user.id}`)
-      ]);
-
-      let existingIncomes = [];
-      let existingExpenses = [];
-      
-      if (incomeResponse.ok) {
-        const incomeData = await incomeResponse.json();
-        existingIncomes = incomeData.map((income: any) => ({
-          id: income.id,
-          title: income.name || '',
-          amount: parseFloat(income.amount),
-          category: income.categoryId || '',
-          date: income.startDate,
-          description: income.notes || '',
-          paymentMethod: '',
-          notes: income.notes || ''
-        }));
-      }
-
-      if (expenseResponse.ok) {
-        const expenseData = await expenseResponse.json();
-        existingExpenses = expenseData.map((expense: any) => ({
-          id: expense.id,
-          title: expense.title || '',
-          amount: parseFloat(expense.amount),
-          category: expense.category || '',
-          date: expense.date,
-          description: expense.description || '',
-          paymentMethod: expense.paymentMethod || '',
-          notes: expense.notes || ''
-        }));
-      }
-
-      let incomeCount = 0;
-      let expenseCount = 0;
-      let errorCount = 0;
-      let duplicateCount = 0;
-
-      // Import each parsed transaction with duplicate checking and categorization
-      for (const transaction of parsedTransactions) {
-        try {
-          // Skip transactions with zero amounts
-          const debitAmount = parseFloat(transaction.debit || '0');
-          const creditAmount = parseFloat(transaction.credit || '0');
-          
-          if (debitAmount === 0 && creditAmount === 0) {
-            continue; // Skip zero amount transactions
-          }
-
-          // Determine if this is income (credit) or expense (debit)
+      // Normalize to common structure
+      const normalized = parsedTransactions
+        .map((t) => {
+          const debitAmount = parseFloat(t.debit || '0');
+          const creditAmount = parseFloat(t.credit || '0');
           const isIncome = creditAmount > 0;
           const amount = isIncome ? creditAmount : debitAmount;
-          
-          const transactionData = {
-            title: transaction.description || 'Bank Transaction',
-            amount: amount.toString(),
-            category: isIncome ? 'Bank Statement' : 'Bank Statement',
-            date: transaction.date_iso || transaction.date || new Date().toISOString().split('T')[0],
-            description: transaction.description || '',
-            paymentMethod: 'Bank Transfer',
-            notes: [transaction.store, transaction.commodity, transaction.remarks].filter(Boolean).join(' | ') || '',
-            store: transaction.store || null,
-            userId: user.id
-          };
+          const title = (t.description || t.narration || '').toString().trim();
+          const date = (t.date_iso || t.date || '').toString().slice(0, 10);
+          return amount > 0 && title && date
+            ? {
+                title,
+                amount,
+                category: t.category || (isIncome ? 'Bank Statement' : 'Bank Statement Expense'),
+                date,
+                description: t.description || t.narration || '',
+                payment_method: 'Bank Transfer',
+                type: isIncome ? 'income' : 'expense',
+              }
+            : null;
+        })
+        .filter(Boolean) as any[];
 
-          // Validate required fields
-          if (!transactionData.title || !transactionData.amount) {
-            errorCount++;
-            continue;
-          }
+      if (!normalized.length) {
+        showError('No valid records', 'No transactions to import');
+        setIsImporting(false);
+        return;
+      }
 
-          // Check for duplicates in the appropriate category
-          const existingRecords = isIncome ? existingIncomes : existingExpenses;
-          const isDuplicate = existingRecords.some((existing: any) => {
-            // Check for exact matches
-            const sameDate = existing.date === transactionData.date;
-            const sameAmount = Math.abs(existing.amount - parseFloat(transactionData.amount)) < 0.01;
-            const sameTitle = existing.title.toLowerCase().trim() === transactionData.title.toLowerCase().trim();
-            
-            // Consider it a duplicate if date, amount, and title match
-            return sameDate && sameAmount && sameTitle;
-          });
-
-          if (isDuplicate) {
-            duplicateCount++;
-            console.log(`Skipping duplicate: ${transactionData.title} - ${transactionData.date} - ${transactionData.amount}`);
-            continue;
-          }
-
-          // Route to appropriate API based on transaction type
-          const apiEndpoint = isIncome ? '/api/income' : '/api/expenses';
-          const response = await fetch(apiEndpoint, {
+      // Simulate import progress up to 90% while waiting for server
+      const total = normalized.length;
+      const importTimer = setInterval(() => {
+        setImportProgress((p) => (p < 90 ? Math.min(90, p + 4) : p));
+      }, 300);
+      const response = await fetch('/api/import/batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id, type: 'income', records: normalized }),
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || 'Batch import failed');
+      }
+      const result = await response.json();
+      success('Imported', `Inserted ${result.inserted}, duplicates ${result.duplicates}`);
+      setImportProgress(100);
+      clearInterval(importTimer);
+      await fetchIncomes();
+      
+      // Clean up temporary files after successful import
+      if (tempFiles.length > 0) {
+        try {
+          console.log('🧹 Cleaning up temporary files:', tempFiles);
+          const cleanupResponse = await fetch('/api/cleanup-temp', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(transactionData)
+            body: JSON.stringify({ files: tempFiles })
           });
-
-          if (response.ok) {
-            if (isIncome) {
-              incomeCount++;
-              // Add to existing incomes to prevent duplicates in the same batch
-              existingIncomes.push({
-                id: `temp_${Date.now()}_${incomeCount}`,
-                title: transactionData.title,
-                amount: parseFloat(transactionData.amount),
-                category: transactionData.category,
-                date: transactionData.date,
-                description: transactionData.description,
-                paymentMethod: transactionData.paymentMethod,
-                notes: transactionData.notes
-              });
-            } else {
-              expenseCount++;
-              // Add to existing expenses to prevent duplicates in the same batch
-              existingExpenses.push({
-                id: `temp_${Date.now()}_${expenseCount}`,
-                title: transactionData.title,
-                amount: parseFloat(transactionData.amount),
-                category: transactionData.category,
-                date: transactionData.date,
-                description: transactionData.description,
-                paymentMethod: transactionData.paymentMethod,
-                notes: transactionData.notes
-              });
-            }
+          if (cleanupResponse.ok) {
+            const cleanupResult = await cleanupResponse.json();
+            console.log('✅ Cleanup successful:', cleanupResult);
+            setTempFiles([]);
           } else {
-            errorCount++;
+            console.warn('⚠️ Cleanup failed, but import succeeded');
           }
-        } catch (err) {
-          errorCount++;
-          console.error('Error importing transaction:', err);
+        } catch (error) {
+          console.warn('⚠️ Cleanup error, but import succeeded:', error);
         }
       }
-
-      // Refresh the list
-      await fetchIncomes();
-
-      // Show success message with categorization and duplicate info
-      const totalImported = incomeCount + expenseCount;
-      let message = `Successfully imported ${totalImported} transactions`;
-      if (incomeCount > 0) {
-        message += ` (${incomeCount} income entries)`;
-      }
-      if (expenseCount > 0) {
-        message += ` (${expenseCount} expense entries)`;
-      }
-      if (duplicateCount > 0) {
-        message += ` (${duplicateCount} duplicates skipped)`;
-      }
-      if (errorCount > 0) {
-        message += ` (${errorCount} failed)`;
-      }
-
-      if (totalImported > 0) {
-        success('Import Complete', message);
-      } else if (duplicateCount > 0) {
-        success('Import Complete', `All ${duplicateCount} transactions were duplicates and skipped`);
-      } else {
-        showError('Import Failed', 'No transactions were imported. Please check the parsed data.');
-      }
-
-      // Reset
-      setShowFileDialog(false);
-      setShowCsvPreview(false);
-      setSelectedFile(null);
-      setParsedTransactions([]);
-    } catch (error) {
-      console.error('Error importing parsed transactions:', error);
-      setFileError(error instanceof Error ? error.message : 'Failed to import transactions');
+    } catch (e) {
+      console.error('Batch import error', e);
+      setFileError(e instanceof Error ? e.message : 'Batch import failed');
+      showError('Import failed', e instanceof Error ? e.message : 'Batch import failed');
     } finally {
       setIsImporting(false);
+      setTimeout(() => setImportProgress(0), 1000);
     }
   };
 
@@ -483,7 +504,7 @@ export default function IncomeManagement() {
       }
 
       // First, fetch existing incomes to check for duplicates
-      const existingResponse = await fetch(`/api/income?userId=${user.id}`);
+      { const n=new Date(); const s=new Date(n.getFullYear(),n.getMonth(),1).toISOString().split('T')[0]; const e=new Date(n.getFullYear(),n.getMonth()+1,0).toISOString().split('T')[0]; var existingResponse = await fetch(`/api/income?userId=${user.id}&start=${s}&end=${e}`); }
       let existingIncomes = [];
       
       if (existingResponse.ok) {
@@ -942,30 +963,40 @@ export default function IncomeManagement() {
       </div>
 
       {/* Search and Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted" />
-          <input
-            type="text"
-            placeholder="Search incomes..."
-            value={searchTerm}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 minimal-input"
-          />
+      <div className="flex flex-col gap-4">
+        <DateRangeFilter
+          startDate={startDate}
+          endDate={endDate}
+          onRangeChange={(start, end) => {
+            setStartDate(start);
+            setEndDate(end);
+          }}
+        />
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted" />
+            <input
+              type="text"
+              placeholder="Search incomes..."
+              value={searchTerm}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 minimal-input"
+            />
+          </div>
+          <select
+            value={filterCategory}
+            onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFilterCategory(e.target.value)}
+            className="minimal-select"
+          >
+            <option value="all">All Categories</option>
+            {categories.map(category => (
+              <option key={category} value={category}>{category}</option>
+            ))}
+          </select>
+          <button className="minimal-button-small p-2">
+            <Filter className="w-4 h-4" />
+          </button>
         </div>
-        <select
-          value={filterCategory}
-          onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFilterCategory(e.target.value)}
-          className="minimal-select"
-        >
-          <option value="all">All Categories</option>
-          {categories.map(category => (
-            <option key={category} value={category}>{category}</option>
-          ))}
-        </select>
-        <button className="minimal-button-small p-2">
-          <Filter className="w-4 h-4" />
-        </button>
       </div>
 
       {/* Import CSV Dialog */}
@@ -1131,24 +1162,47 @@ export default function IncomeManagement() {
               </div>
             )}
 
-            {/* Parse Button */}
-            <button
-              onClick={handleParseFile}
-              disabled={!selectedFile || isParsingFile}
-              className="minimal-button-primary w-full flex justify-center items-center py-4 px-6 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isParsingFile ? (
-                <div className="flex items-center">
-                  <div className="minimal-loading mr-2"></div>
-                  Parsing File...
-                </div>
-              ) : (
-                <div className="flex items-center">
-                  <FileText className="w-4 h-4 mr-2" />
-                  Parse File
-                </div>
-              )}
-            </button>
+            {/* Bank selector and Parse Button */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-semibold text-primary mb-3">
+                  Bank (optional)
+                </label>
+                <select
+                  value={selectedBank}
+                  onChange={(e) => setSelectedBank(e.target.value)}
+                  className="w-full minimal-input"
+                >
+                  <option value="">Auto-detect</option>
+                  <option value="sbi">SBI</option>
+                  <option value="hdfc">HDFC</option>
+                  <option value="icici">ICICI</option>
+                  <option value="axis">Axis</option>
+                  <option value="bob">Bank of Baroda</option>
+                  <option value="kotak">Kotak</option>
+                  <option value="yes">YES Bank</option>
+                </select>
+              </div>
+              <div className="flex items-end">
+                <button
+                  onClick={handleParseFile}
+                  disabled={!selectedFile || isParsingFile}
+                  className="minimal-button-primary w-full flex justify-center items-center py-4 px-6 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isParsingFile ? (
+                    <div className="flex items-center">
+                      <div className="minimal-loading mr-2"></div>
+                      Parsing File...
+                    </div>
+                  ) : (
+                    <div className="flex items-center">
+                      <FileText className="w-4 h-4 mr-2" />
+                      Parse File
+                    </div>
+                  )}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -1175,7 +1229,7 @@ export default function IncomeManagement() {
               <div className="flex items-center space-x-3">
                 <TrendingUp className="w-5 h-5 text-success" />
                 <div>
-                  <p className="font-semibold text-primary">Found {parsedTransactions.length} transactions</p>
+                  <p className="font-semibold text-primary">Found {filteredParsed.length} transactions</p>
                   <p className="text-sm text-muted">
                     Credits will be added to Income, Debits to Expenses. 
                     Zero amounts will be skipped. Duplicates will be automatically skipped.
@@ -1183,6 +1237,14 @@ export default function IncomeManagement() {
                   </p>
                 </div>
               </div>
+              {isParsingFile && (
+                <div className="mt-3">
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div className="bg-gray-900 h-2 rounded-full transition-all" style={{ width: `${parseProgress}%` }}></div>
+                  </div>
+                  <div className="text-xs text-gray-600 mt-1">Parsing... {parseProgress}%</div>
+                </div>
+              )}
             </div>
 
             {/* Split View: Raw Data (Left) and Processed Data (Right) */}
@@ -1196,11 +1258,11 @@ export default function IncomeManagement() {
                 <div className="max-h-96 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded-lg w-full">
                   <div className="bg-gray-50 dark:bg-gray-800 px-4 py-2 border-b border-gray-200 dark:border-gray-700">
                     <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      {parsedTransactions.length} transactions found
+                      {filteredParsed.length} transactions found
                     </p>
                   </div>
-                  <div className="space-y-2 p-4">
-                    {parsedTransactions.map((transaction, index) => (
+              <div className="space-y-2 p-4">
+                    {visibleParsed.map((transaction: any, index: number) => (
                       <div key={index} className="bg-white dark:bg-gray-900 p-3 rounded border border-gray-200 dark:border-gray-700 w-full min-w-0">
                         <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
                           Transaction #{index + 1} (Raw Length: {(transaction.raw || transaction.description || '').length})
@@ -1236,6 +1298,21 @@ export default function IncomeManagement() {
                   Processed Data
                 </h4>
                 <div className="overflow-x-auto max-h-96 overflow-y-auto">
+                  {/* Preview filters */}
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="inline-flex items-center gap-2 text-sm">
+                      <input type="checkbox" checked={previewMonthOnly} onChange={(e)=>{ setPreviewMonthOnly(e.target.checked); setPreviewPage(1); }} />
+                      Current month only
+                    </label>
+                    <div className="flex items-center gap-2 text-xs">
+                      <span>Rows per page</span>
+                      <select value={previewPageSize} onChange={(e)=>{ setPreviewPageSize(parseInt(e.target.value||'200')); setPreviewPage(1); }} className="border rounded px-1 py-0.5">
+                        <option value={100}>100</option>
+                        <option value={200}>200</option>
+                        <option value={500}>500</option>
+                      </select>
+                    </div>
+                  </div>
                   <table className="min-w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
                     <thead className="bg-gray-50 dark:bg-gray-700">
                       <tr>
@@ -1248,7 +1325,7 @@ export default function IncomeManagement() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                      {parsedTransactions.map((transaction, index) => {
+                      {visibleParsed.map((transaction: any, index: number) => {
                         const debitAmount = parseFloat(transaction.debit || '0');
                         const creditAmount = parseFloat(transaction.credit || '0');
                         const isIncome = creditAmount > 0;
@@ -1303,28 +1380,45 @@ export default function IncomeManagement() {
                       })}
                     </tbody>
                   </table>
+                  {/* Pagination */}
+                  {totalPages > 1 && (
+                    <div className="flex items-center justify-between mt-3 text-sm">
+                      <span>Page {previewPage} of {totalPages}</span>
+                      <div className="flex items-center gap-2">
+                        <button className="px-2 py-1 border rounded disabled:opacity-50" onClick={()=> setPreviewPage(p => Math.max(1, p-1))} disabled={previewPage===1}>Prev</button>
+                        <button className="px-2 py-1 border rounded disabled:opacity-50" onClick={()=> setPreviewPage(p => Math.min(totalPages, p+1))} disabled={previewPage===totalPages}>Next</button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
 
-            {/* Import Button */}
-            <button
-              onClick={handleImportParsedTransactions}
-              disabled={isImporting}
-              className="minimal-button-primary w-full flex justify-center items-center py-4 px-6 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isImporting ? (
-                <div className="flex items-center">
-                  <div className="minimal-loading mr-2"></div>
-                  Importing Transactions...
-                </div>
-              ) : (
-                <div className="flex items-center">
-                  <Upload className="w-4 h-4 mr-2" />
-                  Import Transactions
+            {/* Import Button with progress */}
+            <div className="space-y-3">
+              {isImporting && (
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div className="bg-gray-900 h-2 rounded-full transition-all" style={{ width: `${importProgress}%` }}></div>
                 </div>
               )}
-            </button>
+              <button
+                onClick={handleImportParsedTransactions}
+                disabled={isImporting}
+                className="minimal-button-primary w-full flex justify-center items-center py-4 px-6 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isImporting ? (
+                  <div className="flex items-center gap-2">
+                    <div className="minimal-loading"></div>
+                    <span>Importing... {importProgress}%</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center">
+                    <Upload className="w-4 h-4 mr-2" />
+                    Import Transactions
+                  </div>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

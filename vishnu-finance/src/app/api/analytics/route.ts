@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withCache, QueryOptimizer, PerformanceMonitor, CACHE_TTL } from '@/lib/api-cache';
 
+// Configure route caching - user-specific dynamic data
+export const dynamic = 'force-dynamic';
+export const revalidate = 120; // Revalidate every 2 minutes
+
 export const GET = withCache({ ttl: CACHE_TTL.ANALYTICS })(async function (request: NextRequest) {
   const timer = PerformanceMonitor.startTimer('analytics_api');
 

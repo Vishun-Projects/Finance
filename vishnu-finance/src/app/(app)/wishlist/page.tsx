@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import WishlistManagement from '../../../components/WishlistManagement';
+import WishlistManagement from '@/components/management/WishlistManagement';
 
 export default function WishlistPage() {
   return (

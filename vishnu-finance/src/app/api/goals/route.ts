@@ -3,6 +3,10 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
+// Configure route caching - user-specific dynamic data
+export const dynamic = 'force-dynamic';
+export const revalidate = 120; // Revalidate every 2 minutes
+
 export async function GET(request: NextRequest) {
   console.log('🔍 GOALS GET - Starting request');
   try {

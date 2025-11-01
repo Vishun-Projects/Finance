@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import DeadlinesManagement from '../../../components/DeadlinesManagement';
+import DeadlinesManagement from '@/components/management/DeadlinesManagement';
 
 export default function DeadlinesPage() {
   return (

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useLoading } from '../../../contexts/LoadingContext';
 import { Eye, EyeOff, Mail, Lock, User, ArrowRight, AlertCircle, TrendingUp } from 'lucide-react';
-import ModernCard from '../../../components/ModernCard';
+import ModernCard from '@/components/layout/ModernCard';
 
 export default function RegisterPage() {
   const [formData, setFormData] = useState({

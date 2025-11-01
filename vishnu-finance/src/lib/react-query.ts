@@ -5,26 +5,22 @@ import { QueryClient } from '@tanstack/react-query';
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      // Cache data for 5 minutes by default
+      // Cache data for 5 minutes by default - data is fresh during this time
       staleTime: 5 * 60 * 1000,
-      // Keep data in cache for 10 minutes
-      gcTime: 10 * 60 * 1000,
+      // Keep data in cache for 15 minutes - longer retention for better performance
+      gcTime: 15 * 60 * 1000,
       // Retry failed requests 2 times
       retry: 2,
       // Retry delay with exponential backoff
       retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
-      // Refetch on window focus for real-time updates
-      refetchOnWindowFocus: true,
-      // Don't refetch on reconnect if data is still fresh
-      refetchOnReconnect: 'always',
-      // Background refetch interval for critical data
-      refetchInterval: (query) => {
-        // Refetch dashboard data every 30 seconds
-        if (query.queryKey.includes('dashboard')) return 30000;
-        // Refetch analytics every 2 minutes
-        if (query.queryKey.includes('analytics')) return 120000;
-        return false;
-      },
+      // Disable refetch on window focus - prevents unnecessary requests
+      refetchOnWindowFocus: false,
+      // Don't refetch on reconnect - use cached data instead
+      refetchOnReconnect: false,
+      // Disable background polling by default - manual invalidation preferred
+      refetchInterval: false,
+      // Refetch on mount only if data is stale
+      refetchOnMount: true,
     },
     mutations: {
       // Retry mutations once

@@ -16,20 +16,6 @@ interface ValidationRule {
 
 const validationRules: ValidationRule[] = [
   {
-    id: 'email-verified',
-    message: 'Please verify your email address for better security',
-    type: 'warning',
-    condition: (user) => !user?.emailVerified,
-    actionText: 'Verify Email'
-  },
-  {
-    id: 'profile-complete',
-    message: 'Complete your profile to get personalized insights',
-    type: 'info',
-    condition: (user) => !user?.name || !user?.phone,
-    actionText: 'Complete Profile'
-  },
-  {
     id: 'first-income',
     message: 'Add your first income source to get started',
     type: 'info',

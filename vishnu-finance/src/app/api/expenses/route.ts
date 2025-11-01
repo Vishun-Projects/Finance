@@ -1,11 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '../../../lib/db';
 
+// Configure route caching - user-specific dynamic data
+export const dynamic = 'force-dynamic';
+export const revalidate = 60; // Revalidate every minute
+
 export async function GET(request: NextRequest) {
   console.log('🔍 EXPENSES GET - Starting request');
   try {
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
+    const start = searchParams.get('start');
+    const end = searchParams.get('end');
     console.log('🔍 EXPENSES GET - User ID:', userId);
 
     if (!userId) {
@@ -14,10 +20,18 @@ export async function GET(request: NextRequest) {
     }
 
     console.log('🔍 EXPENSES GET - Fetching from database for user:', userId);
-    // Fetch expenses from database
+    const dateFilter = start && end ? {
+      gte: new Date(start),
+      lte: new Date(new Date(end).setHours(23,59,59,999))
+    } : undefined;
+
+    // Fetch expenses from database (optionally date-scoped)
     const expenses = await (prisma as any).expense.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' }
+      where: {
+        userId,
+        ...(dateFilter ? { date: dateFilter } : {})
+      },
+      orderBy: { date: 'desc' }
     });
 
     console.log('✅ EXPENSES GET - Found expenses:', expenses.length, 'records');

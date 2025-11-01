@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo, useCallback } from 'react';
 
 interface User {
   id: string;
@@ -27,7 +27,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const checkAuth = async () => {
+  const checkAuth = useCallback(async () => {
+    const startTime = Date.now();
     try {
       console.log('🔐 AUTH CONTEXT - Starting auth check...');
       setLoading(true);
@@ -41,6 +42,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.log('🔐 AUTH CONTEXT - User data received:', JSON.stringify(data, null, 2));
         setUser(data.user);
         console.log('🔐 AUTH CONTEXT - User state set to:', data.user);
+        console.log(`⏱️ AUTH CONTEXT - checkAuth complete in ${Date.now() - startTime}ms`);
       } else if (response.status === 401) {
         console.log('🔐 AUTH CONTEXT - 401 Unauthorized, setting user to null');
         setUser(null);
@@ -56,13 +58,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
       console.log('🔐 AUTH CONTEXT - Auth check completed, loading set to false');
     }
-  };
+  }, []);
 
   useEffect(() => {
     checkAuth();
-  }, []);
+  }, [checkAuth]);
 
-  const login = async (email: string, password: string): Promise<boolean> => {
+  const login = useCallback(async (email: string, password: string): Promise<boolean> => {
+    const startTime = Date.now();
     try {
       console.log('🔐 AUTH CONTEXT - Starting login...');
       setLoading(true);
@@ -81,6 +84,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.log('🔐 AUTH CONTEXT - Login successful, user data:', JSON.stringify(data, null, 2));
         setUser(data.user);
         console.log('🔐 AUTH CONTEXT - User state set to:', data.user);
+        console.log(`⏱️ AUTH CONTEXT - login complete in ${Date.now() - startTime}ms`);
         return true;
       } else {
         const errorData = await response.json();
@@ -96,23 +100,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
       console.log('🔐 AUTH CONTEXT - Login completed, loading set to false');
     }
-  };
+  }, []);
 
-  const logout = async (): Promise<void> => {
+  const logout = useCallback(async (): Promise<void> => {
     try {
       await fetch('/api/auth/logout', { method: 'POST' });
       setUser(null);
     } catch (err) {
       console.error('Logout failed:', err);
     }
-  };
+  }, []);
 
-  const refreshUser = async (): Promise<void> => {
+  const refreshUser = useCallback(async (): Promise<void> => {
     await checkAuth();
-  };
+  }, [checkAuth]);
+
+  // Memoize context value to prevent unnecessary re-renders
+  const value = useMemo(() => ({
+    user,
+    loading,
+    error,
+    login,
+    logout,
+    refreshUser,
+  }), [user, loading, error, login, logout, refreshUser]);
 
   return (
-    <AuthContext.Provider value={{ user, loading, error, login, logout, refreshUser }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

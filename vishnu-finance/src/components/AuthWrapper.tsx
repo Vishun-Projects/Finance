@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '../hooks/useAuth';
-import Navigation from './Navigation';
+import Navigation from './layout/Navigation';
 
 interface AuthWrapperProps {
   children: React.ReactNode;

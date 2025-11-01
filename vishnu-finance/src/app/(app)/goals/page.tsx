@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import GoalsManagement from '../../../components/GoalsManagement';
+import GoalsManagement from '@/components/management/GoalsManagement';
 
 export default function GoalsPage() {
   return (

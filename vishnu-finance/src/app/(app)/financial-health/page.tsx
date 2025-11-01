@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { 
   TrendingUp, 
@@ -13,7 +13,7 @@ import {
   Activity
 } from 'lucide-react';
 import { formatRupees } from '../../../lib/utils';
-import PageSkeleton from '../../../components/PageSkeleton';
+import PageSkeleton from '@/components/feedback/PageSkeleton';
 
 interface HealthData {
   totalIncome: number;
@@ -42,7 +42,10 @@ export default function FinancialHealthPage() {
     
     try {
       setLoading(true);
-      const response = await fetch(`/api/dashboard-simple?userId=${user.id}`);
+      const now = new Date();
+      const start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+      const end = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+      const response = await fetch(`/api/dashboard-simple?userId=${user.id}&start=${start}&end=${end}`);
       
       if (!response.ok) {
         throw new Error('Failed to fetch health data');
@@ -56,6 +59,11 @@ export default function FinancialHealthPage() {
       setLoading(false);
     }
   };
+
+  const monthLabel = useMemo(() => {
+    const now = new Date();
+    return now.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+  }, []);
 
   const getHealthStatus = (score: number) => {
     if (score >= 80) return { status: 'Excellent', color: 'text-green-600', bg: 'bg-green-50' };
@@ -102,7 +110,7 @@ export default function FinancialHealthPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-semibold text-gray-900">Financial Health Score</h1>
-            <p className="text-gray-600">Your comprehensive financial wellness assessment</p>
+            <p className="text-gray-600">Monthly overview for {monthLabel}</p>
           </div>
         </div>
 
@@ -154,7 +162,7 @@ export default function FinancialHealthPage() {
                 <TrendingUp className="w-5 h-5 text-green-600" />
               </div>
             </div>
-            <p className="text-sm font-medium text-gray-600">Monthly Income</p>
+            <p className="text-sm font-medium text-gray-600">Monthly Income ({monthLabel})</p>
             <p className="text-2xl font-bold text-gray-900 mt-1">{formatRupees(healthData.totalIncome)}</p>
           </div>
 
@@ -165,7 +173,7 @@ export default function FinancialHealthPage() {
                 <TrendingDown className="w-5 h-5 text-red-600" />
               </div>
             </div>
-            <p className="text-sm font-medium text-gray-600">Monthly Expenses</p>
+            <p className="text-sm font-medium text-gray-600">Monthly Expenses ({monthLabel})</p>
             <p className="text-2xl font-bold text-gray-900 mt-1">{formatRupees(healthData.totalExpenses)}</p>
           </div>
 

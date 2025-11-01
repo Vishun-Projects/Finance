@@ -1,9 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+// Configure route caching - external API data
+export const dynamic = 'force-dynamic';
+export const revalidate = 300; // Revalidate every 5 minutes
+
 // Cache for exchange rates to avoid hitting external API too frequently
 let cachedRates: { [key: string]: number } = {};
 let lastFetchTime = 0;
 const CACHE_DURATION = 60000; // 1 minute
+
+// Export function to clear currency rates cache
+export function clearCurrencyRatesCache(): void {
+  cachedRates = {};
+  lastFetchTime = 0;
+  console.log('✅ Currency rates cache cleared');
+}
+
+// Export function to get currency cache stats
+export function getCurrencyCacheStats(): { hasCache: boolean; lastFetchTime: string | null } {
+  return {
+    hasCache: Object.keys(cachedRates).length > 0,
+    lastFetchTime: lastFetchTime ? new Date(lastFetchTime).toISOString() : null
+  };
+}
 
 export async function GET(request: NextRequest) {
   try {

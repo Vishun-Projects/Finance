@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '../../../lib/db';
 
+// Configure route caching - user-specific dynamic data
+export const dynamic = 'force-dynamic';
+export const revalidate = 60; // Revalidate every minute
+
 export async function GET(request: NextRequest) {
   console.log('🔍 DEADLINES GET - Starting request');
   try {

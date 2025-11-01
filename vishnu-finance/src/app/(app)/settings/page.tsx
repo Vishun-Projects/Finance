@@ -6,8 +6,6 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { useCurrency } from '../../../contexts/CurrencyContext';
 import { useToast } from '../../../contexts/ToastContext';
 import { useNotifications } from '../../../lib/notifications';
-import ToastTest from '../../../components/ToastTest';
-import CurrencyTest from '../../../components/CurrencyTest';
 import { 
   User, 
   Bell, 
@@ -178,9 +176,6 @@ export default function SettingsPage() {
           <p className="text-muted-foreground mt-2">Configure your account and preferences</p>
         </div>
 
-        {/* Test Components - Remove these after testing */}
-        <ToastTest />
-        <CurrencyTest />
 
         {/* Settings Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">

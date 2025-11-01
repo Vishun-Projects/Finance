@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '../../../lib/db';
 
+// Configure route caching - user-specific dynamic data (changes infrequently)
+export const dynamic = 'force-dynamic';
+export const revalidate = 600; // Revalidate every 10 minutes (salary changes rarely)
+
 export async function GET(request: NextRequest) {
   console.log('🔍 SALARY STRUCTURE GET - Starting request');
   try {

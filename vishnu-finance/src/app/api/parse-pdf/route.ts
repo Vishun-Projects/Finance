@@ -12,6 +12,8 @@ export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
     const file = formData.get('pdf') as File;
+    const bankHint = (formData.get('bank') as string | null)?.toLowerCase() || '';
+    const dryRun = (formData.get('dryRun') as string | null) === 'true';
     
     console.log('🔍 PDF API: Form data received');
     console.log('🔍 PDF API: File details:', {
@@ -48,54 +50,66 @@ export async function POST(request: NextRequest) {
 
     try {
       // Update the Python script to use the uploaded file
-      const pythonScript = join(toolsDir, 'bank_statement_parser.py');
       const csvOutput = join(uploadsDir, `extracted_${Date.now()}.csv`);
-      const dbOutput = join(uploadsDir, `transactions_${Date.now()}.db`);
       
-      // Create a temporary Python script with the accurate parser
+      // Create a temporary Python script preferring enhanced_bank_parser (JSON stdout)
       const tempScript = `
 import sys
 import os
 sys.path.append(r'${toolsDir.replace(/\\/g, '\\\\')}')
 
-# Update the configuration
 PDF_FILE = r"${filepath.replace(/\\/g, '\\\\')}"
+BANK_HINT = r"${bankHint}"
 CSV_FILE = r"${csvOutput.replace(/\\/g, '\\\\')}"
-DB_FILE = r"${dbOutput.replace(/\\/g, '\\\\')}"
-
-# Import the accurate parser
-from accurate_parser import parse_bank_statement_accurately
 from pathlib import Path
 import pandas as pd
+import json
 
 def main():
     pdf_path = Path(PDF_FILE)
     if not pdf_path.exists():
         raise FileNotFoundError(f"PDF not found: {pdf_path}")
 
-    print(f"Extracting transactions from: {pdf_path.name}")
-
-    df = parse_bank_statement_accurately(pdf_path)
+    df = None
+    try:
+        from enhanced_bank_parser import parse_bank_statement_advanced
+        df = parse_bank_statement_advanced(pdf_path, bank_hint=BANK_HINT)
+    except Exception as e:
+        # Fallback
+        from accurate_parser import parse_bank_statement_accurately
+        df = parse_bank_statement_accurately(pdf_path)
     
     if df.empty:
-        print("No transactions found")
+        print(json.dumps({"success": True, "transactions": [], "count": 0}))
         return
     
-    # Convert dates
-    df["date_iso"] = pd.to_datetime(df["date"], errors="coerce").dt.date
-    
-    # Save to CSV and DB
-    df.to_csv(CSV_FILE, index=False)
-    
-    import sqlite3
-    conn = sqlite3.connect(DB_FILE)
-    df.to_sql("transactions", conn, if_exists="replace", index=False)
-    conn.commit()
-    conn.close()
-
-    print(f"SUCCESS: Extracted {len(df)} transactions.")
-    print(f"CSV saved to: {CSV_FILE}")
-    print(f"SQLite DB saved to: {DB_FILE}")
+    # Convert dates and ensure JSON-serializable
+    df["date_iso"] = pd.to_datetime(df.get("date", pd.Series(dtype=str)), errors="coerce").dt.strftime('%Y-%m-%d')
+    # Best-effort: stringify any remaining date/datetime columns
+    for col in df.columns:
+        if pd.api.types.is_datetime64_any_dtype(df[col]):
+            df[col] = df[col].dt.strftime('%Y-%m-%d')
+    # Persist CSV as a fallback for the Node layer
+    try:
+        df.to_csv(CSV_FILE, index=False)
+    except Exception:
+        pass
+    # Use pandas to_json for safe serialization
+    try:
+        json_records = df.to_json(orient='records')
+        print(json.dumps({"success": True, "transactions": json.loads(json_records), "count": int(len(df))}))
+    except Exception:
+        # Final fallback: basic dict conversion with string casting
+        records = []
+        for _, row in df.iterrows():
+            obj = {}
+            for k, v in row.items():
+                if hasattr(v, 'isoformat'):
+                    obj[k] = v.isoformat()
+                else:
+                    obj[k] = str(v) if not isinstance(v, (int, float)) else v
+            records.append(obj)
+        print(json.dumps({"success": True, "transactions": records, "count": len(records)}))
 
 if __name__ == "__main__":
     main()
@@ -108,76 +122,70 @@ if __name__ == "__main__":
       console.log('🔍 PDF API: Executing Python script:', tempScriptPath);
       console.log('🔍 PDF API: Python command:', `python "${tempScriptPath}"`);
       
-      const { stdout, stderr } = await execAsync(`python "${tempScriptPath}"`);
+      const { stdout, stderr } = await execAsync(`python "${tempScriptPath}"`, { timeout: 90_000 });
       
       console.log('🔍 PDF API: Python stdout:', stdout);
-      if (stderr) {
-        console.log('⚠️ PDF API: Python stderr:', stderr);
-      }
+      if (stderr) console.log('⚠️ PDF API: Python stderr:', stderr);
       
-      // Clean up temporary script
-      await unlink(tempScriptPath);
-      console.log('✅ PDF API: Temporary script cleaned up');
+      // Keep temporary script for later cleanup
+      console.log('📁 PDF API: Temporary script will be cleaned up after import');
 
-      if (stderr && !stdout.includes('SUCCESS')) {
-        console.error('❌ PDF API: Python script error:', stderr);
-        return NextResponse.json({ 
-          error: 'Failed to parse PDF. Please ensure it\'s a valid bank statement.',
-          details: stderr 
-        }, { status: 500 });
-      }
-
-      // Read the generated CSV
-      let csvContent;
+      // Parse JSON from stdout robustly; fallback to CSV file
+      let transactions: any[] = [];
       try {
-        csvContent = await import('fs').then(fs => fs.promises.readFile(csvOutput, 'utf-8'));
-      } catch (error) {
-        console.error('Error reading CSV file:', error);
-        return NextResponse.json({ 
-          error: 'Failed to read parsed data. Please try again.' 
-        }, { status: 500 });
-      }
-      
-      // Parse CSV to return structured data
-      const lines = csvContent.split('\n').filter(line => line.trim());
-      if (lines.length < 2) {
-        return NextResponse.json({ 
-          error: 'No transactions found in PDF. Please ensure it\'s a valid bank statement.' 
-        }, { status: 400 });
+        const trimmed = stdout.trim();
+        let jsonText = '';
+        const firstBrace = trimmed.lastIndexOf('{');
+        const lastBrace = trimmed.lastIndexOf('}');
+        if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+          jsonText = trimmed.slice(firstBrace, lastBrace + 1);
+        }
+        if (jsonText) {
+          const parsed = JSON.parse(jsonText);
+          transactions = Array.isArray(parsed?.transactions) ? parsed.transactions : [];
+        }
+      } catch {}
+
+      if (!transactions.length) {
+        try {
+          const csvContent = await import('fs').then(fs => fs.promises.readFile(csvOutput, 'utf-8'));
+          const lines = csvContent.split('\n').filter(line => line.trim());
+          if (lines.length >= 2) {
+            const headers = lines[0].split(',');
+            const rows: any[] = [];
+            for (let i = 1; i < lines.length; i++) {
+              const values = lines[i].split(',');
+              if (values.every(v => !v.trim())) continue;
+              const row: any = {};
+              headers.forEach((h, idx) => {
+                row[h.trim()] = values[idx]?.trim() || '';
+              });
+              rows.push(row);
+            }
+            transactions = rows;
+          }
+        } catch {}
       }
 
-      const headers = lines[0].split(',');
-      const transactions = [];
-
-      for (let i = 1; i < lines.length; i++) {
-        const values = lines[i].split(',');
-        if (values.every(v => !v.trim())) continue;
-        
-        const transaction: any = {};
-        headers.forEach((header, index) => {
-          transaction[header.trim()] = values[index]?.trim() || '';
+      if (!transactions.length) {
+        return NextResponse.json({ 
+          success: true, 
+          transactions: [], 
+          count: 0,
+          tempFiles: [filepath, csvOutput, tempScriptPath].filter(Boolean)
         });
-        transactions.push(transaction);
       }
 
-      if (transactions.length === 0) {
-        return NextResponse.json({ 
-          error: 'No valid transactions found in PDF. Please check the format.' 
-        }, { status: 400 });
-      }
-
-      // Clean up files
-      await unlink(filepath);
-      await unlink(csvOutput);
-      await unlink(dbOutput);
+      // Keep files for cleanup after successful import
+      console.log('📁 PDF API: Keeping files for import:', { filepath, csvOutput, tempScriptPath });
 
       console.log('✅ PDF API: Success! Returning', transactions.length, 'transactions');
       
-      return NextResponse.json({
-        success: true,
-        transactions,
+      return NextResponse.json({ 
+        success: true, 
+        transactions, 
         count: transactions.length,
-        message: `Successfully parsed ${transactions.length} transactions from PDF`
+        tempFiles: [filepath, csvOutput, tempScriptPath].filter(Boolean)
       });
 
     } catch (error) {

@@ -8,16 +8,34 @@ import {
   Calendar,
   PiggyBank,
   Activity,
-  RefreshCw
+  RefreshCw,
+  Filter,
+  DollarSign,
+  ArrowUpRight,
+  ArrowDownRight,
+  Wallet
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { formatRupees } from '../lib/utils';
 import Link from 'next/link';
-import ModernCard from './ModernCard';
-import ModernGrid from './ModernGrid';
-import ModernPageLayout from './ModernPageLayout';
 import UserValidation from './UserValidation';
 import PageSkeleton from './PageSkeleton';
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer
+} from 'recharts';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { Button } from './ui/button';
+import { Badge } from './ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { DateRangePicker } from './ui/date-range-picker';
+import { DateRange } from 'react-day-picker';
 
 interface SimpleDashboardData {
   totalIncome: number;
@@ -35,26 +53,77 @@ interface SimpleDashboardData {
     date: string;
   }>;
   financialHealthScore: number;
+  monthlyTrends: Array<{
+    month: string;
+    income: number;
+    expenses: number;
+    savings: number;
+  }>;
+  categoryBreakdown: Array<{
+    name: string;
+    amount: number;
+  }>;
 }
 
 export default function SimpleDashboard() {
   const { user, loading: authLoading } = useAuth();
   const [dashboardData, setDashboardData] = useState<SimpleDashboardData | null>(null);
-  const [loading, setLoadingState] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [isUpdating, setIsUpdating] = useState(false);
+  
+  // Date range state with single selector approach
+  const now = new Date();
+  const defaultStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const defaultEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+  
+  const [startDate, setStartDate] = useState(defaultStart.toISOString().split('T')[0]);
+  const [endDate, setEndDate] = useState(defaultEnd.toISOString().split('T')[0]);
+  const [quickRange, setQuickRange] = useState<'month' | 'quarter' | 'year' | 'custom'>('month');
+  
+  // Date range for the date range picker component
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({
+    from: defaultStart,
+    to: defaultEnd,
+  });
 
-  // Load data
+  // Load data on mount
   useEffect(() => {
     if (user && !authLoading) {
-      loadDashboardData();
+      loadDashboardData(true);
     }
-  }, [user, authLoading]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, authLoading]);
 
-  const loadDashboardData = async () => {
+  // Update data when date range changes (without blank screen)
+  useEffect(() => {
+    if (user && !authLoading && dashboardData) {
+      loadDashboardData(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startDate, endDate]);
+
+  const loadDashboardData = async (isInitial = false) => {
     if (!user) return;
 
     try {
-      setLoadingState(true);
-      const response = await fetch(`/api/dashboard-simple?userId=${user.id}`);
+      if (isInitial) {
+        setInitialLoading(true);
+      } else {
+        setIsUpdating(true);
+      }
+
+      // Add cache-busting only for refresh button, otherwise use cache
+      const cacheBuster = isInitial ? '' : `&_=${Date.now()}`;
+      const response = await fetch(
+        `/api/dashboard-simple?userId=${user.id}&start=${startDate}&end=${endDate}${cacheBuster}`,
+        {
+          // Optimize fetch with compression and caching hints
+          headers: {
+            'Accept': 'application/json',
+          },
+          cache: isInitial ? 'default' : 'no-store'
+        }
+      );
 
       if (!response.ok) {
         throw new Error('Failed to fetch dashboard data');
@@ -65,18 +134,78 @@ export default function SimpleDashboard() {
     } catch (error) {
       console.error('Error loading dashboard data:', error);
     } finally {
-      setLoadingState(false);
+      if (isInitial) {
+        setInitialLoading(false);
+      } else {
+        setIsUpdating(false);
+      }
     }
   };
 
   const handleRefresh = async () => {
-    await loadDashboardData();
+    await loadDashboardData(false);
   };
+
+  const handleQuickRangeChange = (range: 'month' | 'quarter' | 'year' | 'all' | 'custom') => {
+    if (range === 'custom') {
+      setQuickRange('custom');
+      return;
+    }
+
+    const today = new Date();
+    let start: Date, end: Date;
+    
+    switch (range) {
+      case 'month':
+        start = new Date(today.getFullYear(), today.getMonth(), 1);
+        end = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59, 999);
+        setQuickRange('month');
+        break;
+      case 'quarter':
+        const quarter = Math.floor(today.getMonth() / 3);
+        start = new Date(today.getFullYear(), quarter * 3, 1);
+        end = new Date(today.getFullYear(), (quarter + 1) * 3, 0, 23, 59, 59, 999);
+        setQuickRange('quarter');
+        break;
+      case 'year':
+        start = new Date(today.getFullYear(), 0, 1);
+        end = new Date(today.getFullYear(), 11, 31, 23, 59, 59, 999);
+        setQuickRange('year');
+        break;
+      case 'all':
+        start = new Date(2020, 0, 1);
+        end = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59, 999);
+        setQuickRange('custom');
+        break;
+    }
+    
+    setStartDate(start.toISOString().split('T')[0]);
+    setEndDate(end.toISOString().split('T')[0]);
+    setDateRange({ from: start, to: end });
+  };
+
+  const handleDateRangeChange = (range: DateRange | undefined) => {
+    if (range?.from && range?.to) {
+      const start = new Date(range.from);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(range.to);
+      end.setHours(23, 59, 59, 999);
+      
+      setStartDate(start.toISOString().split('T')[0]);
+      setEndDate(end.toISOString().split('T')[0]);
+      setDateRange(range);
+      setQuickRange('custom');
+    } else if (range?.from) {
+      // Only start date selected, wait for end date
+      setDateRange(range);
+    }
+  };
+
 
   // Show authentication loading
   if (authLoading) {
     return (
-      <div className="container-fluid px-6">
+      <div className="container-fluid px-6 py-8">
         <PageSkeleton />
       </div>
     );
@@ -85,16 +214,13 @@ export default function SimpleDashboard() {
   // Show login prompt if not authenticated
   if (!user) {
     return (
-      <div className="min-h-screen bg-white pt-16">
+      <div className="min-h-screen bg-background pt-16">
         <div className="container-fluid px-6">
           <div className="text-center py-12">
-            <h3 className="text-xl font-semibold text-gray-900 mb-4">Please Login</h3>
-            <p className="text-gray-600 mb-8">You need to be logged in to view your dashboard</p>
-            <Link 
-              href="/login" 
-              className="inline-flex items-center px-4 py-2 bg-gray-900 text-white font-medium rounded-lg hover:bg-gray-800 transition-colors"
-            >
-              Go to Login
+            <h3 className="text-xl font-semibold text-foreground mb-4">Please Login</h3>
+            <p className="text-muted-foreground mb-8">You need to be logged in to view your dashboard</p>
+            <Link href="/login">
+              <Button>Go to Login</Button>
             </Link>
           </div>
         </div>
@@ -102,9 +228,9 @@ export default function SimpleDashboard() {
     );
   }
 
-  if (loading) {
+  if (initialLoading) {
     return (
-      <div className="container-fluid px-6">
+      <div className="container-fluid px-6 py-8">
         <PageSkeleton />
       </div>
     );
@@ -112,11 +238,11 @@ export default function SimpleDashboard() {
 
   if (!dashboardData) {
     return (
-      <div className="min-h-screen bg-white pt-16">
+      <div className="min-h-screen bg-background pt-16">
         <div className="container-fluid px-6">
           <div className="text-center py-12">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">No Data Available</h3>
-            <p className="text-gray-600">Start by adding your first income or expense</p>
+            <h3 className="text-lg font-semibold text-foreground mb-2">No Data Available</h3>
+            <p className="text-muted-foreground">Start by adding your first income or expense</p>
           </div>
         </div>
       </div>
@@ -124,189 +250,297 @@ export default function SimpleDashboard() {
   }
 
   return (
-    <ModernPageLayout
-      title="Dashboard"
-      subtitle={`Welcome back, ${user.name || user.email}!`}
-      actions={
-        <button
-          onClick={handleRefresh}
-          className="flex items-center space-x-2 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors"
-        >
-          <RefreshCw className="w-4 h-4" />
-          <span>Refresh</span>
-        </button>
-      }
-    >
+    <div className="container-fluid px-4 sm:px-6 py-6 space-y-6">
+      {/* Header Section */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">Financial Dashboard</h1>
+          <p className="text-muted-foreground mt-1">Welcome back, {user.name || user.email}</p>
+        </div>
+        <Button onClick={handleRefresh} variant="outline" size="sm" disabled={isUpdating}>
+          <RefreshCw className={`w-4 h-4 ${isUpdating ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
+      </div>
+
       {/* User Validation */}
       <UserValidation />
 
-      {/* Key Metrics */}
-      <ModernGrid columns={3} gap="lg">
-        <ModernCard hover>
+      {/* Date Range Filter - Compact */}
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Filter className="w-4 h-4 text-muted-foreground" />
+              <CardTitle className="text-base">Date Range</CardTitle>
+            </div>
+            {isUpdating && (
+              <Badge variant="secondary" className="gap-1">
+                <RefreshCw className="w-3 h-3 animate-spin" />
+                Updating
+              </Badge>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Quick Range Selector */}
+          <div className="flex flex-wrap items-center gap-3">
+            <Select value={quickRange} onValueChange={(value) => handleQuickRangeChange(value as any)}>
+              <SelectTrigger className="w-[140px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="month">This Month</SelectItem>
+                <SelectItem value="quarter">This Quarter</SelectItem>
+                <SelectItem value="year">This Year</SelectItem>
+                <SelectItem value="custom">Custom Range</SelectItem>
+              </SelectContent>
+            </Select>
+            
+            <DateRangePicker
+              date={dateRange}
+              onDateChange={handleDateRangeChange}
+              disabled={isUpdating}
+              className="flex-1 min-w-[280px]"
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Key Financial Metrics */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className={isUpdating ? 'opacity-75 transition-opacity' : ''}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Total Income</CardTitle>
+            <div className="h-8 w-8 rounded-full bg-emerald-100 dark:bg-emerald-900/20 flex items-center justify-center">
+              <TrendingUp className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-foreground transition-all">
+              {formatRupees(dashboardData.totalIncome)}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">For selected period</p>
+          </CardContent>
+        </Card>
+
+        <Card className={isUpdating ? 'opacity-75 transition-opacity' : ''}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Total Expenses</CardTitle>
+            <div className="h-8 w-8 rounded-full bg-red-100 dark:bg-red-900/20 flex items-center justify-center">
+              <TrendingDown className="h-4 w-4 text-red-600 dark:text-red-400" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-foreground transition-all">
+              {formatRupees(dashboardData.totalExpenses)}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">For selected period</p>
+          </CardContent>
+        </Card>
+
+        <Card className={isUpdating ? 'opacity-75 transition-opacity' : ''}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Net Savings</CardTitle>
+            <div className="h-8 w-8 rounded-full bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center">
+              <PiggyBank className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className={`text-2xl font-bold transition-all ${
+              dashboardData.netSavings >= 0 
+                ? 'text-foreground' 
+                : 'text-red-600 dark:text-red-400'
+            }`}>
+              {formatRupees(dashboardData.netSavings)}
+            </div>
+            <div className="flex items-center gap-2 mt-1">
+              <Badge variant={dashboardData.savingsRate >= 20 ? 'default' : 'secondary'} className="text-xs">
+                {dashboardData.savingsRate.toFixed(1)}% savings rate
+              </Badge>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className={isUpdating ? 'opacity-75 transition-opacity' : ''}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Health Score</CardTitle>
+            <div className="h-8 w-8 rounded-full bg-purple-100 dark:bg-purple-900/20 flex items-center justify-center">
+              <Activity className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-foreground">
+              {dashboardData.financialHealthScore}
+              <span className="text-sm font-normal text-muted-foreground">/100</span>
+            </div>
+            <div className="mt-2 h-2 bg-muted rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-primary transition-all duration-300"
+                style={{ width: `${dashboardData.financialHealthScore}%` }}
+              />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Chart Section */}
+      <Card className={isUpdating ? 'opacity-75 transition-opacity' : ''}>
+        <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Total Income</p>
-              <p className="text-2xl font-semibold text-gray-900">{formatRupees(dashboardData.totalIncome)}</p>
+              <CardTitle>Income vs Expenses Trend</CardTitle>
+              <CardDescription>Financial overview for the selected period</CardDescription>
             </div>
-            <div className="p-3 bg-green-50 rounded-lg">
-              <TrendingUp className="w-6 h-6 text-green-600" />
-            </div>
+            {isUpdating && (
+              <Badge variant="secondary" className="gap-1">
+                <RefreshCw className="w-3 h-3 animate-spin" />
+                Loading
+              </Badge>
+            )}
           </div>
-        </ModernCard>
-
-        <ModernCard hover>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Total Expenses</p>
-              <p className="text-2xl font-semibold text-gray-900">{formatRupees(dashboardData.totalExpenses)}</p>
-            </div>
-            <div className="p-3 bg-red-50 rounded-lg">
-              <TrendingDown className="w-6 h-6 text-red-600" />
-            </div>
-          </div>
-        </ModernCard>
-
-        <ModernCard hover>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Net Savings</p>
-              <p className={`text-2xl font-semibold ${dashboardData.netSavings >= 0 ? 'text-gray-900' : 'text-red-600'}`}>
-                {formatRupees(dashboardData.netSavings)}
-              </p>
-              <p className="text-sm text-gray-500">{dashboardData.savingsRate.toFixed(1)}% savings rate</p>
-            </div>
-            <div className="p-3 bg-blue-50 rounded-lg">
-              <PiggyBank className="w-6 h-6 text-blue-600" />
-            </div>
-          </div>
-        </ModernCard>
-      </ModernGrid>
-
-      {/* Financial Health */}
-      <ModernCard>
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-900">Financial Health</h3>
-          <div className="flex items-center space-x-2">
-            <Activity className="w-5 h-5 text-gray-400" />
-            <span className="text-2xl font-semibold text-gray-900">{dashboardData.financialHealthScore}/100</span>
-          </div>
-        </div>
-        <div className="w-full bg-gray-200 rounded-full h-3">
-          <div 
-            className="bg-gray-900 h-3 rounded-full transition-all duration-300"
-            style={{ width: `${dashboardData.financialHealthScore}%` }}
-          ></div>
-        </div>
-      </ModernCard>
-
-      {/* Quick Actions */}
-      <ModernCard>
-        <h3 className="text-lg font-semibold text-gray-900 mb-6">Quick Actions</h3>
-        <ModernGrid columns={3} gap="md">
-          <Link href="/income">
-            <ModernCard hover className="h-full">
-              <div className="flex items-center space-x-3">
-                <div className="p-3 bg-green-50 rounded-lg">
-                  <TrendingUp className="w-6 h-6 text-green-600" />
-                </div>
-                <div>
-                  <p className="font-medium text-gray-900">Add Income</p>
-                  <p className="text-sm text-gray-600">Record new income</p>
-                </div>
+        </CardHeader>
+        <CardContent>
+          {dashboardData.monthlyTrends && dashboardData.monthlyTrends.length > 0 ? (
+            <ResponsiveContainer width="100%" height={400}>
+              <LineChart data={dashboardData.monthlyTrends} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted))" />
+                <XAxis 
+                  dataKey="month" 
+                  stroke="hsl(var(--muted-foreground))"
+                  style={{ fontSize: '12px' }}
+                />
+                <YAxis 
+                  tickFormatter={(value) => `₹${(value / 1000).toFixed(0)}k`}
+                  stroke="hsl(var(--muted-foreground))"
+                  style={{ fontSize: '12px' }}
+                />
+                <Tooltip 
+                  formatter={(value: number) => formatRupees(value)}
+                  labelStyle={{ color: 'hsl(var(--foreground))', fontWeight: 600 }}
+                  contentStyle={{ 
+                    backgroundColor: 'hsl(var(--background))', 
+                    border: '1px solid hsl(var(--border))',
+                    borderRadius: '8px',
+                  }}
+                />
+                <Legend />
+                <Line 
+                  type="monotone" 
+                  dataKey="income" 
+                  stroke="hsl(142, 76%, 36%)" 
+                  strokeWidth={3}
+                  name="Income"
+                  dot={{ fill: 'hsl(142, 76%, 36%)', r: 4 }}
+                  activeDot={{ r: 6 }}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="expenses" 
+                  stroke="hsl(0, 84%, 60%)" 
+                  strokeWidth={3}
+                  name="Expenses"
+                  dot={{ fill: 'hsl(0, 84%, 60%)', r: 4 }}
+                  activeDot={{ r: 6 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-[400px] flex items-center justify-center text-muted-foreground bg-muted/50 rounded-lg">
+              <div className="text-center">
+                <p className="font-medium mb-1">No data available</p>
+                <p className="text-sm">Try selecting a different date range</p>
               </div>
-            </ModernCard>
-          </Link>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
-          <Link href="/expenses">
-            <ModernCard hover className="h-full">
-              <div className="flex items-center space-x-3">
-                <div className="p-3 bg-red-50 rounded-lg">
-                  <TrendingDown className="w-6 h-6 text-red-600" />
-                </div>
-                <div>
-                  <p className="font-medium text-gray-900">Add Expense</p>
-                  <p className="text-sm text-gray-600">Record new expense</p>
-                </div>
+      {/* Secondary Metrics & Quick Actions */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Goals & Deadlines */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Goals & Deadlines</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Target className="w-4 h-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">Active Goals</span>
               </div>
-            </ModernCard>
-          </Link>
-
-          <Link href="/goals">
-            <ModernCard hover className="h-full">
-              <div className="flex items-center space-x-3">
-                <div className="p-3 bg-blue-50 rounded-lg">
-                  <Target className="w-6 h-6 text-blue-600" />
-                </div>
-                <div>
-                  <p className="font-medium text-gray-900">Set Goal</p>
-                  <p className="text-sm text-gray-600">Create financial goal</p>
-                </div>
+              <Badge variant="secondary">{dashboardData.activeGoals}</Badge>
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">Upcoming Deadlines</span>
               </div>
-            </ModernCard>
-          </Link>
-        </ModernGrid>
-      </ModernCard>
+              <Badge variant="secondary">{dashboardData.upcomingDeadlines}</Badge>
+            </div>
+          </CardContent>
+        </Card>
 
-      {/* Recent Transactions */}
-      {dashboardData.recentTransactions.length > 0 && (
-        <ModernCard>
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-semibold text-gray-900">Recent Transactions</h3>
-            <Link 
-              href="/transactions"
-              className="text-sm text-gray-600 hover:text-gray-900 font-medium"
-            >
-              View all →
+        {/* Quick Actions */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Quick Actions</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <Link href="/income" className="block">
+              <Button variant="outline" className="w-full justify-start" size="sm">
+                <TrendingUp className="w-4 h-4 mr-2" />
+                Add Income
+              </Button>
             </Link>
-          </div>
-          <div className="space-y-4">
-            {dashboardData.recentTransactions.slice(0, 5).map((transaction) => (
-              <div key={transaction.id} className="flex items-center justify-between py-3 border-b border-gray-100 last:border-b-0">
-                <div className="flex items-center space-x-3">
-                  <div className={`w-3 h-3 rounded-full ${transaction.amount > 0 ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                  <div>
-                    <p className="font-medium text-gray-900">{transaction.title}</p>
-                    <p className="text-sm text-gray-600">{transaction.category}</p>
+            <Link href="/expenses" className="block">
+              <Button variant="outline" className="w-full justify-start" size="sm">
+                <TrendingDown className="w-4 h-4 mr-2" />
+                Add Expense
+              </Button>
+            </Link>
+            <Link href="/goals" className="block">
+              <Button variant="outline" className="w-full justify-start" size="sm">
+                <Target className="w-4 h-4 mr-2" />
+                Set Goal
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+
+        {/* Recent Transactions Preview */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Recent Transactions</CardTitle>
+            <CardDescription>Latest {Math.min(5, dashboardData.recentTransactions.length)} transactions</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {dashboardData.recentTransactions.length > 0 ? (
+              <div className="space-y-3">
+                {dashboardData.recentTransactions.slice(0, 5).map((transaction) => (
+                  <div key={transaction.id} className="flex items-center justify-between py-2 border-b last:border-0">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-2 h-2 rounded-full ${transaction.amount > 0 ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                      <div>
+                        <p className="text-sm font-medium text-foreground">{transaction.title}</p>
+                        <p className="text-xs text-muted-foreground">{transaction.category}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className={`text-sm font-semibold ${transaction.amount > 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                        {transaction.amount > 0 ? '+' : ''}{formatRupees(Math.abs(transaction.amount))}
+                      </p>
+                      <p className="text-xs text-muted-foreground">{new Date(transaction.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p>
+                    </div>
                   </div>
-                </div>
-                <div className="text-right">
-                  <p className={`font-medium ${transaction.amount > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {transaction.amount > 0 ? '+' : ''}{formatRupees(transaction.amount)}
-                  </p>
-                  <p className="text-sm text-gray-600">{transaction.date}</p>
-                </div>
+                ))}
               </div>
-            ))}
-          </div>
-        </ModernCard>
-      )}
-
-      {/* Summary Stats */}
-      <ModernGrid columns={2} gap="lg">
-        <ModernCard hover>
-          <div className="flex items-center space-x-4">
-            <div className="p-3 bg-blue-50 rounded-lg">
-              <Target className="w-6 h-6 text-blue-600" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-gray-600">Active Goals</p>
-              <p className="text-2xl font-semibold text-gray-900">{dashboardData.activeGoals}</p>
-            </div>
-          </div>
-        </ModernCard>
-
-        <ModernCard hover>
-          <div className="flex items-center space-x-4">
-            <div className="p-3 bg-orange-50 rounded-lg">
-              <Calendar className="w-6 h-6 text-orange-600" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-gray-600">Upcoming Deadlines</p>
-              <p className="text-2xl font-semibold text-gray-900">{dashboardData.upcomingDeadlines}</p>
-            </div>
-          </div>
-        </ModernCard>
-      </ModernGrid>
-    </ModernPageLayout>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-4">No recent transactions</p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
   );
 }

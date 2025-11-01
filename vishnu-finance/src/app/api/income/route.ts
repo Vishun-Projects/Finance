@@ -1,11 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '../../../lib/db';
 
+// Configure route caching - user-specific dynamic data
+export const dynamic = 'force-dynamic';
+export const revalidate = 300; // Revalidate every 5 minutes (income sources change less frequently)
+
 export async function GET(request: NextRequest) {
   console.log('🔍 INCOME GET - Starting request');
   try {
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
+    const start = searchParams.get('start');
+    const end = searchParams.get('end');
     console.log('🔍 INCOME GET - User ID:', userId);
 
     if (!userId) {
@@ -14,10 +20,18 @@ export async function GET(request: NextRequest) {
     }
 
     console.log('🔍 INCOME GET - Fetching from database for user:', userId);
-    // Fetch incomes from database using correct model name
+    const dateFilter = start && end ? {
+      gte: new Date(start),
+      lte: new Date(new Date(end).setHours(23,59,59,999))
+    } : undefined;
+
+    // Fetch incomes (income sources) optionally date-scoped by startDate
     const incomes = await (prisma as any).incomeSource.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' }
+      where: {
+        userId,
+        ...(dateFilter ? { startDate: dateFilter } : {})
+      },
+      orderBy: { startDate: 'desc' }
     });
 
     console.log('✅ INCOME GET - Found incomes:', incomes.length, 'records');

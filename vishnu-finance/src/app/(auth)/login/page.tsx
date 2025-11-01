@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useLoading } from '../../../contexts/LoadingContext';
 import { TrendingUp, Eye, EyeOff, Mail, Lock, AlertCircle } from 'lucide-react';
-import ModernCard from '../../../components/ModernCard';
+import ModernCard from '@/components/layout/ModernCard';
 
 export default function LoginPage() {
   const [formData, setFormData] = useState({
@@ -29,6 +29,7 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const startTime = Date.now();
     setIsLoading(true);
     setError('');
     setLoading(true, 'Signing you in...');
@@ -37,6 +38,7 @@ export default function LoginPage() {
       const success = await login(formData.email, formData.password);
       
       if (success) {
+        console.log(`⏱️ LOGIN PAGE - Login flow complete in ${Date.now() - startTime}ms, redirecting...`);
         router.push('/dashboard');
       } else {
         setError('Invalid email or password');

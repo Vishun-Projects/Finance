@@ -228,6 +228,20 @@ export class QueryOptimizer {
   }
 }
 
+// Clear all cache entries
+export function clearAllCache(): void {
+  cache.clear();
+  console.log('✅ All API cache cleared');
+}
+
+// Get cache statistics
+export function getCacheStats(): { size: number; entries: string[] } {
+  return {
+    size: cache.size,
+    entries: Array.from(cache.keys())
+  };
+}
+
 // Cleanup old cache entries periodically
 setInterval(() => {
   const now = Date.now();

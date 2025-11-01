@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '../../../lib/db';
 
+// Configure route caching - user-specific dynamic data
+export const dynamic = 'force-dynamic';
+export const revalidate = 180; // Revalidate every 3 minutes
+
 export async function GET(request: NextRequest) {
   console.log('🔍 WISHLIST GET - Starting request');
   try {

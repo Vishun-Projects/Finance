@@ -25,13 +25,21 @@ export interface RefreshTokenPayload {
 export class AuthService {
   // Hash password
   static async hashPassword(password: string): Promise<string> {
-    const saltRounds = 12;
-    return bcrypt.hash(password, saltRounds);
+    const startTime = Date.now();
+    const saltRounds = 10; // Reduced from 12 to 10 for better performance (~100-200ms savings)
+    const hashed = await bcrypt.hash(password, saltRounds);
+    const duration = Date.now() - startTime;
+    console.log(`⏱️ HASH PASSWORD: ${duration}ms (saltRounds: ${saltRounds})`);
+    return hashed;
   }
 
   // Compare password
   static async comparePassword(password: string, hashedPassword: string): Promise<boolean> {
-    return bcrypt.compare(password, hashedPassword);
+    const startTime = Date.now();
+    const result = await bcrypt.compare(password, hashedPassword);
+    const duration = Date.now() - startTime;
+    console.log(`⏱️ COMPARE PASSWORD: ${duration}ms`);
+    return result;
   }
 
   // Generate access token
@@ -75,10 +83,15 @@ export class AuthService {
 
   // Register new user
   static async registerUser(email: string, password: string, name?: string) {
+    const startTime = Date.now();
+    console.log(`⏱️ REGISTER START: ${email}`);
+    
     // Check if user already exists
+    const dbStart1 = Date.now();
     const existingUser = await prisma.user.findUnique({
       where: { email }
     });
+    console.log(`⏱️ DB QUERY (findUnique): ${Date.now() - dbStart1}ms`);
 
     if (existingUser) {
       throw new Error('User already exists with this email');
@@ -88,6 +101,7 @@ export class AuthService {
     const hashedPassword = await this.hashPassword(password);
 
     // Create user
+    const dbStart2 = Date.now();
     const user = await prisma.user.create({
       data: {
         email,
@@ -95,6 +109,7 @@ export class AuthService {
         name: name || email.split('@')[0], // Use email prefix as default name
       }
     });
+    console.log(`⏱️ DB QUERY (create): ${Date.now() - dbStart2}ms`);
 
     // Generate token
     const token = this.generateToken({
@@ -103,6 +118,7 @@ export class AuthService {
       name: user.name || undefined
     });
 
+    console.log(`⏱️ REGISTER COMPLETE: ${Date.now() - startTime}ms`);
     return {
       user: {
         id: user.id,
@@ -115,13 +131,17 @@ export class AuthService {
 
   // Login user
   static async loginUser(email: string, password: string) {
+    const startTime = Date.now();
     console.log('🔐 LOGIN API - Starting login request');
     console.log('🔐 LOGIN API - Login attempt for email:', email);
+    console.log(`⏱️ LOGIN START: ${email}`);
 
     // Find user
+    const dbStart1 = Date.now();
     const user = await prisma.user.findUnique({
       where: { email }
     });
+    console.log(`⏱️ DB QUERY (findUnique): ${Date.now() - dbStart1}ms`);
 
     if (!user) {
       console.log('❌ LOGIN API - User not found for email:', email);
@@ -159,10 +179,12 @@ export class AuthService {
     }
 
     // Update last login
+    const dbStart2 = Date.now();
     await prisma.user.update({
       where: { id: user.id },
       data: { lastLogin: new Date() }
     });
+    console.log(`⏱️ DB QUERY (update): ${Date.now() - dbStart2}ms`);
 
     // Generate token
     const token = this.generateToken({
@@ -171,6 +193,7 @@ export class AuthService {
       name: user.name || undefined
     });
 
+    console.log(`⏱️ LOGIN COMPLETE: ${Date.now() - startTime}ms`);
     return {
       user: {
         id: user.id,
@@ -183,11 +206,13 @@ export class AuthService {
 
   // Get user by token
   static async getUserFromToken(token: string) {
+    const startTime = Date.now();
     const payload = this.verifyToken(token);
     if (!payload) {
       return null;
     }
 
+    const dbStart = Date.now();
     const user = await prisma.user.findUnique({
       where: { id: payload.userId },
       select: {
@@ -199,6 +224,7 @@ export class AuthService {
         createdAt: true
       }
     });
+    console.log(`⏱️ GET USER FROM TOKEN: ${Date.now() - startTime}ms (DB: ${Date.now() - dbStart}ms)`);
 
     return user;
   }

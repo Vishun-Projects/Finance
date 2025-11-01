@@ -134,9 +134,8 @@ if __name__ == "__main__":
         console.log('⚠️ Multi-Format API: Python stderr:', stderr);
       }
       
-      // Clean up temporary script
-      await unlink(tempScriptPath);
-      console.log('✅ Multi-Format API: Temporary script cleaned up');
+      // Keep temporary script for later cleanup
+      console.log('📁 Multi-Format API: Temporary script will be cleaned up after import');
 
       if (stderr && !stdout.includes('SUCCESS')) {
         console.error('❌ Multi-Format API: Python script error:', stderr);
@@ -181,13 +180,13 @@ if __name__ == "__main__":
 
       if (transactions.length === 0) {
         return NextResponse.json({ 
-          error: `No valid transactions found in ${fileType.toUpperCase()} file. Please check the format.` 
+          error: `No valid transactions found in ${fileType.toUpperCase()} file. Please check the format.`,
+          tempFiles: [filepath, csvOutput, tempScriptPath].filter(Boolean)
         }, { status: 400 });
       }
 
-      // Clean up files
-      await unlink(filepath);
-      await unlink(csvOutput);
+      // Keep files for cleanup after successful import
+      console.log('📁 Multi-Format API: Keeping files for import:', { filepath, csvOutput, tempScriptPath });
 
       console.log('✅ Multi-Format API: Success! Returning', transactions.length, 'transactions');
       
@@ -196,7 +195,8 @@ if __name__ == "__main__":
         transactions,
         count: transactions.length,
         fileType: fileType.toUpperCase(),
-        message: `Successfully parsed ${transactions.length} transactions from ${fileType.toUpperCase()} file`
+        message: `Successfully parsed ${transactions.length} transactions from ${fileType.toUpperCase()} file`,
+        tempFiles: [filepath, csvOutput, tempScriptPath].filter(Boolean)
       });
 
     } catch (error) {

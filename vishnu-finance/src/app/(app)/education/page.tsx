@@ -16,7 +16,7 @@ import {
   Award,
   ArrowRight
 } from 'lucide-react';
-import PageSkeleton from '../../../components/PageSkeleton';
+import PageSkeleton from '@/components/feedback/PageSkeleton';
 
 interface Course {
   id: string;

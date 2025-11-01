@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 
 export type Theme = 'light' | 'dark' | 'high-contrast';
@@ -72,7 +72,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     loadTheme();
   }, [user]);
 
-  const handleSetTheme = async (newTheme: Theme) => {
+  const handleSetTheme = useCallback(async (newTheme: Theme) => {
     setTheme(newTheme);
     
     if (user?.id) {
@@ -91,10 +91,18 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         console.error('Error saving theme:', error);
       }
     }
-  };
+  }, [user?.id]);
+
+  // Memoize context value to prevent unnecessary re-renders
+  const value = useMemo(() => ({
+    theme,
+    setTheme: handleSetTheme,
+    isDark,
+    isLoading,
+  }), [theme, handleSetTheme, isDark, isLoading]);
 
   return (
-    <ThemeContext.Provider value={{ theme, setTheme: handleSetTheme, isDark, isLoading }}>
+    <ThemeContext.Provider value={value}>
       {children}
     </ThemeContext.Provider>
   );

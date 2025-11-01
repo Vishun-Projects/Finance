@@ -34,6 +34,11 @@ interface Expense {
   paymentMethod?: string;
   receiptUrl?: string;
   notes?: string;
+  store?: string;
+  personName?: string;
+  commodity?: string;
+  upiId?: string;
+  accountNumber?: string;
 }
 
 export default function ExpenseManagement() {
@@ -45,6 +50,8 @@ export default function ExpenseManagement() {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState<string>('all');
+  const [filterStore, setFilterStore] = useState<string>('all');
+  const [filterCommodity, setFilterCommodity] = useState<string>('all');
   const [startDate, setStartDate] = useState(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
@@ -108,7 +115,12 @@ export default function ExpenseManagement() {
           description: expense.notes || '',
           paymentMethod: '',
           receiptUrl: '',
-          notes: expense.notes || ''
+          notes: expense.notes || '',
+          store: expense.store || '',
+          personName: expense.personName || '',
+          commodity: expense.notes || '', // commodity is stored in notes field
+          upiId: expense.upiId || '',
+          accountNumber: expense.accountNumber || ''
         }));
         setExpenses(transformedData);
       } else {
@@ -311,9 +323,29 @@ export default function ExpenseManagement() {
                          (expense.category || '').toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesCategory = filterCategory === 'all' || expense.category === filterCategory;
+    const matchesStore = filterStore === 'all' || 
+                         (expense.store && expense.store.toLowerCase().includes(filterStore.toLowerCase())) ||
+                         (expense.personName && expense.personName.toLowerCase().includes(filterStore.toLowerCase()));
+    const matchesCommodity = filterCommodity === 'all' || 
+                             (expense.commodity && expense.commodity.toLowerCase().includes(filterCommodity.toLowerCase()));
     
-    return matchesSearch && matchesCategory;
+    return matchesSearch && matchesCategory && matchesStore && matchesCommodity;
   });
+
+  const storesPersons = Array.from(new Set(
+    expenses
+      .map(e => [e.store, e.personName])
+      .flat()
+      .filter(Boolean)
+      .map(String)
+  ));
+  
+  const commodities = Array.from(new Set(
+    expenses
+      .map(e => e.commodity)
+      .filter(Boolean)
+      .map(String)
+  ));
 
   const totalExpenses = expenses.reduce((sum, expense) => sum + expense.amount, 0);
   const categories = Array.from(new Set(expenses.map(e => e.category)));
@@ -488,6 +520,26 @@ export default function ExpenseManagement() {
             <option key={category} value={category}>{category}</option>
           ))}
         </select>
+        <select
+            value={filterStore}
+            onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFilterStore(e.target.value)}
+            className="minimal-select"
+          >
+            <option value="all">All Stores/People</option>
+            {storesPersons.map(store => (
+              <option key={store} value={store}>{store}</option>
+            ))}
+          </select>
+          <select
+            value={filterCommodity}
+            onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFilterCommodity(e.target.value)}
+            className="minimal-select"
+          >
+            <option value="all">All Commodities</option>
+            {commodities.map(commodity => (
+              <option key={commodity} value={commodity}>{commodity}</option>
+            ))}
+          </select>
         <button className="minimal-button-small p-2">
           <Filter className="w-4 h-4" />
         </button>

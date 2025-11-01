@@ -1,6 +1,14 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Allow ESLint warnings during build (errors still fail)
+  eslint: {
+    ignoreDuringBuilds: false,
+  },
+  typescript: {
+    ignoreBuildErrors: false,
+  },
+  
   // Performance optimizations
   experimental: {
     // Enable modern React features and tree-shaking optimizations

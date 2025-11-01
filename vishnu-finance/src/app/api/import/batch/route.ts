@@ -27,17 +27,54 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ inserted: 0, skipped: 0, duplicates: 0 });
     }
 
+    // Helper to safely parse and validate dates with proper format handling
+    const parseDate = (dateInput: string | Date | null | undefined): Date | null => {
+      if (!dateInput) return null;
+      try {
+        let date: Date;
+        if (dateInput instanceof Date) {
+          date = dateInput;
+        } else {
+          const dateStr = dateInput.toString().trim();
+          // Check if already in ISO format (YYYY-MM-DD)
+          if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+            date = new Date(dateStr + 'T00:00:00'); // Add time to avoid timezone issues
+          } else {
+            date = new Date(dateStr);
+          }
+        }
+        
+        // Check if date is valid
+        if (isNaN(date.getTime())) return null;
+        
+        // Validate date is reasonable (year between 2020-2026)
+        const year = date.getFullYear();
+        if (year < 2020 || year > 2026) {
+          console.warn(`⚠️ Invalid date year: ${year} for date: ${dateInput}`);
+          return null;
+        }
+        
+        return date;
+      } catch (error) {
+        console.warn(`⚠️ Date parsing error for: ${dateInput}`, error);
+        return null;
+      }
+    };
+
     const normalized = records
-      .map((r) => ({
-        title: (r.title || r.description || '').toString().trim(),
-        amount: Number(r.amount ?? 0),
-        category: (r.category || '').toString().trim() || null,
-        date: r.date ? new Date(r.date) : null,
-        description: (r.description || r.notes || '').toString().trim() || null,
-        paymentMethod: (r.payment_method || '').toString().trim() || null,
-        type: (r.type as ImportType) || type,
-      }))
-      .filter((r) => r.title && r.amount && r.date);
+      .map((r) => {
+        const parsedDate = parseDate(r.date);
+        return {
+          title: (r.title || r.description || '').toString().trim(),
+          amount: Number(r.amount ?? 0),
+          category: (r.category || '').toString().trim() || null,
+          date: parsedDate,
+          description: (r.description || r.notes || '').toString().trim() || null,
+          paymentMethod: (r.payment_method || '').toString().trim() || null,
+          type: (r.type as ImportType) || type,
+        };
+      })
+      .filter((r) => r.title && r.amount && r.date && !isNaN(r.date.getTime()));
 
     if (normalized.length === 0) {
       return NextResponse.json({ error: 'No valid records to import' }, { status: 400 });
@@ -46,7 +83,16 @@ export async function POST(request: NextRequest) {
     // Deduplicate in-memory by (date,title,amount,type)
     const seen = new Set<string>();
     const unique = normalized.filter((r) => {
-      const key = `${r.type}|${r.title}|${r.amount}|${r.date?.toISOString().slice(0, 10)}`;
+      // Safely generate date string, defaulting to empty string if invalid
+      let dateStr = '';
+      if (r.date && !isNaN(r.date.getTime())) {
+        try {
+          dateStr = r.date.toISOString().slice(0, 10);
+        } catch {
+          dateStr = '';
+        }
+      }
+      const key = `${r.type}|${r.title}|${r.amount}|${dateStr}`;
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
@@ -54,6 +100,8 @@ export async function POST(request: NextRequest) {
 
     let inserted = 0;
     let duplicates = 0;
+    let incomeInserted = 0;
+    let expenseInserted = 0;
 
     // Split by type for efficient querying
     const incomeRecs = unique.filter(r => r.type === 'income');
@@ -62,9 +110,13 @@ export async function POST(request: NextRequest) {
     // Helper to compute min/max date
     const rangeFor = (recs: typeof unique) => {
       if (!recs.length) return null;
-      const dates = recs.map(r => r.date as Date);
-      const min = new Date(Math.min.apply(null, dates as any));
-      const max = new Date(Math.max.apply(null, dates as any));
+      const validDates = recs
+        .map(r => r.date)
+        .filter((d): d is Date => d !== null && !isNaN(d.getTime()));
+      if (!validDates.length) return null;
+      const timestamps = validDates.map(d => d.getTime());
+      const min = new Date(Math.min(...timestamps));
+      const max = new Date(Math.max(...timestamps));
       return { min, max };
     };
 
@@ -79,9 +131,25 @@ export async function POST(request: NextRequest) {
         select: { id: true, name: true, amount: true, startDate: true },
       });
       const existingSet = new Set(
-        existing.map((e: any) => `${e.name}|${Number(e.amount)}|${new Date(e.startDate).toISOString().slice(0,10)}`)
+        existing.map((e: any) => {
+          try {
+            const date = new Date(e.startDate);
+            if (isNaN(date.getTime())) return null;
+            return `${e.name}|${Number(e.amount)}|${date.toISOString().slice(0,10)}`;
+          } catch {
+            return null;
+          }
+        }).filter((k): k is string => k !== null)
       );
-      const toInsert = incomeRecs.filter(r => !existingSet.has(`${r.title}|${Number(r.amount)}|${(r.date as Date).toISOString().slice(0,10)}`));
+      const toInsert = incomeRecs.filter(r => {
+        if (!r.date || isNaN(r.date.getTime())) return false;
+        try {
+          const key = `${r.title}|${Number(r.amount)}|${r.date.toISOString().slice(0,10)}`;
+          return !existingSet.has(key);
+        } catch {
+          return false;
+        }
+      });
       duplicates += incomeRecs.length - toInsert.length;
       if (toInsert.length) {
         // Chunk createMany to avoid parameter limits
@@ -98,7 +166,9 @@ export async function POST(request: NextRequest) {
             categoryId: null,
           }));
           const res = await (prisma as any).incomeSource.createMany({ data });
-          inserted += res.count ?? data.length;
+          const count = res.count ?? data.length;
+          inserted += count;
+          incomeInserted += count;
         }
       }
     }
@@ -113,9 +183,25 @@ export async function POST(request: NextRequest) {
         select: { id: true, description: true, amount: true, date: true },
       });
       const existingSet = new Set(
-        existing.map((e: any) => `${e.description}|${Number(e.amount)}|${new Date(e.date).toISOString().slice(0,10)}`)
+        existing.map((e: any) => {
+          try {
+            const date = new Date(e.date);
+            if (isNaN(date.getTime())) return null;
+            return `${e.description}|${Number(e.amount)}|${date.toISOString().slice(0,10)}`;
+          } catch {
+            return null;
+          }
+        }).filter((k): k is string => k !== null)
       );
-      const toInsert = expenseRecs.filter(r => !existingSet.has(`${r.title}|${Number(r.amount)}|${(r.date as Date).toISOString().slice(0,10)}`));
+      const toInsert = expenseRecs.filter(r => {
+        if (!r.date || isNaN(r.date.getTime())) return false;
+        try {
+          const key = `${r.title}|${Number(r.amount)}|${r.date.toISOString().slice(0,10)}`;
+          return !existingSet.has(key);
+        } catch {
+          return false;
+        }
+      });
       duplicates += expenseRecs.length - toInsert.length;
       if (toInsert.length) {
         const chunks: typeof toInsert[] = [];
@@ -131,15 +217,29 @@ export async function POST(request: NextRequest) {
             categoryId: null,
           }));
           const res = await (prisma as any).expense.createMany({ data });
-          inserted += res.count ?? data.length;
+          const count = res.count ?? data.length;
+          inserted += count;
+          expenseInserted += count;
         }
       }
     }
 
-    return NextResponse.json({ inserted, skipped: unique.length - inserted, duplicates });
-  } catch (error) {
+    // Return detailed counts
+    return NextResponse.json({ 
+      inserted, 
+      skipped: unique.length - inserted, 
+      duplicates,
+      incomeInserted,
+      expenseInserted
+    });
+  } catch (error: any) {
     console.error('❌ BATCH IMPORT ERROR:', error);
-    return NextResponse.json({ error: 'Failed to import records' }, { status: 500 });
+    console.error('❌ BATCH IMPORT ERROR STACK:', error?.stack);
+    const errorMessage = error?.message || 'Failed to import records';
+    return NextResponse.json({ 
+      error: errorMessage,
+      details: process.env.NODE_ENV === 'development' ? error?.stack : undefined
+    }, { status: 500 });
   }
 }
 

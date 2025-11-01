@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useCurrency } from '../../../contexts/CurrencyContext';
@@ -38,7 +38,8 @@ import {
   AlertCircle,
   Clock,
   CheckCircle2,
-  XCircle
+  XCircle,
+  Map
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -78,6 +79,10 @@ export default function SettingsPage() {
     dateFormat: 'DD/MM/YYYY',
     timezone: 'Asia/Kolkata'
   });
+  
+  // Field mappings state
+  const [selectedBankMapping, setSelectedBankMapping] = useState('SBIN');
+  const [fieldMappings, setFieldMappings] = useState<Record<string, any>>({});
 
   const handleSave = async (section: string) => {
     if (!user?.id) {
@@ -179,7 +184,7 @@ export default function SettingsPage() {
 
         {/* Settings Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="appearance" className="flex items-center space-x-2">
               <Palette className="w-4 h-4" />
               <span>Appearance</span>
@@ -196,9 +201,13 @@ export default function SettingsPage() {
               <Shield className="w-4 h-4" />
               <span>Security</span>
             </TabsTrigger>
+            <TabsTrigger value="field-mappings" className="flex items-center space-x-2">
+              <Map className="w-4 h-4" />
+              <span>Field Maps</span>
+            </TabsTrigger>
             <TabsTrigger value="documentation" className="flex items-center space-x-2">
               <FileText className="w-4 h-4" />
-              <span>Product Docs</span>
+              <span>Docs</span>
             </TabsTrigger>
           </TabsList>
 
@@ -739,6 +748,86 @@ export default function SettingsPage() {
                     <Trash2 className="w-4 h-4" />
                     <span>Delete Account</span>
                   </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="field-mappings" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Map className="w-5 h-5" />
+                  <span>Bank Field Mappings</span>
+                </CardTitle>
+                <CardDescription>
+                  Configure how fields from bank statements map to your database fields
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div>
+                  <Label htmlFor="bank-select" className="mb-3">Select Bank</Label>
+                  <Select value={selectedBankMapping} onValueChange={setSelectedBankMapping}>
+                    <SelectTrigger id="bank-select" className="w-full">
+                      <SelectValue placeholder="Select a bank" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="SBIN">State Bank of India (SBIN)</SelectItem>
+                      <SelectItem value="IDIB">Indian Bank (IDIB)</SelectItem>
+                      <SelectItem value="KKBK">Kotak Mahindra (KKBK)</SelectItem>
+                      <SelectItem value="HDFC">HDFC Bank</SelectItem>
+                      <SelectItem value="YESB">Yes Bank</SelectItem>
+                      <SelectItem value="UTIB">Axis Bank (UTIB)</SelectItem>
+                      <SelectItem value="JIOP">Jio Payments Bank</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="text-sm text-muted-foreground">
+                    <p>Field mappings are automatically applied when importing bank statements.</p>
+                    <p className="mt-2">Drag and drop to reorder, or click to edit mappings.</p>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <h4 className="font-semibold text-sm">Source Fields (PDF Parser)</h4>
+                      <div className="space-y-2 p-3 border rounded-lg bg-gray-50 dark:bg-gray-900">
+                        {['date', 'date_iso', 'description', 'debit', 'credit', 'balance', 'bankCode', 'transactionId', 'accountNumber', 'transferType', 'upiId', 'personName', 'branch', 'store', 'commodity', 'raw'].map((field) => (
+                          <div key={field} className="text-xs p-2 bg-white dark:bg-gray-800 border rounded cursor-move hover:bg-gray-100 dark:hover:bg-gray-700">
+                            {field}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <h4 className="font-semibold text-sm">Target Fields (Database)</h4>
+                      <div className="space-y-2 p-3 border rounded-lg bg-gray-50 dark:bg-gray-900">
+                        {['date', 'title', 'amount', 'description', 'bankCode', 'transactionId', 'accountNumber', 'transferType', 'personName', 'upiId', 'branch', 'store', 'rawData'].map((field) => (
+                          <div key={field} className="text-xs p-2 bg-white dark:bg-gray-800 border rounded">
+                            {field}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-4 border-t">
+                    <p className="text-sm text-muted-foreground">
+                      Default mappings are used automatically. Save custom mappings per bank above.
+                    </p>
+                    <Button 
+                      onClick={() => {
+                        localStorage.setItem(`fieldMappings_${selectedBankMapping}`, JSON.stringify(fieldMappings));
+                        success('Saved', 'Field mappings saved successfully');
+                      }}
+                      className="flex items-center space-x-2"
+                    >
+                      <Save className="w-4 h-4" />
+                      <span>Save Mappings</span>
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>

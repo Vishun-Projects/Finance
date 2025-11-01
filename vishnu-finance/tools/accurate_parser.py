@@ -3,6 +3,12 @@ Final Accurate Bank Statement Parser
 -----------------------------------
 Precise parser that correctly identifies debits and credits based on the actual
 bank statement format.
+
+Supports PDF statements from multiple Indian banks including:
+- Axis Bank (UTIB), Yes Bank (YESB), Kotak Mahindra Bank (KKBK)
+- HDFC Bank (HDFC), Jio Payments Bank (JIOP)
+- SBI (State Bank of India - SBIN)
+- Indian Bank (IDIB)
 """
 
 import re
@@ -82,22 +88,201 @@ def parse_bank_statement_accurately(pdf_path: Path) -> pd.DataFrame:
                 
             lines = text.split('\n')
             
+            # Buffer to handle multi-line transaction descriptions
+            current_transaction_lines = []
+            current_date = None
+            
             for line_num, line in enumerate(lines):
                 line = line.strip()
                 if not line:
+                    # If we have accumulated lines and hit an empty line, process the transaction
+                    if current_transaction_lines and current_date:
+                        full_description = ' '.join(current_transaction_lines)
+                        # Process the accumulated transaction
+                        amount_patterns = [
+                            r'INR\s*([0-9,]+(?:\.[0-9]{2})?)\s*-\s*INR\s*([0-9,]+(?:\.[0-9]{2})?)',
+                            r'-\s*INR\s*([0-9,]+(?:\.[0-9]{2})?)\s*INR\s*([0-9,]+(?:\.[0-9]{2})?)',
+                        ]
+                        
+                        transaction_amount = None
+                        balance = None
+                        is_credit = False
+                        
+                        for pattern in amount_patterns:
+                            match = re.search(pattern, full_description)
+                            if match:
+                                if pattern.startswith('INR'):
+                                    transaction_amount = float(match.group(1).replace(',', ''))
+                                    balance = float(match.group(2).replace(',', ''))
+                                    is_credit = False
+                                else:
+                                    transaction_amount = float(match.group(1).replace(',', ''))
+                                    balance = float(match.group(2).replace(',', ''))
+                                    is_credit = True
+                                break
+                        
+                        if transaction_amount is not None and balance is not None:
+                            # Store raw description before processing
+                            raw_description = full_description
+                            
+                            # Extract description
+                            description = full_description
+                            description = re.sub(r'\d{1,2}\s+[A-Za-z]{3}\s+\d{4}', '', description)
+                            description = re.sub(r'INR\s*[0-9,]+(?:\.[0-9]{2})?', '', description)
+                            description = re.sub(r'[+-]', '', description)
+                            description = re.sub(r'\s{2,}', ' ', description).strip()
+                            
+                            # Extract remarks
+                            remarks = ''
+                            remark_match = re.search(r'/([A-Za-z][A-Za-z0-9 _.-]{2,})$', description)
+                            if remark_match:
+                                remarks = remark_match.group(1)
+                                description = description[:remark_match.start()].strip(" /")
+                            
+                            # Extract store and commodity information
+                            store, commodity, clean_description = extract_store_and_commodity(description)
+                            
+                            # Combine commodity with existing remarks
+                            combined_remarks = remarks or ''
+                            if commodity:
+                                if combined_remarks:
+                                    combined_remarks += f', {commodity}'
+                                else:
+                                    combined_remarks = commodity
+                            
+                            # Determine transaction type and amount
+                            if is_credit:
+                                transaction_type = 'income'
+                                amount = transaction_amount
+                                debit = 0.0
+                                credit = transaction_amount
+                            else:
+                                transaction_type = 'expense'
+                                amount = transaction_amount
+                                debit = transaction_amount
+                                credit = 0.0
+                            
+                            transaction = {
+                                'date': current_date,
+                                'description': clean_description,
+                                'raw': raw_description,
+                                'remarks': combined_remarks,
+                                'amount': amount,
+                                'type': transaction_type,
+                                'debit': debit,
+                                'credit': credit,
+                                'balance': balance,
+                                'page': page_num + 1,
+                                'line': line_num + 1,
+                                'store': store,
+                                'commodity': commodity
+                            }
+                            
+                            transactions.append(transaction)
+                            print(f"Extracted: {current_date} - {clean_description[:40]:<40} - {'Credit' if is_credit else 'Debit'}: {transaction_amount:>8.2f}")
+                    
+                    # Reset for next transaction
+                    current_transaction_lines = []
+                    current_date = None
                     continue
                 
                 # Look for transaction lines with dates
                 date_match = re.search(r'(\d{1,2}\s+[A-Za-z]{3}\s+\d{4})', line)
-                if not date_match:
-                    continue
-                
-                date = date_match.group(1)
-                
-                # Extract amounts - look for patterns like "INR 58.00 - INR 8,250.52"
+                if date_match:
+                    # If we already have accumulated lines, process that transaction first
+                    if current_transaction_lines and current_date:
+                        full_description = ' '.join(current_transaction_lines)
+                        # Process the accumulated transaction
+                        amount_patterns = [
+                            r'INR\s*([0-9,]+(?:\.[0-9]{2})?)\s*-\s*INR\s*([0-9,]+(?:\.[0-9]{2})?)',
+                            r'-\s*INR\s*([0-9,]+(?:\.[0-9]{2})?)\s*INR\s*([0-9,]+(?:\.[0-9]{2})?)',
+                        ]
+                        
+                        transaction_amount = None
+                        balance = None
+                        is_credit = False
+                        
+                        for pattern in amount_patterns:
+                            match = re.search(pattern, full_description)
+                            if match:
+                                if pattern.startswith('INR'):
+                                    transaction_amount = float(match.group(1).replace(',', ''))
+                                    balance = float(match.group(2).replace(',', ''))
+                                    is_credit = False
+                                else:
+                                    transaction_amount = float(match.group(1).replace(',', ''))
+                                    balance = float(match.group(2).replace(',', ''))
+                                    is_credit = True
+                                break
+                        
+                        if transaction_amount is not None and balance is not None:
+                            raw_description = full_description
+                            
+                            description = full_description
+                            description = re.sub(r'\d{1,2}\s+[A-Za-z]{3}\s+\d{4}', '', description)
+                            description = re.sub(r'INR\s*[0-9,]+(?:\.[0-9]{2})?', '', description)
+                            description = re.sub(r'[+-]', '', description)
+                            description = re.sub(r'\s{2,}', ' ', description).strip()
+                            
+                            remarks = ''
+                            remark_match = re.search(r'/([A-Za-z][A-Za-z0-9 _.-]{2,})$', description)
+                            if remark_match:
+                                remarks = remark_match.group(1)
+                                description = description[:remark_match.start()].strip(" /")
+                            
+                            store, commodity, clean_description = extract_store_and_commodity(description)
+                            
+                            combined_remarks = remarks or ''
+                            if commodity:
+                                if combined_remarks:
+                                    combined_remarks += f', {commodity}'
+                                else:
+                                    combined_remarks = commodity
+                            
+                            if is_credit:
+                                transaction_type = 'income'
+                                amount = transaction_amount
+                                debit = 0.0
+                                credit = transaction_amount
+                            else:
+                                transaction_type = 'expense'
+                                amount = transaction_amount
+                                debit = transaction_amount
+                                credit = 0.0
+                            
+                            transaction = {
+                                'date': current_date,
+                                'description': clean_description,
+                                'raw': raw_description,
+                                'remarks': combined_remarks,
+                                'amount': amount,
+                                'type': transaction_type,
+                                'debit': debit,
+                                'credit': credit,
+                                'balance': balance,
+                                'page': page_num + 1,
+                                'line': line_num + 1,
+                                'store': store,
+                                'commodity': commodity
+                            }
+                            
+                            transactions.append(transaction)
+                            print(f"Extracted: {current_date} - {clean_description[:40]:<40} - {'Credit' if is_credit else 'Debit'}: {transaction_amount:>8.2f}")
+                    
+                    # Start new transaction
+                    current_date = date_match.group(1)
+                    current_transaction_lines = [line]
+                else:
+                    # Accumulate lines for current transaction
+                    if current_date:
+                        current_transaction_lines.append(line)
+                    
+            # Process last transaction if exists
+            if current_transaction_lines and current_date:
+                full_description = ' '.join(current_transaction_lines)
                 amount_patterns = [
-                    r'INR\s*([0-9,]+(?:\.[0-9]{2})?)\s*-\s*INR\s*([0-9,]+(?:\.[0-9]{2})?)',  # Debit: INR 58.00 - INR 8,250.52
-                    r'-\s*INR\s*([0-9,]+(?:\.[0-9]{2})?)\s*INR\s*([0-9,]+(?:\.[0-9]{2})?)',  # Credit: - INR 20.00 INR 6,932.52
+                    r'INR\s*([0-9,]+(?:\.[0-9]{2})?)\s*-\s*INR\s*([0-9,]+(?:\.[0-9]{2})?)',
+                    r'-\s*INR\s*([0-9,]+(?:\.[0-9]{2})?)\s*INR\s*([0-9,]+(?:\.[0-9]{2})?)',
                 ]
                 
                 transaction_amount = None
@@ -105,37 +290,35 @@ def parse_bank_statement_accurately(pdf_path: Path) -> pd.DataFrame:
                 is_credit = False
                 
                 for pattern in amount_patterns:
-                    match = re.search(pattern, line)
+                    match = re.search(pattern, full_description)
                     if match:
-                        if pattern.startswith('INR'):  # Debit pattern
+                        if pattern.startswith('INR'):
                             transaction_amount = float(match.group(1).replace(',', ''))
                             balance = float(match.group(2).replace(',', ''))
                             is_credit = False
-                        else:  # Credit pattern
+                        else:
                             transaction_amount = float(match.group(1).replace(',', ''))
                             balance = float(match.group(2).replace(',', ''))
                             is_credit = True
                         break
                 
                 if transaction_amount is not None and balance is not None:
-                    # Extract description
-                    description = line
+                    raw_description = full_description
+                    
+                    description = full_description
                     description = re.sub(r'\d{1,2}\s+[A-Za-z]{3}\s+\d{4}', '', description)
                     description = re.sub(r'INR\s*[0-9,]+(?:\.[0-9]{2})?', '', description)
                     description = re.sub(r'[+-]', '', description)
                     description = re.sub(r'\s{2,}', ' ', description).strip()
                     
-                    # Extract remarks
                     remarks = ''
                     remark_match = re.search(r'/([A-Za-z][A-Za-z0-9 _.-]{2,})$', description)
                     if remark_match:
                         remarks = remark_match.group(1)
                         description = description[:remark_match.start()].strip(" /")
                     
-                    # Extract store and commodity information
                     store, commodity, clean_description = extract_store_and_commodity(description)
                     
-                    # Combine commodity with existing remarks
                     combined_remarks = remarks or ''
                     if commodity:
                         if combined_remarks:
@@ -143,7 +326,6 @@ def parse_bank_statement_accurately(pdf_path: Path) -> pd.DataFrame:
                         else:
                             combined_remarks = commodity
                     
-                    # Determine transaction type and amount
                     if is_credit:
                         transaction_type = 'income'
                         amount = transaction_amount
@@ -156,8 +338,9 @@ def parse_bank_statement_accurately(pdf_path: Path) -> pd.DataFrame:
                         credit = 0.0
                     
                     transaction = {
-                        'date': date,
+                        'date': current_date,
                         'description': clean_description,
+                        'raw': raw_description,
                         'remarks': combined_remarks,
                         'amount': amount,
                         'type': transaction_type,
@@ -171,9 +354,35 @@ def parse_bank_statement_accurately(pdf_path: Path) -> pd.DataFrame:
                     }
                     
                     transactions.append(transaction)
-                    print(f"Extracted: {date} - {description[:40]:<40} - {'Credit' if is_credit else 'Debit'}: {transaction_amount:>8.2f}")
+                    print(f"Extracted: {current_date} - {clean_description[:40]:<40} - {'Credit' if is_credit else 'Debit'}: {transaction_amount:>8.2f}")
     
-    return pd.DataFrame(transactions)
+    # Convert to DataFrame and ensure date_iso is properly formatted
+    df = pd.DataFrame(transactions)
+    
+    if not df.empty and 'date' in df.columns:
+        def format_date_iso(date_val):
+            """Format date to ISO format (YYYY-MM-DD)"""
+            if pd.isna(date_val) or not date_val:
+                return None
+            try:
+                # Try parsing various date formats (28 Oct 2025, etc.)
+                parsed = pd.to_datetime(date_val, errors='coerce')
+                if pd.isna(parsed):
+                    return None
+                # Return in ISO format
+                return parsed.strftime('%Y-%m-%d')
+            except:
+                return None
+        
+        df['date_iso'] = df['date'].apply(format_date_iso)
+        # Filter out rows with invalid dates
+        initial_count = len(df)
+        df = df[df['date_iso'].notna()].copy()
+        if len(df) < initial_count:
+            print(f"Filtered out {initial_count - len(df)} transactions with invalid dates")
+        print(f"After date validation: {len(df)} valid transactions")
+    
+    return df
 
 def create_multiple_statement_processor():
     """Create a system to process multiple statement files."""

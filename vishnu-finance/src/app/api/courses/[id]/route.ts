@@ -3,14 +3,15 @@ import { prisma } from '@/lib/db';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
+    const { id } = await params;
 
     const course = await prisma.course.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         modules: {
           where: { isActive: true },
@@ -63,14 +64,15 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const body = await request.json();
     const { title, description, category, level, duration, lessons, imageUrl } = body;
+    const { id } = await params;
 
     const course = await prisma.course.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         title,
         description,
@@ -94,11 +96,12 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     await prisma.course.update({
-      where: { id: params.id },
+      where: { id },
       data: { isActive: false }
     });
 

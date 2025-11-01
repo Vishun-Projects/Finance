@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFile, unlink } from 'fs/promises';
+import { writeFile, readFile, unlink } from 'fs/promises';
 import { join } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -51,8 +51,9 @@ export async function POST(request: NextRequest) {
     try {
       // Update the Python script to use the uploaded file
       const csvOutput = join(uploadsDir, `extracted_${Date.now()}.csv`);
+      const jsonOutput = join(uploadsDir, `extracted_${Date.now()}.json`);
       
-      // Create a temporary Python script preferring enhanced_bank_parser (JSON stdout)
+      // Create a temporary Python script that writes output to file instead of stdout
       const tempScript = `
 import sys
 import os
@@ -61,6 +62,7 @@ sys.path.append(r'${toolsDir.replace(/\\/g, '\\\\')}')
 PDF_FILE = r"${filepath.replace(/\\/g, '\\\\')}"
 BANK_HINT = r"${bankHint}"
 CSV_FILE = r"${csvOutput.replace(/\\/g, '\\\\')}"
+JSON_FILE = r"${jsonOutput.replace(/\\/g, '\\\\')}"
 from pathlib import Path
 import pandas as pd
 import json
@@ -72,34 +74,80 @@ def main():
 
     df = None
     try:
-        from enhanced_bank_parser import parse_bank_statement_advanced
-        df = parse_bank_statement_advanced(pdf_path, bank_hint=BANK_HINT)
-    except Exception as e:
-        # Fallback
+        # Use accurate parser which correctly handles multi-line transactions
         from accurate_parser import parse_bank_statement_accurately
         df = parse_bank_statement_accurately(pdf_path)
+        print(f"Accurate parser extracted {len(df)} transactions", file=sys.stderr)
+    except Exception as e:
+        print(f"Accurate parser failed: {e}", file=sys.stderr)
+        try:
+            # Fallback to new bank-specific parser
+            from bank_statement_parser import parse_bank_statement
+            df = parse_bank_statement(pdf_path)
+            print(f"Bank-specific parser extracted {len(df)} transactions", file=sys.stderr)
+        except Exception as e2:
+            print(f"Bank-specific parser also failed: {e2}", file=sys.stderr)
+            df = pd.DataFrame()
     
     if df.empty:
-        print(json.dumps({"success": True, "transactions": [], "count": 0}))
+        result = {"success": True, "transactions": [], "count": 0}
+        with open(JSON_FILE, 'w') as f:
+            json.dump(result, f)
+        print(json.dumps(result))
         return
     
-    # Convert dates and ensure JSON-serializable
-    df["date_iso"] = pd.to_datetime(df.get("date", pd.Series(dtype=str)), errors="coerce").dt.strftime('%Y-%m-%d')
+    # Convert dates and ensure JSON-serializable - improved date parsing
+    def normalize_date(date_val):
+        """Normalize date to ISO format (YYYY-MM-DD)"""
+        if pd.isna(date_val):
+            return None
+        try:
+            # Try parsing with pandas (handles multiple formats)
+            parsed = pd.to_datetime(date_val, errors='coerce')
+            if pd.isna(parsed):
+                return None
+            # Return in ISO format
+            return parsed.strftime('%Y-%m-%d')
+        except:
+            return None
+    
+    # Apply date normalization
+    if 'date' in df.columns:
+        df["date_iso"] = df["date"].apply(normalize_date)
+        # Fill any missing date_iso from date column if available
+        df["date_iso"] = df["date_iso"].fillna(df["date"].apply(normalize_date))
+    else:
+        df["date_iso"] = None
+    
+    # Filter out rows with invalid dates
+    df = df[df["date_iso"].notna()].copy()
+    
     # Best-effort: stringify any remaining date/datetime columns
     for col in df.columns:
         if pd.api.types.is_datetime64_any_dtype(df[col]):
             df[col] = df[col].dt.strftime('%Y-%m-%d')
-    # Persist CSV as a fallback for the Node layer
+    
+    # Persist CSV as a fallback
     try:
         df.to_csv(CSV_FILE, index=False)
     except Exception:
         pass
-    # Use pandas to_json for safe serialization
+    
+    # Write JSON to file (primary method for large outputs)
     try:
         json_records = df.to_json(orient='records')
-        print(json.dumps({"success": True, "transactions": json.loads(json_records), "count": int(len(df))}))
-    except Exception:
-        # Final fallback: basic dict conversion with string casting
+        result = {"success": True, "transactions": json.loads(json_records), "count": int(len(df))}
+        with open(JSON_FILE, 'w', encoding='utf-8') as f:
+            json.dump(result, f, ensure_ascii=False)
+        # Also print to stdout for compatibility, but truncate if too large
+        result_str = json.dumps(result, ensure_ascii=False)
+        if len(result_str) < 1000000:  # Only print if under 1MB
+            print(result_str)
+        else:
+            print(json.dumps({"success": True, "transactions": [], "count": len(df), "file": JSON_FILE}))
+    except Exception as e:
+        print(f"JSON serialization error: {e}", file=sys.stderr)
+        # Final fallback: basic dict conversion
         records = []
         for _, row in df.iterrows():
             obj = {}
@@ -109,7 +157,9 @@ def main():
                 else:
                     obj[k] = str(v) if not isinstance(v, (int, float)) else v
             records.append(obj)
-        print(json.dumps({"success": True, "transactions": records, "count": len(records)}))
+        result = {"success": True, "transactions": records, "count": len(records)}
+        with open(JSON_FILE, 'w', encoding='utf-8') as f:
+            json.dump(result, f, ensure_ascii=False)
 
 if __name__ == "__main__":
     main()
@@ -122,7 +172,11 @@ if __name__ == "__main__":
       console.log('🔍 PDF API: Executing Python script:', tempScriptPath);
       console.log('🔍 PDF API: Python command:', `python "${tempScriptPath}"`);
       
-      const { stdout, stderr } = await execAsync(`python "${tempScriptPath}"`, { timeout: 90_000 });
+      // Use increased maxBuffer (10MB) to handle large PDF outputs
+      const { stdout, stderr } = await execAsync(`python "${tempScriptPath}"`, { 
+        timeout: 90_000,
+        maxBuffer: 10 * 1024 * 1024 // 10MB buffer
+      });
       
       console.log('🔍 PDF API: Python stdout:', stdout);
       if (stderr) console.log('⚠️ PDF API: Python stderr:', stderr);
@@ -130,9 +184,12 @@ if __name__ == "__main__":
       // Keep temporary script for later cleanup
       console.log('📁 PDF API: Temporary script will be cleaned up after import');
 
-      // Parse JSON from stdout robustly; fallback to CSV file
+      // Parse JSON - first try stdout, then fallback to JSON file, then CSV file
       let transactions: any[] = [];
+      let transactionCount = 0;
+      
       try {
+        // Try to parse from stdout first
         const trimmed = stdout.trim();
         let jsonText = '';
         const firstBrace = trimmed.lastIndexOf('{');
@@ -142,9 +199,33 @@ if __name__ == "__main__":
         }
         if (jsonText) {
           const parsed = JSON.parse(jsonText);
-          transactions = Array.isArray(parsed?.transactions) ? parsed.transactions : [];
+          if (parsed.file) {
+            // Output indicates JSON was written to file
+            const fileContent = await readFile(jsonOutput, 'utf-8');
+            const fileParsed = JSON.parse(fileContent);
+            transactions = Array.isArray(fileParsed?.transactions) ? fileParsed.transactions : [];
+            transactionCount = fileParsed?.count || 0;
+          } else {
+            transactions = Array.isArray(parsed?.transactions) ? parsed.transactions : [];
+            transactionCount = parsed?.count || 0;
+          }
         }
-      } catch {}
+      } catch (error) {
+        console.log('⚠️ PDF API: Failed to parse stdout, trying JSON file...');
+      }
+      
+      // If stdout parsing failed or returned empty, try reading from JSON file
+      if (transactions.length === 0) {
+        try {
+          const fileContent = await readFile(jsonOutput, 'utf-8');
+          const parsed = JSON.parse(fileContent);
+          transactions = Array.isArray(parsed?.transactions) ? parsed.transactions : [];
+          transactionCount = parsed?.count || 0;
+          console.log(`✅ PDF API: Read ${transactions.length} transactions from JSON file`);
+        } catch (error) {
+          console.log('⚠️ PDF API: Failed to read JSON file, trying CSV...');
+        }
+      }
 
       if (!transactions.length) {
         try {

@@ -133,7 +133,7 @@ export default function CourseLearningPage() {
     return (
       <div className="text-center py-12">
         <h3 className="text-xl font-semibold text-gray-900 mb-4">Course Not Found</h3>
-        <p className="text-gray-600 mb-8">The course you're looking for doesn't exist</p>
+                        <p className="text-gray-600 mb-8">The course you&apos;re looking for doesn&apos;t exist</p>
         <button
           onClick={() => router.push('/education')}
           className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors"
@@ -304,7 +304,7 @@ export default function CourseLearningPage() {
                       <div className="bg-purple-50 rounded-lg p-6">
                         <h4 className="font-semibold text-purple-900 mb-3">Stock Market Facts:</h4>
                         <ul className="space-y-2 text-purple-800">
-                          <li>• BSE is Asia's oldest stock exchange, established in 1875</li>
+                          <li>• BSE is Asia&apos;s oldest stock exchange, established in 1875</li>
                           <li>• NSE and BSE are the two major exchanges in India</li>
                           <li>• Market timings: 9:15 AM to 3:30 PM (Monday to Friday)</li>
                           <li>• Key indices: Nifty 50, Sensex, Bank Nifty</li>
@@ -317,7 +317,7 @@ export default function CourseLearningPage() {
                         <h4 className="font-semibold text-orange-900 mb-3">Mutual Fund Growth:</h4>
                         <ul className="space-y-2 text-orange-800">
                           <li>• Industry grew from ₹8.25 lakh crore in 2014 to over ₹50 lakh crore in 2024</li>
-                          <li>• SIP (Systematic Investment Plan) is India's favorite investment method</li>
+                          <li>• SIP (Systematic Investment Plan) is India&apos;s favorite investment method</li>
                           <li>• SEBI regulations ensure investor protection</li>
                           <li>• Different types suit different risk appetites</li>
                         </ul>

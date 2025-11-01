@@ -173,8 +173,54 @@ def parse_transactions_advanced(text: str) -> pd.DataFrame:
             
             transactions.append(transaction)
     
-    print(f"Extracted {len(transactions)} transactions")
-    return pd.DataFrame(transactions)
+    # Convert to DataFrame
+    df = pd.DataFrame(transactions)
+    
+    # Ensure date_iso is properly formatted for all transactions
+    if not df.empty and 'date' in df.columns:
+        def format_date_iso(date_val):
+            """Format date to ISO format (YYYY-MM-DD)"""
+            if pd.isna(date_val) or not date_val:
+                return None
+            try:
+                # Try parsing various date formats (28 Oct 2025, etc.)
+                parsed = pd.to_datetime(date_val, errors='coerce')
+                if pd.isna(parsed):
+                    return None
+                # Return in ISO format
+                return parsed.strftime('%Y-%m-%d')
+            except:
+                return None
+        
+        df['date_iso'] = df['date'].apply(format_date_iso)
+        # Filter out rows with invalid dates
+        initial_count = len(df)
+        df = df[df['date_iso'].notna()].copy()
+        if len(df) < initial_count:
+            print(f"Filtered out {initial_count - len(df)} transactions with invalid dates")
+    
+    print(f"Extracted {len(df)} transactions with valid dates")
+    return df
+
+def parse_bank_statement_advanced(pdf_path: Path) -> pd.DataFrame:
+    """Main function to parse a bank statement PDF using advanced methods.
+    
+    This is the main entry point that other scripts can import.
+    It uses both pdfplumber and PyPDF2 for maximum coverage.
+    """
+    if isinstance(pdf_path, str):
+        pdf_path = Path(pdf_path)
+    
+    if not pdf_path.exists():
+        raise FileNotFoundError(f"PDF file not found: {pdf_path}")
+    
+    # Extract text using advanced methods
+    text = extract_text_from_pdf_advanced(pdf_path)
+    
+    # Parse transactions from the extracted text
+    df = parse_transactions_advanced(text)
+    
+    return df
 
 def process_multiple_pdfs(pdf_files: list) -> pd.DataFrame:
     """Process multiple PDF files and combine results."""

@@ -3,18 +3,19 @@ import { prisma } from '@/lib/db';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const body = await request.json();
     const { userId, progress, isCompleted } = body;
+    const { id } = await params;
 
     // Update or create module progress
     const moduleProgress = await prisma.moduleProgress.upsert({
       where: {
         userId_moduleId: {
           userId,
-          moduleId: params.id
+          moduleId: id
         }
       },
       update: {
@@ -24,7 +25,7 @@ export async function POST(
       },
       create: {
         userId,
-        moduleId: params.id,
+        moduleId: id,
         progress,
         isCompleted,
         completedAt: isCompleted ? new Date() : null
@@ -32,8 +33,8 @@ export async function POST(
     });
 
     // Update course progress based on module progress
-    const module = await prisma.module.findUnique({
-      where: { id: params.id },
+    const courseModule = await prisma.module.findUnique({
+      where: { id },
       include: {
         course: {
           include: {
@@ -46,13 +47,13 @@ export async function POST(
       }
     });
 
-    if (module) {
-      const totalModules = module.course.modules.length;
+    if (courseModule) {
+      const totalModules = courseModule.course.modules.length;
       const completedModules = await prisma.moduleProgress.count({
         where: {
           userId,
           moduleId: {
-            in: module.course.modules.map(m => m.id)
+            in: courseModule.course.modules.map(m => m.id)
           },
           isCompleted: true
         }
@@ -65,7 +66,7 @@ export async function POST(
         where: {
           userId_courseId: {
             userId,
-            courseId: module.courseId
+            courseId: courseModule.courseId
           }
         },
         update: {
@@ -75,7 +76,7 @@ export async function POST(
         },
         create: {
           userId,
-          courseId: module.courseId,
+          courseId: courseModule.courseId,
           progress: courseProgress,
           isCompleted: isCourseCompleted,
           completedAt: isCourseCompleted ? new Date() : null

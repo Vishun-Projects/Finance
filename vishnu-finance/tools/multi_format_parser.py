@@ -7,6 +7,12 @@ Supports parsing financial data from multiple file formats:
 - DOC/DOCX (Word documents)
 - TXT (text files)
 
+Supports statements from major Indian banks:
+- SBI (State Bank of India) - SBIN identifier
+- Indian Bank - IDIB identifier
+- Axis Bank (UTIB), Yes Bank (YESB), Kotak Mahindra Bank (KKBK)
+- HDFC Bank, Jio Payments Bank (JIOP)
+
 Extracts transaction data and converts to standardized format.
 """
 
@@ -53,103 +59,276 @@ def detect_file_encoding(file_path):
 
 
 def parse_pdf_file(file_path):
-    """Parse PDF files (existing functionality)."""
+    """Parse PDF files using bank-specific parsers."""
     if not pdfplumber:
         raise ImportError("pdfplumber not available for PDF parsing")
     
-    # Import the existing accurate parser
-    import sys
-    sys.path.append(os.path.dirname(__file__))
-    from accurate_parser import parse_bank_statement_accurately
+    # Try new bank-specific parser first
+    try:
+        import sys
+        sys.path.append(os.path.dirname(__file__))
+        from bank_statement_parser import parse_bank_statement
+        
+        df = parse_bank_statement(file_path)
+        if not df.empty:
+            return df
+    except Exception as e:
+        print(f"Bank-specific parser failed, trying fallback: {e}")
     
-    return parse_bank_statement_accurately(file_path)
+    # Fallback to existing accurate parser
+    try:
+        import sys
+        sys.path.append(os.path.dirname(__file__))
+        from accurate_parser import parse_bank_statement_accurately
+        return parse_bank_statement_accurately(file_path)
+    except Exception as e:
+        print(f"Fallback parser also failed: {e}")
+        return pd.DataFrame()
 
 
 def parse_excel_file(file_path):
-    """Parse Excel files (XLS/XLSX) with specific structure for bank statements."""
+    """Parse Excel files (XLS/XLSX) with bank-specific parsers.
+    
+    Supports multiple Indian bank formats with auto-detection and table extraction.
+    Falls back to generic parsing if bank-specific parser fails.
+    """
+    # Try new bank-specific parser first
     try:
-        # Read Excel file without headers to get raw data
-        df = pd.read_excel(file_path, engine='openpyxl', header=None)
+        import sys
+        sys.path.append(os.path.dirname(__file__))
+        from bank_statement_parser import parse_bank_statement
         
-        if df.empty:
+        df = parse_bank_statement(file_path)
+        if not df.empty:
+            return df
+    except Exception as e:
+        print(f"Bank-specific Excel parser failed, trying fallback: {e}")
+    
+    # Fallback to original parsing logic
+    try:
+        # Read Excel file with headers first to detect column structure
+        df_with_headers = pd.read_excel(file_path, engine='openpyxl', header=0)
+        
+        # Also read without headers as fallback
+        df_no_headers = pd.read_excel(file_path, engine='openpyxl', header=None)
+        
+        if df_with_headers.empty and df_no_headers.empty:
             raise Exception("Excel file is empty or has no readable data")
         
         transactions = []
         
-        # Process each row looking for transaction data
-        for index, row in df.iterrows():
+        # Try to detect column indices from headers
+        date_col_idx = None
+        amount_col_idx = None
+        description_col_idx = None
+        debit_col_idx = None
+        credit_col_idx = None
+        balance_col_idx = None
+        
+        # Normalize header names for matching
+        header_normalized = {str(col).strip().lower(): idx for idx, col in enumerate(df_with_headers.columns)}
+        
+        # Common header name variations
+        date_headers = ['date', 'transaction date', 'txn date', 'date of transaction']
+        description_headers = ['description', 'narration', 'particulars', 'transaction details', 'details']
+        debit_headers = ['debit', 'withdrawal', 'dr', 'debit amount']
+        credit_headers = ['credit', 'deposit', 'cr', 'credit amount']
+        amount_headers = ['amount', 'transaction amount', 'txn amount']
+        balance_headers = ['balance', 'closing balance', 'balance amount']
+        
+        # Find column indices
+        for header_list, col_idx_var in [
+            (date_headers, 'date_col_idx'),
+            (description_headers, 'description_col_idx'),
+            (debit_headers, 'debit_col_idx'),
+            (credit_headers, 'credit_col_idx'),
+            (amount_headers, 'amount_col_idx'),
+            (balance_headers, 'balance_col_idx')
+        ]:
+            for header in header_list:
+                if header in header_normalized:
+                    if col_idx_var == 'date_col_idx':
+                        date_col_idx = header_normalized[header]
+                    elif col_idx_var == 'description_col_idx':
+                        description_col_idx = header_normalized[header]
+                    elif col_idx_var == 'debit_col_idx':
+                        debit_col_idx = header_normalized[header]
+                    elif col_idx_var == 'credit_col_idx':
+                        credit_col_idx = header_normalized[header]
+                    elif col_idx_var == 'amount_col_idx':
+                        amount_col_idx = header_normalized[header]
+                    elif col_idx_var == 'balance_col_idx':
+                        balance_col_idx = header_normalized[header]
+                    break
+        
+        # If headers not found, try common bank statement formats
+        # SBI/Indian Bank 6-column format: Date (0), Details (1), Ref No. (2), Debit (3), Credit (4), Balance (5)
+        # Generic 7-column format: Date (0), Amount (1), Description (2), Ref No. (3), Debit (4), Credit (5), Balance (6)
+        if date_col_idx is None:
+            # Check first few rows to detect structure
+            for test_row_idx in range(min(5, len(df_no_headers))):
+                row = df_no_headers.iloc[test_row_idx]
+                # Check if row 0 looks like headers
+                if test_row_idx == 0:
+                    row_str = ' '.join([str(x).lower() for x in row.values if pd.notna(x)])
+                    if 'date' in row_str and ('debit' in row_str or 'credit' in row_str):
+                        # This row is headers, use next row to detect data structure
+                        continue
+                
+                # Try to find date in first column
+                if pd.notna(row.iloc[0]):
+                    date_str = str(row.iloc[0]).strip()
+                    # Check for DD-MM-YYYY or DD/MM/YYYY format
+                    if re.match(r'\d{1,2}[-/]\d{1,2}[-/]\d{4}', date_str):
+                        date_col_idx = 0
+                        description_col_idx = 2 if len(row) > 2 else 1
+                        debit_col_idx = 4 if len(row) > 4 else None
+                        credit_col_idx = 5 if len(row) > 5 else None
+                        balance_col_idx = 6 if len(row) > 6 else None
+                        break
+        
+        # Use detected column structure or default SBI format
+        if date_col_idx is None:
+            date_col_idx = 0
+            description_col_idx = 2
+            debit_col_idx = 4
+            credit_col_idx = 5
+            balance_col_idx = 6
+        
+        # Determine which DataFrame to use
+        # If we found headers in df_with_headers, use it; otherwise use df_no_headers
+        use_df = df_with_headers if len(df_with_headers.columns) > 0 and date_col_idx is not None and date_col_idx < len(df_with_headers.columns) else df_no_headers
+        # If using df_with_headers, start from row 0 (headers already removed by pandas)
+        # If using df_no_headers, check if first row is headers
+        start_row = 0
+        if use_df is df_no_headers and len(df_no_headers) > 0:
+            first_row_str = ' '.join([str(x).lower() for x in df_no_headers.iloc[0].values if pd.notna(x)])
+            if 'date' in first_row_str and ('debit' in first_row_str or 'credit' in first_row_str):
+                start_row = 1
+        
+        # Helper function to parse date in various formats
+        def parse_date(date_val):
+            """Parse date in DD-MM-YYYY, DD/MM/YYYY, or other formats."""
+            if pd.isna(date_val) or not date_val:
+                return None
+            date_str = str(date_val).strip()
+            # Try DD-MM-YYYY or DD/MM/YYYY
+            date_match = re.match(r'(\d{1,2})[-/](\d{1,2})[-/](\d{4})', date_str)
+            if date_match:
+                day, month, year = date_match.groups()
+                try:
+                    parsed_date = pd.to_datetime(f"{year}-{month.zfill(2)}-{day.zfill(2)}", errors='coerce')
+                    if pd.notna(parsed_date):
+                        return parsed_date
+                except:
+                    pass
+            # Try other formats
+            try:
+                parsed_date = pd.to_datetime(date_str, errors='coerce')
+                if pd.notna(parsed_date):
+                    return parsed_date
+            except:
+                pass
+            return None
+        
+        # Helper function to parse amount (handle hyphen as empty)
+        def parse_amount(amount_val):
+            """Parse amount, treating hyphen (-) as 0."""
+            if pd.isna(amount_val):
+                return 0.0
+            amount_str = str(amount_val).strip()
+            if amount_str == '-' or amount_str == '':
+                return 0.0
+            # Remove commas and extract number
+            amount_str = amount_str.replace(',', '').replace('INR', '').replace('₹', '').strip()
+            try:
+                return float(amount_str)
+            except:
+                return 0.0
+        
+        # Process each row
+        for index, row in use_df.iterrows():
+            if index < start_row:
+                continue
+            
             # Skip empty rows
             if row.isna().all():
                 continue
             
-            # Check if this row contains transaction data
-            # Look for date pattern in column 1 (index 1)
+            # Parse date
             date_value = None
-            if pd.notna(row.iloc[1]) and isinstance(row.iloc[1], str):
-                date_match = re.match(r'(\d{1,2}\s+[A-Za-z]{3}\s+\d{4})', str(row.iloc[1]).strip())
-                if date_match:
-                    date_value = date_match.group(1)
+            date_obj = None
+            if date_col_idx is not None and date_col_idx < len(row):
+                date_obj = parse_date(row.iloc[date_col_idx])
+                if date_obj is not None:
+                    date_value = date_obj.strftime('%d-%m-%Y')
             
-            # If we found a date, this is likely a transaction row
-            if date_value:
-                # Get transaction details from column 2 (index 2)
-                description = str(row.iloc[2]) if pd.notna(row.iloc[2]) else ''
-                
-                # Get debit amount from column 8 (index 8)
-                debit_str = str(row.iloc[8]) if pd.notna(row.iloc[8]) else ''
-                debit_amount = 0.0
-                if 'INR' in debit_str and debit_str.strip() != ' - ':
-                    debit_match = re.search(r'INR\s*([0-9,]+(?:\.[0-9]{2})?)', debit_str)
-                    if debit_match:
-                        debit_amount = float(debit_match.group(1).replace(',', ''))
-                
-                # Get credit amount from column 10 (index 10)
-                credit_str = str(row.iloc[10]) if pd.notna(row.iloc[10]) else ''
-                credit_amount = 0.0
-                if 'INR' in credit_str and credit_str.strip() != ' - ':
-                    credit_match = re.search(r'INR\s*([0-9,]+(?:\.[0-9]{2})?)', credit_str)
-                    if credit_match:
-                        credit_amount = float(credit_match.group(1).replace(',', ''))
-                
-                # Skip if no meaningful data found
-                if not description or (debit_amount == 0 and credit_amount == 0):
-                    continue
-                
-                # Extract store and commodity information
-                store, commodity, clean_description = extract_store_and_commodity(description)
-                
-                # Determine transaction type
-                if debit_amount > 0:
-                    transaction_type = 'expense'
-                    amount = debit_amount
-                else:
-                    transaction_type = 'income'
-                    amount = credit_amount
-                
-                # Combine store, commodity, and remarks
-                combined_remarks = []
-                if store:
-                    combined_remarks.append(store)
-                if commodity:
-                    combined_remarks.append(commodity)
-                combined_remarks = ' | '.join(combined_remarks) if combined_remarks else ''
-                
-                transactions.append({
-                    'date': date_value,
-                    'description': clean_description,
-                    'raw': description,
-                    'remarks': combined_remarks,
-                    'amount': amount,
-                    'type': transaction_type,
-                    'debit': debit_amount,
-                    'credit': credit_amount,
-                    'balance': None,
-                    'page': 'Excel',
-                    'line': str(index + 1),
-                    'date_iso': pd.to_datetime(date_value).strftime('%Y-%m-%d'),
-                    'store': store,
-                    'commodity': commodity
-                })
+            if not date_value:
+                continue
+            
+            # Get description
+            description = ''
+            if description_col_idx is not None and description_col_idx < len(row):
+                description = str(row.iloc[description_col_idx]) if pd.notna(row.iloc[description_col_idx]) else ''
+            
+            # Get debit amount
+            debit_amount = 0.0
+            if debit_col_idx is not None and debit_col_idx < len(row):
+                debit_amount = parse_amount(row.iloc[debit_col_idx])
+            
+            # Get credit amount
+            credit_amount = 0.0
+            if credit_col_idx is not None and credit_col_idx < len(row):
+                credit_amount = parse_amount(row.iloc[credit_col_idx])
+            
+            # Get balance (optional)
+            balance = None
+            if balance_col_idx is not None and balance_col_idx < len(row):
+                balance_val = parse_amount(row.iloc[balance_col_idx])
+                balance = balance_val if balance_val > 0 else None
+            
+            # Skip if no meaningful data found
+            if not description or (debit_amount == 0 and credit_amount == 0):
+                continue
+            
+            # Extract store and commodity information
+            store, commodity, clean_description = extract_store_and_commodity(description)
+            
+            # Determine transaction type
+            if debit_amount > 0:
+                transaction_type = 'expense'
+                amount = debit_amount
+            else:
+                transaction_type = 'income'
+                amount = credit_amount
+            
+            # Combine store, commodity, and remarks
+            combined_remarks = []
+            if store:
+                combined_remarks.append(store)
+            if commodity:
+                combined_remarks.append(commodity)
+            combined_remarks = ' | '.join(combined_remarks) if combined_remarks else ''
+            
+            # Format date_iso
+            date_iso = date_obj.strftime('%Y-%m-%d') if date_obj else None
+            
+            transactions.append({
+                'date': date_value,
+                'description': clean_description,
+                'raw': description,
+                'remarks': combined_remarks,
+                'amount': amount,
+                'type': transaction_type,
+                'debit': debit_amount,
+                'credit': credit_amount,
+                'balance': balance,
+                'page': 'Excel',
+                'line': str(index + 1),
+                'date_iso': date_iso,
+                'store': store,
+                'commodity': commodity
+            })
         
         return pd.DataFrame(transactions)
         
@@ -469,7 +648,7 @@ def parse_text_content(text, source="Unknown"):
                 transactions.append({
                     'date': date_match,
                     'description': clean_description,
-                    'raw': original_line if 'original_line' in locals() else description_line,
+                    'raw': description,
                     'remarks': combined_remarks,
                     'amount': amount,
                     'type': transaction_type,

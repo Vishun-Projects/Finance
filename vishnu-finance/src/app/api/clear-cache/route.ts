@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { clearAllCache, getCacheStats } from '@/lib/api-cache';
 import { cacheManager } from '@/lib/advanced-cache';
-import { clearCurrencyRatesCache, getCurrencyCacheStats } from '@/app/api/currency-rates/route';
+import { clearCurrencyRatesCache, getCurrencyCacheStats } from '@/lib/currency-rates-cache';
 
 /**
  * API endpoint to clear all application caches

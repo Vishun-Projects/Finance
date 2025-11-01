@@ -1,38 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getCachedRates, setCachedRates, isCacheValid } from '@/lib/currency-rates-cache';
 
 // Configure route caching - external API data
 export const dynamic = 'force-dynamic';
 export const revalidate = 300; // Revalidate every 5 minutes
-
-// Cache for exchange rates to avoid hitting external API too frequently
-let cachedRates: { [key: string]: number } = {};
-let lastFetchTime = 0;
-const CACHE_DURATION = 60000; // 1 minute
-
-// Export function to clear currency rates cache
-export function clearCurrencyRatesCache(): void {
-  cachedRates = {};
-  lastFetchTime = 0;
-  console.log('✅ Currency rates cache cleared');
-}
-
-// Export function to get currency cache stats
-export function getCurrencyCacheStats(): { hasCache: boolean; lastFetchTime: string | null } {
-  return {
-    hasCache: Object.keys(cachedRates).length > 0,
-    lastFetchTime: lastFetchTime ? new Date(lastFetchTime).toISOString() : null
-  };
-}
 
 export async function GET(request: NextRequest) {
   try {
     const now = Date.now();
     
     // Return cached rates if they're still fresh
-    if (now - lastFetchTime < CACHE_DURATION && Object.keys(cachedRates).length > 0) {
+    if (isCacheValid()) {
+      const cachedRates = getCachedRates();
       return NextResponse.json({
         rates: cachedRates,
-        lastUpdated: new Date(lastFetchTime).toISOString(),
+        lastUpdated: new Date(now).toISOString(),
         source: 'cache'
       });
     }
@@ -42,10 +24,11 @@ export async function GET(request: NextRequest) {
     
     if (Object.keys(rates).length === 0) {
       // If all sources fail, return cached rates or default rates
+      const cachedRates = getCachedRates();
       if (Object.keys(cachedRates).length > 0) {
         return NextResponse.json({
           rates: cachedRates,
-          lastUpdated: new Date(lastFetchTime).toISOString(),
+          lastUpdated: new Date(now).toISOString(),
           source: 'fallback_cache'
         });
       }
@@ -59,8 +42,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Update cache
-    cachedRates = rates;
-    lastFetchTime = now;
+    setCachedRates(rates, now);
 
     return NextResponse.json({
       rates,
@@ -72,10 +54,11 @@ export async function GET(request: NextRequest) {
     console.error('Error fetching exchange rates:', error);
     
     // Return cached rates or default rates on error
+    const cachedRates = getCachedRates();
     if (Object.keys(cachedRates).length > 0) {
       return NextResponse.json({
         rates: cachedRates,
-        lastUpdated: new Date(lastFetchTime).toISOString(),
+        lastUpdated: new Date().toISOString(),
         source: 'error_fallback'
       });
     }

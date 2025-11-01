@@ -3,14 +3,15 @@ import { prisma } from '@/lib/db';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string; moduleId: string } }
+  { params }: { params: Promise<{ id: string; moduleId: string }> }
 ) {
   try {
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
+    const { moduleId } = await params;
 
-    const module = await prisma.module.findUnique({
-      where: { id: params.moduleId },
+    const courseModule = await prisma.module.findUnique({
+      where: { id: moduleId },
       include: userId ? {
         progress: {
           where: { userId }
@@ -18,17 +19,17 @@ export async function GET(
       } : false
     });
 
-    if (!module) {
+    if (!courseModule) {
       return NextResponse.json(
         { error: 'Module not found' },
         { status: 404 }
       );
     }
 
-    const userProgress = module.progress?.[0];
+    const userProgress = courseModule.progress?.[0];
 
     return NextResponse.json({
-      ...module,
+      ...courseModule,
       progress: userProgress?.progress || 0,
       isCompleted: userProgress?.isCompleted || false
     });
@@ -43,14 +44,15 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string; moduleId: string } }
+  { params }: { params: Promise<{ id: string; moduleId: string }> }
 ) {
   try {
     const body = await request.json();
     const { title, description, content, duration, order } = body;
+    const { moduleId } = await params;
 
-    const module = await prisma.module.update({
-      where: { id: params.moduleId },
+    const courseModule = await prisma.module.update({
+      where: { id: moduleId },
       data: {
         title,
         description,
@@ -60,7 +62,7 @@ export async function PUT(
       }
     });
 
-    return NextResponse.json(module);
+    return NextResponse.json(courseModule);
   } catch (error) {
     console.error('Error updating module:', error);
     return NextResponse.json(
@@ -72,11 +74,12 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string; moduleId: string } }
+  { params }: { params: Promise<{ id: string; moduleId: string }> }
 ) {
   try {
+    const { moduleId } = await params;
     await prisma.module.update({
-      where: { id: params.moduleId },
+      where: { id: moduleId },
       data: { isActive: false }
     });
 

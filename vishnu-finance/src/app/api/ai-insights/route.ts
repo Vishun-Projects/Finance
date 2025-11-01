@@ -212,7 +212,11 @@ export async function POST(request: NextRequest) {
     const topExpenseCategories = Object.entries(categoryBreakdown)
       .sort(([,a]: any, [,b]: any) => b - a)
       .slice(0, 5)
-      .map(([category, amount]: any) => ({ category, amount }));
+      .map(([category, amount]: any) => ({ 
+        category, 
+        amount,
+        percentage: totalExpenses > 0 ? (amount / totalExpenses) * 100 : 0
+      }));
 
     // Get income sources
     const incomeSources = incomes.map((income: any) => ({
@@ -235,7 +239,7 @@ export async function POST(request: NextRequest) {
     // Calculate financial health score
     let healthScore = 0;
     let healthStatus = 'Poor';
-    let recommendations: string[] = [];
+    const recommendations: string[] = [];
 
     // Income stability scoring
     if (incomeSources.length > 1) {

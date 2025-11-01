@@ -3,18 +3,19 @@ import { prisma } from '@/lib/db';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const body = await request.json();
     const { userId, progress, isCompleted } = body;
+    const { id } = await params;
 
     // Update or create course progress
     const courseProgress = await prisma.courseProgress.upsert({
       where: {
         userId_courseId: {
           userId,
-          courseId: params.id
+          courseId: id
         }
       },
       update: {
@@ -24,7 +25,7 @@ export async function POST(
       },
       create: {
         userId,
-        courseId: params.id,
+        courseId: id,
         progress,
         isCompleted,
         completedAt: isCompleted ? new Date() : null

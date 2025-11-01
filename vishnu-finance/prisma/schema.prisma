@@ -72,25 +72,29 @@ model Category {
 }
 
 model IncomeSource {
-  id         String          @id @default(cuid())
-  name       String
-  amount     Decimal         @db.Decimal(10, 2)
-  frequency  IncomeFrequency
-  categoryId String?
-  startDate  DateTime
-  endDate    DateTime?
-  notes      String?
-  isActive   Boolean         @default(true)
-  userId     String
-  createdAt  DateTime        @default(now())
-  updatedAt  DateTime        @updatedAt
-  store      String?
-  upiId      String?
-  branch     String?
-  personName String?
-  rawData    String?         @db.Text
-  category   Category?       @relation(fields: [categoryId], references: [id])
-  user       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id            String          @id @default(cuid())
+  name          String
+  amount        Decimal         @db.Decimal(10, 2)
+  frequency     IncomeFrequency
+  categoryId    String?
+  startDate     DateTime
+  endDate       DateTime?
+  notes         String?
+  isActive      Boolean         @default(true)
+  userId        String
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  store         String?
+  upiId         String?
+  branch        String?
+  personName    String?
+  rawData       String?         @db.Text
+  bankCode      String?
+  transactionId String?
+  accountNumber String?
+  transferType  String?
+  category      Category?       @relation(fields: [categoryId], references: [id])
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([categoryId], map: "income_sources_categoryId_fkey")
   @@index([userId], map: "income_sources_userId_fkey")
@@ -98,25 +102,29 @@ model IncomeSource {
 }
 
 model Expense {
-  id          String            @id @default(cuid())
-  amount      Decimal           @db.Decimal(10, 2)
-  description String?
-  date        DateTime
-  categoryId  String?
-  isRecurring Boolean           @default(false)
-  frequency   ExpenseFrequency?
-  notes       String?
-  receiptUrl  String?
-  userId      String
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
-  store       String?
-  upiId       String?
-  branch      String?
-  personName  String?
-  rawData     String?           @db.Text
-  category    Category?         @relation(fields: [categoryId], references: [id])
-  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id            String            @id @default(cuid())
+  amount        Decimal           @db.Decimal(10, 2)
+  description   String?
+  date          DateTime
+  categoryId    String?
+  isRecurring   Boolean           @default(false)
+  frequency     ExpenseFrequency?
+  notes         String?
+  receiptUrl    String?
+  userId        String
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  store         String?
+  upiId         String?
+  branch        String?
+  personName    String?
+  rawData       String?           @db.Text
+  bankCode      String?
+  transactionId String?
+  accountNumber String?
+  transferType  String?
+  category      Category?         @relation(fields: [categoryId], references: [id])
+  user          User              @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([categoryId], map: "expenses_categoryId_fkey")
   @@index([userId], map: "expenses_userId_fkey")

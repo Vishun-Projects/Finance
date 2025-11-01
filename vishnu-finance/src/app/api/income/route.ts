@@ -26,16 +26,110 @@ export async function GET(request: NextRequest) {
     } : undefined;
 
     // Fetch incomes (income sources) optionally date-scoped by startDate
-    const incomes = await (prisma as any).incomeSource.findMany({
-      where: {
-        userId,
-        ...(dateFilter ? { startDate: dateFilter } : {})
-      },
-      orderBy: { startDate: 'desc' }
-    });
+    // IMPORTANT: Only fetch active income sources and ensure proper filtering
+    let incomes: any[] = [];
+    try {
+      incomes = await (prisma as any).incomeSource.findMany({
+        where: {
+          userId,
+          isActive: true, // Only active income sources
+          ...(dateFilter ? { startDate: dateFilter } : {})
+        },
+        select: {
+          id: true,
+          name: true,
+          amount: true,
+          frequency: true,
+          categoryId: true,
+          startDate: true,
+          endDate: true,
+          notes: true,
+          isActive: true,
+          userId: true,
+          createdAt: true,
+          updatedAt: true,
+          store: true,
+          upiId: true,
+          branch: true,
+          personName: true,
+          rawData: true,
+          accountNumber: true,
+          bankCode: true,
+          transactionId: true,
+          transferType: true,
+          category: {
+            select: {
+              id: true,
+              name: true,
+              type: true,
+              color: true
+            }
+          }
+        },
+        orderBy: { startDate: 'desc' }
+      });
+      
+      // Filter out any invalid amounts or duplicates
+      const seen = new Set<string>();
+      incomes = incomes.filter((income: any) => {
+        const amount = parseFloat(income.amount || 0);
+        // Skip invalid amounts
+        if (!amount || amount <= 0 || isNaN(amount) || !isFinite(amount)) {
+          return false;
+        }
+        // Deduplicate by key: name|amount|startDate
+        const dateStr = income.startDate ? new Date(income.startDate).toISOString().split('T')[0] : '';
+        const key = `${income.name}|${amount}|${dateStr}`;
+        if (seen.has(key)) {
+          console.log('⚠️ Duplicate income detected:', key);
+          return false;
+        }
+        seen.add(key);
+        return true;
+      });
+    } catch (error: any) {
+      if (error.code === 'P2022' || error.message?.includes('does not exist')) {
+        // Column doesn't exist, fetch using raw SQL query
+        console.log('⚠️ INCOME GET - Some columns missing, using raw SQL fallback');
+        const params = [userId];
+        let query = `
+          SELECT id, name, amount, frequency, categoryId, startDate, endDate, 
+                 notes, isActive, userId, createdAt, updatedAt`;
+        
+        // Try to include optional columns
+        try {
+          query += `, COALESCE(store, '') as store,
+                     COALESCE(upiId, '') as upiId,
+                     COALESCE(branch, '') as branch,
+                     COALESCE(personName, '') as personName,
+                     COALESCE(rawData, '') as rawData`;
+        } catch {
+          // If columns don't exist, just skip them
+        }
+        
+        query += ` FROM income_sources WHERE userId = ?`;
+        
+        if (dateFilter) {
+          query += ` AND startDate >= ? AND startDate <= ?`;
+          params.push(new Date(dateFilter.gte));
+          params.push(new Date(dateFilter.lte));
+        }
+        
+        query += ` ORDER BY startDate DESC`;
+        
+        incomes = await (prisma as any).$queryRawUnsafe(query, ...params);
+      } else {
+        throw error;
+      }
+    }
 
     console.log('✅ INCOME GET - Found incomes:', incomes.length, 'records');
-    console.log('📊 INCOME GET - Incomes data:', JSON.stringify(incomes, null, 2));
+    
+    // Calculate total sum for verification
+    const totalSum = incomes.reduce((sum, inc) => sum + parseFloat(inc.amount || 0), 0);
+    console.log('📊 INCOME GET - Total sum of amounts:', totalSum);
+    console.log('📊 INCOME GET - Sample incomes data (first 3):', JSON.stringify(incomes.slice(0, 3), null, 2));
+    
     return NextResponse.json(incomes);
   } catch (error) {
     console.error('❌ INCOME GET - Error:', error);

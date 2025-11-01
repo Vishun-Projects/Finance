@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { 
   DollarSign, 
   Plus, 
@@ -17,7 +17,6 @@ import {
   Filter,
   Download,
   Tag,
-  Receipt,
   CreditCard,
   Briefcase,
   Upload,
@@ -38,6 +37,64 @@ interface Income {
   paymentMethod?: string;
   receiptUrl?: string;
   notes?: string;
+  store?: string;
+  personName?: string;
+  commodity?: string;
+  upiId?: string;
+  accountNumber?: string;
+}
+
+interface BankTransaction {
+  debit?: number | string;
+  credit?: number | string;
+  description?: string;
+  date?: string;
+  date_iso?: string;
+  category?: string;
+  narration?: string;
+  bankCode?: string;
+  transactionId?: string;
+  accountNumber?: string;
+  transferType?: string;
+  personName?: string;
+  upiId?: string;
+  branch?: string;
+  store?: string;
+  commodity?: string;
+  rawData?: string;
+  raw?: string;
+  [key: string]: unknown;
+}
+
+interface ApiIncome {
+  id: string;
+  name?: string;
+  amount: number | string;
+  categoryId?: string;
+  startDate: string | Date;
+  notes?: string;
+  [key: string]: unknown;
+}
+
+interface ImportRecord {
+  title: string;
+  amount: number | string;
+  category?: string;
+  date: string;
+  description?: string;
+  payment_method?: string;
+  notes?: string;
+  type?: 'income' | 'expense';
+  bankCode?: string;
+  transactionId?: string;
+  accountNumber?: string;
+  transferType?: string;
+  personName?: string;
+  upiId?: string;
+  branch?: string;
+  store?: string;
+  commodity?: string;
+  rawData?: string;
 }
 
 export default function IncomeManagement() {
@@ -51,11 +108,15 @@ export default function IncomeManagement() {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState<string>('all');
+  const [filterStore, setFilterStore] = useState<string>('all');
+  const [filterCommodity, setFilterCommodity] = useState<string>('all');
   const [startDate, setStartDate] = useState(() => {
+    // Default to 2 years ago to include imported bank statements
     const now = new Date();
-    return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+    return new Date(now.getFullYear() - 2, 0, 1).toISOString().split('T')[0];
   });
   const [endDate, setEndDate] = useState(() => {
+    // Default to end of current month
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
   });
@@ -78,7 +139,7 @@ export default function IncomeManagement() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   const [isParsingFile, setIsParsingFile] = useState(false);
-  const [parsedTransactions, setParsedTransactions] = useState<any[]>([]);
+  const [parsedTransactions, setParsedTransactions] = useState<BankTransaction[]>([]);
   const [showCsvPreview, setShowCsvPreview] = useState(false);
   const [selectedBank, setSelectedBank] = useState<string>('');
   const [previewMonthOnly, setPreviewMonthOnly] = useState<boolean>(false); // Default to false to show all transactions
@@ -87,6 +148,7 @@ export default function IncomeManagement() {
   const [parseProgress, setParseProgress] = useState<number>(0);
   const [importProgress, setImportProgress] = useState<number>(0);
   const [tempFiles, setTempFiles] = useState<string[]>([]);
+  const [isDragging, setIsDragging] = useState(false);
 
   const filteredParsed = useMemo(() => {
     console.log('🔍 FILTERING: parsedTransactions.length:', parsedTransactions.length);
@@ -108,7 +170,7 @@ export default function IncomeManagement() {
       currentYear: now.getFullYear()
     });
     
-    const filtered = parsedTransactions.filter((t: any) => {
+    const filtered = parsedTransactions.filter((t: BankTransaction) => {
       const dStr = (t.date_iso || t.date || '').toString().slice(0, 10);
       const d = dStr ? new Date(dStr) : null;
       const inRange = d && d >= start && d <= end;
@@ -136,22 +198,7 @@ export default function IncomeManagement() {
 
   // formatCurrency is now provided by the CurrencyContext
 
-  useEffect(() => {
-    if (user && !authLoading) {
-      fetchIncomes();
-    }
-  }, [user, authLoading, startDate, endDate]);
-
-  // Debug effect to track state changes
-  useEffect(() => {
-    console.log('🔍 STATE CHANGE: showCsvPreview =', showCsvPreview);
-    console.log('🔍 STATE CHANGE: parsedTransactions.length =', parsedTransactions.length);
-    if (parsedTransactions.length > 0) {
-      console.log('🔍 STATE CHANGE: First 3 parsed transactions:', parsedTransactions.slice(0, 3));
-    }
-  }, [showCsvPreview, parsedTransactions]);
-
-  const fetchIncomes = async () => {
+  const fetchIncomes = useCallback(async () => {
     console.log('🔄 INCOME COMPONENT - Fetching incomes...');
     console.log('🔄 INCOME COMPONENT - User ID:', user?.id);
     
@@ -170,17 +217,65 @@ export default function IncomeManagement() {
         const data = await response.json();
         console.log('✅ INCOME COMPONENT - API Response data:', JSON.stringify(data, null, 2));
         // Transform the data to match the frontend interface
-        const transformedData = data.map((income: any) => ({
-          id: income.id,
-          title: income.name || '', // Map name to title
-          amount: parseFloat(income.amount),
-          category: income.categoryId || '',
-          date: income.startDate,
-          description: income.notes || '',
-          paymentMethod: '',
-          receiptUrl: '',
-          notes: income.notes || ''
-        }));
+        // Filter out invalid records during transformation
+        const transformedData = data
+          .map((income: ApiIncome) => {
+            const amount = parseFloat(String(income.amount || 0));
+            // Skip invalid incomes
+            if (!amount || amount <= 0 || isNaN(amount) || !isFinite(amount)) {
+              console.warn('⚠️ Skipping invalid income:', income);
+              return null;
+            }
+            // Normalize date to ISO format (YYYY-MM-DD)
+            let dateStr = '';
+            if (income.startDate) {
+              try {
+                const date = new Date(income.startDate);
+                if (!isNaN(date.getTime())) {
+                  dateStr = date.toISOString().slice(0, 10); // YYYY-MM-DD format
+                } else {
+                  // If date is already a string, try to extract ISO format
+                  const dateMatch = income.startDate.toString().match(/(\d{4}-\d{2}-\d{2})/);
+                  if (dateMatch) {
+                    dateStr = dateMatch[0];
+                  }
+                }
+              } catch {
+                // If date is already a string, try to extract ISO format
+                const dateMatch = income.startDate.toString().match(/(\d{4}-\d{2}-\d{2})/);
+                if (dateMatch) {
+                  dateStr = dateMatch[0];
+                }
+              }
+            }
+            
+            // Ensure we have a valid date, otherwise use today
+            if (!dateStr || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+              dateStr = new Date().toISOString().slice(0, 10);
+            }
+            
+            return {
+              id: income.id,
+              title: income.name || '', // Map name to title
+              amount: amount,
+              category: income.categoryId || '',
+              date: dateStr, // Use normalized ISO date
+              description: income.notes || '',
+              paymentMethod: '',
+              receiptUrl: '',
+              notes: income.notes || '',
+              store: income.store || '',
+              personName: income.personName || '',
+              commodity: income.notes || '', // commodity is stored in notes field
+              upiId: income.upiId || '',
+              accountNumber: income.accountNumber || ''
+            };
+          })
+          .filter(Boolean) as Income[];
+        
+        console.log(`✅ Transformed ${transformedData.length} valid incomes out of ${data.length} total`);
+        const totalSum = transformedData.reduce((sum, inc) => sum + inc.amount, 0);
+        console.log(`📊 Total income sum: ₹${totalSum.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`);
         setIncomes(transformedData);
       } else {
         const errorData = await response.json();
@@ -194,7 +289,22 @@ export default function IncomeManagement() {
     } finally {
       setIsFetching(false);
     }
-  };
+  }, [user?.id, startDate, endDate, showError]);
+
+  useEffect(() => {
+    if (user && !authLoading) {
+      fetchIncomes();
+    }
+  }, [user, authLoading, fetchIncomes]);
+
+  // Debug effect to track state changes
+  useEffect(() => {
+    console.log('🔍 STATE CHANGE: showCsvPreview =', showCsvPreview);
+    console.log('🔍 STATE CHANGE: parsedTransactions.length =', parsedTransactions.length);
+    if (parsedTransactions.length > 0) {
+      console.log('🔍 STATE CHANGE: First 3 parsed transactions:', parsedTransactions.slice(0, 3));
+    }
+  }, [showCsvPreview, parsedTransactions]);
 
   // Download sample CSV template
   const downloadSampleTemplate = () => {
@@ -217,7 +327,7 @@ export default function IncomeManagement() {
   };
 
   // Parse CSV file
-  const parseCSV = (text: string): any[] => {
+  const parseCSV = (text: string): Record<string, string>[] => {
     // Remove BOM if present
     const cleanText = text.charCodeAt(0) === 0xFEFF ? text.slice(1) : text;
     
@@ -264,7 +374,7 @@ export default function IncomeManagement() {
       const values = parseCSVLine(lines[i]);
       if (values.every(v => !v)) continue; // Skip empty rows
       
-      const row: any = {};
+      const row: Record<string, string> = {};
       headers.forEach((header, index) => {
         row[header] = values[index] || '';
       });
@@ -310,6 +420,54 @@ export default function IncomeManagement() {
       }
       setSelectedFile(file);
       setFileError(null);
+    }
+  };
+
+  // Drag and drop handlers
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      const file = files[0];
+      const supportedTypes = [
+        'application/pdf',
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'text/plain'
+      ];
+      
+      const supportedExtensions = ['.pdf', '.xls', '.xlsx', '.doc', '.docx', '.txt'];
+      const hasValidType = supportedTypes.includes(file.type);
+      const hasValidExtension = supportedExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
+      
+      if (hasValidType || hasValidExtension) {
+        setSelectedFile(file);
+        setFileError(null);
+      } else {
+        setFileError('Please drop a valid file (PDF, XLS, XLSX, DOC, DOCX, or TXT)');
+      }
     }
   };
 
@@ -409,28 +567,100 @@ export default function IncomeManagement() {
     setFileError(null);
 
     try {
-      // Normalize to common structure
+      // Normalize to common structure - extract only plain data values to avoid circular references
       const normalized = parsedTransactions
         .map((t) => {
-          const debitAmount = parseFloat(t.debit || '0');
-          const creditAmount = parseFloat(t.credit || '0');
-          const isIncome = creditAmount > 0;
-          const amount = isIncome ? creditAmount : debitAmount;
-          const title = (t.description || t.narration || '').toString().trim();
-          const date = (t.date_iso || t.date || '').toString().slice(0, 10);
-          return amount > 0 && title && date
-            ? {
-                title,
-                amount,
-                category: t.category || (isIncome ? 'Bank Statement' : 'Bank Statement Expense'),
-                date,
-                description: t.description || t.narration || '',
-                payment_method: 'Bank Transfer',
-                type: isIncome ? 'income' : 'expense',
+          try {
+            // Extract only primitive values to avoid circular references
+            const safeTransaction = {
+              debit: typeof t.debit === 'number' ? t.debit : parseFloat(t.debit || '0'),
+              credit: typeof t.credit === 'number' ? t.credit : parseFloat(t.credit || '0'),
+              description: String(t.description || t.narration || '').trim(),
+              date: t.date ? String(t.date) : '',
+              date_iso: t.date_iso ? String(t.date_iso) : '',
+              category: t.category ? String(t.category) : '',
+              narration: t.narration ? String(t.narration) : '',
+              // Preserve bank-specific fields
+              bankCode: t.bankCode,
+              transactionId: t.transactionId,
+              accountNumber: t.accountNumber,
+              transferType: t.transferType,
+              personName: t.personName,
+              upiId: t.upiId,
+              branch: t.branch,
+              store: t.store,
+              commodity: t.commodity,
+              rawData: t.raw || t.rawData,
+            };
+            
+            const debitAmount = safeTransaction.debit;
+            const creditAmount = safeTransaction.credit;
+            const isIncome = creditAmount > 0;
+            const amount = isIncome ? creditAmount : debitAmount;
+            const title = safeTransaction.description;
+            
+            // Properly parse and normalize date to ISO format (YYYY-MM-DD)
+            let dateStr = '';
+            if (safeTransaction.date_iso) {
+              dateStr = safeTransaction.date_iso.slice(0, 10);
+            } else if (safeTransaction.date) {
+              // Try to parse various date formats
+              const dateInput = safeTransaction.date;
+              try {
+                const parsedDate = new Date(dateInput);
+                if (!isNaN(parsedDate.getTime())) {
+                  // Validate date is reasonable (between 2020-2026)
+                  const year = parsedDate.getFullYear();
+                  if (year >= 2020 && year <= 2026) {
+                    dateStr = parsedDate.toISOString().slice(0, 10);
+                  }
+                }
+              } catch {
+                // If parsing fails, try extracting date pattern
+                const dateMatch = dateInput.match(/(\d{4}-\d{2}-\d{2})|(\d{1,2}\s+[A-Za-z]{3}\s+\d{4})/);
+                if (dateMatch) {
+                  try {
+                    const parsedDate = new Date(dateMatch[0]);
+                    if (!isNaN(parsedDate.getTime())) {
+                      dateStr = parsedDate.toISOString().slice(0, 10);
+                    }
+                  } catch {}
+                }
               }
-            : null;
+            }
+            
+            // Validate date format is correct (YYYY-MM-DD)
+            const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+            const isValidDate = dateStr && dateRegex.test(dateStr);
+            
+            return amount > 0 && title && isValidDate
+              ? {
+                  title,
+                  amount,
+                  category: safeTransaction.category || (isIncome ? 'Bank Statement' : 'Bank Statement Expense'),
+                  date: dateStr, // Use the normalized date string
+                  description: safeTransaction.description,
+                  payment_method: 'Bank Transfer',
+                  type: isIncome ? 'income' : 'expense',
+                  // Include bank-specific fields
+                  bankCode: safeTransaction.bankCode,
+                  transactionId: safeTransaction.transactionId,
+                  accountNumber: safeTransaction.accountNumber,
+                  transferType: safeTransaction.transferType,
+                  personName: safeTransaction.personName,
+                  upiId: safeTransaction.upiId,
+                  branch: safeTransaction.branch,
+                  store: safeTransaction.store,
+                  commodity: safeTransaction.commodity,
+                  rawData: safeTransaction.rawData,
+                }
+              : null;
+          } catch (error) {
+            console.warn('⚠️ Error normalizing transaction:', error);
+            return null;
+          }
         })
-        .filter(Boolean) as any[];
+        .filter(Boolean) as ImportRecord[];
 
       if (!normalized.length) {
         showError('No valid records', 'No transactions to import');
@@ -439,23 +669,28 @@ export default function IncomeManagement() {
       }
 
       // Simulate import progress up to 90% while waiting for server
-      const total = normalized.length;
       const importTimer = setInterval(() => {
         setImportProgress((p) => (p < 90 ? Math.min(90, p + 4) : p));
       }, 300);
-      const response = await fetch('/api/import/batch', {
+      // Use bank statement import API which handles bank-specific fields
+      const response = await fetch('/api/import-bank-statement', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.id, type: 'income', records: normalized }),
+        body: JSON.stringify({ userId: user.id, type: 'income', records: normalized }), // type is fallback only
       });
       if (!response.ok) {
         const err = await response.json().catch(() => ({}));
         throw new Error(err.error || 'Batch import failed');
       }
       const result = await response.json();
-      success('Imported', `Inserted ${result.inserted}, duplicates ${result.duplicates}`);
+      const incomeCount = result.incomeInserted || 0;
+      const expenseCount = result.expenseInserted || 0;
+      const totalInserted = result.inserted || (incomeCount + expenseCount);
+      
+      success('Imported', `Inserted ${totalInserted} records (${incomeCount} income, ${expenseCount} expenses), ${result.duplicates || 0} duplicates`);
       setImportProgress(100);
       clearInterval(importTimer);
+      // Refetch with expanded date range to show imported transactions
       await fetchIncomes();
       
       // Clean up temporary files after successful import
@@ -504,17 +739,22 @@ export default function IncomeManagement() {
       }
 
       // First, fetch existing incomes to check for duplicates
-      { const n=new Date(); const s=new Date(n.getFullYear(),n.getMonth(),1).toISOString().split('T')[0]; const e=new Date(n.getFullYear(),n.getMonth()+1,0).toISOString().split('T')[0]; var existingResponse = await fetch(`/api/income?userId=${user.id}&start=${s}&end=${e}`); }
-      let existingIncomes = [];
+      const n = new Date();
+      const s = new Date(n.getFullYear(), n.getMonth(), 1).toISOString().split('T')[0];
+      const e = new Date(n.getFullYear(), n.getMonth() + 1, 0).toISOString().split('T')[0];
+      const existingResponse = await fetch(`/api/income?userId=${user.id}&start=${s}&end=${e}`);
+      let existingIncomes: Income[] = [];
       
       if (existingResponse.ok) {
         const existingData = await existingResponse.json();
-        existingIncomes = existingData.map((income: any) => ({
+        existingIncomes = existingData.map((income: ApiIncome) => ({
           id: income.id,
           title: income.name || '',
-          amount: parseFloat(income.amount),
+          amount: parseFloat(String(income.amount)),
           category: income.categoryId || '',
-          date: income.startDate,
+          date: typeof income.startDate === 'string' ? income.startDate : 
+                income.startDate instanceof Date ? income.startDate.toISOString().slice(0, 10) : 
+                new Date().toISOString().slice(0, 10),
           description: income.notes || '',
           paymentMethod: '',
           notes: income.notes || ''
@@ -547,7 +787,7 @@ export default function IncomeManagement() {
           }
 
           // Check for duplicates
-          const isDuplicate = existingIncomes.some((existing: any) => {
+          const isDuplicate = existingIncomes.some((existing: Income) => {
             // Check for exact matches
             const sameDate = existing.date === incomeData.date;
             const sameAmount = Math.abs(existing.amount - parseFloat(incomeData.amount)) < 0.01;
@@ -764,11 +1004,29 @@ export default function IncomeManagement() {
   const handleEdit = (income: Income) => {
     setEditingIncome(income);
     setIsEditMode(true);
+    
+    // Normalize date to YYYY-MM-DD format for form input
+    let normalizedDate = '';
+    if (income.date) {
+      try {
+        const date = new Date(income.date);
+        if (!isNaN(date.getTime())) {
+          normalizedDate = date.toISOString().slice(0, 10);
+        } else {
+          // If date is already a string, try to extract ISO format
+          const dateMatch = income.date.toString().match(/(\d{4}-\d{2}-\d{2})/);
+          normalizedDate = dateMatch ? dateMatch[0] : income.date.toString().slice(0, 10);
+        }
+      } catch {
+        normalizedDate = income.date.toString().slice(0, 10);
+      }
+    }
+    
     setFormData({
       title: income.title,
       amount: income.amount.toString(),
       category: income.category,
-      date: income.date,
+      date: normalizedDate,
       description: income.description || '',
       paymentMethod: income.paymentMethod || '',
       notes: income.notes || ''
@@ -802,12 +1060,64 @@ export default function IncomeManagement() {
                          (income.category || '').toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesCategory = filterCategory === 'all' || income.category === filterCategory;
+    const matchesStore = filterStore === 'all' || 
+                         (income.store && income.store.toLowerCase().includes(filterStore.toLowerCase())) ||
+                         (income.personName && income.personName.toLowerCase().includes(filterStore.toLowerCase()));
+    const matchesCommodity = filterCommodity === 'all' || 
+                             (income.commodity && income.commodity.toLowerCase().includes(filterCommodity.toLowerCase()));
     
-    return matchesSearch && matchesCategory;
+    return matchesSearch && matchesCategory && matchesStore && matchesCommodity;
   });
 
-  const totalIncome = incomes.reduce((sum, income) => sum + income.amount, 0);
+  const storesPersons = Array.from(new Set(
+    incomes
+      .map(i => [i.store, i.personName])
+      .flat()
+      .filter(Boolean)
+      .map(String)
+  ));
+  
+  const commodities = Array.from(new Set(
+    incomes
+      .map(i => i.commodity)
+      .filter(Boolean)
+      .map(String)
+  ));
+
   const categories = Array.from(new Set(incomes.map(i => i.category)));
+
+  // Calculate total income for the filtered date range (only ONE_TIME incomes)
+  // Note: Since we're fetching incomes filtered by date range, we should only sum ONE_TIME transactions
+  // Recurring transactions should be handled differently but for now, we'll only sum ONE_TIME
+  const now = new Date();
+  const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  
+  // Total income in the filtered date range - ensure we're only summing valid amounts
+  const totalIncome = filteredIncomes.reduce((sum, income) => {
+    const amount = typeof income.amount === 'number' ? income.amount : parseFloat(String(income.amount)) || 0;
+    // Only sum positive amounts (income should always be positive)
+    // Also validate the amount is a reasonable number
+    if (amount > 0 && !isNaN(amount) && isFinite(amount) && amount < 1000000000) {
+      return sum + amount;
+    }
+    return sum;
+  }, 0);
+  
+  // This month's income - only count incomes from current month
+  const thisMonthIncome = filteredIncomes.reduce((sum, income) => {
+    try {
+      const dateStr = income.date.toString().slice(0, 10); // Ensure YYYY-MM-DD format
+      const incomeDate = new Date(dateStr + 'T00:00:00'); // Add time to avoid timezone issues
+      
+      if (!isNaN(incomeDate.getTime()) && incomeDate >= currentMonthStart && incomeDate <= currentMonthEnd) {
+        return sum + income.amount;
+      }
+    } catch {
+      // Skip invalid dates
+    }
+    return sum;
+  }, 0);
 
   if (isFetching) {
     return (
@@ -941,7 +1251,7 @@ export default function IncomeManagement() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-muted">This Month</p>
-              <p className="text-2xl font-bold text-info currency-inr">{formatCurrency(totalIncome)}</p>
+              <p className="text-2xl font-bold text-info currency-inr">{formatCurrency(thisMonthIncome)}</p>
             </div>
             <div className="minimal-stat-inset">
               <Calendar className="w-6 h-6 text-info" />
@@ -953,7 +1263,7 @@ export default function IncomeManagement() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-muted">Total Sources</p>
-              <p className="text-2xl font-bold text-primary">{incomes.length}</p>
+              <p className="text-2xl font-bold text-primary">{filteredIncomes.length}</p>
             </div>
             <div className="minimal-stat-inset">
               <Briefcase className="w-6 h-6 text-primary" />
@@ -991,6 +1301,26 @@ export default function IncomeManagement() {
             <option value="all">All Categories</option>
             {categories.map(category => (
               <option key={category} value={category}>{category}</option>
+            ))}
+          </select>
+          <select
+            value={filterStore}
+            onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFilterStore(e.target.value)}
+            className="minimal-select"
+          >
+            <option value="all">All Stores/People</option>
+            {storesPersons.map(store => (
+              <option key={store} value={store}>{store}</option>
+            ))}
+          </select>
+          <select
+            value={filterCommodity}
+            onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFilterCommodity(e.target.value)}
+            className="minimal-select"
+          >
+            <option value="all">All Commodities</option>
+            {commodities.map(commodity => (
+              <option key={commodity} value={commodity}>{commodity}</option>
             ))}
           </select>
           <button className="minimal-button-small p-2">
@@ -1134,17 +1464,37 @@ export default function IncomeManagement() {
               </div>
             </div>
 
-            {/* File Input */}
+            {/* File Input with Drag and Drop */}
             <div>
               <label className="block text-sm font-semibold text-primary mb-3">
                 Select File
               </label>
-              <input
-                type="file"
-                accept=".pdf,.xls,.xlsx,.doc,.docx,.txt"
-                onChange={handleMultiFormatFileSelect}
-                className="w-full minimal-input"
-              />
+              <div 
+                onDragEnter={handleDragEnter}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+                  isDragging 
+                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' 
+                    : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
+                }`}
+              >
+                <Upload className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                  {isDragging ? 'Drop file here' : 'Drag and drop your file here, or click to browse'}
+                </p>
+                <input
+                  type="file"
+                  accept=".pdf,.xls,.xlsx,.doc,.docx,.txt"
+                  onChange={handleMultiFormatFileSelect}
+                  className="hidden"
+                  id="file-upload"
+                />
+                <label htmlFor="file-upload" className="minimal-button-secondary cursor-pointer inline-block">
+                  Choose File
+                </label>
+              </div>
               {selectedFile && (
                 <p className="text-sm text-success mt-2">
                   Selected: {selectedFile.name}
@@ -1262,7 +1612,7 @@ export default function IncomeManagement() {
                     </p>
                   </div>
               <div className="space-y-2 p-4">
-                    {visibleParsed.map((transaction: any, index: number) => (
+                    {visibleParsed.map((transaction: BankTransaction, index: number) => (
                       <div key={index} className="bg-white dark:bg-gray-900 p-3 rounded border border-gray-200 dark:border-gray-700 w-full min-w-0">
                         <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
                           Transaction #{index + 1} (Raw Length: {(transaction.raw || transaction.description || '').length})
@@ -1322,22 +1672,23 @@ export default function IncomeManagement() {
                         <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Type</th>
                         <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Amount</th>
                         <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Notes</th>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Raw Data</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                      {visibleParsed.map((transaction: any, index: number) => {
-                        const debitAmount = parseFloat(transaction.debit || '0');
-                        const creditAmount = parseFloat(transaction.credit || '0');
+                      {visibleParsed.map((transaction: BankTransaction, index: number) => {
+                        const debitAmount = parseFloat(String(transaction.debit || '0'));
+                        const creditAmount = parseFloat(String(transaction.credit || '0'));
                         const isIncome = creditAmount > 0;
                         const amount = isIncome ? creditAmount : debitAmount;
-                        const store = transaction.store || '';
+                        const storeOrPerson = transaction.store || transaction.personName || '';
                         const commodity = transaction.commodity || '';
-                        const notes = [store, commodity, transaction.remarks].filter(Boolean).join(' | ') || '';
+                        const notes = [storeOrPerson, commodity, transaction.remarks].filter(Boolean).join(' | ') || '';
                         
                         // Debug logging for first few transactions
                         if (index < 3) {
                           console.log(`🔍 Transaction ${index + 1} debug:`, {
-                            store,
+                            store: storeOrPerson,
                             commodity,
                             remarks: transaction.remarks,
                             notes,
@@ -1353,7 +1704,7 @@ export default function IncomeManagement() {
                               {transaction.date_iso || transaction.date || new Date().toISOString().split('T')[0]}
                             </td>
                             <td className="px-3 py-2 text-xs text-gray-900 dark:text-white font-medium">
-                              {store || '-'}
+                              {storeOrPerson || '-'}
                             </td>
                             <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400">
                               {commodity || '-'}
@@ -1374,6 +1725,33 @@ export default function IncomeManagement() {
                             </td>
                             <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400 max-w-xs truncate" title={notes}>
                               {notes || '-'}
+                            </td>
+                            <td className="px-3 py-2 text-xs font-mono max-w-md">
+                              <details className="cursor-pointer">
+                                <summary className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300">
+                                  View Raw
+                                </summary>
+                                <pre className="mt-2 p-2 bg-gray-50 dark:bg-gray-900 rounded text-xs overflow-auto max-h-40 whitespace-pre-wrap">
+                                  {JSON.stringify({
+                                    date: transaction.date,
+                                    date_iso: transaction.date_iso,
+                                    description: transaction.description,
+                                    debit: transaction.debit,
+                                    credit: transaction.credit,
+                                    balance: transaction.balance,
+                                    bankCode: transaction.bankCode,
+                                    transactionId: transaction.transactionId,
+                                    accountNumber: transaction.accountNumber,
+                                    transferType: transaction.transferType,
+                                    upiId: transaction.upiId,
+                                    personName: transaction.personName,
+                                    branch: transaction.branch,
+                                    store: transaction.store,
+                                    commodity: transaction.commodity,
+                                    raw: transaction.raw
+                                  }, null, 2)}
+                                </pre>
+                              </details>
                             </td>
                           </tr>
                         );
@@ -1643,7 +2021,24 @@ export default function IncomeManagement() {
                       <div className="flex items-center space-x-4 text-sm text-muted mb-2">
                         <span className="flex items-center space-x-1">
                           <Calendar className="w-3 h-3" />
-                          <span>{new Date(income.date).toLocaleDateString('en-IN')}</span>
+                          <span>
+                            {(() => {
+                              try {
+                                const dateStr = income.date.toString().slice(0, 10);
+                                const date = new Date(dateStr + 'T00:00:00');
+                                if (!isNaN(date.getTime())) {
+                                  return date.toLocaleDateString('en-IN', { 
+                                    year: 'numeric', 
+                                    month: 'short', 
+                                    day: 'numeric' 
+                                  });
+                                }
+                                return dateStr; // Fallback to ISO format string
+                              } catch {
+                                return income.date.toString().slice(0, 10);
+                              }
+                            })()}
+                          </span>
                         </span>
                         {income.paymentMethod && (
                           <span className="flex items-center space-x-1">

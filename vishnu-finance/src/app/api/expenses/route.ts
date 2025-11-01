@@ -26,13 +26,82 @@ export async function GET(request: NextRequest) {
     } : undefined;
 
     // Fetch expenses from database (optionally date-scoped)
-    const expenses = await (prisma as any).expense.findMany({
-      where: {
-        userId,
-        ...(dateFilter ? { date: dateFilter } : {})
-      },
-      orderBy: { date: 'desc' }
-    });
+    // Try Prisma query first, fallback to raw SQL if columns are missing
+    let expenses: any[] = [];
+    try {
+      expenses = await (prisma as any).expense.findMany({
+        where: {
+          userId,
+          ...(dateFilter ? { date: dateFilter } : {})
+        },
+        select: {
+          id: true,
+          amount: true,
+          description: true,
+          date: true,
+          categoryId: true,
+          isRecurring: true,
+          frequency: true,
+          notes: true,
+          receiptUrl: true,
+          userId: true,
+          createdAt: true,
+          updatedAt: true,
+          store: true,
+          upiId: true,
+          branch: true,
+          personName: true,
+          rawData: true,
+          accountNumber: true,
+          bankCode: true,
+          transactionId: true,
+          transferType: true,
+          category: {
+            select: {
+              id: true,
+              name: true,
+              type: true,
+              color: true
+            }
+          }
+        },
+        orderBy: { date: 'desc' }
+      });
+    } catch (error: any) {
+      if (error.code === 'P2022' || error.message?.includes('does not exist')) {
+        // Column doesn't exist, fetch using raw SQL query
+        console.log('⚠️ EXPENSES GET - Some columns missing, using raw SQL fallback');
+        const params = [userId];
+        let query = `
+          SELECT id, amount, description, date, categoryId, isRecurring, frequency,
+                 notes, receiptUrl, userId, createdAt, updatedAt`;
+        
+        // Try to include optional columns
+        try {
+          query += `, COALESCE(store, '') as store,
+                     COALESCE(upiId, '') as upiId,
+                     COALESCE(branch, '') as branch,
+                     COALESCE(personName, '') as personName,
+                     COALESCE(rawData, '') as rawData`;
+        } catch {
+          // If columns don't exist, just skip them
+        }
+        
+        query += ` FROM expenses WHERE userId = ?`;
+        
+        if (dateFilter) {
+          query += ` AND date >= ? AND date <= ?`;
+          params.push(new Date(dateFilter.gte));
+          params.push(new Date(dateFilter.lte));
+        }
+        
+        query += ` ORDER BY date DESC`;
+        
+        expenses = await (prisma as any).$queryRawUnsafe(query, ...params);
+      } else {
+        throw error;
+      }
+    }
 
     console.log('✅ EXPENSES GET - Found expenses:', expenses.length, 'records');
     console.log('📊 EXPENSES GET - Expenses data:', JSON.stringify(expenses, null, 2));

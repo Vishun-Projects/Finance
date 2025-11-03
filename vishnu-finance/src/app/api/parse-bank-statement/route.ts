@@ -90,12 +90,18 @@ def main():
     if bank_type:
         print(f"Bank type override: {bank_type}")
     
-    # Parse using bank-specific parser
-    df = parse_bank_statement(file_path, bank_type if bank_type else None)
+    # Parse using bank-specific parser (returns tuple: df, metadata)
+    df, metadata = parse_bank_statement(file_path, bank_type if bank_type else None)
     
     if df.empty:
         print("No transactions found")
-        result = {"success": True, "transactions": [], "count": 0, "bankType": bank_type or "UNKNOWN"}
+        result = {
+            "success": True, 
+            "transactions": [], 
+            "count": 0, 
+            "bankType": bank_type or "UNKNOWN",
+            "metadata": metadata or {}
+        }
         with open(r"${jsonOutput.replace(/\\/g, '\\\\')}", 'w') as f:
             json.dump(result, f)
         print(json.dumps(result))
@@ -104,20 +110,62 @@ def main():
     # Get detected bank type
     detected_bank = df['bankCode'].iloc[0] if 'bankCode' in df.columns and not df['bankCode'].isna().all() else None
     
-    # Ensure date_iso is properly formatted
+    # CRITICAL: Preserve date_iso from strict parser - don't re-parse!
+    # Get bank code for strict date parsing if needed
+    bank_code = None
+    if 'bankCode' in df.columns and not df['bankCode'].isna().all():
+        bank_code = str(df['bankCode'].iloc[0]) if not df.empty else None
+    
+    # Only parse dates if date_iso is missing
     if 'date_iso' not in df.columns or df['date_iso'].isna().all():
         if 'date' in df.columns:
-            df['date_iso'] = pd.to_datetime(df['date'], errors='coerce').dt.strftime('%Y-%m-%d')
+            # Use strict DD/MM/YYYY format for MAHB/SBM
+            def parse_date_strict(date_val, bank_code=None):
+                if pd.isna(date_val):
+                    return None
+                try:
+                    date_str = str(date_val).strip()
+                    # For MAHB/SBM/IDIB, ALWAYS use DD/MM/YYYY (never auto-detect)
+                    if bank_code in ['MAHB', 'SBM', 'IDIB']:
+                        parsed = pd.to_datetime(date_str, format='%d/%m/%Y', errors='coerce')
+                        if pd.notna(parsed):
+                            return parsed.strftime('%Y-%m-%d')
+                        # Manual parsing fallback to prevent swap
+                        import re
+                        match = re.match(r'^(\d{2})/(\d{2})/(\d{4})$', date_str)
+                        if match:
+                            day_str, month_str, year_str = match.groups()
+                            from datetime import datetime
+                            try:
+                                dt = datetime(int(year_str), int(month_str), int(day_str))
+                                return dt.strftime('%Y-%m-%d')
+                            except ValueError:
+                                return None
+                        return None
+                    # For other banks, use dayfirst=True
+                    parsed = pd.to_datetime(date_str, dayfirst=True, errors='coerce')
+                    if pd.notna(parsed):
+                        return parsed.strftime('%Y-%m-%d')
+                    return None
+                except:
+                    return None
+            
+            df['date_iso'] = df['date'].apply(lambda x: parse_date_strict(x, bank_code=bank_code))
     
-    # Normalize date_iso
+    # Normalize date_iso - preserve if already correct
     def normalize_date_iso(date_val):
+        """Normalize date_iso - preserve if already in YYYY-MM-DD format"""
         if pd.isna(date_val):
             return None
         try:
+            # If already in YYYY-MM-DD format (from strict parser), return as-is
+            if isinstance(date_val, str) and re.match(r'^\d{4}-\d{2}-\d{2}$', date_val):
+                return date_val
+            # Otherwise, try to parse
             parsed = pd.to_datetime(date_val, errors='coerce')
-            if pd.isna(parsed):
-                return None
-            return parsed.strftime('%Y-%m-%d')
+            if pd.notna(parsed):
+                return parsed.strftime('%Y-%m-%d')
+            return None
         except:
             return None
     
@@ -147,7 +195,8 @@ def main():
             "success": True,
             "transactions": json_records,
             "count": len(json_records),
-            "bankType": detected_bank or bank_type or "UNKNOWN"
+            "bankType": detected_bank or bank_type or "UNKNOWN",
+            "metadata": metadata or {}
         }
         with open(r"${jsonOutput.replace(/\\/g, '\\\\')}", 'w', encoding='utf-8') as f:
             json.dump(result, f, ensure_ascii=False, default=str)
@@ -162,6 +211,7 @@ def main():
                 "transactions": [],
                 "count": len(df),
                 "bankType": detected_bank or bank_type or "UNKNOWN",
+                "metadata": metadata or {},
                 "file": str(jsonOutput)
             }, default=str))
     except Exception as e:
@@ -179,7 +229,7 @@ if __name__ == "__main__":
       console.log('🏦 Parse Bank Statement API: Executing Python script');
       
       const { stdout, stderr } = await execAsync(`python "${tempScriptPath}"`, { 
-        timeout: 90_000,
+        timeout: 180_000,
         maxBuffer: 10 * 1024 * 1024
       });
       
@@ -192,6 +242,7 @@ if __name__ == "__main__":
       let transactions: any[] = [];
       let transactionCount = 0;
       let detectedBankType: string = 'UNKNOWN';
+      let metadata: any = null;
       
       try {
         // Try parsing from stdout
@@ -213,10 +264,12 @@ if __name__ == "__main__":
             transactions = Array.isArray(fileParsed?.transactions) ? fileParsed.transactions : [];
             transactionCount = fileParsed?.count || 0;
             detectedBankType = fileParsed?.bankType || 'UNKNOWN';
+            metadata = fileParsed?.metadata || null;
           } else {
             transactions = Array.isArray(parsed?.transactions) ? parsed.transactions : [];
             transactionCount = parsed?.count || 0;
             detectedBankType = parsed?.bankType || 'UNKNOWN';
+            metadata = parsed?.metadata || null;
           }
         }
       } catch (error) {
@@ -224,14 +277,19 @@ if __name__ == "__main__":
       }
       
       // If stdout parsing failed, try reading JSON file
-      if (transactions.length === 0) {
+      if (transactions.length === 0 || !metadata) {
         try {
           const { readFile } = await import('fs/promises');
           const fileContent = await readFile(jsonOutput, 'utf-8');
           const parsed = JSON.parse(fileContent);
-          transactions = Array.isArray(parsed?.transactions) ? parsed.transactions : [];
-          transactionCount = parsed?.count || 0;
-          detectedBankType = parsed?.bankType || 'UNKNOWN';
+          if (transactions.length === 0) {
+            transactions = Array.isArray(parsed?.transactions) ? parsed.transactions : [];
+            transactionCount = parsed?.count || 0;
+            detectedBankType = parsed?.bankType || 'UNKNOWN';
+          }
+          if (!metadata && parsed?.metadata) {
+            metadata = parsed.metadata;
+          }
           console.log(`✅ Parse Bank Statement API: Read ${transactions.length} transactions from JSON file`);
         } catch (error) {
           console.log('⚠️ Parse Bank Statement API: Failed to read JSON file');
@@ -247,12 +305,22 @@ if __name__ == "__main__":
       }
 
       console.log('✅ Parse Bank Statement API: Success! Returning', transactions.length, 'transactions');
+      if (metadata) {
+        console.log('✅ Parse Bank Statement API: Metadata included:', {
+          openingBalance: metadata.openingBalance,
+          accountNumber: metadata.accountNumber,
+          statementPeriod: metadata.statementStartDate && metadata.statementEndDate 
+            ? `${metadata.statementStartDate} to ${metadata.statementEndDate}` 
+            : 'N/A'
+        });
+      }
       
       return NextResponse.json({
         success: true,
         transactions,
         count: transactions.length,
         bankType: detectedBankType,
+        metadata: metadata || undefined,
         message: `Successfully parsed ${transactions.length} transactions from ${detectedBankType} statement`,
         tempFiles: [filepath, csvOutput, tempScriptPath].filter(Boolean)
       });

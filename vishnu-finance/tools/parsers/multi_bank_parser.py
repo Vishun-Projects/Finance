@@ -122,7 +122,7 @@ class MultiBankParser(BaseBankParser):
     
     def _parse_table_row(self, row: List, page: int, line: int) -> Optional[Dict]:
         """Parse a table row into a transaction dictionary."""
-        if not row or len(row) < 3:
+        if not row or len(row) < 2:
             return None
         
         try:
@@ -136,38 +136,64 @@ class MultiBankParser(BaseBankParser):
             balance_str = None
             
             # Try to identify columns by content
-            for col_idx, cell in enumerate(row[:6]):  # Check first 6 columns
+            for col_idx, cell in enumerate(row[:8]):  # Check first 8 columns
                 cell_str = str(cell).strip() if cell else ''
                 
-                # Check for date
+                # Skip empty cells and obvious headers
+                if not cell_str or cell_str.lower() in ['date', 'transaction', 'details', 'debit', 'credit', 'balance', 'particulars']:
+                    continue
+                
+                # Check for date (various formats)
                 if not date_str:
-                    if re.match(r'\d{1,2}[-/\s][a-zA-Z]{3,10}[-/\s]\d{4}', cell_str) or \
-                       re.match(r'\d{1,2}\s+[A-Za-z]{3}\s+\d{4}', cell_str):
+                    # DD MMM, YYYY (Kotak Type 2)
+                    if re.match(r'\d{1,2}\s+[A-Za-z]{3,},\s*\d{4}', cell_str):
+                        date_str = cell_str
+                        continue
+                    # DD-MM-YYYY or DD/MM/YYYY
+                    if re.match(r'\d{1,2}[-/\s]\d{1,2}[-/\s]\d{4}', cell_str):
+                        date_str = cell_str
+                        continue
+                    # DD MMM YYYY (without comma)
+                    if re.match(r'\d{1,2}\s+[A-Za-z]{3,}\s+\d{4}', cell_str):
                         date_str = cell_str
                         continue
                 
                 # Check for amount (numeric with decimal)
-                if re.match(r'[0-9,]+\.\d{2}', cell_str):
-                    if not debit_str:
+                amount_match = re.match(r'[+-]?[0-9,]+\.\d{0,2}', cell_str)
+                if amount_match:
+                    # Determine if it's debit (negative) or credit (positive)
+                    if cell_str.startswith('-'):
                         debit_str = cell_str
-                        continue
-                    elif not credit_str:
+                    elif cell_str.startswith('+') or cell_str.replace(',', '').replace('.', '').isdigit():
+                        if not debit_str and cell_str.replace(',', '').replace('.', '').isdigit():
+                            # Could be either, check context
+                            credit_str = cell_str
+                    continue
+                
+                # Check for negative amounts without - prefix
+                if re.match(r'[0-9,]+\.\d{0,2}', cell_str) and not any([debit_str, credit_str, balance_str]):
+                    # First numeric could be debit or credit - check column position
+                    if col_idx >= 3:  # Usually debit/credit columns come after date and description
                         credit_str = cell_str
-                        continue
-                    elif not balance_str:
-                        balance_str = cell_str
-                        continue
+                    continue
             
             # Details is usually the longest text column
             if not details and len(row) > 1:
-                potential_details = [str(cell) for cell in row if cell and str(cell).strip()]
+                potential_details = [str(cell) for cell in row[1:] if cell and str(cell).strip()]
                 for pd in potential_details:
-                    if len(pd) > 20:  # Likely description
+                    # Likely description if it's text and not a date or amount
+                    if len(pd) > 5 and not re.match(r'([-+]?[0-9,]+\.?\d*|\d{1,2}[-/\s][a-zA-Z]{3,10}[-/\s]\d{4})', pd):
                         details = pd
                         break
             
-            if not date_str or not details:
+            if not date_str:
                 return None
+            
+            # If no details but we have amounts, still create transaction
+            if not details:
+                details = ' '.join([str(cell) for cell in row[1:4] if cell and str(cell).strip()])
+                if not details:
+                    details = f"Transaction {line}"
             
             date_iso = self.parse_date(date_str)
             if not date_iso:

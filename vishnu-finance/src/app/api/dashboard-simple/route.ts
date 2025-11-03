@@ -51,6 +51,7 @@ export async function GET(request: NextRequest) {
       prisma.expense.aggregate({
         where: {
           userId,
+          isDeleted: false,
           date: { gte: rangeStart, lte: rangeEnd }
         },
         _sum: { amount: true },
@@ -59,7 +60,7 @@ export async function GET(request: NextRequest) {
       
       // Get only active income sources (we need these for calculations)
       prisma.incomeSource.findMany({
-        where: { userId, isActive: true },
+        where: { userId, isActive: true, isDeleted: false },
         select: {
           id: true,
           name: true,
@@ -89,6 +90,7 @@ export async function GET(request: NextRequest) {
       prisma.expense.findMany({
         where: {
           userId,
+          isDeleted: false,
           date: { gte: rangeStart, lte: rangeEnd }
         },
         select: {
@@ -154,6 +156,7 @@ export async function GET(request: NextRequest) {
       by: ['date'],
       where: {
         userId,
+        isDeleted: false,
         date: { gte: rangeStart, lte: rangeEnd }
       },
       _sum: { amount: true }
@@ -309,6 +312,7 @@ export async function GET(request: NextRequest) {
       by: ['categoryId'],
       where: {
         userId,
+        isDeleted: false,
         date: { gte: rangeStart, lte: rangeEnd }
       },
       _sum: { amount: true }

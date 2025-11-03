@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import Navigation from "@/components/layout/Navigation";
-import { ProtectedRoute } from "@/components/assistants/ProtectedRoute";
+import Navigation from "@/components/layout/navigation";
+import { ProtectedRoute } from "@/components/assistants/protected-route";
 
 export const metadata: Metadata = {
   title: "Vishnu Finance - Dashboard",

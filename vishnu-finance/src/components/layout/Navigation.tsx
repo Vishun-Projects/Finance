@@ -17,6 +17,7 @@ import {
   X,
   BookOpen,
   Heart,
+  Trash2,
 } from 'lucide-react';
 
 const navItems = [
@@ -27,6 +28,7 @@ const navItems = [
   { href: '/goals', label: 'Goals', icon: Target },
   { href: '/deadlines', label: 'Deadlines', icon: Calendar },
   { href: '/wishlist', label: 'Wishlist', icon: Gift },
+  { href: '/manage-transactions', label: 'Manage', icon: Trash2 },
   { href: '/education', label: 'Learn', icon: BookOpen },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];

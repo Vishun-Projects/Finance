@@ -1,18 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '../../../lib/db';
+import { getCanonicalName } from '../entity-mappings/route';
+import { rateLimitMiddleware, getRouteType } from '../../../lib/rate-limit';
 
 // Configure route caching - user-specific dynamic data
 export const dynamic = 'force-dynamic';
 export const revalidate = 60; // Revalidate every minute
 
 export async function GET(request: NextRequest) {
+  // Rate limiting
+  const routeType = getRouteType(request.nextUrl.pathname);
+  const rateLimitResponse = rateLimitMiddleware(routeType, request);
+  if (rateLimitResponse) {
+    return rateLimitResponse;
+  }
   console.log('🔍 EXPENSES GET - Starting request');
   try {
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
     const start = searchParams.get('start');
     const end = searchParams.get('end');
-    console.log('🔍 EXPENSES GET - User ID:', userId);
+    
+    // PERFORMANCE: Add pagination support
+    const page = parseInt(searchParams.get('page') || '1');
+    const pageSize = Math.min(parseInt(searchParams.get('pageSize') || '100'), 200); // Max 200 per page
+    const skip = (page - 1) * pageSize;
+    
+    console.log('🔍 EXPENSES GET - User ID:', userId, 'Page:', page, 'PageSize:', pageSize);
 
     if (!userId) {
       console.log('❌ EXPENSES GET - No user ID provided');
@@ -25,87 +39,167 @@ export async function GET(request: NextRequest) {
       lte: new Date(new Date(end).setHours(23,59,59,999))
     } : undefined;
 
-    // Fetch expenses from database (optionally date-scoped)
-    // Try Prisma query first, fallback to raw SQL if columns are missing
-    let expenses: any[] = [];
-    try {
-      expenses = await (prisma as any).expense.findMany({
+    // PERFORMANCE: Get total count for pagination (only if needed)
+    const getTotalCount = page === 1 || searchParams.get('includeTotal') === 'true';
+          const [totalCount, expensesResult] = await Promise.all([
+      getTotalCount ? (prisma as any).expense.count({
         where: {
           userId,
+          isDeleted: false,
           ...(dateFilter ? { date: dateFilter } : {})
-        },
-        select: {
-          id: true,
-          amount: true,
-          description: true,
-          date: true,
-          categoryId: true,
-          isRecurring: true,
-          frequency: true,
-          notes: true,
-          receiptUrl: true,
-          userId: true,
-          createdAt: true,
-          updatedAt: true,
-          store: true,
-          upiId: true,
-          branch: true,
-          personName: true,
-          rawData: true,
-          accountNumber: true,
-          bankCode: true,
-          transactionId: true,
-          transferType: true,
-          category: {
+        }
+      }) : Promise.resolve(0),
+      // Fetch expenses from database with pagination
+      (async () => {
+        try {
+          // Try Prisma query first (will work after regenerating Prisma Client)
+          let expenses = await (prisma as any).expense.findMany({
+            where: {
+              userId,
+              isDeleted: false,
+              ...(dateFilter ? { date: dateFilter } : {})
+            },
             select: {
               id: true,
-              name: true,
-              type: true,
-              color: true
-            }
+              amount: true,
+              description: true,
+              date: true,
+              categoryId: true,
+              isRecurring: true,
+              frequency: true,
+              notes: true,
+              receiptUrl: true,
+              userId: true,
+              createdAt: true,
+              updatedAt: true,
+              store: true,
+              upiId: true,
+              branch: true,
+              personName: true,
+              rawData: true
+            },
+            orderBy: { date: 'desc' },
+            skip,
+            take: pageSize
+          });
+          
+          // Manually add bank fields from raw SQL since Prisma Client doesn't recognize them yet
+          if (expenses.length > 0) {
+            const ids = expenses.map((e: any) => e.id);
+            const bankFields = await (prisma as any).$queryRawUnsafe(`
+              SELECT id, bankCode, transactionId, accountNumber, transferType
+              FROM expenses
+              WHERE id IN (${ids.map(() => '?').join(',')})
+            `, ...ids);
+            const bankMap = new Map(bankFields.map((bf: any) => [bf.id, bf]));
+            expenses = expenses.map((exp: any) => {
+              const bankData = bankMap.get(exp.id) || {};
+              return {
+                ...exp,
+                ...bankData
+              };
+            });
           }
-        },
-        orderBy: { date: 'desc' }
-      });
-    } catch (error: any) {
-      if (error.code === 'P2022' || error.message?.includes('does not exist')) {
-        // Column doesn't exist, fetch using raw SQL query
-        console.log('⚠️ EXPENSES GET - Some columns missing, using raw SQL fallback');
-        const params = [userId];
-        let query = `
-          SELECT id, amount, description, date, categoryId, isRecurring, frequency,
-                 notes, receiptUrl, userId, createdAt, updatedAt`;
-        
-        // Try to include optional columns
-        try {
+          return expenses;
+        } catch (error: any) {
+          // Use raw SQL fallback if Prisma validation fails (new fields not recognized)
+          console.log('⚠️ EXPENSES GET - Using raw SQL fallback');
+          const params: any[] = [userId];
+          let query = `
+            SELECT id, amount, description, date, categoryId, isRecurring, frequency,
+                   notes, receiptUrl, userId, createdAt, updatedAt`;
+          
+          // Include all optional columns including bank fields
           query += `, COALESCE(store, '') as store,
                      COALESCE(upiId, '') as upiId,
                      COALESCE(branch, '') as branch,
                      COALESCE(personName, '') as personName,
-                     COALESCE(rawData, '') as rawData`;
-        } catch {
-          // If columns don't exist, just skip them
+                     COALESCE(rawData, '') as rawData,
+                     COALESCE(bankCode, '') as bankCode,
+                     COALESCE(transactionId, '') as transactionId,
+                     COALESCE(accountNumber, '') as accountNumber,
+                     COALESCE(transferType, '') as transferType`;
+          
+          query += ` FROM expenses WHERE userId = ? AND (isDeleted = 0 OR isDeleted IS NULL)`;
+          
+          if (dateFilter) {
+            query += ` AND date >= ? AND date <= ?`;
+            params.push(dateFilter.gte);
+            params.push(dateFilter.lte);
+          }
+          
+          query += ` ORDER BY date DESC LIMIT ? OFFSET ?`;
+          params.push(pageSize, skip);
+          
+          return await (prisma as any).$queryRawUnsafe(query, ...params);
         }
-        
-        query += ` FROM expenses WHERE userId = ?`;
-        
-        if (dateFilter) {
-          query += ` AND date >= ? AND date <= ?`;
-          params.push(new Date(dateFilter.gte));
-          params.push(new Date(dateFilter.lte));
-        }
-        
-        query += ` ORDER BY date DESC`;
-        
-        expenses = await (prisma as any).$queryRawUnsafe(query, ...params);
-      } else {
-        throw error;
-      }
-    }
+      })()
+    ]);
+
+    let expenses: any[] = expensesResult || [];
 
     console.log('✅ EXPENSES GET - Found expenses:', expenses.length, 'records');
-    console.log('📊 EXPENSES GET - Expenses data:', JSON.stringify(expenses, null, 2));
-    return NextResponse.json(expenses);
+    
+    // PERFORMANCE OPTIMIZATION: Batch entity mapping lookups instead of N+1 queries
+    if (userId && expenses.length > 0) {
+      // Collect all unique person names and stores
+      const personNames = new Set<string>();
+      const storeNames = new Set<string>();
+      
+      expenses.forEach((expense: any) => {
+        if (expense.personName && expense.personName.trim()) {
+          personNames.add(expense.personName);
+        }
+        if (expense.store && expense.store.trim()) {
+          storeNames.add(expense.store);
+        }
+      });
+
+      // Batch fetch all entity mappings in 2 queries (instead of N queries)
+      // Gracefully handle if entity_mappings table doesn't exist
+      try {
+        const { getCanonicalNamesBatch } = await import('../entity-mappings/route');
+        const [personMappingsResult, storeMappingsResult] = await Promise.all([
+          personNames.size > 0 ? getCanonicalNamesBatch(userId, Array.from(personNames), ['PERSON']) : Promise.resolve({}),
+          storeNames.size > 0 ? getCanonicalNamesBatch(userId, Array.from(storeNames), ['STORE']) : Promise.resolve({})
+        ]);
+
+        const personMappings: Record<string, string> = personMappingsResult || {};
+        const storeMappings: Record<string, string> = storeMappingsResult || {};
+
+        // Apply mappings in memory (no database queries)
+        expenses = expenses.map((expense: any) => {
+          if (expense.personName && personMappings[expense.personName]) {
+            expense.personName = personMappings[expense.personName];
+          }
+          if (expense.store && storeMappings[expense.store]) {
+            expense.store = storeMappings[expense.store];
+          }
+          return expense;
+        });
+      } catch (mappingError) {
+        // Gracefully continue without mappings if table doesn't exist
+        console.warn('⚠️ Entity mapping feature not available (table may not exist). Continuing without name mapping.');
+        // Expenses remain unchanged (original names kept)
+      }
+    }
+    
+    console.log('📊 EXPENSES GET - Expenses data:', expenses.length, 'records');
+    
+    // Return paginated response with metadata
+    const response: any = {
+      data: expenses,
+      pagination: {
+        page,
+        pageSize,
+        total: totalCount,
+        totalPages: Math.ceil(totalCount / pageSize),
+        hasNextPage: skip + pageSize < totalCount,
+        hasPreviousPage: page > 1
+      }
+    };
+    
+    return NextResponse.json(response);
   } catch (error) {
     console.error('❌ EXPENSES GET - Error:', error);
     console.error('❌ EXPENSES GET - Error details:', JSON.stringify(error, null, 2));

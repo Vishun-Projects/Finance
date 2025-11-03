@@ -1,16 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '../../../lib/db';
+import { rateLimitMiddleware, getRouteType } from '../../../lib/rate-limit';
 
 // Configure route caching - user-specific dynamic data
 export const dynamic = 'force-dynamic';
 export const revalidate = 60; // Revalidate every minute
 
 export async function GET(request: NextRequest) {
+  // Rate limiting
+  const routeType = getRouteType(request.nextUrl.pathname);
+  const rateLimitResponse = rateLimitMiddleware(routeType, request);
+  if (rateLimitResponse) {
+    return rateLimitResponse;
+  }
+
   console.log('🔍 DEADLINES GET - Starting request');
   try {
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
-    console.log('🔍 DEADLINES GET - User ID:', userId);
+    
+    // PERFORMANCE: Add pagination support
+    const page = parseInt(searchParams.get('page') || '1');
+    const pageSize = Math.min(parseInt(searchParams.get('pageSize') || '100'), 200); // Max 200 per page
+    const skip = (page - 1) * pageSize;
+    
+    console.log('🔍 DEADLINES GET - User ID:', userId, 'Page:', page, 'PageSize:', pageSize);
 
     if (!userId) {
       console.log('❌ DEADLINES GET - No user ID provided');
@@ -18,15 +32,57 @@ export async function GET(request: NextRequest) {
     }
 
     console.log('🔍 DEADLINES GET - Fetching from database for user:', userId);
-    // Fetch deadlines from database
-    const deadlines = await (prisma as any).deadline.findMany({
-      where: { userId },
-      orderBy: { dueDate: 'asc' }
-    });
+    
+    // PERFORMANCE: Get total count for pagination (only if needed)
+    const getTotalCount = page === 1 || searchParams.get('includeTotal') === 'true';
+    const [totalCount, deadlines] = await Promise.all([
+      getTotalCount ? (prisma as any).deadline.count({
+        where: { userId }
+      }) : Promise.resolve(0),
+      // Fetch deadlines from database with pagination
+      (prisma as any).deadline.findMany({
+        where: { userId },
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          amount: true,
+          dueDate: true,
+          isRecurring: true,
+          frequency: true,
+          status: true,
+          category: true,
+          isCompleted: true,
+          completedDate: true,
+          paymentMethod: true,
+          accountDetails: true,
+          notes: true,
+          userId: true,
+          createdAt: true,
+          updatedAt: true
+        },
+        orderBy: { dueDate: 'asc' },
+        skip,
+        take: pageSize // PERFORMANCE: Add limit
+      })
+    ]);
 
     console.log('✅ DEADLINES GET - Found deadlines:', deadlines.length, 'records');
-    console.log('📊 DEADLINES GET - Deadlines data:', JSON.stringify(deadlines, null, 2));
-    return NextResponse.json(deadlines);
+    
+    // Return paginated response with metadata
+    const response: any = {
+      data: deadlines,
+      pagination: {
+        page,
+        pageSize,
+        total: totalCount,
+        totalPages: Math.ceil(totalCount / pageSize),
+        hasNextPage: skip + pageSize < totalCount,
+        hasPreviousPage: page > 1
+      }
+    };
+    
+    return NextResponse.json(response);
   } catch (error) {
     console.error('❌ DEADLINES GET - Error:', error);
     console.error('❌ DEADLINES GET - Error details:', JSON.stringify(error, null, 2));

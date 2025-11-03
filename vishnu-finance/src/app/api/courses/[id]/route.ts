@@ -10,23 +10,33 @@ export async function GET(
     const userId = searchParams.get('userId');
     const { id } = await params;
 
-    const course = await prisma.course.findUnique({
-      where: { id },
-      include: {
-        modules: {
-          where: { isActive: true },
-          orderBy: { order: 'asc' },
-          include: userId ? {
+    const course = userId
+      ? await prisma.course.findUnique({
+          where: { id },
+          include: {
+            modules: {
+              where: { isActive: true },
+              orderBy: { order: 'asc' },
+              include: {
+                progress: {
+                  where: { userId }
+                }
+              }
+            },
             progress: {
               where: { userId }
             }
-          } : false
-        },
-        progress: userId ? {
-          where: { userId }
-        } : false
-      }
-    });
+          }
+        })
+      : await prisma.course.findUnique({
+          where: { id },
+          include: {
+            modules: {
+              where: { isActive: true },
+              orderBy: { order: 'asc' }
+            }
+          }
+        });
 
     if (!course) {
       return NextResponse.json(
@@ -37,21 +47,29 @@ export async function GET(
 
     // Calculate progress for each module if userId is provided
     const modulesWithProgress = course.modules.map(module => {
-      const userProgress = module.progress?.[0];
+      let userProgress = null;
+      if (userId && 'progress' in module && module.progress && Array.isArray(module.progress)) {
+        userProgress = module.progress[0] || null;
+      }
       return {
         ...module,
         progress: userProgress?.progress || 0,
-        isCompleted: userProgress?.isCompleted || false
+        isCompleted: userProgress?.isCompleted || false,
+        ...(userId && 'progress' in module ? {} : { progress: [] })
       };
     });
 
-    const userProgress = course.progress?.[0];
+    let userProgress = null;
+    if (userId && 'progress' in course && course.progress && Array.isArray(course.progress)) {
+      userProgress = course.progress[0] || null;
+    }
 
     return NextResponse.json({
       ...course,
       modules: modulesWithProgress,
       progress: userProgress?.progress || 0,
-      isCompleted: userProgress?.isCompleted || false
+      isCompleted: userProgress?.isCompleted || false,
+      ...(userId && 'progress' in course ? {} : { progress: [] })
     });
   } catch (error) {
     console.error('Error fetching course:', error);

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import TutorialGuide from "@/components/assistants/TutorialGuide";
-import GlobalPreloader from "@/components/feedback/GlobalPreloader";
+import TutorialGuide from "@/components/assistants/tutorial-guide";
+import GlobalPreloader from "@/components/feedback/global-preloader";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { LayoutProvider } from "@/contexts/LayoutContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";

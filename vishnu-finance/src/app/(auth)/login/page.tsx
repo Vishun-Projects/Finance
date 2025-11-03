@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useLoading } from '../../../contexts/LoadingContext';
 import { TrendingUp, Eye, EyeOff, Mail, Lock, AlertCircle } from 'lucide-react';
-import ModernCard from '@/components/layout/ModernCard';
+import ModernCard from '@/components/layout/modern-card';
 
 export default function LoginPage() {
   const [formData, setFormData] = useState({

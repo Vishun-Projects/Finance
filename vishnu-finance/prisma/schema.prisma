@@ -49,6 +49,8 @@ model User {
   preferences      UserPreferences?
   wishlistItems    WishlistItem[]
   upiMappings      UpiFieldMapping[]
+  entityMappings   EntityMapping[]
+  accountStatements AccountStatement[]
 
   @@map("users")
 }
@@ -93,6 +95,8 @@ model IncomeSource {
   transactionId String?
   accountNumber String?
   transferType  String?
+  isDeleted     Boolean         @default(false)
+  deletedAt     DateTime?
   category      Category?       @relation(fields: [categoryId], references: [id])
   user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -123,6 +127,8 @@ model Expense {
   transactionId String?
   accountNumber String?
   transferType  String?
+  isDeleted     Boolean           @default(false)
+  deletedAt     DateTime?
   category      Category?         @relation(fields: [categoryId], references: [id])
   user          User              @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -489,4 +495,50 @@ model UpiFieldMapping {
 
   @@index([userId], map: "upi_field_mappings_userId_fkey")
   @@map("upi_field_mappings")
+}
+
+enum EntityType {
+  PERSON
+  STORE
+}
+
+model EntityMapping {
+  id            String     @id @default(cuid())
+  userId        String
+  canonicalName String
+  mappedNames   String      @db.Text // JSON array of alternative names
+  entityType    EntityType
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], map: "entity_mappings_userId_fkey")
+  @@index([userId, entityType], map: "entity_mappings_userId_entityType_idx")
+  @@map("entity_mappings")
+}
+
+model AccountStatement {
+  id                String   @id @default(cuid())
+  userId            String
+  accountNumber     String
+  bankCode          String
+  statementStartDate DateTime
+  statementEndDate   DateTime
+  openingBalance    Decimal  @db.Decimal(12, 2)
+  closingBalance    Decimal  @db.Decimal(12, 2)
+  totalDebits       Decimal  @default(0.00) @db.Decimal(12, 2)
+  totalCredits      Decimal  @default(0.00) @db.Decimal(12, 2)
+  transactionCount  Int      @default(0)
+  importedAt        DateTime @default(now())
+  importedBy        String
+  metadata          String?  @db.Text // JSON with IFSC, branch, etc.
+  isActive          Boolean  @default(true) // true if this is the latest statement for account
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], map: "account_statements_userId_fkey")
+  @@index([userId, accountNumber, bankCode], map: "account_statements_userId_accountNumber_bankCode_idx")
+  @@index([userId, accountNumber, statementStartDate], map: "account_statements_userId_accountNumber_startDate_idx")
+  @@map("account_statements")
 }

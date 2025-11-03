@@ -42,13 +42,13 @@ export class RealDataService {
         recurringItems
       ] = await Promise.all([
         prisma.expense.findMany({
-          where: { userId },
+          where: { userId, isDeleted: false },
           include: { category: true },
           orderBy: { date: 'desc' },
           take: 50
         }),
         prisma.incomeSource.findMany({
-          where: { userId, isActive: true },
+          where: { userId, isActive: true, isDeleted: false },
           include: { category: true }
         }),
         prisma.goal.findMany({

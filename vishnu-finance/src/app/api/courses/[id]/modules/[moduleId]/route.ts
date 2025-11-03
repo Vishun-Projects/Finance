@@ -10,14 +10,18 @@ export async function GET(
     const userId = searchParams.get('userId');
     const { moduleId } = await params;
 
-    const courseModule = await prisma.module.findUnique({
-      where: { id: moduleId },
-      include: userId ? {
-        progress: {
-          where: { userId }
-        }
-      } : false
-    });
+    const courseModule = userId 
+      ? await prisma.module.findUnique({
+          where: { id: moduleId },
+          include: {
+            progress: {
+              where: { userId }
+            }
+          }
+        })
+      : await prisma.module.findUnique({
+          where: { id: moduleId }
+        });
 
     if (!courseModule) {
       return NextResponse.json(
@@ -26,12 +30,16 @@ export async function GET(
       );
     }
 
-    const userProgress = courseModule.progress?.[0];
+    let userProgress = null;
+    if (userId && 'progress' in courseModule && courseModule.progress && Array.isArray(courseModule.progress)) {
+      userProgress = courseModule.progress[0] || null;
+    }
 
     return NextResponse.json({
       ...courseModule,
       progress: userProgress?.progress || 0,
-      isCompleted: userProgress?.isCompleted || false
+      isCompleted: userProgress?.isCompleted || false,
+      ...(userId && 'progress' in courseModule ? {} : { progress: [] })
     });
   } catch (error) {
     console.error('Error fetching module:', error);

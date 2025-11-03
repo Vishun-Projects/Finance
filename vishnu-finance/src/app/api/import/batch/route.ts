@@ -63,7 +63,10 @@ export async function POST(request: NextRequest) {
 
     const normalized = records
       .map((r) => {
-        const parsedDate = parseDate(r.date);
+        // CRITICAL: Use date_iso if available (correctly parsed by strict parser)
+        // Only fall back to date if date_iso is missing
+        const dateInput = (r.date_iso || r.date) as string | Date | null | undefined;
+        const parsedDate = parseDate(dateInput);
         return {
           title: (r.title || r.description || '').toString().trim(),
           amount: Number(r.amount ?? 0),
@@ -126,6 +129,7 @@ export async function POST(request: NextRequest) {
       const existing = await (prisma as any).incomeSource.findMany({
         where: {
           userId,
+          isDeleted: false,
           ...(range ? { startDate: { gte: range.min, lte: range.max } } : {}),
         },
         select: { id: true, name: true, amount: true, startDate: true },
@@ -139,7 +143,7 @@ export async function POST(request: NextRequest) {
           } catch {
             return null;
           }
-        }).filter((k): k is string => k !== null)
+        }).filter((k: string | null): k is string => k !== null)
       );
       const toInsert = incomeRecs.filter(r => {
         if (!r.date || isNaN(r.date.getTime())) return false;
@@ -178,6 +182,7 @@ export async function POST(request: NextRequest) {
       const existing = await (prisma as any).expense.findMany({
         where: {
           userId,
+          isDeleted: false,
           ...(range ? { date: { gte: range.min, lte: range.max } } : {}),
         },
         select: { id: true, description: true, amount: true, date: true },
@@ -191,7 +196,7 @@ export async function POST(request: NextRequest) {
           } catch {
             return null;
           }
-        }).filter((k): k is string => k !== null)
+        }).filter((k: string | null): k is string => k !== null)
       );
       const toInsert = expenseRecs.filter(r => {
         if (!r.date || isNaN(r.date.getTime())) return false;

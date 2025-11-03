@@ -10,6 +10,15 @@ import pandas as pd
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime
 
+try:
+    from .date_validator import DateValidator, parse_date_strict
+    from .amount_validator import AmountValidator, parse_amount_strict
+    from .statement_metadata import StatementMetadataExtractor
+except ImportError:
+    from date_validator import DateValidator, parse_date_strict
+    from amount_validator import AmountValidator, parse_amount_strict
+    from statement_metadata import StatementMetadataExtractor
+
 
 class BaseBankParser(ABC):
     """Abstract base class for bank-specific parsers."""
@@ -112,49 +121,41 @@ class BaseBankParser(ABC):
         
         return store, commodity, clean_description
     
-    def parse_date(self, date_str: str) -> Optional[str]:
+    def parse_date(self, date_str: str, statement_start_date: Optional[str] = None,
+                   statement_end_date: Optional[str] = None,
+                   previous_date: Optional[str] = None) -> Optional[str]:
         """
-        Parse date string to ISO format (YYYY-MM-DD).
+        Parse date string to ISO format (YYYY-MM-DD) using strict validation.
         
         Args:
             date_str: Date string in various formats
+            statement_start_date: Statement start date in ISO format (for validation)
+            statement_end_date: Statement end date in ISO format (for validation)
+            previous_date: Previous transaction date in ISO format (for chronological validation)
             
         Returns:
             ISO formatted date string or None
         """
-        if not date_str or pd.isna(date_str):
-            return None
-        
-        try:
-            # Try parsing with pandas (handles multiple formats)
-            parsed = pd.to_datetime(date_str, errors='coerce')
-            if pd.isna(parsed):
-                return None
-            return parsed.strftime('%Y-%m-%d')
-        except:
-            return None
+        return DateValidator.parse_date(
+            date_str,
+            bank_code=self.bank_code,
+            statement_start_date=statement_start_date,
+            statement_end_date=statement_end_date,
+            previous_date=previous_date
+        )
     
-    def parse_amount(self, amount_str: str) -> float:
+    def parse_amount(self, amount_str: str, allow_negative: bool = False) -> float:
         """
-        Parse amount string to float.
+        Parse amount string to float with strict validation.
         
         Args:
             amount_str: Amount string
+            allow_negative: Whether to allow negative amounts
             
         Returns:
-            Float amount or 0.0 if invalid
+            Float amount or 0.0 if invalid. Preserves all decimals.
         """
-        if pd.isna(amount_str) or not amount_str:
-            return 0.0
-        
-        try:
-            # Remove commas and currency symbols
-            amount_str = str(amount_str).replace(',', '').replace('INR', '').replace('₹', '').replace('-', '').strip()
-            if amount_str == '':
-                return 0.0
-            return float(amount_str)
-        except:
-            return 0.0
+        return AmountValidator.parse_amount(amount_str, allow_negative=allow_negative)
     
     def normalize_transaction(self, transaction: Dict) -> Dict:
         """
@@ -171,13 +172,16 @@ class BaseBankParser(ABC):
             if 'date' in transaction:
                 transaction['date_iso'] = self.parse_date(transaction['date'])
         
-        # Ensure numeric fields
+        # Ensure numeric fields - use strict amount parsing
         for field in ['amount', 'debit', 'credit', 'balance']:
             if field in transaction and transaction[field] is not None:
                 if isinstance(transaction[field], str):
                     transaction[field] = self.parse_amount(transaction[field])
-                else:
+                elif isinstance(transaction[field], (int, float)):
                     transaction[field] = float(transaction[field])
+                else:
+                    # Try to convert to string and parse
+                    transaction[field] = self.parse_amount(str(transaction[field]))
         
         # Extract store and commodity if not already done
         if 'description' in transaction and transaction['description']:
@@ -213,4 +217,30 @@ class BaseBankParser(ABC):
         # Use date, description, debit, credit for hash
         key = f"{transaction.get('date_iso', '')}_{transaction.get('description', '')}_{transaction.get('debit', 0)}_{transaction.get('credit', 0)}"
         return hashlib.md5(key.encode()).hexdigest()
+    
+    def extract_statement_metadata(self, pdf_path, transactions_df: Optional[pd.DataFrame] = None) -> Dict:
+        """
+        Extract statement metadata including opening balance, period, account info.
+        
+        Args:
+            pdf_path: Path to PDF file
+            transactions_df: DataFrame of parsed transactions (optional)
+            
+        Returns:
+            Dictionary with metadata:
+            - openingBalance
+            - closingBalance
+            - statementStartDate
+            - statementEndDate
+            - accountNumber
+            - ifsc
+            - branch
+            - accountHolderName
+            - totalDebits
+            - totalCredits
+            - transactionCount
+        """
+        return StatementMetadataExtractor.extract_all_metadata(
+            pdf_path, self.bank_code, transactions_df
+        )
 

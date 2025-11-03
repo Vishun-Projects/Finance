@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../contexts/AuthContext';
-import { LoadingSpinner } from '@/components/feedback/LoadingSpinner';
+import { LoadingSpinner } from '@/components/feedback/loading-spinner';
 
 export default function Home() {
   const router = useRouter();

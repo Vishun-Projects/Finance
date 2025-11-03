@@ -228,10 +228,10 @@ export async function POST(request: NextRequest) {
     // Get recent transactions
     const recentTransactions = [...incomes, ...expenses]
       .map((item: any) => ({
-        type: 'income' in item ? 'income' : 'expense',
-        title: item.name || item.description || 'Transaction',
+        type: ('income' in item ? 'income' : 'expense') as 'income' | 'expense',
+        title: (item.name || item.description || 'Transaction') as string,
         amount: parseFloat(item.amount),
-        date: item.startDate || item.date
+        date: (item.startDate || item.date) as string
       }))
       .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
       .slice(0, 10);

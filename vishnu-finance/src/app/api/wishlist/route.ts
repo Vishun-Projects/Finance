@@ -1,16 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '../../../lib/db';
+import { rateLimitMiddleware, getRouteType } from '../../../lib/rate-limit';
 
 // Configure route caching - user-specific dynamic data
 export const dynamic = 'force-dynamic';
 export const revalidate = 180; // Revalidate every 3 minutes
 
 export async function GET(request: NextRequest) {
+  // Rate limiting
+  const routeType = getRouteType(request.nextUrl.pathname);
+  const rateLimitResponse = rateLimitMiddleware(routeType, request);
+  if (rateLimitResponse) {
+    return rateLimitResponse;
+  }
+
   console.log('🔍 WISHLIST GET - Starting request');
   try {
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
-    console.log('🔍 WISHLIST GET - User ID:', userId);
+    
+    // PERFORMANCE: Add pagination support
+    const page = parseInt(searchParams.get('page') || '1');
+    const pageSize = Math.min(parseInt(searchParams.get('pageSize') || '100'), 200); // Max 200 per page
+    const skip = (page - 1) * pageSize;
+    
+    console.log('🔍 WISHLIST GET - User ID:', userId, 'Page:', page, 'PageSize:', pageSize);
 
     if (!userId) {
       console.log('❌ WISHLIST GET - No user ID provided');
@@ -18,11 +32,38 @@ export async function GET(request: NextRequest) {
     }
 
     console.log('🔍 WISHLIST GET - Fetching from database for user:', userId);
-    // Fetch wishlist items from database
-    const wishlistItems = await (prisma as any).wishlistItem.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' }
-    });
+    
+    // PERFORMANCE: Get total count for pagination (only if needed)
+    const getTotalCount = page === 1 || searchParams.get('includeTotal') === 'true';
+    const [totalCount, wishlistItems] = await Promise.all([
+      getTotalCount ? (prisma as any).wishlistItem.count({
+        where: { userId }
+      }) : Promise.resolve(0),
+      // Fetch wishlist items from database with pagination
+      (prisma as any).wishlistItem.findMany({
+        where: { userId },
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          estimatedCost: true,
+          priority: true,
+          category: true,
+          targetDate: true,
+          isCompleted: true,
+          completedDate: true,
+          imageUrl: true,
+          notes: true,
+          tags: true,
+          userId: true,
+          createdAt: true,
+          updatedAt: true
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: pageSize // PERFORMANCE: Add limit
+      })
+    ]);
 
     // Parse tags from JSON strings to arrays
     const processedItems = wishlistItems.map((item: any) => ({
@@ -31,8 +72,21 @@ export async function GET(request: NextRequest) {
     }));
 
     console.log('✅ WISHLIST GET - Found wishlist items:', processedItems.length, 'records');
-    console.log('📊 WISHLIST GET - Wishlist data:', JSON.stringify(processedItems, null, 2));
-    return NextResponse.json(processedItems);
+    
+    // Return paginated response with metadata
+    const response: any = {
+      data: processedItems,
+      pagination: {
+        page,
+        pageSize,
+        total: totalCount,
+        totalPages: Math.ceil(totalCount / pageSize),
+        hasNextPage: skip + pageSize < totalCount,
+        hasPreviousPage: page > 1
+      }
+    };
+    
+    return NextResponse.json(response);
   } catch (error) {
     console.error('❌ WISHLIST GET - Error:', error);
     console.error('❌ WISHLIST GET - Error details:', JSON.stringify(error, null, 2));

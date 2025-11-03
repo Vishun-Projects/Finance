@@ -18,11 +18,15 @@ if parsers_dir not in sys.path:
 from bank_detector import BankDetector
 from sbi_parser import SBIParser
 from indian_bank_parser import IndianBankParser
+from kotak_bank_parser import KotakBankParser
+from kotak_bank_parser_v2 import KotakBankParserV2
+from hdfc_bank_parser import HDFCBankParser
+from sbm_parser import SBMParser
 from multi_bank_parser import MultiBankParser
 from base_parser import BaseBankParser
 
 
-def parse_bank_statement(file_path: Path, bank_code: Optional[str] = None) -> pd.DataFrame:
+def parse_bank_statement(file_path: Path, bank_code: Optional[str] = None) -> tuple[pd.DataFrame, Optional[dict]]:
     """
     Parse bank statement with auto-detection.
     
@@ -59,6 +63,8 @@ def parse_bank_statement(file_path: Path, bank_code: Optional[str] = None) -> pd
             bank_code = 'UTIB'
         elif 'jio' in filename:
             bank_code = 'JIOP'
+        elif 'maharashtra' in filename or 'sbm' in filename or 'mahabank' in filename or 'mahb' in filename:
+            bank_code = 'MAHB'
     
     # Select appropriate parser
     parser: BaseBankParser
@@ -66,6 +72,14 @@ def parse_bank_statement(file_path: Path, bank_code: Optional[str] = None) -> pd
         parser = SBIParser()
     elif bank_code == 'IDIB':
         parser = IndianBankParser()
+    elif bank_code == 'KKBK':
+        parser = KotakBankParser()
+    elif bank_code == 'KKBK_V2':
+        parser = KotakBankParserV2()
+    elif bank_code == 'HDFC':
+        parser = HDFCBankParser()
+    elif bank_code == 'MAHB':
+        parser = SBMParser()
     else:
         # Use generic multi-bank parser
         parser = MultiBankParser(bank_code or 'UNKNOWN')
@@ -82,7 +96,39 @@ def parse_bank_statement(file_path: Path, bank_code: Optional[str] = None) -> pd
     if not df.empty:
         df = deduplicate_transactions(df)
     
-    return df
+    # Post-parse validation
+    if not df.empty:
+        try:
+            from parsers.data_validator import DataValidator
+            validation_result = DataValidator.validate_transactions(df, bank_code)
+            
+            # Print validation report if there are errors
+            if validation_result.get('errors') or validation_result.get('warnings'):
+                from parsers.data_validator import DataValidator
+                report = DataValidator.generate_validation_report(validation_result)
+                print("\n" + report)
+                
+                # If there are critical errors, log them
+                if validation_result.get('errors'):
+                    print(f"\n⚠️  WARNING: {len(validation_result['errors'])} validation errors found!")
+        except Exception as e:
+            # Don't fail parsing if validation fails
+            print(f"Validation error (non-critical): {e}")
+    
+    # Extract statement metadata
+    metadata = None
+    try:
+        if file_path.suffix.lower() == '.pdf':
+            metadata = parser.extract_statement_metadata(file_path, df if not df.empty else None)
+            # Convert datetime objects to ISO strings for JSON serialization
+            if metadata and metadata.get('statementStartDate'):
+                metadata['statementStartDate'] = metadata['statementStartDate'].isoformat() if hasattr(metadata['statementStartDate'], 'isoformat') else str(metadata['statementStartDate'])
+            if metadata and metadata.get('statementEndDate'):
+                metadata['statementEndDate'] = metadata['statementEndDate'].isoformat() if hasattr(metadata['statementEndDate'], 'isoformat') else str(metadata['statementEndDate'])
+    except Exception as e:
+        print(f"Metadata extraction error (non-critical): {e}")
+    
+    return df, metadata
 
 
 def deduplicate_transactions(df: pd.DataFrame) -> pd.DataFrame:
@@ -141,6 +187,14 @@ def get_parser_for_bank(bank_code: str) -> BaseBankParser:
         return SBIParser()
     elif bank_code == 'IDIB':
         return IndianBankParser()
+    elif bank_code == 'KKBK':
+        return KotakBankParser()
+    elif bank_code == 'KKBK_V2':
+        return KotakBankParserV2()
+    elif bank_code == 'HDFC':
+        return HDFCBankParser()
+    elif bank_code == 'MAHB':
+        return SBMParser()
     else:
         return MultiBankParser(bank_code)
 
@@ -157,7 +211,7 @@ def main():
     bank_code = sys.argv[2] if len(sys.argv) > 2 else None
     
     try:
-        df = parse_bank_statement(file_path, bank_code)
+        df, metadata = parse_bank_statement(file_path, bank_code)
         
         if df.empty:
             print("No transactions found")

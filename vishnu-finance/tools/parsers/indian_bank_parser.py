@@ -232,72 +232,91 @@ class IndianBankParser(BaseBankParser):
         transactions = []
         lines = text.split('\n')
         
-        for line_num, line in enumerate(lines):
-            line = line.strip()
-            if not line:
-                continue
+        i = 0
+        while i < len(lines):
+            line = lines[i].strip()
             
-            date_match = re.search(r'(\d{1,2}\s+[A-Za-z]{3}\s+\d{4})', line)
+            # Look for date at start of line (DD MMM YYYY or DD MMM, YYYY)
+            date_match = re.search(r'^(\d{1,2}\s+[A-Za-z]{3,}\s+\d{4})\s+(.+)', line)
             if not date_match:
+                i += 1
                 continue
             
-            date = date_match.group(1)
-            date_iso = self.parse_date(date)
+            date_str = date_match.group(1)
+            rest_of_line = date_match.group(2)
+            
+            # Parse date
+            date_iso = self.parse_date(date_str)
             if not date_iso:
+                i += 1
                 continue
             
-            amount_patterns = [
-                r'INR\s*([0-9,]+(?:\.[0-9]{2})?)\s*-\s*INR\s*([0-9,]+(?:\.[0-9]{2})?)',
-                r'-\s*INR\s*([0-9,]+(?:\.[0-9]{2})?)\s*INR\s*([0-9,]+(?:\.[0-9]{2})?)',
-            ]
+            # Collect description lines (merge with next lines if needed)
+            description_lines = [rest_of_line]
             
-            transaction_amount = None
-            balance = None
-            is_credit = False
+            # Look for amount pattern in first line
+            # Format: "Description text INR amount - INR balance" (debit) or "- INR amount INR balance" (credit)
+            amount_match = re.search(r'(?:INR\s*([0-9,]+(?:\.[0-9]{2})?)\s*-\s*INR\s*([0-9,]+(?:\.[0-9]{2})?)|-\s*INR\s*([0-9,]+(?:\.[0-9]{2})?)\s+INR\s*([0-9,]+(?:\.[0-9]{2})?))', rest_of_line)
             
-            for pattern in amount_patterns:
-                match = re.search(pattern, line)
-                if match:
-                    if pattern.startswith('INR'):
-                        transaction_amount = float(match.group(1).replace(',', ''))
-                        balance = float(match.group(2).replace(',', ''))
-                        is_credit = False
-                    else:
-                        transaction_amount = float(match.group(1).replace(',', ''))
-                        balance = float(match.group(2).replace(',', ''))
-                        is_credit = True
-                    break
-            
-            if transaction_amount is None:
-                continue
-            
-            description = line
-            description = re.sub(r'\d{1,2}\s+[A-Za-z]{3}\s+\d{4}', '', description)
-            description = re.sub(r'INR\s*[0-9,]+(?:\.[0-9]{2})?', '', description)
-            description = re.sub(r'[+-]', '', description)
-            description = re.sub(r'\s{2,}', ' ', description).strip()
-            
-            metadata = self._extract_metadata(description)
-            store, commodity, clean_desc = self.extract_store_and_commodity(description)
-            
-            transaction = {
-                'date': date,
-                'date_iso': date_iso,
-                'description': clean_desc or description,
-                'raw': description,
-                'amount': transaction_amount,
-                'type': 'income' if is_credit else 'expense',
-                'debit': 0 if is_credit else transaction_amount,
-                'credit': transaction_amount if is_credit else 0,
-                'balance': balance,
-                'page': 'Text',
-                'line': str(line_num + 1),
-                'store': store,
-                'commodity': commodity,
-                **metadata
-            }
-            
-            transactions.append(self.normalize_transaction(transaction))
+            if amount_match:
+                # Found amount pattern on first line
+                if amount_match.group(1) and amount_match.group(2):
+                    # Debit: "INR amount - INR balance"
+                    transaction_amount = float(amount_match.group(1).replace(',', ''))
+                    balance = float(amount_match.group(2).replace(',', ''))
+                    is_credit = False
+                else:
+                    # Credit: "- INR amount INR balance"
+                    transaction_amount = float(amount_match.group(3).replace(',', ''))
+                    balance = float(amount_match.group(4).replace(',', ''))
+                    is_credit = True
+                
+                # Remove amount from description
+                rest_of_line = re.sub(r'INR\s*[0-9,]+(?:\.[0-9]{2})?\s*(?:-\s*)?', '', rest_of_line)
+                description_lines = [rest_of_line] if rest_of_line.strip() else []
+                
+                # Look for continuation lines (description text without dates)
+                i += 1
+                while i < len(lines):
+                    next_line = lines[i].strip()
+                    # Stop if next line starts with a date
+                    if re.match(r'^\d{1,2}\s+[A-Za-z]{3,}\s+\d{4}', next_line):
+                        break
+                    # Stop if line has amount pattern
+                    if re.search(r'INR\s*[0-9,]+(?:\.[0-9]{2})?', next_line):
+                        break
+                    # Add continuation line to description
+                    if next_line:
+                        description_lines.append(next_line)
+                    i += 1
+                
+                # Join description lines
+                description = ' '.join(description_lines).strip()
+                
+                metadata = self._extract_metadata(description)
+                store, commodity, clean_desc = self.extract_store_and_commodity(description)
+                
+                transaction = {
+                    'date': date_str,
+                    'date_iso': date_iso,
+                    'description': clean_desc or description,
+                    'raw': description,
+                    'amount': transaction_amount,
+                    'type': 'income' if is_credit else 'expense',
+                    'debit': 0 if is_credit else transaction_amount,
+                    'credit': transaction_amount if is_credit else 0,
+                    'balance': balance,
+                    'page': 'Text',
+                    'line': str(i),
+                    'store': store,
+                    'commodity': commodity,
+                    **metadata
+                }
+                
+                transactions.append(self.normalize_transaction(transaction))
+            else:
+                # No amount pattern found, move to next line
+                i += 1
         
         return transactions
     

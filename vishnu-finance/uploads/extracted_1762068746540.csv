@@ -1,0 +1,6 @@
+date,date_iso,description,raw,amount,type,debit,credit,balance,page,line,store,commodity,reference,transactionId,personName,accountNumber,transferType,upiId,bankCode
+"19 Jul, 2025",2025-07-19,"19 Jul, 2025","19 Jul, 2025",17.12,income,0.0,17.12,,Page 12,3,,,"19 Jul, 2025",,,,,,KKBK
+"19 Jul, 2025",2025-07-19,"19 Jul, 2025","19 Jul, 2025",4.11,income,0.0,4.11,,Page 12,4,,,"19 Jul, 2025",,,,,,KKBK
+"20 Jul, 2025",2025-07-20,"20 Jul, 2025","20 Jul, 2025",922.0,income,0.0,922.0,,Page 11,2,,,"20 Jul, 2025",,,,,,KKBK
+"20 Jul, 2025",2025-07-20,"20 Jul, 2025","20 Jul, 2025",277.0,income,0.0,277.0,,Page 11,3,,,"20 Jul, 2025",,,,,,KKBK
+"29 Jul, 2025",2025-07-29,"29 Jul, 2025","29 Jul, 2025",20.55,income,0.0,20.55,,Page 12,3,,,"29 Jul, 2025",,,,,,KKBK

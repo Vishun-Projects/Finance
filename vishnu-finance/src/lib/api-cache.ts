@@ -1,8 +1,20 @@
 // High-performance API caching and optimization utilities
 import { NextRequest, NextResponse } from 'next/server';
 
-// In-memory cache for API responses (in production, use Redis)
-const cache = new Map<string, { data: any; timestamp: number; ttl: number }>();
+// PERFORMANCE: In-memory cache with LRU eviction for API responses
+// NOTE: For production scaling with multiple server instances, migrate to Redis:
+// - Install: npm install ioredis
+// - Use: Redis client with same API (get/set/del operations)
+// - Benefits: Shared cache across instances, persistence, better memory management
+
+interface CacheEntry {
+  data: any;
+  timestamp: number;
+  ttl: number;
+  lastAccessed: number; // For LRU eviction
+}
+
+const cache = new Map<string, CacheEntry>();
 
 // Cache configuration
 export const CACHE_TTL = {
@@ -11,6 +23,14 @@ export const CACHE_TTL = {
   STATIC_DATA: 300000, // 5 minutes
   USER_DATA: 15000,    // 15 seconds
 } as const;
+
+// PERFORMANCE: Cache size limits to prevent memory issues
+const MAX_CACHE_SIZE = 1000; // Maximum number of cache entries
+const MAX_CACHE_SIZE_MB = 100; // Maximum cache size in MB (approximate)
+
+// Cache metrics for monitoring
+let cacheHits = 0;
+let cacheMisses = 0;
 
 interface CacheOptions {
   ttl?: number;
@@ -30,27 +50,60 @@ function generateCacheKey(request: NextRequest, customKey?: string): string {
   return `${url.pathname}:${userId}:${period}:${type}`;
 }
 
-// Get cached data
+// Get cached data with LRU tracking
 export function getCachedData(key: string): any | null {
   const cached = cache.get(key);
-  if (!cached) return null;
+  if (!cached) {
+    cacheMisses++;
+    return null;
+  }
   
   const now = Date.now();
   if (now - cached.timestamp > cached.ttl) {
     cache.delete(key);
+    cacheMisses++;
     return null;
   }
+  
+  // Update last accessed time for LRU
+  cached.lastAccessed = now;
+  cache.set(key, cached);
+  cacheHits++;
   
   return cached.data;
 }
 
-// Set cached data
+// Set cached data with LRU eviction
 export function setCachedData(key: string, data: any, ttl: number): void {
+  const now = Date.now();
+  
+  // PERFORMANCE: Evict entries if cache is too large
+  if (cache.size >= MAX_CACHE_SIZE) {
+    evictLRUEntries(Math.floor(MAX_CACHE_SIZE * 0.2)); // Evict 20% oldest entries
+  }
+  
   cache.set(key, {
     data,
-    timestamp: Date.now(),
+    timestamp: now,
     ttl,
+    lastAccessed: now,
   });
+}
+
+// LRU Eviction: Remove least recently used entries
+function evictLRUEntries(count: number): void {
+  const entries = Array.from(cache.entries())
+    .map(([key, entry]) => ({ key, lastAccessed: entry.lastAccessed }))
+    .sort((a, b) => a.lastAccessed - b.lastAccessed); // Sort by last accessed (oldest first)
+  
+  // Remove oldest entries
+  for (let i = 0; i < Math.min(count, entries.length); i++) {
+    cache.delete(entries[i].key);
+  }
+  
+  if (count > 0) {
+    console.log(`🧹 Cache eviction: Removed ${Math.min(count, entries.length)} LRU entries`);
+  }
 }
 
 // Clear cache for user
@@ -234,20 +287,54 @@ export function clearAllCache(): void {
   console.log('✅ All API cache cleared');
 }
 
-// Get cache statistics
-export function getCacheStats(): { size: number; entries: string[] } {
+// Get cache statistics with hit/miss metrics
+export function getCacheStats(): { 
+  size: number; 
+  entries: string[];
+  hits: number;
+  misses: number;
+  hitRate: number;
+  maxSize: number;
+} {
+  const totalRequests = cacheHits + cacheMisses;
+  const hitRate = totalRequests > 0 ? (cacheHits / totalRequests) * 100 : 0;
+  
   return {
     size: cache.size,
-    entries: Array.from(cache.keys())
+    entries: Array.from(cache.keys()),
+    hits: cacheHits,
+    misses: cacheMisses,
+    hitRate: Math.round(hitRate * 100) / 100,
+    maxSize: MAX_CACHE_SIZE,
   };
 }
 
-// Cleanup old cache entries periodically
+// Reset cache metrics (for testing/monitoring)
+export function resetCacheMetrics(): void {
+  cacheHits = 0;
+  cacheMisses = 0;
+}
+
+// Cleanup old cache entries periodically (TTL-based) and enforce size limits
 setInterval(() => {
   const now = Date.now();
+  let expiredCount = 0;
+  
+  // Remove expired entries
   for (const [key, cached] of cache.entries()) {
     if (now - cached.timestamp > cached.ttl) {
       cache.delete(key);
+      expiredCount++;
     }
+  }
+  
+  // If still over limit after TTL cleanup, use LRU eviction
+  if (cache.size > MAX_CACHE_SIZE) {
+    const toEvict = cache.size - MAX_CACHE_SIZE;
+    evictLRUEntries(toEvict);
+  }
+  
+  if (expiredCount > 0 || cache.size > MAX_CACHE_SIZE) {
+    console.log(`🧹 Cache cleanup: Removed ${expiredCount} expired entries, current size: ${cache.size}/${MAX_CACHE_SIZE}`);
   }
 }, 60000); // Cleanup every minute

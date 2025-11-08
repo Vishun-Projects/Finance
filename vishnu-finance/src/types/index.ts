@@ -2,10 +2,24 @@ export interface User {
   id: string;
   email: string;
   name?: string;
+  avatarUrl?: string;
+  gender?: 'MALE' | 'FEMALE' | 'OTHER' | 'PREFER_NOT_TO_SAY';
+  phone?: string;
+  dateOfBirth?: Date;
+  addressLine1?: string;
+  addressLine2?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  pincode?: string;
+  occupation?: string;
+  bio?: string;
   isActive: boolean;
+  status?: 'ACTIVE' | 'FROZEN' | 'SUSPENDED';
   lastLogin?: Date;
   createdAt: Date;
   updatedAt: Date;
+  role: 'USER' | 'SUPERUSER';
 }
 
 export interface Income {
@@ -33,6 +47,82 @@ export interface Expense {
   notes?: string;
   receiptUrl?: string;
   userId: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export type TransactionCategory = 'INCOME' | 'EXPENSE' | 'TRANSFER' | 'INVESTMENT' | 'OTHER';
+
+export interface Transaction {
+  id: string;
+  userId: string;
+  transactionDate: Date;
+  description?: string;
+  creditAmount: number;
+  debitAmount: number;
+  financialCategory: TransactionCategory;
+  categoryId?: string;
+  accountStatementId?: string;
+  // Bank-specific fields
+  bankCode?: string;
+  transactionId?: string;
+  accountNumber?: string;
+  transferType?: string;
+  personName?: string;
+  upiId?: string;
+  branch?: string;
+  store?: string;
+  rawData?: string;
+  balance?: number;
+  // Metadata
+  notes?: string;
+  receiptUrl?: string;
+  isDeleted: boolean;
+  deletedAt?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+  // Relations
+  category?: Category;
+  documentId?: string;
+  document?: Document;
+}
+
+export type DocumentVisibility = 'PRIVATE' | 'ORGANIZATION' | 'PUBLIC';
+export type DocumentSourceType = 'USER_UPLOAD' | 'BANK_STATEMENT' | 'PORTAL_RESOURCE' | 'SYSTEM';
+
+export interface Document {
+  id: string;
+  ownerId?: string | null;
+  uploadedById: string;
+  deletedById?: string | null;
+  deletedBy?: { id: string; email?: string | null; name?: string | null } | null;
+  storageKey: string;
+  originalName: string;
+  mimeType: string;
+  fileSize?: number | null;
+  checksum?: string | null;
+  visibility: DocumentVisibility;
+  sourceType: DocumentSourceType;
+  sourceReference?: string | null;
+  bankCode?: string | null;
+  parsedAt?: Date | null;
+  metadata?: string | null; // JSON string
+  createdAt: Date;
+  updatedAt: Date;
+  deletedAt?: Date | null;
+  isDeleted: boolean;
+}
+
+export interface BankFieldMapping {
+  id: string;
+  bankCode: string;
+  fieldKey: string;
+  mappedTo: string;
+  description?: string | null;
+  version: number;
+  isActive: boolean;
+  mappingConfig?: Record<string, unknown> | null;
+  createdById: string;
   createdAt: Date;
   updatedAt: Date;
 }

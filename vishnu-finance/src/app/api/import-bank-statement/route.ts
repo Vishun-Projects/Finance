@@ -1,22 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { getCanonicalName } from '../entity-mappings/route';
+import { AuthService } from '@/lib/auth';
+import { getCanonicalName } from '@/lib/entity-mapping-service';
 import {
   getOrCreateAccountStatement,
   validateOpeningBalance,
   checkStatementContinuity,
   type StatementMetadata,
 } from '@/lib/account-statement';
+import { relative } from 'path';
+import { writeAuditLog, extractRequestMeta } from '@/lib/audit';
 
 interface ImportRecord {
-  title: string;
-  amount: number | string;
+  title?: string;
+  amount?: number | string;
+  debit?: number | string; // Debit amount
+  credit?: number | string; // Credit amount
   category?: string;
-  date: string;
+  date?: string;
+  date_iso?: string;
   description?: string;
   payment_method?: string;
   notes?: string;
-  type?: 'income' | 'expense';
+  type?: 'income' | 'expense'; // Legacy field, prefer credit/debit
   // New bank-specific fields
   bankCode?: string;
   transactionId?: string;
@@ -29,6 +35,7 @@ interface ImportRecord {
   commodity?: string;
   raw?: string; // Original raw transaction text from PDF/Excel
   rawData?: string; // Deprecated - use raw instead
+  balance?: number | string;
 }
 
 export async function POST(request: NextRequest) {
@@ -36,11 +43,17 @@ export async function POST(request: NextRequest) {
   
   try {
     const body = await request.json();
-    const { userId, type, records, metadata } = body as { 
+    const { userId, records, metadata, document } = body as { 
       userId: string; 
-      type?: 'income' | 'expense'; 
       records: ImportRecord[];
       metadata?: StatementMetadata;
+      document?: {
+        storageKey?: string;
+        originalName?: string;
+        mimeType?: string;
+        fileSize?: number;
+        checksum?: string;
+      };
     };
 
     if (!userId || !Array.isArray(records)) {
@@ -48,6 +61,14 @@ export async function POST(request: NextRequest) {
         { error: 'userId and records are required' }, 
         { status: 400 }
       );
+    }
+
+    const authToken = request.cookies.get('auth-token');
+    const actorRecord = authToken ? (await AuthService.getUserFromToken(authToken.value)) as any : null;
+    const actorRole = (actorRecord as { role?: 'USER' | 'SUPERUSER' } | null)?.role;
+
+    if (!actorRecord || !actorRecord.isActive || (actorRole !== 'SUPERUSER' && actorRecord.id !== userId)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     if (records.length === 0) {
@@ -107,14 +128,16 @@ export async function POST(request: NextRequest) {
 
         // Store account statement (only if validation passed or it's first import)
         if (balanceValidation.isValid || balanceValidation.isFirstImport) {
-          // Calculate totals from records
-          const totalDebits = records
-            .filter(r => r.type === 'expense' || (!r.type && Number(r.amount) < 0))
-            .reduce((sum, r) => sum + Math.abs(Number(r.amount || 0)), 0);
+          // Calculate totals from records using credit/debit fields
+          const totalDebits = records.reduce((sum, r) => {
+            const debit = Number(r.debit || 0);
+            return sum + debit;
+          }, 0);
           
-          const totalCredits = records
-            .filter(r => r.type === 'income' || (!r.type && Number(r.amount) > 0))
-            .reduce((sum, r) => sum + Number(r.amount || 0), 0);
+          const totalCredits = records.reduce((sum, r) => {
+            const credit = Number(r.credit || 0);
+            return sum + credit;
+          }, 0);
 
           // Update metadata with calculated totals
           const enrichedMetadata: StatementMetadata = {
@@ -139,6 +162,36 @@ export async function POST(request: NextRequest) {
       } catch (error: any) {
         console.error('Error processing account statement:', error);
         warnings.push(`Failed to store account statement metadata: ${error.message}`);
+      }
+    }
+
+    // Prepare document linkage if provided
+    let documentRecord: any = null;
+    if (document?.storageKey) {
+      try {
+        const absolutePath = document.storageKey;
+        const relativePath = absolutePath.startsWith(process.cwd())
+          ? relative(process.cwd(), absolutePath).replace(/\\/g, '/')
+          : document.storageKey;
+
+        documentRecord = await (prisma as any).document.create({
+          data: {
+            ownerId: userId,
+            uploadedById: actorRecord.id,
+            storageKey: relativePath,
+            originalName: document.originalName || 'bank-statement.pdf',
+            mimeType: document.mimeType || 'application/pdf',
+            fileSize: document.fileSize ?? null,
+            checksum: document.checksum || null,
+            visibility: 'PRIVATE',
+            sourceType: 'BANK_STATEMENT',
+            bankCode,
+            parsedAt: new Date(),
+            metadata: metadata ? JSON.stringify(metadata) : null,
+          },
+        });
+      } catch (error) {
+        console.warn('⚠️ Failed to persist document record for bank import:', error);
       }
     }
 
@@ -173,21 +226,56 @@ export async function POST(request: NextRequest) {
       }
     };
 
-    // Normalize records with bank-specific fields
-    let normalized = records
+    // Normalize records with bank-specific fields and convert to credit/debit format
+    const normalized = records
       .map((r) => {
         // CRITICAL: Use date_iso if available (correctly parsed by strict DD/MM/YYYY parser)
         // Only fall back to date if date_iso is missing
         const dateInput = (r.date_iso || r.date) as string | Date | null | undefined;
         const parsedDate = parseDate(dateInput);
+        
+        // Determine credit and debit amounts
+        let debitAmount = Number(r.debit || 0);
+        let creditAmount = Number(r.credit || 0);
+        
+        // If credit/debit not provided, infer from amount and legacy type
+        if (debitAmount === 0 && creditAmount === 0) {
+          const amount = Number(r.amount || 0);
+          if (r.type === 'income' || (!r.type && amount > 0)) {
+            creditAmount = Math.abs(amount);
+            debitAmount = 0;
+          } else {
+            debitAmount = Math.abs(amount);
+            creditAmount = 0;
+          }
+        }
+        
+        // Determine financial category (default based on debit/credit)
+        let financialCategory: 'INCOME' | 'EXPENSE' | 'TRANSFER' | 'INVESTMENT' | 'OTHER' = 'EXPENSE';
+        if (creditAmount > 0) {
+          financialCategory = 'INCOME'; // Default credits to INCOME
+        } else if (debitAmount > 0) {
+          financialCategory = 'EXPENSE'; // Default debits to EXPENSE
+        }
+        
+        // Heuristic: If transferType suggests transfer, update category
+        if (r.transferType && (
+          r.transferType.toLowerCase().includes('transfer') ||
+          r.transferType.toLowerCase().includes('neft') ||
+          r.transferType.toLowerCase().includes('rtgs') ||
+          r.transferType.toLowerCase().includes('imps')
+        )) {
+          financialCategory = 'TRANSFER';
+        }
+        
         return {
-          title: (r.title || r.description || '').toString().trim(),
-          amount: Number(r.amount ?? 0),
+          description: (r.title || r.description || '').toString().trim(),
+          transactionDate: parsedDate,
+          creditAmount: creditAmount,
+          debitAmount: debitAmount,
+          financialCategory: financialCategory,
           category: (r.category || '').toString().trim() || null,
-          date: parsedDate,
-          description: (r.description || r.notes || '').toString().trim() || null,
-          paymentMethod: (r.payment_method || '').toString().trim() || null,
-          type: (r.type as 'income' | 'expense') || type || 'expense',
+          notes: (r.notes || '').toString().trim() || null,
           // Bank-specific fields
           bankCode: r.bankCode || null,
           transactionId: r.transactionId || null,
@@ -197,12 +285,12 @@ export async function POST(request: NextRequest) {
           upiId: r.upiId || null,
           branch: r.branch || null,
           store: r.store || null,
-          commodity: r.commodity || null,
+          balance: r.balance ? Number(r.balance) : null,
           // Save original raw transaction text from PDF/Excel
-          rawData: r.raw || r.rawData || null
+          rawData: r.raw || r.rawData || null,
         };
       })
-      .filter((r) => r.title && r.amount && r.date && !isNaN(r.date.getTime()));
+      .filter((r) => r.description && (r.creditAmount > 0 || r.debitAmount > 0) && r.transactionDate && !isNaN(r.transactionDate.getTime()));
 
     // Apply entity mappings before saving to database
     if (userId && normalized.length > 0) {
@@ -220,18 +308,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No valid records to import' }, { status: 400 });
     }
 
-    // Deduplicate in-memory by (date, title, amount, type)
+    // Deduplicate in-memory by (date, description, creditAmount, debitAmount)
     const seen = new Set<string>();
     const unique = normalized.filter((r) => {
       let dateStr = '';
-      if (r.date && !isNaN(r.date.getTime())) {
+      if (r.transactionDate && !isNaN(r.transactionDate.getTime())) {
         try {
-          dateStr = r.date.toISOString().slice(0, 10);
+          dateStr = r.transactionDate.toISOString().slice(0, 10);
         } catch {
           dateStr = '';
         }
       }
-      const key = `${r.type}|${r.title}|${r.amount}|${dateStr}`;
+      const key = `${r.description}|${r.creditAmount}|${r.debitAmount}|${dateStr}`;
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
@@ -239,18 +327,14 @@ export async function POST(request: NextRequest) {
 
     let inserted = 0;
     let duplicates = 0;
-    let incomeInserted = 0;
-    let expenseInserted = 0;
-
-    // Split by type
-    const incomeRecs = unique.filter(r => r.type === 'income');
-    const expenseRecs = unique.filter(r => r.type === 'expense');
+    let creditInserted = 0;
+    let debitInserted = 0;
 
     // Helper to compute date range
     const rangeFor = (recs: typeof unique) => {
       if (!recs.length) return null;
       const validDates = recs
-        .map(r => r.date)
+        .map(r => r.transactionDate)
         .filter((d): d is Date => d !== null && !isNaN(d.getTime()));
       if (!validDates.length) return null;
       const timestamps = validDates.map(d => d.getTime());
@@ -259,63 +343,97 @@ export async function POST(request: NextRequest) {
       return { min, max };
     };
 
-    // Process income records
-    if (incomeRecs.length) {
-      const range = rangeFor(incomeRecs);
-      const existing = await (prisma as any).incomeSource.findMany({
+    // Check for existing transactions
+    const range = rangeFor(unique);
+    let existing: any[] = [];
+    try {
+      // Check if transaction table exists
+      await (prisma as any).$queryRaw`SELECT 1 FROM transactions LIMIT 1`;
+      existing = await (prisma as any).transaction.findMany({
         where: {
           userId,
           isDeleted: false,
-          ...(range ? { startDate: { gte: range.min, lte: range.max } } : {}),
+          ...(range ? { transactionDate: { gte: range.min, lte: range.max } } : {}),
         },
-        select: { id: true, name: true, amount: true, startDate: true },
+        select: { 
+          id: true, 
+          description: true, 
+          creditAmount: true, 
+          debitAmount: true, 
+          transactionDate: true 
+        },
       });
-      
-      const existingSet = new Set(
-        existing.map((e: any) => {
-          try {
-            const date = new Date(e.startDate);
-            if (isNaN(date.getTime())) return null;
-            return `${e.name}|${Number(e.amount)}|${date.toISOString().slice(0,10)}`;
-          } catch {
-            return null;
-          }
-        }).filter((k: string | null): k is string => k !== null)
-      );
-      
-      const toInsert = incomeRecs.filter(r => {
-        if (!r.date || isNaN(r.date.getTime())) return false;
+    } catch (error: any) {
+      // Transaction table doesn't exist yet, skip deduplication
+      console.log('⚠️ Transaction table not available, skipping deduplication check');
+      existing = [];
+    }
+    
+    // Build deduplication key for existing records
+    const existingSet = new Set(
+      existing.map((e: any) => {
         try {
-          const key = `${r.title}|${Number(r.amount)}|${r.date.toISOString().slice(0,10)}`;
-          return !existingSet.has(key);
+          const date = new Date(e.transactionDate);
+          if (isNaN(date.getTime())) return null;
+          const desc = (e.description || '').substring(0, 50); // Match MySQL index prefix
+          return `${e.userId}|${desc}|${Number(e.creditAmount)}|${Number(e.debitAmount)}|${date.toISOString().slice(0,10)}|${e.isDeleted || false}`;
         } catch {
-          return false;
+          return null;
         }
-      });
+      }).filter((k: string | null): k is string => k !== null)
+    );
+    
+    // Filter out duplicates before insertion (in-memory check)
+    // Note: This helps but database constraint is the ultimate protection against race conditions
+    const toInsert = unique.filter(r => {
+      if (!r.transactionDate || isNaN(r.transactionDate.getTime())) return false;
+      try {
+        const desc = (r.description || '').substring(0, 50);
+        const key = `${userId}|${desc}|${r.creditAmount}|${r.debitAmount}|${r.transactionDate.toISOString().slice(0,10)}|false`;
+        return !existingSet.has(key);
+      } catch {
+        return false;
+      }
+    });
+    
+    duplicates += unique.length - toInsert.length;
+    
+    if (toInsert.length) {
+      // Check if Transaction table exists before inserting
+      try {
+        await (prisma as any).$queryRaw`SELECT 1 FROM transactions LIMIT 1`;
+      } catch (error: any) {
+        // Transaction table doesn't exist, fall back to Expense/IncomeSource
+        console.log('⚠️ Transaction table not available, falling back to Expense/IncomeSource');
+        return NextResponse.json({
+          success: false,
+          error: 'Transaction table not migrated yet. Please run Prisma migration first.',
+          fallback: true
+        }, { status: 400 });
+      }
       
-      duplicates += incomeRecs.length - toInsert.length;
+      const chunks: typeof toInsert[] = [];
+      for (let i = 0; i < toInsert.length; i += 500) {
+        chunks.push(toInsert.slice(i, i + 500));
+      }
       
-      if (toInsert.length) {
-        const chunks: typeof toInsert[] = [];
-        for (let i = 0; i < toInsert.length; i += 500) {
-          chunks.push(toInsert.slice(i, i + 500));
-        }
-        
-        for (const chunk of chunks) {
-          const data = chunk.map(r => {
-            const baseData = {
+      // Use database transaction to prevent race conditions
+      for (const chunk of chunks) {
+        // Process each chunk in a database transaction for atomicity
+        try {
+          await (prisma as any).$transaction(async (tx: any) => {
+            // Build data for insertion
+            const data = chunk.map(r => ({
               userId,
-              name: r.title,
-              amount: r.amount,
-              startDate: r.date,
-              notes: formatNotes(r),
-              frequency: 'ONE_TIME' as const,
+              transactionDate: r.transactionDate,
+              description: r.description,
+              creditAmount: r.creditAmount,
+              debitAmount: r.debitAmount,
+              financialCategory: r.financialCategory,
               categoryId: null,
-            };
-            
-            // Always include new fields - they exist in database even if Prisma Client doesn't recognize them
-            return {
-              ...baseData,
+              accountStatementId: accountStatement?.id || null,
+              notes: formatNotes(r),
+              // Bank-specific fields
               bankCode: r.bankCode || null,
               transactionId: r.transactionId || null,
               accountNumber: r.accountNumber || null,
@@ -324,76 +442,64 @@ export async function POST(request: NextRequest) {
               upiId: r.upiId || null,
               branch: r.branch || null,
               store: r.store || null,
-              // Save original raw transaction text from PDF/Excel (not JSON)
-              rawData: r.raw || r.rawData || null
-            };
-          });
-          
-          const res = await (prisma as any).incomeSource.createMany({ data });
-          const count = res.count ?? data.length;
-          inserted += count;
-          incomeInserted += count;
-        }
-      }
-    }
+              balance: r.balance || null,
+              rawData: r.rawData || null,
+              documentId: documentRecord?.id || null,
+              receiptUrl: documentRecord
+                ? `/api/user/documents/${documentRecord.id}/download`
+                : null,
+            }));
 
-    // Process expense records
-    if (expenseRecs.length) {
-      const range = rangeFor(expenseRecs);
-      const existing = await (prisma as any).expense.findMany({
-        where: {
-          userId,
-          isDeleted: false,
-          ...(range ? { date: { gte: range.min, lte: range.max } } : {}),
-        },
-        select: { id: true, description: true, amount: true, date: true },
-      });
-      
-      const existingSet = new Set(
-        existing.map((e: any) => {
-          try {
-            const date = new Date(e.date);
-            if (isNaN(date.getTime())) return null;
-            return `${e.description}|${Number(e.amount)}|${date.toISOString().slice(0,10)}`;
-          } catch {
-            return null;
-          }
-        }).filter((k: string | null): k is string => k !== null)
-      );
-      
-      const toInsert = expenseRecs.filter(r => {
-        if (!r.date || isNaN(r.date.getTime())) return false;
-        try {
-          const key = `${r.title}|${Number(r.amount)}|${r.date.toISOString().slice(0,10)}`;
-          return !existingSet.has(key);
-        } catch {
-          return false;
-        }
-      });
-      
-      duplicates += expenseRecs.length - toInsert.length;
-      
-      if (toInsert.length) {
-        const chunks: typeof toInsert[] = [];
-        for (let i = 0; i < toInsert.length; i += 500) {
-          chunks.push(toInsert.slice(i, i + 500));
-        }
-        
-        for (const chunk of chunks) {
-          const data = chunk.map(r => {
-            const baseData = {
-              userId,
-              description: r.title,
-              amount: r.amount,
-              date: r.date,
-              notes: formatNotes(r),
-              isRecurring: false,
-              categoryId: null,
-            };
+            // Use INSERT IGNORE approach - insert only if not duplicate
+            // For MySQL, we'll catch duplicate errors and skip those records
+            let chunkInserted = 0;
+            let chunkDuplicates = 0;
+
+            // Insert one by one to handle duplicates gracefully
+            const insertedRecords: typeof data = [];
+            for (const record of data) {
+              try {
+                await tx.transaction.create({ data: record });
+                chunkInserted++;
+                insertedRecords.push(record);
+              } catch (error: any) {
+                // Check if it's a duplicate key error (code 1062 in MySQL, P2002 in Prisma)
+                if (error.code === 'P2002' || error.code === 1062 || 
+                    (error.message && (error.message.includes('Duplicate') || error.message.includes('UNIQUE') || error.message.includes('Unique constraint')))) {
+                  chunkDuplicates++;
+                  duplicates++;
+                } else {
+                  // Re-throw if it's a different error
+                  throw error;
+                }
+              }
+            }
+
+            inserted += chunkInserted;
+            duplicates += chunkDuplicates;
             
-            // Always include new fields - they exist in database even if Prisma Client doesn't recognize them
-            return {
-              ...baseData,
+            // Count credits and debits for successfully inserted records
+            for (const record of insertedRecords) {
+              if (record.creditAmount > 0) creditInserted++;
+              if (record.debitAmount > 0) debitInserted++;
+            }
+          });
+        } catch (error: any) {
+          // If transaction fails entirely, try fallback: createMany with skipDuplicates
+          console.warn('⚠️ Transaction-level insert failed, trying batch insert with duplicate handling:', error.message);
+          
+          try {
+            // Fallback: Use createMany with individual error handling
+            const data = chunk.map(r => ({
+              userId,
+              transactionDate: r.transactionDate,
+              description: r.description,
+              creditAmount: r.creditAmount,
+              debitAmount: r.debitAmount,
+              financialCategory: r.financialCategory,
+              categoryId: null,
+              accountStatementId: accountStatement?.id || null,
+              notes: formatNotes(r),
               bankCode: r.bankCode || null,
               transactionId: r.transactionId || null,
               accountNumber: r.accountNumber || null,
@@ -402,27 +508,80 @@ export async function POST(request: NextRequest) {
               upiId: r.upiId || null,
               branch: r.branch || null,
               store: r.store || null,
-              // Save original raw transaction text from PDF/Excel (not JSON)
-              rawData: r.raw || r.rawData || null
-            };
-          });
-          
-          const res = await (prisma as any).expense.createMany({ data });
-          const count = res.count ?? data.length;
-          inserted += count;
-          expenseInserted += count;
+              balance: r.balance || null,
+              rawData: r.rawData || null,
+              documentId: documentRecord?.id || null,
+              receiptUrl: documentRecord
+                ? `/api/user/documents/${documentRecord.id}/download`
+                : null,
+            }));
+
+            // Insert individually to catch duplicates
+            let chunkInserted = 0;
+            const insertedRecords: typeof data = [];
+            for (const record of data) {
+              try {
+                await (prisma as any).transaction.create({ data: record });
+                chunkInserted++;
+                insertedRecords.push(record);
+              } catch (dupError: any) {
+                if (dupError.code === 'P2002' || dupError.code === 1062 || 
+                    (dupError.message && (dupError.message.includes('Duplicate') || dupError.message.includes('UNIQUE') || dupError.message.includes('Unique constraint')))) {
+                  duplicates++;
+                } else {
+                  console.error('❌ Insert error:', dupError);
+                  // Log the full error for debugging
+                  console.error('❌ Error details:', JSON.stringify(dupError, null, 2));
+                }
+              }
+            }
+            inserted += chunkInserted;
+            
+            // Count credits and debits for successfully inserted records
+            for (const record of insertedRecords) {
+              if (record.creditAmount > 0) creditInserted++;
+              if (record.debitAmount > 0) debitInserted++;
+            }
+          } catch (fallbackError: any) {
+            console.error('❌ Fallback insert also failed:', fallbackError);
+            errors.push(`Failed to insert chunk: ${fallbackError.message}`);
+          }
         }
       }
     }
 
-    console.log(`✅ Import Bank Statement: ${inserted} records inserted (${incomeInserted} income, ${expenseInserted} expenses), ${duplicates} duplicates`);
+    console.log(`✅ Import Bank Statement: ${inserted} transactions inserted (${creditInserted} credits, ${debitInserted} debits), ${duplicates} duplicates`);
 
+    const meta = extractRequestMeta(request);
+
+    await writeAuditLog({
+      actorId: actorRecord.id,
+      event: 'TRANSACTION_IMPORT',
+      severity: duplicates > 0 ? 'WARN' : 'INFO',
+      targetUserId: userId,
+      targetResource: documentRecord ? `document:${documentRecord.id}` : undefined,
+      metadata: {
+        inserted,
+        duplicates,
+        creditInserted,
+        debitInserted,
+        bankCode,
+        accountNumber,
+      },
+      message: `${actorRecord.email} imported ${inserted} transactions${duplicates ? ` (${duplicates} duplicates)` : ''}`,
+      ipAddress: meta.ipAddress,
+      userAgent: meta.userAgent,
+    });
+ 
     return NextResponse.json({ 
       inserted, 
       skipped: unique.length - inserted, 
       duplicates,
-      incomeInserted,
-      expenseInserted,
+      creditInserted,
+      debitInserted,
+      // Legacy fields for backward compatibility
+      incomeInserted: creditInserted,
+      expenseInserted: debitInserted,
       warnings: warnings.length > 0 ? warnings : undefined,
       errors: errors.length > 0 ? errors : undefined,
       balanceValidation,
@@ -443,35 +602,6 @@ export async function POST(request: NextRequest) {
       error: errorMessage,
       details: process.env.NODE_ENV === 'development' ? error?.stack : undefined
     }, { status: 500 });
-  }
-}
-
-// Helper to check if new schema fields exist using raw SQL
-async function checkSchemaForNewFields(modelName: string): Promise<boolean> {
-  try {
-    // Map model names to table names
-    const tableMap: Record<string, string> = {
-      'incomeSource': 'income_sources',
-      'expense': 'expenses'
-    };
-    
-    const tableName = tableMap[modelName] || modelName;
-    
-    // Use raw SQL to check if columns exist
-    const result = await (prisma as any).$queryRawUnsafe(`
-      SELECT COUNT(*) as count
-      FROM INFORMATION_SCHEMA.COLUMNS
-      WHERE TABLE_SCHEMA = DATABASE()
-        AND TABLE_NAME = ?
-        AND COLUMN_NAME IN ('bankCode', 'transactionId', 'accountNumber', 'transferType')
-    `, tableName);
-    
-    const count = result?.[0]?.count || 0;
-    return count >= 4; // All 4 fields must exist
-  } catch (error) {
-    console.log(`⚠️ Error checking schema for ${modelName}:`, error);
-    // Default to true since we know columns exist in database
-    return true;
   }
 }
 

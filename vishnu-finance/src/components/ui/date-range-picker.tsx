@@ -28,6 +28,17 @@ export function DateRangePicker({
   disabled = false,
 }: DateRangePickerProps) {
   const [isOpen, setIsOpen] = React.useState(false)
+  const [isMobile, setIsMobile] = React.useState(false)
+
+  // Detect mobile screen size
+  React.useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768) // md breakpoint
+    }
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
 
   return (
     <div className={cn("grid gap-2", className)}>
@@ -46,10 +57,10 @@ export function DateRangePicker({
             {date?.from ? (
               date.to ? (
                 <>
-                  {format(date.from, "dd-MM-yyyy")} - {format(date.to, "dd-MM-yyyy")}
+                  {format(date.from, "dd MMM yyyy")} - {format(date.to, "dd MMM yyyy")}
                 </>
               ) : (
-                format(date.from, "dd-MM-yyyy")
+                format(date.from, "dd MMM yyyy")
               )
             ) : (
               <span>Pick a date range</span>
@@ -68,7 +79,7 @@ export function DateRangePicker({
                 setIsOpen(false)
               }
             }}
-            numberOfMonths={2}
+            numberOfMonths={isMobile ? 1 : 2}
           />
         </PopoverContent>
       </Popover>

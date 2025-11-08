@@ -24,7 +24,10 @@ import {
 import { useAuth } from '../hooks/useAuth';
 import { DateRangeFilter } from './ui/date-range-filter';
 import { Combobox } from './ui/combobox';
-import { EntityMappingManager } from './entity-mapping-manager';
+import FabButton from './ui/fab-button';
+import MobileHeader from './ui/mobile-header';
+import FilterSheet from './ui/filter-sheet';
+import QuickRangeChips, { QuickRange } from './ui/quick-range-chips';
 
 interface Expense {
   id: string;
@@ -41,6 +44,10 @@ interface Expense {
   commodity?: string;
   upiId?: string;
   accountNumber?: string;
+  // New Transaction model fields
+  creditAmount?: number;
+  debitAmount?: number;
+  financialCategory?: 'INCOME' | 'EXPENSE' | 'TRANSFER' | 'INVESTMENT' | 'OTHER';
 }
 
 export default function ExpenseManagement() {
@@ -74,8 +81,56 @@ export default function ExpenseManagement() {
   });
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
-  const [showPersonMapping, setShowPersonMapping] = useState(false);
-  const [showStoreMapping, setShowStoreMapping] = useState(false);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [quickRange, setQuickRange] = useState<QuickRange>('month');
+  const [amountPreset, setAmountPreset] = useState<'all'|'lt1k'|'1to10k'|'10to50k'|'50to100k'|'gt100k'>('all');
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('quickRange_expenses');
+      if (saved) {
+        applyQuickRange(saved as QuickRange);
+      }
+    } catch {}
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    try { localStorage.setItem('quickRange_expenses', quickRange); } catch {}
+  }, [quickRange]);
+
+  const applyQuickRange = (range: QuickRange) => {
+    const today = new Date();
+    let start: Date, end: Date;
+    switch (range) {
+      case 'month':
+        start = new Date(today.getFullYear(), today.getMonth(), 1);
+        end = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59, 999);
+        break;
+      case 'lastMonth':
+        const prev = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        start = new Date(prev.getFullYear(), prev.getMonth(), 1);
+        end = new Date(prev.getFullYear(), prev.getMonth() + 1, 0, 23, 59, 59, 999);
+        break;
+      case 'quarter':
+        const q = Math.floor(today.getMonth() / 3);
+        start = new Date(today.getFullYear(), q * 3, 1);
+        end = new Date(today.getFullYear(), (q + 1) * 3, 0, 23, 59, 59, 999);
+        break;
+      case 'year':
+        start = new Date(today.getFullYear(), 0, 1);
+        end = new Date(today.getFullYear(), 11, 31, 23, 59, 59, 999);
+        break;
+      case 'all':
+        start = new Date(2020, 0, 1);
+        end = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59, 999);
+        break;
+      case 'custom':
+        setQuickRange('custom');
+        return;
+    }
+    setQuickRange(range);
+    setStartDate(start.toISOString().split('T')[0]);
+    setEndDate(end.toISOString().split('T')[0]);
+  };
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-IN', {
@@ -346,8 +401,19 @@ export default function ExpenseManagement() {
                          (expense.personName && expense.personName.toLowerCase().includes(filterStore.toLowerCase()));
     const matchesCommodity = filterCommodity === 'all' || 
                              (expense.commodity && expense.commodity.toLowerCase().includes(filterCommodity.toLowerCase()));
+    // Optional amount range presets (applied via filter sheet)
+    const amountNum = typeof expense.amount === 'number' ? expense.amount : parseFloat(String(expense.amount)) || 0;
+    let inRange = true;
+    switch (amountPreset) {
+      case 'lt1k': inRange = amountNum < 1000; break;
+      case '1to10k': inRange = amountNum >= 1000 && amountNum <= 10000; break;
+      case '10to50k': inRange = amountNum > 10000 && amountNum <= 50000; break;
+      case '50to100k': inRange = amountNum > 50000 && amountNum <= 100000; break;
+      case 'gt100k': inRange = amountNum > 100000; break;
+      default: inRange = true;
+    }
     
-    return matchesSearch && matchesCategory && matchesStore && matchesCommodity;
+    return matchesSearch && matchesCategory && matchesStore && matchesCommodity && inRange;
   });
 
   const storesPersons = Array.from(new Set(
@@ -458,32 +524,48 @@ export default function ExpenseManagement() {
   }
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in mobile-body pb-bottom-bar">
+      {/* Sticky Mobile Header */}
+      <MobileHeader
+        title="Expenses"
+        subtitle="Manage and track expenses"
+        right={(
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsFilterOpen(true)}
+              className="minimal-button-secondary btn-touch px-3 py-2"
+              aria-label="Open Filters"
+            >
+              Filters
+            </button>
+            <button
+              onClick={() => setShowForm(true)}
+              className="minimal-button-primary btn-touch px-3 py-2"
+              aria-label="Add Expense"
+            >
+              <Plus className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+      />
       {/* Header */}
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
         <div>
           <h2 className="text-2xl font-bold text-primary">Expense Management</h2>
-          <p className="text-muted">Track and manage your expenses</p>
+          <p className="text-muted">Track and manage your expenses and bank debits</p>
         </div>
-        <div className="flex space-x-3">
+        <div className="flex flex-wrap gap-2 sm:flex-nowrap sm:space-x-3">
           <button
             onClick={fetchExpenses}
-            className="minimal-button-secondary flex items-center space-x-2"
+            className="minimal-button-secondary flex items-center space-x-2 btn-touch w-full sm:w-auto"
             disabled={isFetching}
           >
             <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
             <span>Refresh</span>
           </button>
-          <button
-            onClick={() => setShowPersonMapping(true)}
-            className="minimal-button-secondary flex items-center space-x-2"
-          >
-            <Tag className="w-4 h-4" />
-            <span>Unify Names</span>
-          </button>
         <button
           onClick={() => setShowForm(true)}
-            className="minimal-button-primary flex items-center space-x-2"
+            className="minimal-button-primary flex items-center space-x-2 btn-touch w-full sm:w-auto"
         >
             <Plus className="w-4 h-4" />
           <span>Add Expense</span>
@@ -512,7 +594,8 @@ export default function ExpenseManagement() {
         <div className="minimal-card p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-muted">Total Expenses</p>
+              <p className="text-sm font-medium text-muted">Total Debits</p>
+              <p className="text-xs text-muted mb-1">(Bank debits + expenses)</p>
               <p className="text-2xl font-bold text-error currency-inr">{formatCurrency(totalExpenses)}</p>
             </div>
             <div className="minimal-stat-inset">
@@ -548,6 +631,7 @@ export default function ExpenseManagement() {
 
       {/* Search and Filters */}
       <div className="flex flex-col gap-4">
+        <QuickRangeChips value={quickRange} onChange={applyQuickRange} className="md:flex xl:hidden" />
         <DateRangeFilter
           startDate={startDate}
           endDate={endDate}
@@ -555,6 +639,7 @@ export default function ExpenseManagement() {
             setStartDate(start);
             setEndDate(end);
           }}
+          showPresets={false}
         />
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="relative flex-1">
@@ -600,7 +685,7 @@ export default function ExpenseManagement() {
             searchPlaceholder="Search commodities..."
             className="min-w-[200px]"
           />
-        <button className="minimal-button-small p-2">
+        <button className="minimal-button-small p-2" onClick={() => setIsFilterOpen(true)} aria-label="Open Filters">
           <Filter className="w-4 h-4" />
         </button>
         </div>
@@ -826,7 +911,7 @@ export default function ExpenseManagement() {
             </button>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-3 sm:space-y-4">
             {filteredExpenses.map((expense) => (
               <div key={expense.id} className="minimal-card-inset p-4 hover-lift transition-all">
                 <div className="flex items-start justify-between">
@@ -838,6 +923,11 @@ export default function ExpenseManagement() {
                       <div className="flex items-center space-x-3 mb-2">
                         <h4 className="font-medium text-primary">{expense.title}</h4>
                         <span className="minimal-badge minimal-badge-info">{expense.category}</span>
+                        {expense.financialCategory && (
+                          <span className="minimal-badge bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
+                            {expense.financialCategory}
+                          </span>
+                        )}
                   </div>
                       <div className="flex items-center space-x-4 text-sm text-muted mb-2">
                         <span className="flex items-center space-x-1">
@@ -861,7 +951,14 @@ export default function ExpenseManagement() {
                   </div>
                   <div className="flex items-center space-x-2 ml-4">
                 <div className="text-right">
-                  <p className="font-semibold text-error currency-inr">{formatCurrency(expense.amount)}</p>
+                  {expense.debitAmount !== undefined && expense.debitAmount > 0 ? (
+                    <div>
+                      <p className="font-semibold text-error currency-inr">{formatCurrency(expense.debitAmount)}</p>
+                      <p className="text-xs text-muted">Debit</p>
+                    </div>
+                  ) : (
+                    <p className="font-semibold text-error currency-inr">{formatCurrency(expense.amount)}</p>
+                  )}
                 </div>
                   <button
                     onClick={() => handleEdit(expense)}
@@ -885,35 +982,107 @@ export default function ExpenseManagement() {
         )}
       </div>
 
-      {/* Person Name Mapping Modal */}
-      {showPersonMapping && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-            <EntityMappingManager
-              entityType="PERSON"
-              onClose={() => {
-                setShowPersonMapping(false);
-                fetchExpenses();
-              }}
-            />
-          </div>
-        </div>
-      )}
+      {/* Mobile FAB for quick add */}
+      <FabButton
+        label="Add Expense"
+        icon={<Plus className="w-5 h-5" />}
+        onClick={() => setShowForm(true)}
+      />
 
-      {/* Store Name Mapping Modal */}
-      {showStoreMapping && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-            <EntityMappingManager
-              entityType="STORE"
-              onClose={() => {
-                setShowStoreMapping(false);
-                fetchExpenses();
-              }}
-            />
+      {/* Filter Sheet (Mobile) */}
+      <FilterSheet open={isFilterOpen} onClose={() => setIsFilterOpen(false)} title="Filters">
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-2">Amount</label>
+            <div className="flex flex-wrap gap-2">
+              {[
+                {k:'all',l:'All'},
+                {k:'lt1k',l:'<1k'},
+                {k:'1to10k',l:'1–10k'},
+                {k:'10to50k',l:'10–50k'},
+                {k:'50to100k',l:'50–100k'},
+                {k:'gt100k',l:'>100k'},
+              ].map(({k,l}) => (
+                <button key={k}
+                  className={`px-3 py-1.5 rounded-full text-sm border ${amountPreset===k? 'bg-primary text-primary-foreground border-primary':'border-input'}`}
+                  onClick={() => setAmountPreset(k as any)}
+                >{l}</button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Category</label>
+            <select
+              value={filterCategory}
+              onChange={(e) => setFilterCategory(e.target.value)}
+              className="minimal-select w-full"
+            >
+              <option value="all">All Categories</option>
+              {categories.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Store/Person</label>
+            <select
+              value={filterStore}
+              onChange={(e) => setFilterStore(e.target.value)}
+              className="minimal-select w-full"
+            >
+              <option value="all">All</option>
+              {storesPersons.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Commodity</label>
+            <select
+              value={filterCommodity}
+              onChange={(e) => setFilterCommodity(e.target.value)}
+              className="minimal-select w-full"
+            >
+              <option value="all">All</option>
+              {commodities.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <button className="minimal-button-secondary px-4 py-2" onClick={() => setIsFilterOpen(false)}>Close</button>
+            <button className="minimal-button-primary px-4 py-2" onClick={() => setIsFilterOpen(false)}>Apply</button>
           </div>
         </div>
-      )}
+      </FilterSheet>
+
+      {/* Bottom action bar (mobile) */}
+      <div className="md:hidden bottom-action-bar">
+        <div className="px-3 py-2 bottom-action-grid">
+          <button
+            className="bottom-action-btn bg-secondary text-secondary-foreground"
+            onClick={fetchExpenses}
+            disabled={isFetching}
+            aria-label="Refresh"
+          >
+            Refresh
+          </button>
+          <button
+            className="bottom-action-btn bg-accent text-accent-foreground"
+            onClick={() => setShowForm(true)}
+            aria-label="Add Expense"
+          >
+            Add
+          </button>
+          <button
+            className="bottom-action-btn border border-input"
+            onClick={() => setIsFilterOpen(true)}
+            aria-label="Filters"
+          >
+            Filters
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

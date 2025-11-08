@@ -107,7 +107,8 @@ export default function DeadlinesManagement() {
       const response = await fetch(`/api/deadlines?userId=${user.id}`);
       if (response.ok) {
         const data = await response.json();
-        setDeadlines(data);
+        // API returns { data: deadlines[], pagination: {...} }
+        setDeadlines(Array.isArray(data.data) ? data.data : (Array.isArray(data) ? data : []));
       } else {
         throw new Error('Failed to fetch deadlines');
       }
@@ -285,7 +286,7 @@ export default function DeadlinesManagement() {
         <div className="flex flex-wrap gap-2">
           <button
             onClick={fetchDeadlines}
-            className="minimal-button-secondary flex items-center space-x-2"
+            className="minimal-button-secondary flex items-center space-x-2 btn-touch"
             disabled={isFetching}
           >
             <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
@@ -293,7 +294,7 @@ export default function DeadlinesManagement() {
           </button>
           <button
             onClick={() => setShowForm(true)}
-            className="minimal-button-primary flex items-center space-x-2"
+            className="minimal-button-primary flex items-center space-x-2 btn-touch"
           >
             <Plus className="w-4 h-4" />
             <span>Add Deadline</span>
@@ -636,7 +637,7 @@ export default function DeadlinesManagement() {
             <button
               type="submit"
               disabled={isLoading}
-              className="minimal-button-primary w-full flex justify-center items-center py-4 px-6 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+              className="minimal-button-primary w-full flex justify-center items-center py-4 px-6 font-semibold disabled:opacity-50 disabled:cursor-not-allowed btn-touch"
             >
               {isLoading ? (
                 <div className="flex items-center">

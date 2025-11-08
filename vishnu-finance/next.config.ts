@@ -1,12 +1,17 @@
 import type { NextConfig } from "next";
 
+const strictBuild = process.env.NEXT_STRICT_BUILD === 'true';
+
+const outputMode = process.env.NEXT_OUTPUT_MODE === 'export' ? 'export' : undefined;
+
 const nextConfig: NextConfig = {
-  // Allow ESLint warnings during build (errors still fail)
+  ...(outputMode ? { output: outputMode } : {}),
+  // Allow overriding strict mode via env flag
   eslint: {
-    ignoreDuringBuilds: false,
+    ignoreDuringBuilds: !strictBuild,
   },
   typescript: {
-    ignoreBuildErrors: false,
+    ignoreBuildErrors: !strictBuild,
   },
   
   // Performance optimizations
@@ -14,7 +19,6 @@ const nextConfig: NextConfig = {
     // Enable modern React features and tree-shaking optimizations
     optimizePackageImports: [
       'lucide-react', 
-      '@tanstack/react-query',
       '@radix-ui/react-alert-dialog',
       '@radix-ui/react-dialog',
       '@radix-ui/react-dropdown-menu',

@@ -37,3 +37,5 @@ export function isCacheValid(): boolean {
   return now - lastFetchTime < CACHE_DURATION && Object.keys(cachedRates).length > 0;
 }
 
+
+

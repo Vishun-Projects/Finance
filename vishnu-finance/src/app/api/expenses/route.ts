@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '../../../lib/db';
-import { getCanonicalName } from '../entity-mappings/route';
+import { getCanonicalName, getCanonicalNamesBatch } from '@/lib/entity-mapping-service';
 import { rateLimitMiddleware, getRouteType } from '../../../lib/rate-limit';
 
 // Configure route caching - user-specific dynamic data
@@ -40,8 +40,21 @@ export async function GET(request: NextRequest) {
     } : undefined;
 
     // PERFORMANCE: Get total count for pagination (only if needed)
+    // Fetch expenses from Transaction model (financialCategory=EXPENSE and debitAmount > 0)
+    // Also include legacy Expense records for backward compatibility
     const getTotalCount = page === 1 || searchParams.get('includeTotal') === 'true';
-          const [totalCount, expensesResult] = await Promise.all([
+    const [transactionCount, expenseCount, expensesResult] = await Promise.all([
+      // Count transactions with EXPENSE category
+      getTotalCount ? (prisma as any).transaction.count({
+        where: {
+          userId,
+          isDeleted: false,
+          financialCategory: 'EXPENSE',
+          debitAmount: { gt: 0 },
+          ...(dateFilter ? { transactionDate: dateFilter } : {})
+        }
+      }) : Promise.resolve(0),
+      // Count legacy expenses
       getTotalCount ? (prisma as any).expense.count({
         where: {
           userId,
@@ -51,88 +64,150 @@ export async function GET(request: NextRequest) {
       }) : Promise.resolve(0),
       // Fetch expenses from database with pagination
       (async () => {
+        let expenses: any[] = [];
+        
         try {
-          // Try Prisma query first (will work after regenerating Prisma Client)
-          let expenses = await (prisma as any).expense.findMany({
+          // Fetch from Transaction model (primary source)
+          try {
+          const transactions = await (prisma as any).transaction.findMany({
             where: {
               userId,
               isDeleted: false,
-              ...(dateFilter ? { date: dateFilter } : {})
+              financialCategory: 'EXPENSE',
+              debitAmount: { gt: 0 },
+              ...(dateFilter ? { transactionDate: dateFilter } : {})
             },
-            select: {
-              id: true,
-              amount: true,
-              description: true,
-              date: true,
-              categoryId: true,
-              isRecurring: true,
-              frequency: true,
-              notes: true,
-              receiptUrl: true,
-              userId: true,
-              createdAt: true,
-              updatedAt: true,
-              store: true,
-              upiId: true,
-              branch: true,
-              personName: true,
-              rawData: true
+            include: {
+              category: true,
             },
-            orderBy: { date: 'desc' },
+            orderBy: { transactionDate: 'desc' },
             skip,
             take: pageSize
           });
           
-          // Manually add bank fields from raw SQL since Prisma Client doesn't recognize them yet
-          if (expenses.length > 0) {
-            const ids = expenses.map((e: any) => e.id);
-            const bankFields = await (prisma as any).$queryRawUnsafe(`
-              SELECT id, bankCode, transactionId, accountNumber, transferType
-              FROM expenses
-              WHERE id IN (${ids.map(() => '?').join(',')})
-            `, ...ids);
-            const bankMap = new Map(bankFields.map((bf: any) => [bf.id, bf]));
-            expenses = expenses.map((exp: any) => {
-              const bankData = bankMap.get(exp.id) || {};
-              return {
-                ...exp,
-                ...bankData
-              };
+          // Transform Transaction to Expense format for backward compatibility
+          expenses = transactions.map((t: any) => ({
+            id: t.id,
+            amount: Number(t.debitAmount),
+            description: t.description || '',
+            date: t.transactionDate,
+            categoryId: t.categoryId,
+            isRecurring: false,
+            frequency: null,
+            notes: t.notes,
+            receiptUrl: t.receiptUrl,
+            userId: t.userId,
+            createdAt: t.createdAt,
+            updatedAt: t.updatedAt,
+            // Bank fields
+            store: t.store,
+            upiId: t.upiId,
+            branch: t.branch,
+            personName: t.personName,
+            rawData: t.rawData,
+            bankCode: t.bankCode,
+            transactionId: t.transactionId,
+            accountNumber: t.accountNumber,
+            transferType: t.transferType,
+            // Additional Transaction fields
+            creditAmount: Number(t.creditAmount),
+            debitAmount: Number(t.debitAmount),
+            financialCategory: t.financialCategory,
+          }));
+        } catch (error) {
+          console.warn('⚠️ Failed to fetch from Transaction model, falling back to Expense');
+        }
+        
+        // Also fetch legacy Expense records if Transaction model doesn't have enough
+        if (expenses.length < pageSize) {
+          try {
+            let legacyExpenses = await (prisma as any).expense.findMany({
+              where: {
+                userId,
+                isDeleted: false,
+                ...(dateFilter ? { date: dateFilter } : {})
+              },
+              select: {
+                id: true,
+                amount: true,
+                description: true,
+                date: true,
+                categoryId: true,
+                isRecurring: true,
+                frequency: true,
+                notes: true,
+                receiptUrl: true,
+                userId: true,
+                createdAt: true,
+                updatedAt: true,
+                store: true,
+                upiId: true,
+                branch: true,
+                personName: true,
+                rawData: true
+              },
+              orderBy: { date: 'desc' },
+              skip: 0,
+              take: pageSize - expenses.length
             });
+            
+            // Add bank fields from raw SQL
+            if (legacyExpenses.length > 0) {
+              const ids = legacyExpenses.map((e: any) => e.id);
+              const bankFields = await (prisma as any).$queryRawUnsafe(`
+                SELECT id, bankCode, transactionId, accountNumber, transferType
+                FROM expenses
+                WHERE id IN (${ids.map(() => '?').join(',')})
+              `, ...ids);
+              const bankMap = new Map(bankFields.map((bf: any) => [bf.id, bf]));
+              legacyExpenses.forEach((exp: any) => {
+                const bankData = bankMap.get(exp.id) || {};
+                Object.assign(exp, bankData);
+              });
+            }
+            
+            // Merge with transaction expenses (avoid duplicates by ID)
+            const existingIds = new Set(expenses.map((e: any) => e.id));
+            const newLegacy = legacyExpenses.filter((exp: any) => !existingIds.has(exp.id));
+            expenses = [...expenses, ...newLegacy].slice(0, pageSize);
+          } catch (error) {
+            console.warn('⚠️ Failed to fetch legacy Expense records');
           }
+          }
+          
           return expenses;
         } catch (error: any) {
-          // Use raw SQL fallback if Prisma validation fails (new fields not recognized)
-          console.log('⚠️ EXPENSES GET - Using raw SQL fallback');
-          const params: any[] = [userId];
-          let query = `
-            SELECT id, amount, description, date, categoryId, isRecurring, frequency,
-                   notes, receiptUrl, userId, createdAt, updatedAt`;
-          
-          // Include all optional columns including bank fields
-          query += `, COALESCE(store, '') as store,
-                     COALESCE(upiId, '') as upiId,
-                     COALESCE(branch, '') as branch,
-                     COALESCE(personName, '') as personName,
-                     COALESCE(rawData, '') as rawData,
-                     COALESCE(bankCode, '') as bankCode,
-                     COALESCE(transactionId, '') as transactionId,
-                     COALESCE(accountNumber, '') as accountNumber,
-                     COALESCE(transferType, '') as transferType`;
-          
-          query += ` FROM expenses WHERE userId = ? AND (isDeleted = 0 OR isDeleted IS NULL)`;
-          
-          if (dateFilter) {
-            query += ` AND date >= ? AND date <= ?`;
-            params.push(dateFilter.gte);
-            params.push(dateFilter.lte);
-          }
-          
-          query += ` ORDER BY date DESC LIMIT ? OFFSET ?`;
-          params.push(pageSize, skip);
-          
-          return await (prisma as any).$queryRawUnsafe(query, ...params);
+        // Use raw SQL fallback if Prisma validation fails (new fields not recognized)
+        console.log('⚠️ EXPENSES GET - Using raw SQL fallback');
+        const params: any[] = [userId];
+        let query = `
+          SELECT id, amount, description, date, categoryId, isRecurring, frequency,
+                 notes, receiptUrl, userId, createdAt, updatedAt`;
+        
+        // Include all optional columns including bank fields
+        query += `, COALESCE(store, '') as store,
+                   COALESCE(upiId, '') as upiId,
+                   COALESCE(branch, '') as branch,
+                   COALESCE(personName, '') as personName,
+                   COALESCE(rawData, '') as rawData,
+                   COALESCE(bankCode, '') as bankCode,
+                   COALESCE(transactionId, '') as transactionId,
+                   COALESCE(accountNumber, '') as accountNumber,
+                   COALESCE(transferType, '') as transferType`;
+        
+        query += ` FROM expenses WHERE userId = ? AND (isDeleted = 0 OR isDeleted IS NULL)`;
+        
+        if (dateFilter) {
+          query += ` AND date >= ? AND date <= ?`;
+          params.push(dateFilter.gte);
+          params.push(dateFilter.lte);
         }
+        
+        query += ` ORDER BY date DESC LIMIT ? OFFSET ?`;
+        params.push(pageSize, skip);
+        
+        return await (prisma as any).$queryRawUnsafe(query, ...params);
+      }
       })()
     ]);
 
@@ -158,7 +233,6 @@ export async function GET(request: NextRequest) {
       // Batch fetch all entity mappings in 2 queries (instead of N queries)
       // Gracefully handle if entity_mappings table doesn't exist
       try {
-        const { getCanonicalNamesBatch } = await import('../entity-mappings/route');
         const [personMappingsResult, storeMappingsResult] = await Promise.all([
           personNames.size > 0 ? getCanonicalNamesBatch(userId, Array.from(personNames), ['PERSON']) : Promise.resolve({}),
           storeNames.size > 0 ? getCanonicalNamesBatch(userId, Array.from(storeNames), ['STORE']) : Promise.resolve({})
@@ -187,6 +261,7 @@ export async function GET(request: NextRequest) {
     console.log('📊 EXPENSES GET - Expenses data:', expenses.length, 'records');
     
     // Return paginated response with metadata
+    const totalCount = transactionCount + expenseCount;
     const response: any = {
       data: expenses,
       pagination: {
@@ -242,23 +317,45 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    console.log('➕ EXPENSES POST - Creating expense in database...');
-    // Create new expense in database using correct field mappings
-    const newExpense = await (prisma as any).expense.create({
+    console.log('➕ EXPENSES POST - Creating expense as Transaction in database...');
+    // Create new expense as Transaction record with EXPENSE category
+    const newExpense = await (prisma as any).transaction.create({
       data: {
-        amount: parseFloat(amount),
-        description: title, // Map title to description field
-        date: new Date(date),
-        notes: description || notes,
-        // store: store || null, // Temporarily disabled - store info will go in notes
-        isRecurring: false,
         userId: userId,
-        categoryId: null // We'll handle categories later
+        transactionDate: new Date(date),
+        description: title,
+        creditAmount: 0,
+        debitAmount: parseFloat(amount),
+        financialCategory: 'EXPENSE',
+        categoryId: null,
+        notes: description || notes,
+        receiptUrl: null,
+        store: store || null,
       }
     });
+    
+    // Transform to Expense format for backward compatibility
+    const transformedExpense = {
+      id: newExpense.id,
+      amount: Number(newExpense.debitAmount),
+      description: newExpense.description,
+      date: newExpense.transactionDate,
+      categoryId: newExpense.categoryId,
+      isRecurring: false,
+      frequency: null,
+      notes: newExpense.notes,
+      receiptUrl: newExpense.receiptUrl,
+      userId: newExpense.userId,
+      createdAt: newExpense.createdAt,
+      updatedAt: newExpense.updatedAt,
+      store: newExpense.store,
+      creditAmount: 0,
+      debitAmount: Number(newExpense.debitAmount),
+      financialCategory: newExpense.financialCategory,
+    };
 
-    console.log('✅ EXPENSES POST - Successfully created expense:', JSON.stringify(newExpense, null, 2));
-    return NextResponse.json(newExpense);
+    console.log('✅ EXPENSES POST - Successfully created expense:', JSON.stringify(transformedExpense, null, 2));
+    return NextResponse.json(transformedExpense);
   } catch (error) {
     console.error('❌ EXPENSES POST - Error:', error);
     console.error('❌ EXPENSES POST - Error details:', JSON.stringify(error, null, 2));

@@ -35,12 +35,14 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     } else if (theme === 'dark') {
       document.documentElement.classList.add('dark');
       document.documentElement.classList.remove('high-contrast');
+      // Ensure body also gets dark background via CSS, don't clear inline styles
       document.body.style.backgroundColor = '';
       document.body.style.color = '';
       setIsDark(true);
       console.log('Applied dark theme');
     } else {
       document.documentElement.classList.remove('dark', 'high-contrast');
+      // Ensure body gets light background
       document.body.style.backgroundColor = '';
       document.body.style.color = '';
       setIsDark(false);
@@ -50,7 +52,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     console.log('Document classes after:', document.documentElement.className);
   }, [theme]);
 
-  // Load theme from API on mount
+  // Load theme from API on mount or reset to light when user logs out
   useEffect(() => {
     const loadTheme = async () => {
       if (user?.id) {
@@ -65,6 +67,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         } catch (error) {
           console.error('Error loading theme:', error);
         }
+      } else {
+        // Reset to light theme when user is null (logged out)
+        setTheme('light');
       }
       setIsLoading(false);
     };

@@ -128,6 +128,12 @@ cp .env.example .env.local
 # Run database migrations
 npx prisma migrate dev
 
+# Seed baseline data (users, categories, etc.)
+npm run setup
+
+# Seed superuser portal resources
+npm run seed:admin
+
 # Start development server
 npm run dev
 ```
@@ -163,6 +169,17 @@ ALPHA_VANTAGE_API_KEY="your-alpha-vantage-key"
 - **RecurringItem**: Recurring transactions
 - **AIInsight**: AI-generated recommendations
 - **MarketData**: Market trends and data
+
+## 🧰 Superuser & Admin Portal
+
+The project ships with a dedicated admin console for managing organisation-wide documents and bank field mappings.
+
+- **Seed command:** `npm run seed:admin`
+- **Guide:** see [`docs/admin-setup.md`](docs/admin-setup.md) for migration/seed/test instructions.
+- **Login:** use the superuser credentials seeded via `npm run setup` (defaults: `vishun@finance.com` / `Vishun@8291`).
+- **Tests:** run `npm run test` to execute the shared document utility checks.
+
+Once authenticated, visit `/admin` to access the dashboard, document library, and bank mapping manager.
 
 ## 🚀 API Endpoints
 

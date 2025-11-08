@@ -5,17 +5,31 @@ import React, { createContext, useContext, useState, useEffect, ReactNode, useMe
 interface User {
   id: string;
   email: string;
-  name: string;
+  name?: string;
+  avatarUrl?: string;
+  gender?: 'MALE' | 'FEMALE' | 'OTHER' | 'PREFER_NOT_TO_SAY';
+  phone?: string;
+  dateOfBirth?: string;
+  addressLine1?: string;
+  addressLine2?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  pincode?: string;
+  occupation?: string;
+  bio?: string;
   isActive: boolean;
-  lastLogin: string;
+  lastLogin?: string;
   createdAt: string;
+  updatedAt?: string;
+  role?: 'USER' | 'SUPERUSER';
 }
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
   error: string | null;
-  login: (email: string, password: string) => Promise<boolean>;
+  login: (email: string, password: string) => Promise<User | null>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -64,7 +78,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     checkAuth();
   }, [checkAuth]);
 
-  const login = useCallback(async (email: string, password: string): Promise<boolean> => {
+  const login = useCallback(async (email: string, password: string): Promise<User | null> => {
     const startTime = Date.now();
     try {
       console.log('🔐 AUTH CONTEXT - Starting login...');
@@ -85,17 +99,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(data.user);
         console.log('🔐 AUTH CONTEXT - User state set to:', data.user);
         console.log(`⏱️ AUTH CONTEXT - login complete in ${Date.now() - startTime}ms`);
-        return true;
+        return data.user;
       } else {
         const errorData = await response.json();
         console.log('🔐 AUTH CONTEXT - Login failed:', errorData);
         setError(errorData.error || 'Login failed');
-        return false;
+        return null;
       }
     } catch (err) {
       console.error('🔐 AUTH CONTEXT - Login error:', err);
       setError(err instanceof Error ? err.message : 'Login failed');
-      return false;
+      return null;
     } finally {
       setLoading(false);
       console.log('🔐 AUTH CONTEXT - Login completed, loading set to false');
@@ -106,6 +120,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await fetch('/api/auth/logout', { method: 'POST' });
       setUser(null);
+      // Reset theme to light on logout
+      document.documentElement.classList.remove('dark', 'high-contrast');
+      // Clear any theme-related localStorage if needed
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('theme');
+      }
     } catch (err) {
       console.error('Logout failed:', err);
     }

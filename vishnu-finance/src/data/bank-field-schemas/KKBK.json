@@ -1,0 +1,52 @@
+{
+  "bankCode": "KKBK",
+  "parserClasses": [
+    "KotakBankParser",
+    "KotakBankParserV2",
+    "MultiBankParser"
+  ],
+  "parserFiles": [
+    "tools/parsers/kotak_bank_parser.py",
+    "tools/parsers/kotak_bank_parser_v2.py",
+    "tools/parsers/multi_bank_parser.py"
+  ],
+  "aliases": [
+    "KOTAK"
+  ],
+  "transactionFields": [
+    "amount",
+    "balance",
+    "bankCode",
+    "commodity",
+    "credit",
+    "date",
+    "date_iso",
+    "debit",
+    "description",
+    "line",
+    "page",
+    "raw",
+    "reference",
+    "store"
+  ],
+  "metadataFields": [
+    "accountNumber",
+    "personName",
+    "transactionId",
+    "transferType",
+    "upiId"
+  ],
+  "statementMetadataFields": [
+    "accountHolderName",
+    "accountNumber",
+    "branch",
+    "closingBalance",
+    "ifsc",
+    "openingBalance",
+    "statementEndDate",
+    "statementStartDate",
+    "totalCredits",
+    "totalDebits",
+    "transactionCount"
+  ]
+}

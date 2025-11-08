@@ -44,23 +44,48 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(cached);
     }
 
-    // OPTIMIZATION 1: Use database aggregations instead of fetching all records
+    // OPTIMIZATION 1: Use Transaction model aggregations with credit/debit breakdown
     // Get totals directly from database
-    const [expenseStats, incomeStats, activeGoalsCount, upcomingDeadlinesCount, recentExpenses] = await Promise.all([
-      // Expense aggregation - get total and count only
-      prisma.expense.aggregate({
+    const [transactionStats, legacyExpenseStats, legacyIncomeStats, activeGoalsCount, upcomingDeadlinesCount, recentTransactions] = await Promise.all([
+      // Transaction aggregation - get credit and debit totals separately
+      // Check if Transaction model exists (it may not be migrated yet)
+      (async () => {
+        try {
+          // Check if transaction table exists by trying to query it
+          await (prisma as any).$queryRaw`SELECT 1 FROM transactions LIMIT 1`;
+          // If table exists, aggregate transactions
+          return await (prisma as any).transaction.aggregate({
         where: {
           userId,
           isDeleted: false,
+          transactionDate: { gte: rangeStart, lte: rangeEnd }
+        },
+        _sum: { 
+          creditAmount: true,
+          debitAmount: true
+        },
+        _count: true
+          });
+        } catch {
+          // Transaction table doesn't exist yet or model not available
+          console.log('⚠️ Transaction model not available, using empty stats');
+          return { _sum: { creditAmount: 0, debitAmount: 0 }, _count: 0 };
+        }
+      })(),
+      
+      // Legacy expense aggregation (for backward compatibility)
+      (prisma as any).expense.aggregate({
+        where: {
+          userId,
           date: { gte: rangeStart, lte: rangeEnd }
         },
         _sum: { amount: true },
         _count: true
-      }),
+      }).catch(() => ({ _sum: { amount: 0 }, _count: 0 })),
       
-      // Get only active income sources (we need these for calculations)
-      prisma.incomeSource.findMany({
-        where: { userId, isActive: true, isDeleted: false },
+      // Legacy income sources (for backward compatibility and recurring calculations)
+      (prisma as any).incomeSource.findMany({
+        where: { userId, isActive: true },
         select: {
           id: true,
           name: true,
@@ -70,7 +95,7 @@ export async function GET(request: NextRequest) {
           category: { select: { name: true } }
         },
         orderBy: { startDate: 'desc' }
-      }),
+      }).catch(() => []),
       
       // Goals count only
       prisma.goal.count({
@@ -86,34 +111,48 @@ export async function GET(request: NextRequest) {
         }
       }),
       
-      // Recent expenses - only last 10, only needed fields
-      prisma.expense.findMany({
+      // Recent transactions - only last 10, only needed fields
+      (async () => {
+        try {
+          await (prisma as any).$queryRaw`SELECT 1 FROM transactions LIMIT 1`;
+          return await (prisma as any).transaction.findMany({
         where: {
           userId,
           isDeleted: false,
-          date: { gte: rangeStart, lte: rangeEnd }
+          transactionDate: { gte: rangeStart, lte: rangeEnd }
         },
         select: {
           id: true,
           description: true,
-          amount: true,
-          date: true,
+          creditAmount: true,
+          debitAmount: true,
+          financialCategory: true,
+          transactionDate: true,
+          store: true,
           category: { select: { name: true } }
         },
-        orderBy: { date: 'desc' },
+        orderBy: { transactionDate: 'desc' },
         take: 10
-      })
+          });
+        } catch {
+          return [];
+        }
+      })()
     ]);
 
-    // OPTIMIZATION 2: Calculate totals using optimized logic
-    const totalExpenses = Number(expenseStats._sum.amount || 0);
+    // OPTIMIZATION 2: Calculate totals using Transaction model (credits/debits)
+    const totalCredits = Number(transactionStats._sum?.creditAmount || 0);
+    const totalDebits = Number(transactionStats._sum?.debitAmount || 0);
     
-    // Calculate income more efficiently
+    // Add legacy expenses/income for backward compatibility
+    const legacyExpenses = Number(legacyExpenseStats._sum?.amount || 0);
+    
+    // Calculate legacy income more efficiently
     const rangeStartTime = rangeStart.getTime();
     const rangeEndTime = rangeEnd.getTime();
     const daysInRange = Math.ceil((rangeEndTime - rangeStartTime) / (1000 * 60 * 60 * 24)) + 1;
     
-    const totalIncome = incomeStats.reduce((sum, source) => {
+    const legacyIncome = legacyIncomeStats.reduce((sum: number, source: any) => {
       const sourceDate = new Date(source.startDate);
       const sourceTime = sourceDate.getTime();
       
@@ -144,15 +183,77 @@ export async function GET(request: NextRequest) {
       }
     }, 0);
 
+    // Combine Transaction model totals with legacy totals
+    const totalIncome = totalCredits + legacyIncome;
+    const totalExpenses = totalDebits + legacyExpenses;
     const netSavings = totalIncome - totalExpenses;
     const savingsRate = totalIncome > 0 ? (netSavings / totalIncome) * 100 : 0;
+    
+    // Credit/Debit breakdown by financial category
+    const categoryStats = await (async () => {
+      try {
+        await (prisma as any).$queryRaw`SELECT 1 FROM transactions LIMIT 1`;
+        return await (prisma as any).transaction.groupBy({
+      by: ['financialCategory'],
+      where: {
+        userId,
+        isDeleted: false,
+        transactionDate: { gte: rangeStart, lte: rangeEnd }
+      },
+      _sum: {
+        creditAmount: true,
+        debitAmount: true
+      }
+        });
+      } catch {
+        return [];
+      }
+    })();
+    
+    const financialCategoryStatsMap = new Map();
+    categoryStats.forEach((stat: any) => {
+      financialCategoryStatsMap.set(stat.financialCategory, {
+        credits: Number(stat._sum.creditAmount || 0),
+        debits: Number(stat._sum.debitAmount || 0),
+      });
+    });
 
     // OPTIMIZATION 3: Efficient monthly trends - group by month/week using date math
     const daysDiff = daysInRange - 1;
-    const monthlyTrends: Array<{ month: string; income: number; expenses: number; savings: number }> = [];
+    const monthlyTrends: Array<{ month: string; income: number; expenses: number; savings: number; credits: number; debits: number }> = [];
     
-    // Get expense totals grouped by date (single query)
-    const expenseTotals = await prisma.expense.groupBy({
+    // Get transaction totals grouped by date (single query)
+    const transactionTotals = await (async () => {
+      try {
+        await (prisma as any).$queryRaw`SELECT 1 FROM transactions LIMIT 1`;
+        return await (prisma as any).transaction.groupBy({
+      by: ['transactionDate'],
+      where: {
+        userId,
+        isDeleted: false,
+        transactionDate: { gte: rangeStart, lte: rangeEnd }
+      },
+      _sum: {
+        creditAmount: true,
+        debitAmount: true
+      }
+        });
+      } catch {
+        return [];
+      }
+    })();
+
+    // Create credit/debit maps by date
+    const creditsByDate = new Map<string, number>();
+    const debitsByDate = new Map<string, number>();
+    transactionTotals.forEach((t: any) => {
+      const dateKey = t.transactionDate.toISOString().split('T')[0];
+      creditsByDate.set(dateKey, (creditsByDate.get(dateKey) || 0) + Number(t._sum.creditAmount || 0));
+      debitsByDate.set(dateKey, (debitsByDate.get(dateKey) || 0) + Number(t._sum.debitAmount || 0));
+    });
+    
+    // Legacy expense map (for backward compatibility)
+    const expenseTotals = await (prisma as any).expense.groupBy({
       by: ['date'],
       where: {
         userId,
@@ -160,18 +261,17 @@ export async function GET(request: NextRequest) {
         date: { gte: rangeStart, lte: rangeEnd }
       },
       _sum: { amount: true }
-    });
+    }).catch(() => []);
 
-    // Create expense map
     const expenseByDate = new Map<string, number>();
-    expenseTotals.forEach(exp => {
+    expenseTotals.forEach((exp: any) => {
       const dateKey = exp.date.toISOString().split('T')[0];
-      expenseByDate.set(dateKey, Number(exp._sum.amount || 0));
+      expenseByDate.set(dateKey, Number(exp._sum?.amount || 0));
     });
 
-    // Pre-process income sources
+    // Pre-process legacy income sources
     const oneTimeIncomes = new Map<string, number>();
-    const recurringIncomes = incomeStats.filter(source => {
+    const recurringIncomes = legacyIncomeStats.filter((source: any) => {
       const sourceDate = new Date(source.startDate);
       if (sourceDate > rangeEnd) return false;
       
@@ -195,18 +295,23 @@ export async function GET(request: NextRequest) {
         const periodStartTime = currentDate.getTime();
         const periodEndTime = periodEnd.getTime();
         
-        // Aggregate expenses for this week
-        let weekExpenses = 0;
+        // Aggregate credits/debits for this week from Transaction model
+        let weekCredits = 0;
+        let weekDebits = 0;
         const checkDate = new Date(currentDate);
         while (checkDate <= periodEnd) {
-          weekExpenses += expenseByDate.get(checkDate.toISOString().split('T')[0]) || 0;
+          const dateKey = checkDate.toISOString().split('T')[0];
+          weekCredits += creditsByDate.get(dateKey) || 0;
+          weekDebits += debitsByDate.get(dateKey) || 0;
+          // Also add legacy expenses
+          weekDebits += expenseByDate.get(dateKey) || 0;
           checkDate.setDate(checkDate.getDate() + 1);
         }
         
-        // Calculate income for this week
+        // Calculate legacy income for this week
         let weekIncome = 0;
         
-        recurringIncomes.forEach(source => {
+        recurringIncomes.forEach((source: any) => {
           const sourceTime = new Date(source.startDate).getTime();
           if (sourceTime > periodEndTime) return;
           
@@ -239,9 +344,11 @@ export async function GET(request: NextRequest) {
         
         monthlyTrends.push({
           month: currentDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-          income: weekIncome,
-          expenses: weekExpenses,
-          savings: weekIncome - weekExpenses
+          income: weekCredits + weekIncome,
+          expenses: weekDebits,
+          savings: (weekCredits + weekIncome) - weekDebits,
+          credits: weekCredits,
+          debits: weekDebits
         });
         
         currentDate = new Date(periodEnd);
@@ -258,17 +365,22 @@ export async function GET(request: NextRequest) {
         const monthEnd = plannedMonthEnd > rangeEnd ? new Date(rangeEnd) : plannedMonthEnd;
         const monthEndTime = monthEnd.getTime();
         
-        // Aggregate expenses for this month
-        let monthExpenses = 0;
+        // Aggregate credits/debits for this month from Transaction model
+        let monthCredits = 0;
+        let monthDebits = 0;
         const checkDate = new Date(monthStart);
         while (checkDate <= monthEnd) {
-          monthExpenses += expenseByDate.get(checkDate.toISOString().split('T')[0]) || 0;
+          const dateKey = checkDate.toISOString().split('T')[0];
+          monthCredits += creditsByDate.get(dateKey) || 0;
+          monthDebits += debitsByDate.get(dateKey) || 0;
+          // Also add legacy expenses
+          monthDebits += expenseByDate.get(dateKey) || 0;
           checkDate.setDate(checkDate.getDate() + 1);
         }
         
-        // Calculate income for this month
+        // Calculate legacy income for this month
         let monthIncome = 0;
-        recurringIncomes.forEach(source => {
+        recurringIncomes.forEach((source: any) => {
           const sourceTime = new Date(source.startDate).getTime();
           if (sourceTime > monthEndTime) return;
           
@@ -298,17 +410,40 @@ export async function GET(request: NextRequest) {
         
         monthlyTrends.push({
           month: monthStart.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
-          income: monthIncome,
-          expenses: monthExpenses,
-          savings: monthIncome - monthExpenses
+          income: monthCredits + monthIncome,
+          expenses: monthDebits,
+          savings: (monthCredits + monthIncome) - monthDebits,
+          credits: monthCredits,
+          debits: monthDebits
         });
         
         currentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1);
       }
     }
 
-    // OPTIMIZATION 4: Category breakdown - use groupBy
-    const categoryBreakdownData = await prisma.expense.groupBy({
+    // OPTIMIZATION 4: Category breakdown - use groupBy on Transaction model
+    const categoryBreakdownData = await (async () => {
+      try {
+        await (prisma as any).$queryRaw`SELECT 1 FROM transactions LIMIT 1`;
+        return await (prisma as any).transaction.groupBy({
+      by: ['categoryId'],
+      where: {
+        userId,
+        isDeleted: false,
+        transactionDate: { gte: rangeStart, lte: rangeEnd }
+      },
+      _sum: { 
+        debitAmount: true,
+        creditAmount: true
+      }
+        });
+      } catch {
+        return [];
+      }
+    })();
+    
+    // Also get legacy expense category breakdown
+    const legacyCategoryBreakdown = await (prisma as any).expense.groupBy({
       by: ['categoryId'],
       where: {
         userId,
@@ -316,50 +451,70 @@ export async function GET(request: NextRequest) {
         date: { gte: rangeStart, lte: rangeEnd }
       },
       _sum: { amount: true }
-    });
+    }).catch(() => []);
 
     // Get category names
-    const categoryIds = categoryBreakdownData.map(c => c.categoryId).filter(Boolean) as string[];
-    const categories = categoryIds.length > 0 ? await prisma.category.findMany({
-      where: { id: { in: categoryIds } },
+    const allCategoryIds = [
+      ...categoryBreakdownData.map((c: any) => c.categoryId),
+      ...legacyCategoryBreakdown.map((c: any) => c.categoryId)
+    ].filter(Boolean) as string[];
+    const uniqueCategoryIds = [...new Set(allCategoryIds)];
+    const categories = uniqueCategoryIds.length > 0 ? await prisma.category.findMany({
+      where: { id: { in: uniqueCategoryIds } },
       select: { id: true, name: true }
     }) : [];
 
-    const categoryMap = new Map(categories.map(c => [c.id, c.name]));
-    const categoryBreakdown = categoryBreakdownData
-      .map(item => ({
-        name: item.categoryId ? (categoryMap.get(item.categoryId) || 'Other') : 'Other',
-        amount: Number(item._sum.amount || 0)
-      }))
+    const categoryMap = new Map(categories.map((c) => [c.id, c.name]));
+    const categoryBreakdownMap = new Map<string, number>();
+    
+    // Combine Transaction and legacy expense amounts by category
+    categoryBreakdownData.forEach((item: any) => {
+      const categoryName = item.categoryId ? (categoryMap.get(item.categoryId) || 'Other') : 'Other';
+      const total = Number(item._sum?.debitAmount || 0) + Number(item._sum?.creditAmount || 0);
+      categoryBreakdownMap.set(categoryName, (categoryBreakdownMap.get(categoryName) || 0) + total);
+    });
+    
+    legacyCategoryBreakdown.forEach((item: any) => {
+      const categoryName = item.categoryId ? (categoryMap.get(item.categoryId) || 'Other') : 'Other';
+      categoryBreakdownMap.set(categoryName, (categoryBreakdownMap.get(categoryName) || 0) + Number(item._sum?.amount || 0));
+    });
+    
+    const categoryBreakdown = Array.from(categoryBreakdownMap.entries())
+      .map(([name, amount]) => ({ name, amount }))
       .sort((a, b) => b.amount - a.amount);
 
-    // Recent transactions
-    const recentTransactions = recentExpenses.map(expense => ({
-      id: expense.id,
-      title: expense.description || 'Expense',
-      amount: -Number(expense.amount),
-      type: 'expense' as const,
-      date: expense.date.toISOString().split('T')[0],
-      category: expense.category?.name || 'Other'
-    }));
+    // Recent transactions from Transaction model (may be empty if table doesn't exist)
+    const recentTrans = (recentTransactions || []).map((t: any) => {
+      const isCredit = Number(t.creditAmount || 0) > 0;
+      return {
+        id: t.id,
+        title: t.description || (isCredit ? 'Credit' : 'Debit'),
+        amount: isCredit ? Number(t.creditAmount) : -Number(t.debitAmount),
+        type: isCredit ? 'credit' : 'debit',
+        date: t.transactionDate.toISOString().split('T')[0],
+        category: t.category?.name || t.financialCategory || 'Other',
+        financialCategory: t.financialCategory,
+        store: t.store || null
+      };
+    });
 
-    // Add income transactions (only ONE_TIME in range)
-    const incomeTransactions = incomeStats
-      .filter(income => {
+    // Add legacy income transactions (only ONE_TIME in range)
+    const incomeTransactions = legacyIncomeStats
+      .filter((income: any) => {
         if (income.frequency !== 'ONE_TIME') return false;
         const incDate = new Date(income.startDate);
         return incDate >= rangeStart && incDate <= rangeEnd;
       })
-      .map(income => ({
-      id: income.id,
-      title: income.name,
-      amount: Number(income.amount),
-        type: 'income' as const,
-      date: income.startDate.toISOString().split('T')[0],
-      category: income.category?.name || 'Income'
-    }));
+      .map((income: any) => ({
+        id: income.id,
+        title: income.name,
+        amount: Number(income.amount),
+        type: 'income' as 'income' | 'credit' | 'debit',
+        date: income.startDate.toISOString().split('T')[0],
+        category: 'Income'
+      }));
 
-    const allTransactions = [...incomeTransactions, ...recentTransactions]
+    const allTransactions = [...incomeTransactions, ...recentTrans]
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
       .slice(0, 10);
 
@@ -372,14 +527,19 @@ export async function GET(request: NextRequest) {
     if (activeGoalsCount >= 3) financialHealthScore += 20;
     else if (activeGoalsCount >= 1) financialHealthScore += 10;
 
-    if (expenseStats._count >= 30) financialHealthScore += 20;
-    else if (expenseStats._count >= 10) financialHealthScore += 10;
+    const totalTransactionCount = transactionStats._count || 0;
+    const legacyExpenseCount = legacyExpenseStats._count || 0;
+    if (totalTransactionCount + legacyExpenseCount >= 30) financialHealthScore += 20;
+    else if (totalTransactionCount + legacyExpenseCount >= 10) financialHealthScore += 10;
 
     if (totalIncome > 0) financialHealthScore += 15;
 
     const result = {
       totalIncome,
       totalExpenses,
+      // Banking terminology breakdown
+      totalCredits,
+      totalDebits,
       netSavings,
       savingsRate: Math.round(savingsRate * 100) / 100,
       upcomingDeadlines: upcomingDeadlinesCount,
@@ -388,6 +548,8 @@ export async function GET(request: NextRequest) {
       monthlyTrends,
       categoryBreakdown,
       financialHealthScore: Math.min(financialHealthScore, 100),
+      // Financial category breakdown
+      categoryStats: Object.fromEntries(financialCategoryStatsMap),
     };
 
     // Cache for 30 seconds

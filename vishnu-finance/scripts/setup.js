@@ -73,6 +73,7 @@ async function main() {
           email: 'demo@vishnufinance.com',
           name: 'Demo User',
           password: hashedPassword,
+          role: 'USER',
         },
       })
       console.log(`✅ Created demo user: ${user.email}`)
@@ -82,6 +83,38 @@ async function main() {
     }
   } catch (error) {
     console.log(`⚠️  Demo user error: ${error.message}`)
+  }
+
+  console.log('🛡️  Ensuring superuser account exists...')
+  try {
+    const superEmail = 'vishun@finance.com'
+    const existingSuper = await prisma.user.findUnique({
+      where: { email: superEmail },
+    })
+
+    if (!existingSuper) {
+      const hashedPassword = await bcrypt.hash('Vishun@8291', 12)
+      const superUser = await prisma.user.create({
+        data: {
+          email: superEmail,
+          name: 'Portal Superuser',
+          password: hashedPassword,
+          role: 'SUPERUSER',
+        },
+      })
+      console.log(`✅ Created superuser account: ${superUser.email}`)
+      console.log('🔑 Superuser password: Vishun@8291')
+    } else if (existingSuper.role !== 'SUPERUSER') {
+      await prisma.user.update({
+        where: { email: superEmail },
+        data: { role: 'SUPERUSER' },
+      })
+      console.log(`🔄 Updated existing account to SUPERUSER: ${superEmail}`)
+    } else {
+      console.log(`ℹ️  Superuser already present: ${superEmail}`)
+    }
+  } catch (error) {
+    console.log(`⚠️  Superuser setup error: ${error.message}`)
   }
 
   console.log('🎉 Setup completed successfully!')

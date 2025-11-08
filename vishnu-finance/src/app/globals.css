@@ -70,6 +70,22 @@
 }
 
 /* Dark Theme - Force proper application */
+html.dark {
+  background-color: hsl(var(--background)) !important;
+  color: hsl(var(--foreground)) !important;
+}
+
+html.dark body {
+  background-color: hsl(var(--background)) !important;
+  color: hsl(var(--foreground)) !important;
+}
+
+/* Ensure body also gets dark background when html has dark class */
+html.dark > body {
+  background-color: hsl(var(--background)) !important;
+  color: hsl(var(--foreground)) !important;
+}
+
 .dark {
   background-color: hsl(var(--background)) !important;
   color: hsl(var(--foreground)) !important;
@@ -78,6 +94,26 @@
 .dark body {
   background-color: hsl(var(--background)) !important;
   color: hsl(var(--foreground)) !important;
+}
+
+/* Force html and body background in dark mode - multiple selectors for maximum compatibility */
+html.dark,
+html.dark body,
+html.dark > body,
+body.dark {
+  background-color: hsl(var(--background)) !important;
+  background: hsl(var(--background)) !important;
+}
+
+/* Ensure body inherits from html in dark mode */
+html.dark {
+  background-color: hsl(var(--background)) !important;
+}
+
+html.dark body,
+html.dark > body {
+  background-color: hsl(var(--background)) !important;
+  background: hsl(var(--background)) !important;
 }
 
 .dark .bg-background,
@@ -489,10 +525,45 @@ html.high-contrast .badge {
   border-color: hsl(var(--border));
 }
 
+html {
+  background-color: hsl(var(--background));
+  min-height: 100%;
+}
+
 body {
   background-color: hsl(var(--background));
   color: hsl(var(--foreground));
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+}
+
+/* Dark mode overrides for hardcoded Tailwind classes */
+.dark .bg-white,
+.dark [class*="bg-white"] {
+  background-color: hsl(var(--background)) !important;
+}
+
+.dark .bg-gray-50,
+.dark .bg-gray-100,
+.dark .bg-gray-200,
+.dark [class*="bg-gray-"] {
+  background-color: hsl(var(--muted)) !important;
+}
+
+.dark .text-gray-900,
+.dark .text-gray-800,
+.dark .text-gray-700,
+.dark .text-gray-600,
+.dark [class*="text-gray-"] {
+  color: hsl(var(--foreground)) !important;
+}
+
+.dark .border-gray-200,
+.dark .border-gray-300,
+.dark [class*="border-gray-"] {
+  border-color: hsl(var(--border)) !important;
 }
 
 /* Enhanced Component Styles */
@@ -918,6 +989,130 @@ body {
 }
 
 
+
+/* Container utilities */
+.container-fluid {
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+@media (min-width: 640px) {
+  .container-fluid {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .container-fluid {
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+}
+
+/* Mobile-first responsive utilities */
+/* Chart container responsive heights */
+.chart-container {
+  height: 250px;
+}
+
+@media (min-width: 640px) {
+  .chart-container {
+    height: 300px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .chart-container {
+    height: 400px;
+  }
+}
+
+/* Table responsive wrapper for horizontal scroll on small screens */
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Touch-friendly buttons */
+.btn-touch {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Safe area utilities (for notches and system gestures) */
+.safe-top {
+  padding-top: env(safe-area-inset-top);
+}
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Floating Action Button (FAB) */
+.fab {
+  position: fixed;
+  right: 1rem;
+  bottom: calc(1rem + env(safe-area-inset-bottom));
+  z-index: 40;
+}
+.fab-btn {
+  @apply rounded-full shadow-strong transition-smooth;
+  height: 56px;
+  width: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Mobile typography helpers */
+@media (max-width: 640px) {
+  .mobile-body {
+    font-size: 16px;
+    line-height: 1.6;
+  }
+}
+
+/* Sticky bottom action bar for mobile */
+.bottom-action-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+  backdrop-filter: saturate(180%) blur(8px);
+  background-color: hsl(var(--background) / 0.85);
+  border-top: 1px solid hsl(var(--border));
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.bottom-action-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+.bottom-action-btn {
+  @apply btn-touch rounded-lg font-medium transition-smooth;
+  height: 48px;
+}
+
+/* Page padding helper so content isn't hidden behind bar */
+.pb-bottom-bar {
+  padding-bottom: calc(80px + env(safe-area-inset-bottom));
+}
+
+/* Compact gaps on mobile */
+.gap-responsive {
+  gap: 0.75rem;
+}
+
+@media (min-width: 640px) {
+  .gap-responsive {
+    gap: 1rem;
+  }
+}
 
 @layer base {
   :root {

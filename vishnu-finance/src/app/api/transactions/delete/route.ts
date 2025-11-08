@@ -23,50 +23,24 @@ export async function DELETE(req: NextRequest) {
 
     let deletedCount = 0;
 
-    // Soft delete by IDs
-    if (transactionIds && Array.isArray(transactionIds) && transactionIds.length > 0) {
-      // First, find which IDs belong to expenses and which to income
-      // by querying both tables
-      const existingExpenses = await (prisma as any).expense.findMany({
-        where: {
-          id: { in: transactionIds },
-          userId: user.id,
-          isDeleted: false,
-        },
-        select: { id: true },
-      });
+    // Check if Transaction table exists
+    let transactionTableExists = false;
+    try {
+      await (prisma as any).$queryRaw`SELECT 1 FROM transactions LIMIT 1`;
+      transactionTableExists = true;
+    } catch {
+      // Transaction table doesn't exist, fall back to Expense/IncomeSource
+      transactionTableExists = false;
+    }
 
-      const existingIncome = await (prisma as any).incomeSource.findMany({
-        where: {
-          id: { in: transactionIds },
-          userId: user.id,
-          isDeleted: false,
-        },
-        select: { id: true },
-      });
-
-      const expenseIds = existingExpenses.map((e: any) => e.id);
-      const incomeIds = existingIncome.map((i: any) => i.id);
-
-      if (expenseIds.length > 0) {
-        const expenseResult = await (prisma as any).expense.updateMany({
+    if (transactionTableExists) {
+      // Use Transaction model (primary path)
+      
+      // Soft delete by IDs
+      if (transactionIds && Array.isArray(transactionIds) && transactionIds.length > 0) {
+        const result = await (prisma as any).transaction.updateMany({
           where: {
-            id: { in: expenseIds },
-            userId: user.id, // Ensure user owns these transactions
-            isDeleted: false, // Only delete if not already deleted
-          },
-          data: {
-            isDeleted: true,
-            deletedAt: new Date(),
-          },
-        });
-        deletedCount += expenseResult.count;
-      }
-
-      if (incomeIds.length > 0) {
-        const incomeResult = await (prisma as any).incomeSource.updateMany({
-          where: {
-            id: { in: incomeIds },
+            id: { in: transactionIds },
             userId: user.id,
             isDeleted: false,
           },
@@ -75,65 +49,155 @@ export async function DELETE(req: NextRequest) {
             deletedAt: new Date(),
           },
         });
-        deletedCount += incomeResult.count;
-      }
-    }
-
-    // Bulk delete by filters
-    if (filters) {
-      const whereExpense: any = {
-        userId: user.id,
-        isDeleted: false,
-      };
-
-      const whereIncome: any = {
-        userId: user.id,
-        isDeleted: false,
-      };
-
-      // Apply filters
-      if (filters.bankCode) {
-        whereExpense.bankCode = filters.bankCode;
-        whereIncome.bankCode = filters.bankCode;
+        deletedCount += result.count;
       }
 
-      if (filters.transactionType === 'expense') {
-        const result = await (prisma as any).expense.updateMany({
-          where: whereExpense,
+      // Bulk delete by filters
+      if (filters) {
+        const where: any = {
+          userId: user.id,
+          isDeleted: false,
+        };
+
+        // Apply filters
+        if (filters.bankCode) {
+          where.bankCode = filters.bankCode;
+        }
+
+        if (filters.transactionType === 'expense' || filters.transactionType === 'debit') {
+          where.financialCategory = 'EXPENSE';
+          where.debitAmount = { gt: 0 };
+        } else if (filters.transactionType === 'income' || filters.transactionType === 'credit') {
+          where.financialCategory = 'INCOME';
+          where.creditAmount = { gt: 0 };
+        }
+
+        if (filters.startDate || filters.endDate) {
+          where.transactionDate = {};
+          if (filters.startDate) where.transactionDate.gte = new Date(filters.startDate);
+          if (filters.endDate) where.transactionDate.lte = new Date(filters.endDate);
+        }
+
+        const result = await (prisma as any).transaction.updateMany({
+          where,
           data: {
             isDeleted: true,
             deletedAt: new Date(),
           },
         });
         deletedCount += result.count;
-      } else if (filters.transactionType === 'income') {
-        const result = await (prisma as any).incomeSource.updateMany({
-          where: whereIncome,
-          data: {
-            isDeleted: true,
-            deletedAt: new Date(),
+      }
+    } else {
+      // Fallback to Expense/IncomeSource (backward compatibility)
+      
+      // Soft delete by IDs
+      if (transactionIds && Array.isArray(transactionIds) && transactionIds.length > 0) {
+        const existingExpenses = await (prisma as any).expense.findMany({
+          where: {
+            id: { in: transactionIds },
+            userId: user.id,
+            isDeleted: false,
           },
+          select: { id: true },
         });
-        deletedCount += result.count;
-      } else {
-        // Delete both types
-        const expenseResult = await (prisma as any).expense.updateMany({
-          where: whereExpense,
-          data: {
-            isDeleted: true,
-            deletedAt: new Date(),
-          },
-        });
-        deletedCount += expenseResult.count;
 
-        const incomeResult = await (prisma as any).incomeSource.updateMany({
-          where: whereIncome,
-          data: {
-            isDeleted: true,
-            deletedAt: new Date(),
+        const existingIncome = await (prisma as any).incomeSource.findMany({
+          where: {
+            id: { in: transactionIds },
+            userId: user.id,
+            isDeleted: false,
           },
+          select: { id: true },
         });
-        deletedCount += incomeResult.count;
+
+        const expenseIds = existingExpenses.map((e: any) => e.id);
+        const incomeIds = existingIncome.map((i: any) => i.id);
+
+        if (expenseIds.length > 0) {
+          const expenseResult = await (prisma as any).expense.updateMany({
+            where: {
+              id: { in: expenseIds },
+              userId: user.id,
+              isDeleted: false,
+            },
+            data: {
+              isDeleted: true,
+              deletedAt: new Date(),
+            },
+          });
+          deletedCount += expenseResult.count;
+        }
+
+        if (incomeIds.length > 0) {
+          const incomeResult = await (prisma as any).incomeSource.updateMany({
+            where: {
+              id: { in: incomeIds },
+              userId: user.id,
+              isDeleted: false,
+            },
+            data: {
+              isDeleted: true,
+              deletedAt: new Date(),
+            },
+          });
+          deletedCount += incomeResult.count;
+        }
+      }
+
+      // Bulk delete by filters (legacy)
+      if (filters) {
+        const whereExpense: any = {
+          userId: user.id,
+          isDeleted: false,
+        };
+
+        const whereIncome: any = {
+          userId: user.id,
+          isDeleted: false,
+        };
+
+        if (filters.bankCode) {
+          whereExpense.bankCode = filters.bankCode;
+          whereIncome.bankCode = filters.bankCode;
+        }
+
+        if (filters.transactionType === 'expense') {
+          const result = await (prisma as any).expense.updateMany({
+            where: whereExpense,
+            data: {
+              isDeleted: true,
+              deletedAt: new Date(),
+            },
+          });
+          deletedCount += result.count;
+        } else if (filters.transactionType === 'income') {
+          const result = await (prisma as any).incomeSource.updateMany({
+            where: whereIncome,
+            data: {
+              isDeleted: true,
+              deletedAt: new Date(),
+            },
+          });
+          deletedCount += result.count;
+        } else {
+          const expenseResult = await (prisma as any).expense.updateMany({
+            where: whereExpense,
+            data: {
+              isDeleted: true,
+              deletedAt: new Date(),
+            },
+          });
+          deletedCount += expenseResult.count;
+
+          const incomeResult = await (prisma as any).incomeSource.updateMany({
+            where: whereIncome,
+            data: {
+              isDeleted: true,
+              deletedAt: new Date(),
+            },
+          });
+          deletedCount += incomeResult.count;
+        }
       }
     }
 

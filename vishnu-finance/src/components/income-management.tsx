@@ -27,7 +27,10 @@ import { useCurrency } from '../contexts/CurrencyContext';
 import { useToast } from '../contexts/ToastContext';
 import { DateRangeFilter } from './ui/date-range-filter';
 import { Combobox, ComboboxOption } from './ui/combobox';
-import { EntityMappingManager } from './entity-mapping-manager';
+import FabButton from './ui/fab-button';
+import MobileHeader from './ui/mobile-header';
+import FilterSheet from './ui/filter-sheet';
+import QuickRangeChips, { QuickRange } from './ui/quick-range-chips';
 
 interface Income {
   id: string;
@@ -152,8 +155,77 @@ export default function IncomeManagement() {
   const [importProgress, setImportProgress] = useState<number>(0);
   const [tempFiles, setTempFiles] = useState<string[]>([]);
   const [isDragging, setIsDragging] = useState(false);
-  const [showPersonMapping, setShowPersonMapping] = useState(false);
-  const [showStoreMapping, setShowStoreMapping] = useState(false);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  // Quick range state (must be before any early returns)
+  const [quickRange, setQuickRange] = useState<QuickRange>('month');
+
+  const computeRange = (range: QuickRange): [Date, Date] => {
+    const today = new Date();
+    switch (range) {
+      case 'month':
+        return [
+          new Date(today.getFullYear(), today.getMonth(), 1),
+          new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59, 999),
+        ];
+      case 'lastMonth': {
+        const prev = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        return [
+          new Date(prev.getFullYear(), prev.getMonth(), 1),
+          new Date(prev.getFullYear(), prev.getMonth() + 1, 0, 23, 59, 59, 999),
+        ];
+      }
+      case 'quarter': {
+        const q = Math.floor(today.getMonth() / 3);
+        return [
+          new Date(today.getFullYear(), q * 3, 1),
+          new Date(today.getFullYear(), (q + 1) * 3, 0, 23, 59, 59, 999),
+        ];
+      }
+      case 'year':
+        return [
+          new Date(today.getFullYear(), 0, 1),
+          new Date(today.getFullYear(), 11, 31, 23, 59, 59, 999),
+        ];
+      case 'all':
+        return [
+          new Date(2020, 0, 1),
+          new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59, 999),
+        ];
+      case 'custom':
+      default:
+        return [
+          new Date(startDate + 'T00:00:00'),
+          new Date(endDate + 'T23:59:59'),
+        ];
+    }
+  };
+
+  const applyQuickRange = (range: QuickRange) => {
+    if (range === 'custom') {
+      setQuickRange('custom');
+      return;
+    }
+    const [start, end] = computeRange(range);
+    setQuickRange(range);
+    setStartDate(start.toISOString().split('T')[0]);
+    setEndDate(end.toISOString().split('T')[0]);
+  };
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('quickRange_income');
+      if (saved) {
+        applyQuickRange(saved as QuickRange);
+      }
+    } catch {}
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('quickRange_income', quickRange);
+    } catch {}
+  }, [quickRange]);
 
   const filteredParsed = useMemo(() => {
     console.log('🔍 FILTERING: parsedTransactions.length:', parsedTransactions.length);
@@ -1135,8 +1207,11 @@ export default function IncomeManagement() {
                          (income.personName && income.personName.toLowerCase().includes(filterStore.toLowerCase()));
     const matchesCommodity = filterCommodity === 'all' || 
                              (income.commodity && income.commodity.toLowerCase().includes(filterCommodity.toLowerCase()));
+    // amount range presets support (optional; defaults to all)
+    const amountNum = typeof income.amount === 'number' ? income.amount : parseFloat(String(income.amount)) || 0;
+    const inRange = true; // hook up if amountRange state added later
     
-    return matchesSearch && matchesCategory && matchesStore && matchesCommodity;
+    return matchesSearch && matchesCategory && matchesStore && matchesCommodity && inRange;
   });
 
   const storesPersons = Array.from(new Set(
@@ -1246,18 +1321,36 @@ export default function IncomeManagement() {
     );
   }
 
+  
+
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in mobile-body pb-bottom-bar">
+      {/* Sticky Mobile Header */}
+      <MobileHeader
+        title="Income"
+        subtitle="Manage income and credits"
+        right={(
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+              className="minimal-button-primary btn-touch px-3 py-2"
+              aria-label="Add Income"
+            >
+              <Plus className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+      />
       {/* Header */}
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
         <div>
           <h2 className="text-2xl font-bold text-primary">Income Management</h2>
-          <p className="text-muted">Track and manage your income sources</p>
+          <p className="text-muted">Track and manage your income sources and bank credits</p>
         </div>
-        <div className="flex space-x-3">
+        <div className="flex flex-wrap gap-2 sm:flex-nowrap sm:space-x-3">
           <button
             onClick={fetchIncomes}
-            className="minimal-button-secondary flex items-center space-x-2"
+            className="minimal-button-secondary flex items-center space-x-2 w-full sm:w-auto"
             disabled={isFetching}
           >
             <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
@@ -1265,28 +1358,21 @@ export default function IncomeManagement() {
           </button>
           <button
             onClick={() => setShowFileDialog(true)}
-            className="minimal-button-secondary flex items-center space-x-2"
+            className="minimal-button-secondary flex items-center space-x-2 w-full sm:w-auto"
           >
             <FileText className="w-4 h-4" />
             <span>Parse File</span>
           </button>
           <button
             onClick={() => setShowImportDialog(true)}
-            className="minimal-button-secondary flex items-center space-x-2"
+            className="minimal-button-secondary flex items-center space-x-2 w-full sm:w-auto"
           >
             <Upload className="w-4 h-4" />
             <span>Import CSV</span>
           </button>
-          <button
-            onClick={() => setShowPersonMapping(true)}
-            className="minimal-button-secondary flex items-center space-x-2"
-          >
-            <Tag className="w-4 h-4" />
-            <span>Unify Names</span>
-          </button>
         <button
           onClick={() => setShowForm(true)}
-            className="minimal-button-primary flex items-center space-x-2"
+            className="minimal-button-primary flex items-center space-x-2 w-full sm:w-auto"
         >
             <Plus className="w-4 h-4" />
           <span>Add Income</span>
@@ -1315,7 +1401,8 @@ export default function IncomeManagement() {
         <div className="minimal-card p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-muted">Total Income</p>
+              <p className="text-sm font-medium text-muted">Total Credits</p>
+              <p className="text-xs text-muted mb-1">(Bank credits + income sources)</p>
               <p className="text-2xl font-bold text-success currency-inr">{formatCurrency(totalIncome)}</p>
             </div>
             <div className="minimal-stat-inset">
@@ -1351,6 +1438,7 @@ export default function IncomeManagement() {
 
       {/* Search and Filters */}
       <div className="flex flex-col gap-4">
+        <QuickRangeChips value={quickRange} onChange={applyQuickRange} className="md:flex xl:hidden" />
         <DateRangeFilter
           startDate={startDate}
           endDate={endDate}
@@ -1358,6 +1446,7 @@ export default function IncomeManagement() {
             setStartDate(start);
             setEndDate(end);
           }}
+          showPresets={false}
         />
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="relative flex-1">
@@ -1403,7 +1492,11 @@ export default function IncomeManagement() {
             searchPlaceholder="Search commodities..."
             className="min-w-[200px]"
           />
-          <button className="minimal-button-small p-2">
+          <button 
+            className="minimal-button-small p-2" 
+            onClick={() => setIsFilterOpen(true)} 
+            aria-label="Open Filters"
+          >
             <Filter className="w-4 h-4" />
           </button>
         </div>
@@ -1732,7 +1825,7 @@ export default function IncomeManagement() {
                   <TrendingUp className="w-5 h-5 mr-2" />
                   Processed Data
                 </h4>
-                <div className="overflow-x-auto max-h-96 overflow-y-auto">
+                <div className="max-h-96 overflow-y-auto">
                   {/* Preview filters */}
                   <div className="flex items-center justify-between mb-3">
                     <label className="inline-flex items-center gap-2 text-sm">
@@ -1748,6 +1841,8 @@ export default function IncomeManagement() {
                       </select>
                     </div>
                   </div>
+                  {/* Table (md+) */}
+                  <div className="hidden md:block overflow-x-auto">
                   <table className="min-w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
                     <thead className="bg-gray-50 dark:bg-gray-700">
                       <tr>
@@ -1755,7 +1850,9 @@ export default function IncomeManagement() {
                         <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Store/Person</th>
                         <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Commodity</th>
                         <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Type</th>
-                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Amount</th>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Credit</th>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Debit</th>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Category</th>
                         <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Notes</th>
                         <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Raw Data</th>
                       </tr>
@@ -1800,13 +1897,17 @@ export default function IncomeManagement() {
                                   ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' 
                                   : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
                               }`}>
-                                {isIncome ? 'Income' : 'Expense'}
+                                {isIncome ? 'Credit' : 'Debit'}
                               </span>
                             </td>
-                            <td className="px-3 py-2 text-xs font-bold">
-                              <span className={isIncome ? 'text-green-600' : 'text-red-600'}>
-                                {isIncome ? '+' : '-'}₹{amount.toFixed(2)}
-                              </span>
+                            <td className="px-3 py-2 text-xs font-bold text-green-600 dark:text-green-400">
+                              {creditAmount > 0 ? `₹${creditAmount.toFixed(2)}` : '-'}
+                            </td>
+                            <td className="px-3 py-2 text-xs font-bold text-red-600 dark:text-red-400">
+                              {debitAmount > 0 ? `₹${debitAmount.toFixed(2)}` : '-'}
+                            </td>
+                            <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400">
+                              {(transaction.financialCategory && typeof transaction.financialCategory === 'string') ? transaction.financialCategory : 'N/A'}
                             </td>
                             <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400 max-w-xs truncate" title={notes}>
                               {notes || '-'}
@@ -1836,13 +1937,59 @@ export default function IncomeManagement() {
                                     raw: transaction.raw
                                   }, null, 2)}
                                 </pre>
-                              </details>
+                          </details>
                             </td>
                           </tr>
                         );
                       })}
                     </tbody>
                   </table>
+                  </div>
+
+                  {/* Mobile Card List */}
+                  <div className="md:hidden divide-y divide-gray-200 dark:divide-gray-700 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                    {visibleParsed.length === 0 ? (
+                      <div className="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">No records</div>
+                    ) : (
+                      visibleParsed.map((transaction: BankTransaction, index: number) => {
+                        const debitAmount = parseFloat(String(transaction.debit || '0'));
+                        const creditAmount = parseFloat(String(transaction.credit || '0'));
+                        const isIncome = creditAmount > 0;
+                        const storeOrPerson = transaction.store || transaction.personName || '';
+                        const commodity = transaction.commodity || '';
+                        return (
+                          <div key={index} className="p-4">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex-1">
+                                <div className="text-xs text-gray-500 dark:text-gray-400">{transaction.date_iso || transaction.date || '-'}</div>
+                                <div className="text-sm font-medium text-gray-900 dark:text-gray-100 mt-1" title={transaction.description || transaction.narration || ''}>
+                                  {transaction.description || transaction.narration || '—'}
+                                </div>
+                                <div className="mt-2 flex flex-wrap items-center gap-2">
+                                  <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${isIncome ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'}`}>
+                                    {isIncome ? 'Credit' : 'Debit'}
+                                  </span>
+                                  {storeOrPerson && (
+                                    <span className="px-2 py-0.5 rounded text-xs bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300">{storeOrPerson}</span>
+                                  )}
+                                  {commodity && (
+                                    <span className="px-2 py-0.5 rounded text-xs bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300">{commodity}</span>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                {isIncome ? (
+                                  <div className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">₹{creditAmount.toFixed(2)}</div>
+                                ) : (
+                                  <div className="text-sm font-semibold text-red-600 dark:text-red-400">₹{debitAmount.toFixed(2)}</div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
                   {/* Pagination */}
                   {totalPages > 1 && (
                     <div className="flex items-center justify-between mt-3 text-sm">
@@ -2163,35 +2310,88 @@ export default function IncomeManagement() {
         )}
       </div>
 
-      {/* Person Name Mapping Modal */}
-      {showPersonMapping && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-            <EntityMappingManager
-              entityType="PERSON"
-              onClose={() => {
-                setShowPersonMapping(false);
-                fetchIncomes();
-              }}
-            />
-          </div>
-        </div>
-      )}
+      {/* Mobile FAB for Add Income (scroll to top / open add flow as applicable) */}
+      <FabButton
+        label="Add Income"
+        icon={<Plus className="w-5 h-5" />}
+        onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+      />
 
-      {/* Store Name Mapping Modal */}
-      {showStoreMapping && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-            <EntityMappingManager
-              entityType="STORE"
-              onClose={() => {
-                setShowStoreMapping(false);
-                fetchIncomes();
-              }}
-            />
+      {/* Filter Sheet (Mobile) */}
+      <FilterSheet open={isFilterOpen} onClose={() => setIsFilterOpen(false)} title="Filters">
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">Category</label>
+            <select
+              value={filterCategory}
+              onChange={(e) => setFilterCategory(e.target.value)}
+              className="minimal-select w-full"
+            >
+              <option value="all">All Categories</option>
+              {categories.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Store/Person</label>
+            <select
+              value={filterStore}
+              onChange={(e) => setFilterStore(e.target.value)}
+              className="minimal-select w-full"
+            >
+              <option value="all">All</option>
+              {storesPersons.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Commodity</label>
+            <select
+              value={filterCommodity}
+              onChange={(e) => setFilterCommodity(e.target.value)}
+              className="minimal-select w-full"
+            >
+              <option value="all">All</option>
+              {commodities.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <button className="minimal-button-secondary px-4 py-2" onClick={() => setIsFilterOpen(false)}>Close</button>
+            <button className="minimal-button-primary px-4 py-2" onClick={() => setIsFilterOpen(false)}>Apply</button>
           </div>
         </div>
-      )}
+      </FilterSheet>
+
+      {/* Bottom action bar (mobile) */}
+      <div className="md:hidden bottom-action-bar">
+        <div className="px-3 py-2 bottom-action-grid">
+          <button
+            className="bottom-action-btn bg-secondary text-secondary-foreground"
+            onClick={() => window.location.reload()}
+            aria-label="Refresh"
+          >
+            Refresh
+          </button>
+          <button
+            className="bottom-action-btn bg-accent text-accent-foreground"
+            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+            aria-label="Add Income"
+          >
+            Add
+          </button>
+          <button
+            className="bottom-action-btn border border-input"
+            onClick={() => setIsFilterOpen(true)}
+            aria-label="Filters"
+          >
+            Filters
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

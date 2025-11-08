@@ -1,0 +1,48 @@
+{
+  "bankCode": "HDFC",
+  "parserClasses": [
+    "HDFCBankParser",
+    "MultiBankParser"
+  ],
+  "parserFiles": [
+    "tools/parsers/hdfc_bank_parser.py",
+    "tools/parsers/multi_bank_parser.py"
+  ],
+  "aliases": [],
+  "transactionFields": [
+    "amount",
+    "balance",
+    "bankCode",
+    "commodity",
+    "credit",
+    "date",
+    "date_iso",
+    "debit",
+    "description",
+    "line",
+    "page",
+    "raw",
+    "reference",
+    "store"
+  ],
+  "metadataFields": [
+    "accountNumber",
+    "personName",
+    "transactionId",
+    "transferType",
+    "upiId"
+  ],
+  "statementMetadataFields": [
+    "accountHolderName",
+    "accountNumber",
+    "branch",
+    "closingBalance",
+    "ifsc",
+    "openingBalance",
+    "statementEndDate",
+    "statementStartDate",
+    "totalCredits",
+    "totalDebits",
+    "transactionCount"
+  ]
+}

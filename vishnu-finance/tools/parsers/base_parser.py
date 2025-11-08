@@ -194,11 +194,29 @@ class BaseBankParser(ABC):
         # Set bank code
         transaction['bankCode'] = self.bank_code
         
-        # Determine transaction type
-        if transaction.get('debit', 0) > 0:
-            transaction['type'] = 'expense'
-        elif transaction.get('credit', 0) > 0:
-            transaction['type'] = 'income'
+        # Ensure credit and debit amounts are explicitly set (one should be 0)
+        debit = transaction.get('debit', 0)
+        credit = transaction.get('credit', 0)
+        
+        # If only amount is provided, infer credit/debit
+        if debit == 0 and credit == 0 and 'amount' in transaction:
+            amount = transaction.get('amount', 0)
+            # For backward compatibility, if type was set, use it
+            # Otherwise, amount > 0 could be either, default to expense
+            if transaction.get('type') == 'income':
+                credit = abs(amount)
+                debit = 0.0
+            else:
+                debit = abs(amount)
+                credit = 0.0
+        
+        # Ensure both fields exist and are non-negative
+        transaction['debit'] = abs(float(debit)) if debit > 0 else 0.0
+        transaction['credit'] = abs(float(credit)) if credit > 0 else 0.0
+        
+        # Remove legacy 'type' field if present (we use credit/debit now)
+        if 'type' in transaction:
+            del transaction['type']
         
         return transaction
     

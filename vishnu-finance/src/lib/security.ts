@@ -15,7 +15,7 @@ const RATE_LIMITS = {
 export function rateLimit(limitType: keyof typeof RATE_LIMITS) {
   return function (handler: Function) {
     return async function (request: NextRequest, ...args: any[]) {
-      const ip = getClientIP(request);
+      const ip = resolveClientIp(request);
       const key = `${ip}:${limitType}`;
       const limit = RATE_LIMITS[limitType];
       const now = Date.now();
@@ -47,19 +47,16 @@ export function rateLimit(limitType: keyof typeof RATE_LIMITS) {
 }
 
 // Get client IP address
-function getClientIP(request: NextRequest): string {
+function resolveClientIp(request: Request): string {
   const forwarded = request.headers.get('x-forwarded-for');
-  const realIP = request.headers.get('x-real-ip');
-  
   if (forwarded) {
-    return forwarded.split(',')[0].trim();
+    return forwarded.split(',')[0]?.trim() ?? 'unknown';
   }
-  
-  if (realIP) {
-    return realIP;
+  const realIp = request.headers.get('x-real-ip');
+  if (realIp) {
+    return realIp;
   }
-  
-  return request.ip || 'unknown';
+  return 'unknown';
 }
 
 // Input validation utilities

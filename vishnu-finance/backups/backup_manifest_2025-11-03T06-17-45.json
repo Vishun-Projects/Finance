@@ -1,0 +1,38 @@
+{
+  "timestamp": "2025-11-03T06-17-45",
+  "backups": {
+    "users": {
+      "file": "users_backup_2025-11-03T06-17-45.json",
+      "count": 9
+    },
+    "categories": {
+      "file": "categories_backup_2025-11-03T06-17-45.json",
+      "count": 15
+    },
+    "expenses": {
+      "file": "expenses_backup_2025-11-03T06-17-45.json",
+      "count": 2706
+    },
+    "income_sources": {
+      "file": "income_sources_backup_2025-11-03T06-17-45.json",
+      "count": 449
+    },
+    "goals": {
+      "file": "goals_backup_2025-11-03T06-17-45.json",
+      "count": 2
+    },
+    "deadlines": {
+      "file": "deadlines_backup_2025-11-03T06-17-45.json",
+      "count": 2
+    },
+    "wishlist_items": {
+      "file": "wishlist_items_backup_2025-11-03T06-17-45.json",
+      "count": 11
+    },
+    "account_statements": {
+      "file": null,
+      "count": 0,
+      "error": "\nInvalid `prisma.$queryRawUnsafe()` invocation:\n\n\nRaw query failed. Code: `1146`. Message: `Table 'vishnu_finance.account_statements' doesn't exist`"
+    }
+  }
+}

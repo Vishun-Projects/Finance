@@ -10,7 +10,7 @@ interface AuthWrapperProps {
 }
 
 // Routes that don't require authentication
-const publicRoutes = ['/login', '/register'];
+const publicRoutes = ['/login', '/register', '/auth'];
 
 export default function AuthWrapper({ children }: AuthWrapperProps) {
   const { user, loading } = useAuth();
@@ -24,7 +24,7 @@ export default function AuthWrapper({ children }: AuthWrapperProps) {
 
   useEffect(() => {
     if (!loading && !user && !publicRoutes.includes(pathname)) {
-      router.push('/login');
+      router.push('/auth');
     }
   }, [user, loading, pathname, router]);
 

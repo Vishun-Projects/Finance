@@ -9,10 +9,14 @@ import DeleteConfirmationDialog from './delete-confirmation-dialog';
 
 interface Transaction {
   id: string;
-  type: 'expense' | 'income';
-  date: string;
+  type?: 'expense' | 'income' | 'credit' | 'debit'; // Legacy support
+  date?: string;
+  transactionDate?: string | Date;
   description: string;
-  amount: number;
+  amount?: number; // Legacy field
+  creditAmount?: number;
+  debitAmount?: number;
+  financialCategory?: 'INCOME' | 'EXPENSE' | 'TRANSFER' | 'INVESTMENT' | 'OTHER';
   category?: string;
   bankCode?: string;
   store?: string;
@@ -34,6 +38,7 @@ export default function TransactionManagementTable() {
   const [deletingIds, setDeletingIds] = useState<string[]>([]);
   const [restoringIds, setRestoringIds] = useState<string[]>([]);
   const [showDeleted, setShowDeleted] = useState(true);
+  const [pageSize, setPageSize] = useState<string>('200'); // '100'|'200'|'500'|'1000'|'all'
   
   // Filters
   const [showFilters, setShowFilters] = useState(false);
@@ -48,14 +53,14 @@ export default function TransactionManagementTable() {
     if (user) {
       fetchTransactions();
     }
-  }, [user, filters]);
+  }, [user, filters, pageSize]);
 
   const fetchTransactions = async () => {
     try {
       setLoading(true);
       const params = new URLSearchParams({
         includeDeleted: 'true',
-        limit: '500',
+        limit: pageSize,
       });
 
       if (filters.bankCode) params.append('bankCode', filters.bankCode);
@@ -226,8 +231,9 @@ export default function TransactionManagementTable() {
     }).format(amount);
   };
 
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString('en-IN');
+  const formatDate = (input: string | Date) => {
+    const d = typeof input === 'string' ? new Date(input) : input;
+    return d.toLocaleDateString('en-IN');
   };
 
   const getStatusBadge = (isDeleted: boolean) => {
@@ -290,6 +296,21 @@ export default function TransactionManagementTable() {
         </div>
         
         <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 mr-2">
+            <label className="text-sm text-muted-foreground">Page size</label>
+            <select
+              value={pageSize}
+              onChange={(e) => setPageSize(e.target.value)}
+              className="border rounded-md px-2 py-1 text-sm"
+              title="Number of transactions to load"
+           >
+              <option value="100">100</option>
+              <option value="200">200</option>
+              <option value="500">500</option>
+              <option value="1000">1000</option>
+              <option value="all">All</option>
+            </select>
+          </div>
           <Button
             variant="outline"
             size="sm"
@@ -382,8 +403,8 @@ export default function TransactionManagementTable() {
                 className="w-full border rounded-md px-3 py-2"
               >
                 <option value="">All Types</option>
-                <option value="expense">Expenses</option>
-                <option value="income">Income</option>
+                <option value="expense">Debits</option>
+                <option value="income">Credits</option>
               </select>
             </div>
             
@@ -410,9 +431,9 @@ export default function TransactionManagementTable() {
         </div>
       )}
 
-      {/* Transactions Table */}
-      <div className="border rounded-lg overflow-hidden">
-        <div className="overflow-x-auto">
+      {/* Transactions Table (md and up) */}
+      <div className="border rounded-lg overflow-hidden hidden md:block">
+        <div className="table-responsive">
           <table className="w-full">
             <thead className="bg-muted">
               <tr>
@@ -433,7 +454,9 @@ export default function TransactionManagementTable() {
                 <th className="px-4 py-3 text-left text-sm font-semibold">Date</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold">Type</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold">Description</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold">Amount</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold">Credit</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold">Debit</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold">Category</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold">Bank</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold">Status</th>
               </tr>
@@ -441,50 +464,143 @@ export default function TransactionManagementTable() {
             <tbody>
               {displayedTransactions.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">
+                  <td colSpan={9} className="px-4 py-8 text-center text-muted-foreground">
                     No transactions found
                   </td>
                 </tr>
               ) : (
-                displayedTransactions.map((transaction) => (
-                  <tr
-                    key={transaction.id}
-                    className={`border-t hover:bg-muted/50 ${
-                      transaction.isDeleted ? 'opacity-60' : ''
-                    }`}
-                  >
-                    <td className="px-4 py-3">
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.has(transaction.id)}
-                        onChange={() => handleSelectOne(transaction.id)}
-                        className="w-4 h-4"
-                      />
-                    </td>
-                    <td className="px-4 py-3 text-sm">{formatDate(transaction.date)}</td>
-                    <td className="px-4 py-3">
-                      <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                        transaction.type === 'income'
-                          ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                          : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-                      }`}>
-                        {transaction.type.toUpperCase()}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-sm max-w-md truncate" title={transaction.description}>
-                      {transaction.description || '-'}
-                    </td>
-                    <td className="px-4 py-3 text-sm font-medium">
-                      {formatCurrency(transaction.amount)}
-                    </td>
-                    <td className="px-4 py-3 text-sm">{transaction.bankCode || '-'}</td>
-                    <td className="px-4 py-3">{getStatusBadge(transaction.isDeleted)}</td>
-                  </tr>
-                ))
+                displayedTransactions.map((transaction) => {
+                  const date = transaction.transactionDate || transaction.date;
+                  const isCredit = (transaction.creditAmount ?? 0) > 0;
+                  const isDebit = (transaction.debitAmount ?? 0) > 0;
+                  const creditAmount = transaction.creditAmount ?? 0;
+                  const debitAmount = transaction.debitAmount ?? 0;
+                  const amount = transaction.amount ?? (isCredit ? creditAmount : debitAmount);
+                  const transactionType = transaction.type || (isCredit ? 'credit' : 'debit');
+                  
+                  return (
+                    <tr
+                      key={transaction.id}
+                      className={`border-t hover:bg-muted/50 ${
+                        transaction.isDeleted ? 'opacity-60' : ''
+                      }`}
+                    >
+                      <td className="px-4 py-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(transaction.id)}
+                          onChange={() => handleSelectOne(transaction.id)}
+                          className="w-4 h-4"
+                        />
+                      </td>
+                      <td className="px-4 py-3 text-sm">{date ? formatDate(date as any) : '-'}</td>
+                      <td className="px-4 py-3">
+                        <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                          isCredit
+                            ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                            : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                        }`}>
+                          {isCredit ? 'CREDIT' : 'DEBIT'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm max-w-md truncate" title={transaction.description}>
+                        {transaction.description || '-'}
+                      </td>
+                      <td className="px-4 py-3 text-sm font-medium text-green-600 dark:text-green-400">
+                        {creditAmount > 0 ? formatCurrency(creditAmount) : '-'}
+                      </td>
+                      <td className="px-4 py-3 text-sm font-medium text-red-600 dark:text-red-400">
+                        {debitAmount > 0 ? formatCurrency(debitAmount) : '-'}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="px-2 py-1 rounded text-xs bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
+                          {transaction.financialCategory || 'EXPENSE'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm">{transaction.bankCode || '-'}</td>
+                      <td className="px-4 py-3">{getStatusBadge(transaction.isDeleted)}</td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* Mobile Card List (below md) */}
+      <div className="md:hidden">
+        {displayedTransactions.length === 0 ? (
+          <div className="px-4 py-8 text-center text-muted-foreground">No transactions found</div>
+        ) : (
+          <div className="divide-y divide-gray-200 dark:divide-gray-800 border rounded-lg overflow-hidden">
+            {displayedTransactions.map((t) => {
+              const date = t.transactionDate || t.date;
+              const isCredit = (t.creditAmount ?? 0) > 0;
+              const isDebit = (t.debitAmount ?? 0) > 0;
+              const creditAmount = t.creditAmount ?? 0;
+              const debitAmount = t.debitAmount ?? 0;
+              return (
+                <div key={t.id} className={`p-4 ${t.isDeleted ? 'opacity-60' : ''}`}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1">
+                      <div className="text-xs text-gray-500 dark:text-gray-400">{date ? formatDate(date as any) : '-'}</div>
+                      <div className="text-sm font-medium text-gray-900 dark:text-gray-100 mt-1" title={t.description}>{t.description}</div>
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${isCredit ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'}`}>
+                          {isCredit ? 'CREDIT' : 'DEBIT'}
+                        </span>
+                        <span className="px-2 py-0.5 rounded text-xs bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
+                          {t.financialCategory || 'EXPENSE'}
+                        </span>
+                        {t.bankCode && (
+                          <span className="px-2 py-0.5 rounded text-xs bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300">{t.bankCode}</span>
+                        )}
+                        {t.isDeleted && (
+                          <span className="px-2 py-0.5 rounded text-xs bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-200">Deleted</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      {isCredit && (
+                        <div className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">{formatCurrency(creditAmount)}</div>
+                      )}
+                      {isDebit && (
+                        <div className="text-sm font-semibold text-red-600 dark:text-red-400">{formatCurrency(debitAmount)}</div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="mt-3 flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="btn-touch"
+                      onClick={() => {
+                        setDeletingIds([t.id]);
+                        setShowConfirmDialog(true);
+                      }}
+                    >
+                      Delete
+                    </Button>
+                    {t.isDeleted && (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="btn-touch"
+                        onClick={() => {
+                          setRestoringIds([t.id]);
+                          setShowRestoreDialog(true);
+                        }}
+                      >
+                        Restore
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Delete Confirmation Dialog */}

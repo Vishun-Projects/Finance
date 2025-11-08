@@ -1,0 +1,92 @@
+[
+  {
+    "id": "cmez473ni0000b2nsk1vct894",
+    "email": "vishun.orv@gmail.com",
+    "password": "$2b$12$tMU.AtyWaij9ONpOw5D3TumZhpo9DdetTUrhilH/stlkhite1o9xK",
+    "name": "Vishnu Vishwakarma",
+    "createdAt": "2025-08-31T03:12:08.766Z",
+    "updatedAt": "2025-11-03T06:10:17.325Z",
+    "isActive": 1,
+    "lastLogin": "2025-11-03T06:10:17.321Z"
+  },
+  {
+    "id": "cmez4a4np000fb2sk8rqq22ju",
+    "email": "demo@vishnufinance.com",
+    "password": "$2b$12$b/2Ob37.f/W1ROqOBfWv2.SHQXCjNrru3p774pq4E73cIsd8wKdCi",
+    "name": "Demo User",
+    "createdAt": "2025-08-31T03:14:30.037Z",
+    "updatedAt": "2025-09-09T07:52:46.240Z",
+    "isActive": 1,
+    "lastLogin": "2025-09-09T07:52:46.238Z"
+  },
+  {
+    "id": "cmhggx5q70000b23om4bqg449",
+    "email": "sachinv13188@gmail.com",
+    "password": "$2b$10$OQ9nKrQCTq0ld2CjV9mqZ.ZfM1WwXR/cLv67NbtpeDgLZkf/zwbpa",
+    "name": "Sachin Vishwakarma",
+    "createdAt": "2025-11-01T15:59:49.567Z",
+    "updatedAt": "2025-11-02T07:17:46.542Z",
+    "isActive": 1,
+    "lastLogin": "2025-11-02T07:17:46.539Z"
+  },
+  {
+    "id": "cmhh3ul8500ebb29omvs6kcpq",
+    "email": "mamtavishwakarma@gmail.com",
+    "password": "$2b$10$RgSuMSw0OGvvHuzrsa5r9.kNqAYxDJnJGM/Tt8onkicUAYAZwnf.a",
+    "name": "Mamta Vishwakarma",
+    "createdAt": "2025-11-02T02:41:40.844Z",
+    "updatedAt": "2025-11-02T07:19:34.672Z",
+    "isActive": 1,
+    "lastLogin": "2025-11-02T07:19:34.669Z"
+  },
+  {
+    "id": "cmhhavbmb0080b25k6ypkgnvw",
+    "email": "sundarmsharma@gmail.com",
+    "password": "$2b$10$qWxfvJobUw47VX4aSeYwWeM69bchpg/c3a0ZdDnR5dYWBLXvDtnvK",
+    "name": "Sundarm Sharma",
+    "createdAt": "2025-11-02T05:58:12.366Z",
+    "updatedAt": "2025-11-02T07:21:00.297Z",
+    "isActive": 1,
+    "lastLogin": "2025-11-02T07:21:00.295Z"
+  },
+  {
+    "id": "cmhhe7hjm0000b2m4tg3ahp3z",
+    "email": "pushkalrao@gmail.com",
+    "password": "$2b$10$cNIZgG0MPuPzzRnarYAhFuIazRaIN.SZ5J0qPIGhCpI.icXnoL6Uq",
+    "name": "Pushkal Anand Rao",
+    "createdAt": "2025-11-02T07:31:38.770Z",
+    "updatedAt": "2025-11-02T08:24:08.942Z",
+    "isActive": 1,
+    "lastLogin": "2025-11-02T08:24:08.940Z"
+  },
+  {
+    "id": "cmhhezh8y0000b2ugjd7wjqfd",
+    "email": "vishnu.vishwakarma@wpsgp.com",
+    "password": "$2b$10$tDN5ept2sM2YAYwj6/Vd9uA82d7/wISs0gtoIfvoWeChE5uSie466",
+    "name": "Vishnu Munshilal Vishwakarma",
+    "createdAt": "2025-11-02T07:53:24.754Z",
+    "updatedAt": "2025-11-02T07:53:32.706Z",
+    "isActive": 1,
+    "lastLogin": "2025-11-02T07:53:32.703Z"
+  },
+  {
+    "id": "cmhhgkh1w0013b2ugfyq74ip9",
+    "email": "pushkal2003@gmail.com",
+    "password": "$2b$10$3a6xhUzmH9pU5LvaXAYWF.ttV/lPJRJBOxKdC5hOV7effAybBBSqy",
+    "name": "Pushkal Ananda Rao",
+    "createdAt": "2025-11-02T08:37:43.892Z",
+    "updatedAt": "2025-11-02T08:53:20.089Z",
+    "isActive": 1,
+    "lastLogin": "2025-11-02T08:53:20.087Z"
+  },
+  {
+    "id": "demo-user-id",
+    "email": "demo@example.com",
+    "password": "demo-password-hash",
+    "name": "Demo User",
+    "createdAt": "2025-08-31T04:58:23.025Z",
+    "updatedAt": "2025-08-31T04:58:23.025Z",
+    "isActive": 1,
+    "lastLogin": null
+  }
+]

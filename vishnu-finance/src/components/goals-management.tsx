@@ -198,7 +198,7 @@ export default function GoalsManagement() {
         <div className="flex space-x-3">
           <button
             onClick={fetchGoals}
-            className="minimal-button-small flex items-center space-x-2"
+            className="minimal-button-small flex items-center space-x-2 btn-touch"
             disabled={isFetching}
           >
             <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
@@ -206,7 +206,7 @@ export default function GoalsManagement() {
           </button>
         <button
           onClick={() => setShowForm(true)}
-            className="minimal-button-primary flex items-center space-x-2"
+            className="minimal-button-primary flex items-center space-x-2 btn-touch"
         >
             <Plus className="w-4 h-4" />
           <span>Add Goal</span>
@@ -429,7 +429,7 @@ export default function GoalsManagement() {
             <button
               type="submit"
               disabled={isLoading}
-              className="minimal-button-primary w-full flex justify-center items-center py-4 px-6 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+              className="minimal-button-primary w-full flex justify-center items-center py-4 px-6 font-semibold disabled:opacity-50 disabled:cursor-not-allowed btn-touch"
             >
               {isLoading ? (
                 <div className="flex items-center">

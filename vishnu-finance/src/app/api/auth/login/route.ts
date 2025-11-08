@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { AuthService } from '@/lib/auth';
+import { writeAuditLog, extractRequestMeta } from '@/lib/audit';
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
@@ -33,6 +34,18 @@ export async function POST(request: NextRequest) {
     });
 
     console.log(`✅ LOGIN API - Cookie set successfully in ${Date.now() - startTime}ms total`);
+
+    const meta = extractRequestMeta(request);
+
+    await writeAuditLog({
+      actorId: result.user.id,
+      event: 'USER_LOGIN',
+      severity: 'INFO',
+      ipAddress: meta.ipAddress,
+      userAgent: meta.userAgent,
+      message: `${result.user.email} signed in`,
+    });
+
     return response;
   } catch (error) {
     console.error('❌ LOGIN API - Error during login:', error);

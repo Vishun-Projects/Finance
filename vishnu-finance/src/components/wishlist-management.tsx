@@ -220,7 +220,7 @@ export default function WishlistManagement() {
       case 'HIGH': return 'text-orange-600 bg-orange-100';
       case 'MEDIUM': return 'text-yellow-600 bg-yellow-100';
       case 'LOW': return 'text-green-600 bg-green-100';
-      default: return 'text-gray-600 bg-gray-100';
+      default: return 'text-muted-foreground bg-muted';
     }
   };
 
@@ -263,8 +263,8 @@ export default function WishlistManagement() {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Wishlist & Bucket List</h2>
-          <p className="text-gray-600">Track your dreams and aspirations</p>
+          <h2 className="text-2xl font-bold text-foreground">Wishlist & Bucket List</h2>
+          <p className="text-muted-foreground">Track your dreams and aspirations</p>
         </div>
         <button
           onClick={() => setShowForm(true)}
@@ -277,10 +277,10 @@ export default function WishlistManagement() {
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="p-4 bg-white rounded-lg shadow-md">
+        <div className="p-4 bg-card rounded-lg shadow-md border border-border">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Total Items</p>
+              <p className="text-sm text-muted-foreground">Total Items</p>
               <p className="text-2xl font-bold">{totalCount}</p>
             </div>
             <div className="text-blue-600">
@@ -288,10 +288,10 @@ export default function WishlistManagement() {
             </div>
           </div>
         </div>
-        <div className="p-4 bg-white rounded-lg shadow-md">
+        <div className="p-4 bg-card rounded-lg shadow-md border border-border">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Completed</p>
+              <p className="text-sm text-muted-foreground">Completed</p>
               <p className="text-2xl font-bold text-green-600">{completedCount}</p>
             </div>
             <div className="text-green-600">
@@ -299,10 +299,10 @@ export default function WishlistManagement() {
             </div>
           </div>
         </div>
-        <div className="p-4 bg-white rounded-lg shadow-md">
+        <div className="p-4 bg-card rounded-lg shadow-md border border-border">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Total Cost</p>
+              <p className="text-sm text-muted-foreground">Total Cost</p>
               <p className="text-2xl font-bold">{formatCurrency(totalCost)}</p>
             </div>
             <div className="text-purple-600">
@@ -310,10 +310,10 @@ export default function WishlistManagement() {
             </div>
           </div>
         </div>
-        <div className="p-4 bg-white rounded-lg shadow-md">
+        <div className="p-4 bg-card rounded-lg shadow-md border border-border">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Progress</p>
+              <p className="text-sm text-muted-foreground">Progress</p>
               <p className="text-2xl font-bold">
                 {totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0}%
               </p>
@@ -329,31 +329,31 @@ export default function WishlistManagement() {
       <div className="flex gap-2">
         <button
           onClick={() => setFilterPriority('all')}
-          className={`px-3 py-2 rounded-md text-sm font-medium ${filterPriority === 'all' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+          className={`px-3 py-2 rounded-md text-sm font-medium ${filterPriority === 'all' ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground hover:bg-accent'}`}
         >
           All ({totalCount})
         </button>
         <button
           onClick={() => setFilterPriority('low')}
-          className={`px-3 py-2 rounded-md text-sm font-medium ${filterPriority === 'low' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+          className={`px-3 py-2 rounded-md text-sm font-medium ${filterPriority === 'low' ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground hover:bg-accent'}`}
         >
           Low ({wishlistItems.filter(item => item.priority === 'LOW').length})
         </button>
         <button
           onClick={() => setFilterPriority('medium')}
-          className={`px-3 py-2 rounded-md text-sm font-medium ${filterPriority === 'medium' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+          className={`px-3 py-2 rounded-md text-sm font-medium ${filterPriority === 'medium' ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground hover:bg-accent'}`}
         >
           Medium ({wishlistItems.filter(item => item.priority === 'MEDIUM').length})
         </button>
         <button
           onClick={() => setFilterPriority('high')}
-          className={`px-3 py-2 rounded-md text-sm font-medium ${filterPriority === 'high' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+          className={`px-3 py-2 rounded-md text-sm font-medium ${filterPriority === 'high' ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground hover:bg-accent'}`}
         >
           High ({wishlistItems.filter(item => item.priority === 'HIGH').length})
         </button>
         <button
           onClick={() => setFilterPriority('critical')}
-          className={`px-3 py-2 rounded-md text-sm font-medium ${filterPriority === 'critical' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+          className={`px-3 py-2 rounded-md text-sm font-medium ${filterPriority === 'critical' ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground hover:bg-accent'}`}
         >
           Critical ({wishlistItems.filter(item => item.priority === 'CRITICAL').length})
         </button>
@@ -362,7 +362,7 @@ export default function WishlistManagement() {
       {/* Form Modal */}
       {showForm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 modal-overlay">
-          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-xl modal-content">
+          <div className="bg-card rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-xl modal-content border border-border">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-xl font-bold">
                 {editingItem ? 'Edit Wishlist Item' : 'Add New Wishlist Item'}
@@ -382,7 +382,7 @@ export default function WishlistManagement() {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     Title *
                   </label>
                   <input
@@ -390,13 +390,13 @@ export default function WishlistManagement() {
                     required
                     value={formData.title}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-input text-foreground"
                     placeholder="Enter item title"
                   />
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     Estimated Cost *
                   </label>
                   <input
@@ -406,27 +406,27 @@ export default function WishlistManagement() {
                     step="0.01"
                     value={formData.estimatedCost}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData(prev => ({ ...prev, estimatedCost: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-input text-foreground"
                     placeholder="0.00"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   Description
                 </label>
                 <textarea
                   value={formData.description}
                   onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData(prev => ({ ...prev, description: e.target.value }))}
                   rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-input text-foreground"
                 />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     Priority
                   </label>
                   <Combobox
@@ -444,56 +444,56 @@ export default function WishlistManagement() {
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     Category
                   </label>
                   <input
                     type="text"
                     value={formData.category}
                                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData(prev => ({ ...prev, category: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-input text-foreground"
                   />
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     Target Date
                   </label>
                   <input
                     type="date"
                     value={formData.targetDate}
                                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData(prev => ({ ...prev, targetDate: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-input text-foreground"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   Image URL
                 </label>
                 <input
                   type="url"
                   value={formData.imageUrl}
                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData(prev => ({ ...prev, imageUrl: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-input text-foreground"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   Notes
                 </label>
                 <textarea
                   value={formData.notes}
                                        onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
                   rows={2}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-input text-foreground"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   Tags
                 </label>
                 <div className="flex flex-wrap gap-2 mb-2">
@@ -525,7 +525,7 @@ export default function WishlistManagement() {
                         input.value = '';
                       }
                     }}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="flex-1 px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-input text-foreground"
                   />
                   <button
                     type="button"
@@ -543,7 +543,7 @@ export default function WishlistManagement() {
                 </div>
               </div>
 
-              <div className="flex justify-end gap-3 pt-6 border-t border-gray-200">
+              <div className="flex justify-end gap-3 pt-6 border-t border-border">
                 <button
                   type="button"
                   onClick={() => {
@@ -551,7 +551,7 @@ export default function WishlistManagement() {
                     setEditingItem(null);
                     resetForm();
                   }}
-                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors"
+                  className="px-4 py-2 bg-muted text-foreground rounded-md hover:bg-accent transition-colors"
                 >
                   Cancel
                 </button>

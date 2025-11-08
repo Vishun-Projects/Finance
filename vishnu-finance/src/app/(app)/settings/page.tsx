@@ -1,29 +1,21 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useCurrency } from '../../../contexts/CurrencyContext';
 import { useToast } from '../../../contexts/ToastContext';
 import { useNotifications } from '../../../lib/notifications';
 import { 
-  User, 
   Bell, 
   Shield, 
-  Database, 
-  Eye, 
-  Info,
   Save,
   CheckCircle,
-  Settings,
   Palette,
-  Monitor,
   Moon,
   Sun,
   Contrast,
   Globe,
-  Volume2,
-  VolumeX,
   Mail,
   Smartphone,
   Lock,
@@ -32,14 +24,13 @@ import {
   Download,
   Upload,
   FileText,
-  BookOpen,
-  DollarSign,
-  Users,
-  AlertCircle,
-  Clock,
-  CheckCircle2,
-  XCircle,
-  Map
+  Tag,
+  Plus,
+  Edit,
+  X,
+  TrendingUp,
+  TrendingDown,
+  RefreshCw
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -50,6 +41,618 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
+import Link from 'next/link';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { formatFileSize, validateDeleteMode } from '@/lib/document-utils';
+
+// Document Management Component
+type UserDocument = {
+  id: string;
+  originalName: string;
+  mimeType: string;
+  fileSize?: number | null;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt?: string | null;
+  isDeleted: boolean;
+  visibility: 'PRIVATE' | 'ORGANIZATION' | 'PUBLIC';
+  sourceType: 'USER_UPLOAD' | 'BANK_STATEMENT' | 'PORTAL_RESOURCE' | 'SYSTEM';
+  ownerId?: string | null;
+  uploadedById: string;
+  bankCode?: string | null;
+  transactionCount: number;
+};
+
+function DocumentManagement() {
+  const { user } = useAuth();
+  const { success, error: showError } = useToast();
+  const [documents, setDocuments] = useState<UserDocument[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [includePortal, setIncludePortal] = useState(true);
+  const [filter, setFilter] = useState<'all' | 'mine' | 'portal'>('all');
+  const [deleteState, setDeleteState] = useState<{
+    open: boolean;
+    document: UserDocument | null;
+    mode: 'document-only' | 'document-and-transactions';
+    submitting: boolean;
+  }>({ open: false, document: null, mode: 'document-only', submitting: false });
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const fetchDocuments = useCallback(async () => {
+    setLoading(true);
+    try {
+      const response = await fetch(`/api/user/documents?includePortal=${includePortal}`);
+      if (!response.ok) {
+        throw new Error('Failed to load documents');
+      }
+      const data = await response.json();
+      setDocuments(data.documents || []);
+    } catch (error) {
+      console.error('Failed to load documents:', error);
+      showError('Error', 'Unable to load documents right now');
+    } finally {
+      setLoading(false);
+    }
+  }, [includePortal, showError]);
+
+  useEffect(() => {
+    fetchDocuments();
+  }, [fetchDocuments]);
+
+  const filteredDocuments = useMemo(() => {
+    if (!user) return documents;
+    switch (filter) {
+      case 'mine':
+        return documents.filter(doc => doc.ownerId === user.id || doc.uploadedById === user.id);
+      case 'portal':
+        return documents.filter(doc => doc.visibility !== 'PRIVATE' && doc.ownerId !== user.id);
+      default:
+        return documents;
+    }
+  }, [documents, filter, user]);
+
+  const handleFilePick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileSelected = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch('/api/user/documents', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('Upload failed');
+      }
+
+      const data = await response.json();
+      setDocuments(prev => [data.document, ...prev]);
+      success('Uploaded', `${file.name} added to your documents`);
+    } catch (error) {
+      console.error('Upload error:', error);
+      showError('Upload failed', 'Could not upload the document. Please try again.');
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const openDeleteDialog = (document: UserDocument) => {
+    setDeleteState({
+      open: true,
+      document,
+      mode: 'document-only',
+      submitting: false,
+    });
+  };
+
+  const closeDeleteDialog = () => {
+    setDeleteState(prev => ({ ...prev, open: false, document: null, submitting: false }));
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteState.document) return;
+    setDeleteState(prev => ({ ...prev, submitting: true }));
+    try {
+      const response = await fetch(`/api/user/documents/${deleteState.document.id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: deleteState.mode }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Delete failed');
+      }
+
+      setDocuments(prev => prev.filter(doc => doc.id !== deleteState.document?.id));
+      const message =
+        deleteState.mode === 'document-and-transactions'
+          ? 'Document and linked transactions deleted.'
+          : 'Document deleted. Transactions will remain.';
+      success('Deleted', message);
+      closeDeleteDialog();
+    } catch (error) {
+      console.error('Delete error:', error);
+      showError('Delete failed', 'Could not delete the document.');
+      setDeleteState(prev => ({ ...prev, submitting: false }));
+    }
+  };
+
+  return (
+      <Card>
+      <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <CardTitle className="flex items-center space-x-2">
+            <FileText className="w-5 h-5" />
+            <span>Your Documents</span>
+              </CardTitle>
+              <CardDescription>
+            Manage statements and personal uploads. Download originals or remove them when no longer needed.
+              </CardDescription>
+            </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={fetchDocuments} disabled={loading}>
+            <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+            </Button>
+          <Button size="sm" onClick={handleFilePick} disabled={uploading}>
+            <Upload className="w-4 h-4 mr-2" />
+            {uploading ? 'Uploading...' : 'Upload PDF'}
+          </Button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="application/pdf"
+            className="hidden"
+            onChange={handleFileSelected}
+          />
+          </div>
+        </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Label className="flex items-center gap-1 text-xs">
+              <Switch
+                checked={includePortal}
+                onCheckedChange={value => setIncludePortal(value)}
+              />
+              Include portal documents
+            </Label>
+              </div>
+          <div className="flex items-center gap-2">
+            {(['all', 'mine', 'portal'] as const).map(option => (
+              <Button
+                key={option}
+                variant={filter === option ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setFilter(option)}
+              >
+                {option === 'all' && 'All'}
+                {option === 'mine' && 'My Uploads'}
+                {option === 'portal' && 'Portal'}
+              </Button>
+            ))}
+            </div>
+              </div>
+
+        {loading ? (
+          <div className="border border-dashed rounded-lg p-10 text-center text-sm text-muted-foreground">
+            Loading documents...
+            </div>
+        ) : filteredDocuments.length === 0 ? (
+          <div className="border border-dashed rounded-lg p-10 text-center text-sm text-muted-foreground">
+            No documents found. Upload a PDF or import a statement to get started.
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {filteredDocuments.map(doc => {
+              const canDelete =
+                user &&
+                (doc.ownerId === user.id || doc.uploadedById === user.id) &&
+                doc.visibility === 'PRIVATE';
+
+              return (
+                <Card key={doc.id} className="border border-border/70">
+                  <CardContent className="p-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-sm font-semibold text-foreground">{doc.originalName}</h3>
+                        <Badge variant={doc.sourceType === 'USER_UPLOAD' ? 'default' : 'secondary'}>
+                          {doc.sourceType.replace('_', ' ')}
+                        </Badge>
+                        {doc.visibility !== 'PRIVATE' && (
+                          <Badge variant="outline">{doc.visibility.toLowerCase()}</Badge>
+                      )}
+                    </div>
+                      <div className="text-xs text-muted-foreground flex flex-wrap items-center gap-3">
+                        <span>{new Date(doc.createdAt).toLocaleString()}</span>
+                        <Separator orientation="vertical" />
+                        <span>{formatFileSize(doc.fileSize)}</span>
+                        <Separator orientation="vertical" />
+                        <span>{doc.transactionCount} linked transaction{doc.transactionCount === 1 ? '' : 's'}</span>
+                        {doc.bankCode && (
+                          <>
+                            <Separator orientation="vertical" />
+                            <span>Bank: {doc.bankCode}</span>
+                          </>
+                        )}
+                  </div>
+                </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        asChild
+                      >
+                        <Link href={`/api/user/documents/${doc.id}/download`} target="_blank">
+                          <Download className="w-4 h-4 mr-1" />
+                          Download
+                        </Link>
+                      </Button>
+                      {canDelete && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => openDeleteDialog(doc)}
+                        >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                      )}
+            </div>
+          </CardContent>
+        </Card>
+              );
+            })}
+          </div>
+        )}
+
+        <Dialog open={deleteState.open} onOpenChange={open => !open && closeDeleteDialog()}>
+          <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+              <DialogTitle>Remove document</DialogTitle>
+            <DialogDescription>
+                Choose whether to remove just the document or delete the linked transactions as well.
+            </DialogDescription>
+          </DialogHeader>
+            <div className="space-y-4">
+              <div className="p-3 rounded-md bg-muted/60 text-sm">
+                <p className="font-medium">{deleteState.document?.originalName}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {deleteState.document?.transactionCount || 0} transaction(s) linked.
+                </p>
+            </div>
+            <div className="space-y-2">
+                <Label>Delete Options</Label>
+                <div className="grid gap-2">
+                  {(['document-only', 'document-and-transactions'] as const).map(option => (
+                    <Button
+                      key={option}
+                      variant={deleteState.mode === option ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() =>
+                        setDeleteState(prev => ({ ...prev, mode: validateDeleteMode(option) }))
+                      }
+                    >
+                      {option === 'document-only'
+                        ? 'Keep transactions, delete document'
+                        : 'Delete document and linked transactions'}
+                    </Button>
+                  ))}
+              </div>
+              </div>
+            </div>
+            <DialogFooter className="flex justify-between">
+              <Button variant="outline" onClick={closeDeleteDialog} disabled={deleteState.submitting}>
+              Cancel
+            </Button>
+              <Button
+                variant="destructive"
+                onClick={confirmDelete}
+                disabled={deleteState.submitting}
+              >
+                {deleteState.submitting ? 'Deleting...' : 'Confirm Delete'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      </CardContent>
+    </Card>
+  );
+}
+
+type UserCategory = {
+  id: string;
+  name: string;
+  type: 'INCOME' | 'EXPENSE';
+  color?: string | null;
+  isDefault?: boolean;
+};
+
+type CategoryForm = {
+  name: string;
+  type: 'INCOME' | 'EXPENSE';
+  color: string;
+};
+
+// Category Management Component
+function CategoryManagement() {
+  const [categories, setCategories] = useState<UserCategory[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<UserCategory | null>(null);
+  const [formData, setFormData] = useState<CategoryForm>({ name: '', type: 'EXPENSE', color: '#3B82F6' });
+  const { success, error: showError } = useToast();
+
+  useEffect(() => {
+    fetchCategories();
+  }, []);
+
+  const fetchCategories = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch('/api/categories');
+      if (response.ok) {
+        const data = (await response.json()) as UserCategory[];
+        setCategories(data || []);
+      }
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!formData.name.trim()) {
+      showError('Error', 'Category name is required');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const url = editingCategory ? `/api/categories/${editingCategory.id}` : '/api/categories';
+      const method = editingCategory ? 'PUT' : 'POST';
+      
+      const response = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
+
+      if (response.ok) {
+        success('Success', editingCategory ? 'Category updated' : 'Category created');
+        setShowForm(false);
+        setEditingCategory(null);
+        setFormData({ name: '', type: 'EXPENSE', color: '#3B82F6' });
+        fetchCategories();
+      } else {
+        const error = await response.json();
+        showError('Error', error.error || 'Failed to save category');
+      }
+    } catch {
+      showError('Error', 'Failed to save category');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async (category: UserCategory) => {
+    if (category.isDefault) {
+      showError('Error', 'Cannot delete default categories');
+      return;
+    }
+
+    if (!confirm(`Delete category "${category.name}"? This cannot be undone.`)) {
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await fetch(`/api/categories/${category.id}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        success('Success', 'Category deleted');
+        fetchCategories();
+      } else {
+        const error = await response.json();
+        showError('Error', error.error || 'Failed to delete category');
+      }
+    } catch {
+      showError('Error', 'Failed to delete category');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const incomeCategories = categories.filter(c => c.type === 'INCOME');
+  const expenseCategories = categories.filter(c => c.type === 'EXPENSE');
+
+  const colorPresets = [
+    '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6',
+    '#EC4899', '#06B6D4', '#84CC16', '#F97316', '#6366F1',
+    '#14B8A6', '#F43F5E', '#DC2626', '#7C2D12', '#059669', '#6B7280'
+  ];
+
+  return (
+    <>
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center space-x-2">
+                <Tag className="w-5 h-5" />
+                <span>Transaction Categories</span>
+              </CardTitle>
+              <CardDescription>
+                Manage your income and expense categories. Default categories cannot be modified or deleted.
+              </CardDescription>
+            </div>
+            <Button onClick={() => { setShowForm(true); setEditingCategory(null); setFormData({ name: '', type: 'EXPENSE', color: '#3B82F6' }); }}>
+              <Plus className="w-4 h-4 mr-2" />
+              Add Category
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Income Categories */}
+          <div>
+            <div className="flex items-center gap-2 mb-4">
+              <TrendingUp className="w-5 h-5 text-green-600" />
+              <h3 className="font-semibold text-lg">Income Categories</h3>
+              <Badge variant="secondary">{incomeCategories.length}</Badge>
+            </div>
+            {loading && incomeCategories.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">Loading...</div>
+            ) : incomeCategories.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">No income categories</div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                {incomeCategories.map((category) => (
+                  <div key={category.id} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div className="flex items-center gap-2 flex-1">
+                      <div className="w-4 h-4 rounded-full" style={{ backgroundColor: category.color ?? '#3B82F6' }} />
+                      <span className="font-medium">{category.name}</span>
+                      {category.isDefault && <Badge variant="outline" className="text-xs">Default</Badge>}
+                    </div>
+                    {!category.isDefault && (
+                      <div className="flex gap-1">
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditingCategory(category); setFormData({ name: category.name, type: category.type, color: category.color || '#3B82F6' }); setShowForm(true); }}>
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDelete(category)}>
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <Separator />
+
+          {/* Expense Categories */}
+          <div>
+            <div className="flex items-center gap-2 mb-4">
+              <TrendingDown className="w-5 h-5 text-red-600" />
+              <h3 className="font-semibold text-lg">Expense Categories</h3>
+              <Badge variant="secondary">{expenseCategories.length}</Badge>
+            </div>
+            {loading && expenseCategories.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">Loading...</div>
+            ) : expenseCategories.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">No expense categories</div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                {expenseCategories.map((category) => (
+                  <div key={category.id} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div className="flex items-center gap-2 flex-1">
+                      <div className="w-4 h-4 rounded-full" style={{ backgroundColor: category.color ?? '#3B82F6' }} />
+                      <span className="font-medium">{category.name}</span>
+                      {category.isDefault && <Badge variant="outline" className="text-xs">Default</Badge>}
+                    </div>
+                    {!category.isDefault && (
+                      <div className="flex gap-1">
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditingCategory(category); setFormData({ name: category.name, type: category.type, color: category.color || '#3B82F6' }); setShowForm(true); }}>
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDelete(category)}>
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Add/Edit Category Modal */}
+      {showForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => { setShowForm(false); setEditingCategory(null); }}>
+          <Card className="w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>{editingCategory ? 'Edit Category' : 'Add Category'}</CardTitle>
+                <Button variant="ghost" size="icon" onClick={() => { setShowForm(false); setEditingCategory(null); }}>
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="name">Category Name</Label>
+                <Input
+                  id="name"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="e.g., Groceries, Salary"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="type">Type</Label>
+                <Select value={formData.type} onValueChange={(value: 'INCOME' | 'EXPENSE') => setFormData({ ...formData, type: value })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="INCOME">Income</SelectItem>
+                    <SelectItem value="EXPENSE">Expense</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Color</Label>
+                <div className="flex gap-2 flex-wrap">
+                  {colorPresets.map((color) => (
+                    <button
+                      key={color}
+                      type="button"
+                      onClick={() => setFormData({ ...formData, color })}
+                      className={`w-8 h-8 rounded-full border-2 ${formData.color === color ? 'border-primary ring-2 ring-primary' : 'border-border'}`}
+                      style={{ backgroundColor: color }}
+                    />
+                  ))}
+                </div>
+                <Input
+                  type="color"
+                  value={formData.color}
+                  onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                  className="w-full h-10"
+                />
+              </div>
+              <div className="flex gap-2 pt-4">
+                <Button className="flex-1" onClick={handleSave} disabled={loading}>
+                  {loading ? 'Saving...' : editingCategory ? 'Update' : 'Create'}
+                </Button>
+                <Button variant="outline" onClick={() => { setShowForm(false); setEditingCategory(null); }}>
+                  Cancel
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+    </>
+  );
+}
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState('appearance');
@@ -57,7 +660,7 @@ export default function SettingsPage() {
   const [savedSections, setSavedSections] = useState<Record<string, boolean>>({});
   const { theme, setTheme } = useTheme();
   const { user } = useAuth();
-  const { selectedCurrency, setSelectedCurrency, formatCurrency, lastUpdated } = useCurrency();
+  const { selectedCurrency, setSelectedCurrency, lastUpdated } = useCurrency();
   const { success, error: showError } = useToast();
   const { requestPermission, isSupported, permission } = useNotifications();
 
@@ -80,9 +683,6 @@ export default function SettingsPage() {
     timezone: 'Asia/Kolkata'
   });
   
-  // Field mappings state
-  const [selectedBankMapping, setSelectedBankMapping] = useState('SBIN');
-  const [fieldMappings, setFieldMappings] = useState<Record<string, any>>({});
 
   const handleSave = async (section: string) => {
     if (!user?.id) {
@@ -157,7 +757,7 @@ export default function SettingsPage() {
       } else {
         showError('Permission Denied', 'Desktop notifications were blocked. Please enable them in your browser settings.');
       }
-    } catch (err) {
+    } catch {
       showError('Error', 'Failed to request notification permission');
     }
   };
@@ -173,43 +773,56 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background p-6">
+    <div className="min-h-screen bg-background px-3 sm:px-6 py-6">
       <div className="max-w-4xl mx-auto space-y-6">
         {/* Header */}
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Settings</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Settings</h1>
           <p className="text-muted-foreground mt-2">Configure your account and preferences</p>
         </div>
 
 
         {/* Settings Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-6">
-            <TabsTrigger value="appearance" className="flex items-center space-x-2">
-              <Palette className="w-4 h-4" />
+          <div className="w-full overflow-x-auto border-b border-border">
+          <TabsList className="inline-flex h-10 items-center justify-start rounded-none bg-transparent p-0 w-full">
+            <TabsTrigger 
+              value="appearance" 
+              className="rounded-none border-b-2 border-transparent bg-transparent px-4 py-2 text-sm font-medium text-muted-foreground transition-all hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:shadow-none"
+            >
+              <Palette className="w-4 h-4 mr-2" />
               <span>Appearance</span>
             </TabsTrigger>
-            <TabsTrigger value="profile" className="flex items-center space-x-2">
-              <User className="w-4 h-4" />
-              <span>Profile</span>
-            </TabsTrigger>
-            <TabsTrigger value="notifications" className="flex items-center space-x-2">
-              <Bell className="w-4 h-4" />
+            <TabsTrigger 
+              value="notifications" 
+              className="rounded-none border-b-2 border-transparent bg-transparent px-4 py-2 text-sm font-medium text-muted-foreground transition-all hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:shadow-none"
+            >
+              <Bell className="w-4 h-4 mr-2" />
               <span>Notifications</span>
             </TabsTrigger>
-            <TabsTrigger value="security" className="flex items-center space-x-2">
-              <Shield className="w-4 h-4" />
+            <TabsTrigger 
+              value="security" 
+              className="rounded-none border-b-2 border-transparent bg-transparent px-4 py-2 text-sm font-medium text-muted-foreground transition-all hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:shadow-none"
+            >
+              <Shield className="w-4 h-4 mr-2" />
               <span>Security</span>
             </TabsTrigger>
-            <TabsTrigger value="field-mappings" className="flex items-center space-x-2">
-              <Map className="w-4 h-4" />
-              <span>Field Maps</span>
+            <TabsTrigger 
+              value="categories" 
+              className="rounded-none border-b-2 border-transparent bg-transparent px-4 py-2 text-sm font-medium text-muted-foreground transition-all hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:shadow-none"
+            >
+              <Tag className="w-4 h-4 mr-2" />
+              <span>Categories</span>
             </TabsTrigger>
-            <TabsTrigger value="documentation" className="flex items-center space-x-2">
-              <FileText className="w-4 h-4" />
+            <TabsTrigger 
+              value="documentation" 
+              className="rounded-none border-b-2 border-transparent bg-transparent px-4 py-2 text-sm font-medium text-muted-foreground transition-all hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:shadow-none"
+            >
+              <FileText className="w-4 h-4 mr-2" />
               <span>Docs</span>
             </TabsTrigger>
           </TabsList>
+          </div>
 
           {/* Tab Content */}
           <TabsContent value="appearance" className="space-y-6">
@@ -444,7 +1057,7 @@ export default function SettingsPage() {
               <Button
                 onClick={() => handleSave('Appearance')}
                 disabled={loading}
-                className="flex items-center space-x-2"
+                className="flex items-center space-x-2 btn-touch"
               >
                 {loading ? (
                   <>
@@ -520,7 +1133,7 @@ export default function SettingsPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div className="space-y-1">
                     <Label htmlFor="browser-notifications">Browser Notifications</Label>
                     <p className="text-sm text-muted-foreground">Show notifications in your browser</p>
@@ -566,7 +1179,7 @@ export default function SettingsPage() {
               <Button
                 onClick={() => handleSave('Notifications')}
                 disabled={loading}
-                className="flex items-center space-x-2"
+                className="flex items-center space-x-2 btn-touch"
               >
                 {loading ? (
                   <>
@@ -581,80 +1194,6 @@ export default function SettingsPage() {
                 )}
               </Button>
             </div>
-          </TabsContent>
-
-          <TabsContent value="profile" className="space-y-6">
-            {/* Personal Information */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <User className="w-5 h-5" />
-                  <span>Personal Information</span>
-                </CardTitle>
-                <CardDescription>
-                  Update your personal details and contact information
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Name</Label>
-                    <Input 
-                      id="name" 
-                      type="text" 
-                      defaultValue={user?.name || ''} 
-                      placeholder="Enter your name" 
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
-                    <Input 
-                      id="email" 
-                      type="email" 
-                      defaultValue={user?.email || ''} 
-                      placeholder="Enter your email" 
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Phone</Label>
-                  <Input 
-                    id="phone" 
-                    type="tel" 
-                    placeholder="Enter your phone number" 
-                  />
-                </div>
-                <Button className="flex items-center space-x-2">
-                  <Save className="w-4 h-4" />
-                  <span>Update Profile</span>
-                </Button>
-              </CardContent>
-            </Card>
-
-            {/* Data Management */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Download className="w-5 h-5" />
-                  <span>Data Management</span>
-                </CardTitle>
-                <CardDescription>
-                  Export your data or manage your account
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-1">
-                    <Label>Export Data</Label>
-                    <p className="text-sm text-muted-foreground">Download all your financial data</p>
-                  </div>
-                  <Button variant="outline" className="flex items-center space-x-2">
-                    <Download className="w-4 h-4" />
-                    <span>Export</span>
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
           </TabsContent>
 
           <TabsContent value="security" className="space-y-6">
@@ -682,7 +1221,7 @@ export default function SettingsPage() {
                   <Label htmlFor="confirm-password">Confirm New Password</Label>
                   <Input id="confirm-password" type="password" placeholder="Confirm new password" />
                 </div>
-                <Button className="flex items-center space-x-2">
+                <Button className="flex items-center space-x-2 btn-touch">
                   <Key className="w-4 h-4" />
                   <span>Change Password</span>
                 </Button>
@@ -739,12 +1278,12 @@ export default function SettingsPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div className="space-y-1">
                     <Label>Delete Account</Label>
                     <p className="text-sm text-muted-foreground">Permanently delete your account and all data</p>
                   </div>
-                  <Button variant="destructive" className="flex items-center space-x-2">
+                  <Button variant="destructive" className="flex items-center space-x-2 btn-touch">
                     <Trash2 className="w-4 h-4" />
                     <span>Delete Account</span>
                   </Button>
@@ -753,406 +1292,12 @@ export default function SettingsPage() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="field-mappings" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Map className="w-5 h-5" />
-                  <span>Bank Field Mappings</span>
-                </CardTitle>
-                <CardDescription>
-                  Configure how fields from bank statements map to your database fields
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div>
-                  <Label htmlFor="bank-select" className="mb-3">Select Bank</Label>
-                  <Select value={selectedBankMapping} onValueChange={setSelectedBankMapping}>
-                    <SelectTrigger id="bank-select" className="w-full">
-                      <SelectValue placeholder="Select a bank" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="SBIN">State Bank of India (SBIN)</SelectItem>
-                      <SelectItem value="IDIB">Indian Bank (IDIB)</SelectItem>
-                      <SelectItem value="KKBK">Kotak Mahindra (KKBK)</SelectItem>
-                      <SelectItem value="HDFC">HDFC Bank</SelectItem>
-                      <SelectItem value="YESB">Yes Bank</SelectItem>
-                      <SelectItem value="UTIB">Axis Bank (UTIB)</SelectItem>
-                      <SelectItem value="JIOP">Jio Payments Bank</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="text-sm text-muted-foreground">
-                    <p>Field mappings are automatically applied when importing bank statements.</p>
-                    <p className="mt-2">Drag and drop to reorder, or click to edit mappings.</p>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <h4 className="font-semibold text-sm">Source Fields (PDF Parser)</h4>
-                      <div className="space-y-2 p-3 border rounded-lg bg-gray-50 dark:bg-gray-900">
-                        {['date', 'date_iso', 'description', 'debit', 'credit', 'balance', 'bankCode', 'transactionId', 'accountNumber', 'transferType', 'upiId', 'personName', 'branch', 'store', 'commodity', 'raw'].map((field) => (
-                          <div key={field} className="text-xs p-2 bg-white dark:bg-gray-800 border rounded cursor-move hover:bg-gray-100 dark:hover:bg-gray-700">
-                            {field}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <h4 className="font-semibold text-sm">Target Fields (Database)</h4>
-                      <div className="space-y-2 p-3 border rounded-lg bg-gray-50 dark:bg-gray-900">
-                        {['date', 'title', 'amount', 'description', 'bankCode', 'transactionId', 'accountNumber', 'transferType', 'personName', 'upiId', 'branch', 'store', 'rawData'].map((field) => (
-                          <div key={field} className="text-xs p-2 bg-white dark:bg-gray-800 border rounded">
-                            {field}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between pt-4 border-t">
-                    <p className="text-sm text-muted-foreground">
-                      Default mappings are used automatically. Save custom mappings per bank above.
-                    </p>
-                    <Button 
-                      onClick={() => {
-                        localStorage.setItem(`fieldMappings_${selectedBankMapping}`, JSON.stringify(fieldMappings));
-                        success('Saved', 'Field mappings saved successfully');
-                      }}
-                      className="flex items-center space-x-2"
-                    >
-                      <Save className="w-4 h-4" />
-                      <span>Save Mappings</span>
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+          <TabsContent value="categories" className="space-y-6">
+            <CategoryManagement />
           </TabsContent>
 
           <TabsContent value="documentation" className="space-y-6">
-            {/* Product Documentation Overview */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <BookOpen className="w-5 h-5" />
-                  <span>Product Documentation</span>
-                </CardTitle>
-                <CardDescription>
-                  Complete set of documents for selling the Personal Finance Dashboard as a product
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                  <div className="flex items-center space-x-3 p-3 bg-green-50 border border-green-200 rounded-lg">
-                    <CheckCircle2 className="w-5 h-5 text-green-600" />
-                    <div>
-                      <p className="font-medium text-green-800">7 Documents Completed</p>
-                      <p className="text-sm text-green-600">Ready for sales</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-3 p-3 bg-orange-50 border border-orange-200 rounded-lg">
-                    <Clock className="w-5 h-5 text-orange-600" />
-                    <div>
-                      <p className="font-medium text-orange-800">8 Documents Pending</p>
-                      <p className="text-sm text-orange-600">In progress</p>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Completed Documents */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <CheckCircle2 className="w-5 h-5 text-green-600" />
-                  <span>Completed Documents</span>
-                </CardTitle>
-                <CardDescription>
-                  These documents are ready for use in sales and client presentations
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* README */}
-                  <div className="flex items-center justify-between p-4 border border-green-200 rounded-lg bg-green-50">
-                    <div className="flex items-center space-x-3">
-                      <FileText className="w-5 h-5 text-green-600" />
-                      <div>
-                        <p className="font-medium">README.md</p>
-                        <p className="text-sm text-muted-foreground">Product documentation index</p>
-                      </div>
-                    </div>
-                    <Badge variant="secondary" className="bg-green-100 text-green-800">Complete</Badge>
-                  </div>
-
-                  {/* Product Brief */}
-                  <div className="flex items-center justify-between p-4 border border-green-200 rounded-lg bg-green-50">
-                    <div className="flex items-center space-x-3">
-                      <BookOpen className="w-5 h-5 text-green-600" />
-                      <div>
-                        <p className="font-medium">PRODUCT_BRIEF.md</p>
-                        <p className="text-sm text-muted-foreground">Executive summary & value proposition</p>
-                      </div>
-                    </div>
-                    <Badge variant="secondary" className="bg-green-100 text-green-800">Complete</Badge>
-                  </div>
-
-                  {/* Features & Modules */}
-                  <div className="flex items-center justify-between p-4 border border-green-200 rounded-lg bg-green-50">
-                    <div className="flex items-center space-x-3">
-                      <Settings className="w-5 h-5 text-green-600" />
-                      <div>
-                        <p className="font-medium">FEATURES_MODULES.md</p>
-                        <p className="text-sm text-muted-foreground">Detailed feature breakdown</p>
-                      </div>
-                    </div>
-                    <Badge variant="secondary" className="bg-green-100 text-green-800">Complete</Badge>
-                  </div>
-
-                  {/* Pricing Packages */}
-                  <div className="flex items-center justify-between p-4 border border-green-200 rounded-lg bg-green-50">
-                    <div className="flex items-center space-x-3">
-                      <DollarSign className="w-5 h-5 text-green-600" />
-                      <div>
-                        <p className="font-medium">PRICING_PACKAGES.md</p>
-                        <p className="text-sm text-muted-foreground">Pricing tiers & commercial terms</p>
-                      </div>
-                    </div>
-                    <Badge variant="secondary" className="bg-green-100 text-green-800">Complete</Badge>
-                  </div>
-
-                  {/* Sales Proposal */}
-                  <div className="flex items-center justify-between p-4 border border-green-200 rounded-lg bg-green-50">
-                    <div className="flex items-center space-x-3">
-                      <Users className="w-5 h-5 text-green-600" />
-                      <div>
-                        <p className="font-medium">SALES_PROPOSAL_TEMPLATE.md</p>
-                        <p className="text-sm text-muted-foreground">Standard proposal template</p>
-                      </div>
-                    </div>
-                    <Badge variant="secondary" className="bg-green-100 text-green-800">Complete</Badge>
-                  </div>
-
-                  {/* Order Form */}
-                  <div className="flex items-center justify-between p-4 border border-green-200 rounded-lg bg-green-50">
-                    <div className="flex items-center space-x-3">
-                      <FileText className="w-5 h-5 text-green-600" />
-                      <div>
-                        <p className="font-medium">ORDER_FORM.md</p>
-                        <p className="text-sm text-muted-foreground">Customer order & agreement form</p>
-                      </div>
-                    </div>
-                    <Badge variant="secondary" className="bg-green-100 text-green-800">Complete</Badge>
-                  </div>
-
-                  {/* FAQ */}
-                  <div className="flex items-center justify-between p-4 border border-green-200 rounded-lg bg-green-50">
-                    <div className="flex items-center space-x-3">
-                      <Info className="w-5 h-5 text-green-600" />
-                      <div>
-                        <p className="font-medium">FAQ.md</p>
-                        <p className="text-sm text-muted-foreground">Frequently asked questions</p>
-                      </div>
-                    </div>
-                    <Badge variant="secondary" className="bg-green-100 text-green-800">Complete</Badge>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Pending Documents */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Clock className="w-5 h-5 text-orange-600" />
-                  <span>Pending Documents</span>
-                </CardTitle>
-                <CardDescription>
-                  These documents need to be created to complete the product documentation suite
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Implementation Guide */}
-                  <div className="flex items-center justify-between p-4 border border-orange-200 rounded-lg bg-orange-50">
-                    <div className="flex items-center space-x-3">
-                      <Settings className="w-5 h-5 text-orange-600" />
-                      <div>
-                        <p className="font-medium">IMPLEMENTATION_GUIDE.md</p>
-                        <p className="text-sm text-muted-foreground">Onboarding & setup process</p>
-                      </div>
-                    </div>
-                    <Badge variant="secondary" className="bg-orange-100 text-orange-800">Pending</Badge>
-                  </div>
-
-                  {/* Support Policy */}
-                  <div className="flex items-center justify-between p-4 border border-orange-200 rounded-lg bg-orange-50">
-                    <div className="flex items-center space-x-3">
-                      <Bell className="w-5 h-5 text-orange-600" />
-                      <div>
-                        <p className="font-medium">SUPPORT_POLICY.md</p>
-                        <p className="text-sm text-muted-foreground">Support levels & response times</p>
-                      </div>
-                    </div>
-                    <Badge variant="secondary" className="bg-orange-100 text-orange-800">Pending</Badge>
-                  </div>
-
-                  {/* Terms of Service */}
-                  <div className="flex items-center justify-between p-4 border border-orange-200 rounded-lg bg-orange-50">
-                    <div className="flex items-center space-x-3">
-                      <Shield className="w-5 h-5 text-orange-600" />
-                      <div>
-                        <p className="font-medium">TERMS_OF_SERVICE.md</p>
-                        <p className="text-sm text-muted-foreground">Terms & conditions</p>
-                      </div>
-                    </div>
-                    <Badge variant="secondary" className="bg-orange-100 text-orange-800">Pending</Badge>
-                  </div>
-
-                  {/* Privacy Policy */}
-                  <div className="flex items-center justify-between p-4 border border-orange-200 rounded-lg bg-orange-50">
-                    <div className="flex items-center space-x-3">
-                      <Lock className="w-5 h-5 text-orange-600" />
-                      <div>
-                        <p className="font-medium">PRIVACY_POLICY.md</p>
-                        <p className="text-sm text-muted-foreground">Data handling & privacy</p>
-                      </div>
-                    </div>
-                    <Badge variant="secondary" className="bg-orange-100 text-orange-800">Pending</Badge>
-                  </div>
-
-                  {/* Service Level Agreement */}
-                  <div className="flex items-center justify-between p-4 border border-orange-200 rounded-lg bg-orange-50">
-                    <div className="flex items-center space-x-3">
-                      <CheckCircle className="w-5 h-5 text-orange-600" />
-                      <div>
-                        <p className="font-medium">SERVICE_LEVEL_AGREEMENT.md</p>
-                        <p className="text-sm text-muted-foreground">SLA terms & uptime guarantees</p>
-                      </div>
-                    </div>
-                    <Badge variant="secondary" className="bg-orange-100 text-orange-800">Pending</Badge>
-                  </div>
-
-                  {/* Data Processing Agreement */}
-                  <div className="flex items-center justify-between p-4 border border-orange-200 rounded-lg bg-orange-50">
-                    <div className="flex items-center space-x-3">
-                      <Database className="w-5 h-5 text-orange-600" />
-                      <div>
-                        <p className="font-medium">DATA_PROCESSING_AGREEMENT.md</p>
-                        <p className="text-sm text-muted-foreground">Data processing & security terms</p>
-                      </div>
-                    </div>
-                    <Badge variant="secondary" className="bg-orange-100 text-orange-800">Pending</Badge>
-                  </div>
-
-                  {/* Security Overview */}
-                  <div className="flex items-center justify-between p-4 border border-orange-200 rounded-lg bg-orange-50">
-                    <div className="flex items-center space-x-3">
-                      <Shield className="w-5 h-5 text-orange-600" />
-                      <div>
-                        <p className="font-medium">SECURITY_OVERVIEW.md</p>
-                        <p className="text-sm text-muted-foreground">Security measures & compliance</p>
-                      </div>
-                    </div>
-                    <Badge variant="secondary" className="bg-orange-100 text-orange-800">Pending</Badge>
-                  </div>
-
-                  {/* Compliance Checklist */}
-                  <div className="flex items-center justify-between p-4 border border-orange-200 rounded-lg bg-orange-50">
-                    <div className="flex items-center space-x-3">
-                      <CheckCircle className="w-5 h-5 text-orange-600" />
-                      <div>
-                        <p className="font-medium">COMPLIANCE_CHECKLIST.md</p>
-                        <p className="text-sm text-muted-foreground">Regulatory compliance requirements</p>
-                      </div>
-                    </div>
-                    <Badge variant="secondary" className="bg-orange-100 text-orange-800">Pending</Badge>
-                  </div>
-
-                  {/* Demo Script */}
-                  <div className="flex items-center justify-between p-4 border border-orange-200 rounded-lg bg-orange-50">
-                    <div className="flex items-center space-x-3">
-                      <Eye className="w-5 h-5 text-orange-600" />
-                      <div>
-                        <p className="font-medium">DEMO_SCRIPT.md</p>
-                        <p className="text-sm text-muted-foreground">Product demonstration guide</p>
-                      </div>
-                    </div>
-                    <Badge variant="secondary" className="bg-orange-100 text-orange-800">Pending</Badge>
-                  </div>
-
-                  {/* Quote Template */}
-                  <div className="flex items-center justify-between p-4 border border-orange-200 rounded-lg bg-orange-50">
-                    <div className="flex items-center space-x-3">
-                      <DollarSign className="w-5 h-5 text-orange-600" />
-                      <div>
-                        <p className="font-medium">QUOTE_TEMPLATE.md</p>
-                        <p className="text-sm text-muted-foreground">Pricing quote template</p>
-                      </div>
-                    </div>
-                    <Badge variant="secondary" className="bg-orange-100 text-orange-800">Pending</Badge>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Document Usage Guide */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Info className="w-5 h-5" />
-                  <span>Document Usage Guide</span>
-                </CardTitle>
-                <CardDescription>
-                  How to use these documents effectively in your sales process
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="p-4 border rounded-lg">
-                    <h4 className="font-medium mb-2 flex items-center space-x-2">
-                      <Users className="w-4 h-4 text-blue-600" />
-                      <span>Sales Process</span>
-                    </h4>
-                    <ul className="text-sm text-muted-foreground space-y-1">
-                      <li>• Use PRODUCT_BRIEF for initial presentations</li>
-                      <li>• Reference FEATURES_MODULES for detailed demos</li>
-                      <li>• Present PRICING_PACKAGES for commercial discussions</li>
-                      <li>• Use SALES_PROPOSAL_TEMPLATE for formal proposals</li>
-                    </ul>
-                  </div>
-                  <div className="p-4 border rounded-lg">
-                    <h4 className="font-medium mb-2 flex items-center space-x-2">
-                      <Shield className="w-4 h-4 text-green-600" />
-                      <span>Legal & Compliance</span>
-                    </h4>
-                    <ul className="text-sm text-muted-foreground space-y-1">
-                      <li>• TERMS_OF_SERVICE for contract negotiations</li>
-                      <li>• PRIVACY_POLICY for data protection discussions</li>
-                      <li>• SECURITY_OVERVIEW for security requirements</li>
-                      <li>• COMPLIANCE_CHECKLIST for regulatory needs</li>
-                    </ul>
-                  </div>
-                  <div className="p-4 border rounded-lg">
-                    <h4 className="font-medium mb-2 flex items-center space-x-2">
-                      <Settings className="w-4 h-4 text-purple-600" />
-                      <span>Implementation</span>
-                    </h4>
-                    <ul className="text-sm text-muted-foreground space-y-1">
-                      <li>• IMPLEMENTATION_GUIDE for project planning</li>
-                      <li>• SUPPORT_POLICY for ongoing support discussions</li>
-                      <li>• DEMO_SCRIPT for product demonstrations</li>
-                      <li>• ORDER_FORM for contract finalization</li>
-                    </ul>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            <DocumentManagement />
           </TabsContent>
         </Tabs>
       </div>

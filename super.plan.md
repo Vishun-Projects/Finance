@@ -1,0 +1,5 @@
+- [x] Update role schema, seed superuser account, and secure login/middleware routing
+- [x] Create document + mapping tables and update transaction model & migrations
+- [x] Implement document/mapping REST endpoints and extend import/delete flows
+- [x] Build superuser interface, adjust end-user docs view, and wire transaction link behaviours
+- [x] Add tests, seed scripts, and rollout documentation

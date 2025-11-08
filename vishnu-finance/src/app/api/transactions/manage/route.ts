@@ -22,32 +22,31 @@ export async function GET(req: NextRequest) {
     const searchParams = req.nextUrl.searchParams;
     const includeDeleted = searchParams.get('includeDeleted') === 'true';
     const bankCode = searchParams.get('bankCode');
-    const transactionType = searchParams.get('type'); // 'expense' or 'income'
+    const transactionType = searchParams.get('type'); // Legacy: 'expense' or 'income' - maps to financialCategory
+    const financialCategory = searchParams.get('financialCategory'); // New: INCOME, EXPENSE, TRANSFER, etc.
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
     const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '100');
-    const skip = (page - 1) * limit;
+    const rawLimit = (searchParams.get('limit') || '').toLowerCase();
+    // Allowed: 100, 200, 500, 1000, 'all' (default 200)
+    const allowed = new Set(['100', '200', '500', '1000', 'all']);
+    const normalizedLimit = allowed.has(rawLimit) ? rawLimit : '200';
+    let limit = normalizedLimit === 'all' ? 0 : parseInt(normalizedLimit);
+    let skip = (page - 1) * (limit || 0);
 
-    // Build where clause
-    const whereExpense: any = {
-      userId: user.id,
-    };
-
-    const whereIncome: any = {
+    // Build where clause for Transaction model
+    const where: any = {
       userId: user.id,
     };
 
     // Filter by deleted status
     if (!includeDeleted) {
-      whereExpense.isDeleted = false;
-      whereIncome.isDeleted = false;
+      where.isDeleted = false;
     }
 
     // Filter by bank
     if (bankCode) {
-      whereExpense.bankCode = bankCode;
-      whereIncome.bankCode = bankCode;
+      where.bankCode = bankCode;
     }
 
     // Filter by date range
@@ -55,93 +54,95 @@ export async function GET(req: NextRequest) {
       const dateFilter: any = {};
       if (startDate) dateFilter.gte = new Date(startDate);
       if (endDate) dateFilter.lte = new Date(endDate);
-      
-      whereExpense.date = dateFilter;
-      whereIncome.startDate = dateFilter;
+      where.transactionDate = dateFilter;
     }
 
-    // Fetch expenses and income based on type filter
-    let expenses: any[] = [];
-    let income: any[] = [];
-
-    if (!transactionType || transactionType === 'expense') {
-      expenses = await (prisma as any).expense.findMany({
-        where: whereExpense,
-        include: {
-          category: true,
-        },
-        orderBy: {
-          date: 'desc',
-        },
-        skip,
-        take: limit,
-      });
+    // Filter by financial category
+    // Support legacy 'type' parameter for backward compatibility
+    if (financialCategory) {
+      where.financialCategory = financialCategory.toUpperCase();
+    } else if (transactionType) {
+      // Map legacy type to financialCategory
+      if (transactionType === 'expense') {
+        where.financialCategory = 'EXPENSE';
+      } else if (transactionType === 'income') {
+        where.financialCategory = 'INCOME';
+      }
     }
 
-    if (!transactionType || transactionType === 'income') {
-      income = await (prisma as any).incomeSource.findMany({
-        where: whereIncome,
-        include: {
-          category: true,
-        },
-        orderBy: {
-          startDate: 'desc',
-        },
-        skip,
-        take: limit,
-      });
-    }
-
-    // Get counts
-    const expenseCount = !transactionType || transactionType === 'expense'
-      ? await (prisma as any).expense.count({ where: whereExpense })
-      : 0;
+    // Fetch transactions
+    let transactions: any[] = [];
+    let totalCount = 0;
     
-    const incomeCount = !transactionType || transactionType === 'income'
-      ? await (prisma as any).incomeSource.count({ where: whereIncome })
-      : 0;
+    try {
+      // Check if transaction table exists
+      await (prisma as any).$queryRaw`SELECT 1 FROM transactions LIMIT 1`;
+      
+      // If requesting all, compute total first and then fetch without pagination
+      if (normalizedLimit === 'all') {
+        totalCount = await (prisma as any).transaction.count({ where });
+        // Override pagination to return all
+        skip = 0;
+        limit = totalCount || 0;
+        transactions = await (prisma as any).transaction.findMany({
+          where,
+          include: { category: true },
+          orderBy: { transactionDate: 'desc' },
+        });
+      } else {
+        transactions = await (prisma as any).transaction.findMany({
+          where,
+          include: { category: true },
+          orderBy: { transactionDate: 'desc' },
+          skip,
+          take: limit,
+        });
+        // Get total count
+        totalCount = await (prisma as any).transaction.count({ where });
+      }
+    } catch (error: any) {
+      // Transaction table doesn't exist yet
+      console.log('⚠️ Transaction table not available');
+      return NextResponse.json({
+        transactions: [],
+        pagination: {
+          total: 0,
+          page: 1,
+          limit: limit,
+          totalPages: 0,
+        },
+        message: 'Transaction table not migrated yet. Please run Prisma migration first.'
+      });
+    }
 
     // Transform data for unified format
-    const allTransactions = [
-      ...expenses.map(exp => ({
-        id: exp.id,
-        type: 'expense',
-        date: exp.date,
-        description: exp.description,
-        amount: exp.amount,
-        category: exp.category?.name,
-        bankCode: exp.bankCode,
-        store: exp.store,
-        rawData: exp.rawData,
-        isDeleted: exp.isDeleted,
-        deletedAt: exp.deletedAt,
-        createdAt: exp.createdAt,
-        updatedAt: exp.updatedAt,
-      })),
-      ...income.map(inc => ({
-        id: inc.id,
-        type: 'income',
-        date: inc.startDate,
-        description: inc.name,
-        amount: inc.amount,
-        category: inc.category?.name,
-        bankCode: inc.bankCode,
-        store: inc.store,
-        rawData: inc.rawData,
-        isDeleted: inc.isDeleted,
-        deletedAt: inc.deletedAt,
-        createdAt: inc.createdAt,
-        updatedAt: inc.updatedAt,
-      })),
-    ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    const allTransactions = transactions.map((t: any) => ({
+      id: t.id,
+      type: t.creditAmount > 0 ? 'credit' : 'debit', // For backward compatibility
+      date: t.transactionDate,
+      transactionDate: t.transactionDate,
+      description: t.description,
+      creditAmount: Number(t.creditAmount),
+      debitAmount: Number(t.debitAmount),
+      amount: t.creditAmount > 0 ? Number(t.creditAmount) : Number(t.debitAmount), // For backward compatibility
+      financialCategory: t.financialCategory,
+      category: t.category?.name,
+      bankCode: t.bankCode,
+      store: t.store,
+      rawData: t.rawData,
+      isDeleted: t.isDeleted,
+      deletedAt: t.deletedAt,
+      createdAt: t.createdAt,
+      updatedAt: t.updatedAt,
+    }));
 
     return NextResponse.json({
       transactions: allTransactions,
       pagination: {
-        total: expenseCount + incomeCount,
+        total: totalCount,
         page,
-        limit,
-        totalPages: Math.ceil((expenseCount + incomeCount) / limit),
+        limit: normalizedLimit === 'all' ? totalCount : limit,
+        totalPages: normalizedLimit === 'all' ? 1 : Math.ceil(totalCount / limit),
       },
     });
   } catch (error) {

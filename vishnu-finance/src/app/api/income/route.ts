@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '../../../lib/db';
-import { getCanonicalNamesBatch } from '../entity-mappings/route';
+import { getCanonicalNamesBatch } from '@/lib/entity-mapping-service';
 import { rateLimitMiddleware, getRouteType } from '../../../lib/rate-limit';
 
 // Configure route caching - user-specific dynamic data
@@ -38,11 +38,21 @@ export async function GET(request: NextRequest) {
     const pageSize = Math.min(parseInt(searchParams.get('pageSize') || '100'), 200); // Max 200 per page
     const skip = (page - 1) * pageSize;
 
-    // Fetch incomes (income sources) optionally date-scoped by startDate
-    // IMPORTANT: Only fetch active income sources and ensure proper filtering
-    // Using raw SQL because Prisma Client hasn't been regenerated for new bank fields
+    // Fetch incomes from Transaction model (financialCategory=INCOME and creditAmount > 0)
+    // Also include legacy IncomeSource records for backward compatibility
     const getTotalCount = page === 1 || searchParams.get('includeTotal') === 'true';
-    const [totalCount, incomesResult] = await Promise.all([
+    const [transactionCount, incomeSourceCount, incomesResult] = await Promise.all([
+      // Count transactions with INCOME category
+      getTotalCount ? (prisma as any).transaction.count({
+        where: {
+          userId,
+          isDeleted: false,
+          financialCategory: 'INCOME',
+          creditAmount: { gt: 0 },
+          ...(dateFilter ? { transactionDate: dateFilter } : {})
+        }
+      }) : Promise.resolve(0),
+      // Count legacy income sources
       getTotalCount ? (prisma as any).incomeSource.count({
         where: {
           userId,
@@ -53,14 +63,68 @@ export async function GET(request: NextRequest) {
       }) : Promise.resolve(0),
       (async () => {
         let incomes: any[] = [];
+        
         try {
-          // Try Prisma query first (will work after regenerating Prisma Client)
-          incomes = await (prisma as any).incomeSource.findMany({
+          // Fetch from Transaction model (primary source)
+          try {
+          const transactions = await (prisma as any).transaction.findMany({
             where: {
               userId,
-              isActive: true,
               isDeleted: false,
-              ...(dateFilter ? { startDate: dateFilter } : {})
+              financialCategory: 'INCOME',
+              creditAmount: { gt: 0 },
+              ...(dateFilter ? { transactionDate: dateFilter } : {})
+            },
+            include: {
+              category: true,
+            },
+            orderBy: { transactionDate: 'desc' },
+            skip,
+            take: pageSize
+          });
+          
+          // Transform Transaction to IncomeSource format for backward compatibility
+          incomes = transactions.map((t: any) => ({
+            id: t.id,
+            name: t.description || '',
+            amount: Number(t.creditAmount),
+            frequency: 'ONE_TIME', // Transactions are one-time
+            categoryId: t.categoryId,
+            startDate: t.transactionDate,
+            endDate: null,
+            notes: t.notes,
+            isActive: true,
+            userId: t.userId,
+            createdAt: t.createdAt,
+            updatedAt: t.updatedAt,
+            // Bank fields
+            store: t.store,
+            upiId: t.upiId,
+            branch: t.branch,
+            personName: t.personName,
+            rawData: t.rawData,
+            bankCode: t.bankCode,
+            transactionId: t.transactionId,
+            accountNumber: t.accountNumber,
+            transferType: t.transferType,
+            // Additional Transaction fields
+            creditAmount: Number(t.creditAmount),
+            debitAmount: Number(t.debitAmount),
+            financialCategory: t.financialCategory,
+          }));
+        } catch (error) {
+          console.warn('⚠️ Failed to fetch from Transaction model, falling back to IncomeSource');
+        }
+        
+        // Also fetch legacy IncomeSource records if Transaction model doesn't have enough
+        if (incomes.length < pageSize) {
+          try {
+            const legacyIncomes = await (prisma as any).incomeSource.findMany({
+              where: {
+                userId,
+                isActive: true,
+                isDeleted: false,
+                ...(dateFilter ? { startDate: dateFilter } : {})
             },
             select: {
               id: true,
@@ -82,25 +146,32 @@ export async function GET(request: NextRequest) {
               rawData: true
             },
             orderBy: { startDate: 'desc' },
-            skip,
-            take: pageSize // PERFORMANCE: Add limit
-          });
-      // Manually add bank fields from raw SQL since Prisma Client doesn't recognize them yet
-      if (incomes.length > 0) {
-        const ids = incomes.map((i: any) => i.id);
+              skip: 0,
+              take: pageSize - incomes.length
+            });
+            
+            // Add bank fields from raw SQL
+            if (legacyIncomes.length > 0) {
+              const ids = legacyIncomes.map((i: any) => i.id);
         const bankFields = await (prisma as any).$queryRawUnsafe(`
           SELECT id, bankCode, transactionId, accountNumber, transferType
           FROM income_sources
           WHERE id IN (${ids.map(() => '?').join(',')})
         `, ...ids);
         const bankMap = new Map(bankFields.map((bf: any) => [bf.id, bf]));
-        incomes = incomes.map((inc: any) => {
+              legacyIncomes.forEach((inc: any) => {
           const bankData = bankMap.get(inc.id) || {};
-          return {
-            ...inc,
-            ...bankData
-          };
-        });
+                Object.assign(inc, bankData);
+              });
+            }
+            
+            // Merge with transaction incomes (avoid duplicates by ID)
+            const existingIds = new Set(incomes.map((i: any) => i.id));
+            const newLegacy = legacyIncomes.filter((inc: any) => !existingIds.has(inc.id));
+            incomes = [...incomes, ...newLegacy].slice(0, pageSize);
+          } catch (error) {
+            console.warn('⚠️ Failed to fetch legacy IncomeSource records');
+          }
       }
       
       // Filter out any invalid amounts or duplicates
@@ -121,6 +192,8 @@ export async function GET(request: NextRequest) {
         seen.add(key);
         return true;
       });
+      
+          return incomes;
     } catch (error: any) {
       // Use raw SQL fallback if Prisma validation fails (new fields not recognized)
       console.log('⚠️ INCOME GET - Using raw SQL fallback');
@@ -151,11 +224,11 @@ export async function GET(request: NextRequest) {
       query += ` ORDER BY startDate DESC LIMIT ? OFFSET ?`;
       params.push(pageSize, skip);
       
-      incomes = await (prisma as any).$queryRawUnsafe(query, ...params);
+          let fallbackIncomes = await (prisma as any).$queryRawUnsafe(query, ...params);
       
       // Filter out any invalid amounts or duplicates
       const seen = new Set<string>();
-      incomes = incomes.filter((income: any) => {
+          fallbackIncomes = fallbackIncomes.filter((income: any) => {
         const amount = parseFloat(income.amount || 0);
         // Skip invalid amounts
         if (!amount || amount <= 0 || isNaN(amount) || !isFinite(amount)) {
@@ -171,9 +244,10 @@ export async function GET(request: NextRequest) {
         seen.add(key);
         return true;
       });
+          
+          return fallbackIncomes;
     }
-    return incomes;
-  })(),
+      })()
 ]);
     
     let incomes: any[] = incomesResult || [];
@@ -229,6 +303,7 @@ export async function GET(request: NextRequest) {
     console.log('📊 INCOME GET - Sample incomes data (first 3):', JSON.stringify(incomes.slice(0, 3), null, 2));
     
     // Return paginated response with metadata
+    const totalCount = transactionCount + incomeSourceCount;
     const response: any = {
       data: incomes,
       pagination: {
@@ -284,23 +359,44 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    console.log('➕ INCOME POST - Creating income in database...');
-    // Create new income in database using correct field mappings
-    const newIncome = await (prisma as any).incomeSource.create({
+    console.log('➕ INCOME POST - Creating income as Transaction in database...');
+    // Create new income as Transaction record with INCOME category
+    const newIncome = await (prisma as any).transaction.create({
       data: {
-        name: title, // Map title to name field
-        amount: parseFloat(amount),
-        frequency: 'ONE_TIME', // Default frequency
-        startDate: new Date(date),
-        notes: description || notes,
-        // store: store || null, // Temporarily disabled - store info will go in notes
         userId: userId,
-        categoryId: null // We'll handle categories later
+        transactionDate: new Date(date),
+        description: title,
+        creditAmount: parseFloat(amount),
+        debitAmount: 0,
+        financialCategory: 'INCOME',
+        categoryId: null,
+        notes: description || notes,
+        store: store || null,
       }
     });
+    
+    // Transform to IncomeSource format for backward compatibility
+    const transformedIncome = {
+      id: newIncome.id,
+      name: newIncome.description,
+      amount: Number(newIncome.creditAmount),
+      frequency: 'ONE_TIME',
+      categoryId: newIncome.categoryId,
+      startDate: newIncome.transactionDate,
+      endDate: null,
+      notes: newIncome.notes,
+      isActive: true,
+      userId: newIncome.userId,
+      createdAt: newIncome.createdAt,
+      updatedAt: newIncome.updatedAt,
+      store: newIncome.store,
+      creditAmount: Number(newIncome.creditAmount),
+      debitAmount: 0,
+      financialCategory: newIncome.financialCategory,
+    };
 
-    console.log('✅ INCOME POST - Successfully created income:', JSON.stringify(newIncome, null, 2));
-    return NextResponse.json(newIncome);
+    console.log('✅ INCOME POST - Successfully created income:', JSON.stringify(transformedIncome, null, 2));
+    return NextResponse.json(transformedIncome);
   } catch (error) {
     console.error('❌ INCOME POST - Error:', error);
     console.error('❌ INCOME POST - Error details:', JSON.stringify(error, null, 2));

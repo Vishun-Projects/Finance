@@ -5,7 +5,7 @@ import DeadlinesManagement from '@/components/management/deadlines-management';
 
 export default function DeadlinesPage() {
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="container mx-auto px-3 sm:px-6 py-6">
       <DeadlinesManagement />
     </div>
   );

@@ -8,6 +8,7 @@ interface ImportRecord {
   amount: number | string;
   category?: string;
   date: string;
+  date_iso?: string;
   description?: string;
   payment_method?: string;
   notes?: string;

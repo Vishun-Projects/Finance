@@ -7,7 +7,6 @@ import { useAuth } from '../../contexts/AuthContext';
 import {
   Home,
   TrendingUp,
-  TrendingDown,
   Target,
   Calendar,
   Gift,
@@ -17,18 +16,14 @@ import {
   X,
   BookOpen,
   Heart,
-  Trash2,
 } from 'lucide-react';
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: Home },
   { href: '/financial-health', label: 'Health Score', icon: Heart },
-  { href: '/income', label: 'Income', icon: TrendingUp },
-  { href: '/expenses', label: 'Expenses', icon: TrendingDown },
+  { href: '/transactions', label: 'Transactions', icon: TrendingUp, tooltip: 'Manage all income, expenses, and transactions' },
   { href: '/goals', label: 'Goals', icon: Target },
-  { href: '/deadlines', label: 'Deadlines', icon: Calendar },
   { href: '/wishlist', label: 'Wishlist', icon: Gift },
-  { href: '/manage-transactions', label: 'Manage', icon: Trash2 },
   { href: '/education', label: 'Learn', icon: BookOpen },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
@@ -52,9 +47,13 @@ export default function Navigation() {
         <div className="flex justify-between items-center h-16">
           {/* Logo and Brand */}
           <div className="flex items-center">
-            <Link href="/dashboard" className="flex items-center space-x-2 group" aria-label="Go to dashboard">
-              <div className="w-8 h-8 rounded-md bg-gray-900 text-white grid place-items-center group-hover:opacity-90 transition-opacity">
-                <TrendingUp className="w-5 h-5" />
+            <Link href="/dashboard" className="flex items-center space-x-3 group" aria-label="Go to dashboard">
+              <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-lg overflow-hidden group-hover:opacity-90 transition-opacity relative flex items-center justify-center bg-white shadow-sm">
+                <img
+                  src="/android-chrome-192x192.png"
+                  alt="Vishnu Finance Logo"
+                  className="w-full h-full object-contain p-1"
+                />
               </div>
               <span className="hidden sm:block text-xl font-bold text-gray-900">Vishnu Finance</span>
             </Link>
@@ -169,5 +168,3 @@ export default function Navigation() {
     </nav>
   );
 }
-
-

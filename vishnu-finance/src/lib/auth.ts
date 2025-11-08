@@ -11,6 +11,7 @@ export interface JWTPayload {
   userId: string;
   email: string;
   name?: string;
+  role: 'USER' | 'SUPERUSER';
   iat?: number;
   exp?: number;
 }
@@ -107,6 +108,7 @@ export class AuthService {
         email,
         password: hashedPassword,
         name: name || email.split('@')[0], // Use email prefix as default name
+        role: 'USER',
       }
     });
     console.log(`⏱️ DB QUERY (create): ${Date.now() - dbStart2}ms`);
@@ -115,7 +117,8 @@ export class AuthService {
     const token = this.generateToken({
       userId: user.id,
       email: user.email,
-      name: user.name || undefined
+      name: user.name || undefined,
+      role: user.role,
     });
 
     console.log(`⏱️ REGISTER COMPLETE: ${Date.now() - startTime}ms`);
@@ -123,7 +126,24 @@ export class AuthService {
       user: {
         id: user.id,
         email: user.email,
-        name: user.name
+        name: user.name,
+        avatarUrl: user.avatarUrl,
+        gender: user.gender,
+        phone: user.phone,
+        dateOfBirth: user.dateOfBirth,
+        addressLine1: user.addressLine1,
+        addressLine2: user.addressLine2,
+        city: user.city,
+        state: user.state,
+        country: user.country,
+        pincode: user.pincode,
+        occupation: user.occupation,
+        bio: user.bio,
+        isActive: user.isActive,
+        lastLogin: user.lastLogin,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+        role: user.role,
       },
       token
     };
@@ -190,7 +210,8 @@ export class AuthService {
     const token = this.generateToken({
       userId: user.id,
       email: user.email,
-      name: user.name || undefined
+      name: user.name || undefined,
+      role: user.role,
     });
 
     console.log(`⏱️ LOGIN COMPLETE: ${Date.now() - startTime}ms`);
@@ -198,7 +219,24 @@ export class AuthService {
       user: {
         id: user.id,
         email: user.email,
-        name: user.name
+        name: user.name,
+        avatarUrl: user.avatarUrl,
+        gender: user.gender,
+        phone: user.phone,
+        dateOfBirth: user.dateOfBirth,
+        addressLine1: user.addressLine1,
+        addressLine2: user.addressLine2,
+        city: user.city,
+        state: user.state,
+        country: user.country,
+        pincode: user.pincode,
+        occupation: user.occupation,
+        bio: user.bio,
+        isActive: user.isActive,
+        lastLogin: user.lastLogin,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+        role: user.role,
       },
       token
     };
@@ -213,19 +251,85 @@ export class AuthService {
     }
 
     const dbStart = Date.now();
-    const user = await prisma.user.findUnique({
-      where: { id: payload.userId },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        isActive: true,
-        lastLogin: true,
-        createdAt: true
-      }
-    });
-    console.log(`⏱️ GET USER FROM TOKEN: ${Date.now() - startTime}ms (DB: ${Date.now() - dbStart}ms)`);
+    try {
+      const user = await prisma.user.findUnique({
+        where: { id: payload.userId },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          avatarUrl: true,
+          gender: true,
+          phone: true,
+          dateOfBirth: true,
+          addressLine1: true,
+          addressLine2: true,
+          city: true,
+          state: true,
+          country: true,
+          pincode: true,
+          occupation: true,
+          bio: true,
+          isActive: true,
+          lastLogin: true,
+          createdAt: true,
+          updatedAt: true,
+          role: true,
+          status: true,
+        }
+      });
 
-    return user;
+      console.log(`⏱️ GET USER FROM TOKEN DB QUERY: ${Date.now() - dbStart}ms`);
+
+      if (!user) {
+        console.log('⚠️ GET USER FROM TOKEN - User not found');
+        return null;
+      }
+
+      console.log(`✅ GET USER FROM TOKEN SUCCESS in ${Date.now() - startTime}ms`);
+      return user;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '';
+      if (message.includes('Unknown field `status`')) {
+        console.warn('⚠️ GET USER FROM TOKEN - status column missing, falling back to legacy schema');
+        const user = await prisma.user.findUnique({
+          where: { id: payload.userId },
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            avatarUrl: true,
+            gender: true,
+            phone: true,
+            dateOfBirth: true,
+            addressLine1: true,
+            addressLine2: true,
+            city: true,
+            state: true,
+            country: true,
+            pincode: true,
+            occupation: true,
+            bio: true,
+            isActive: true,
+            lastLogin: true,
+            createdAt: true,
+            updatedAt: true,
+            role: true,
+          }
+        });
+
+        console.log(`⏱️ GET USER FROM TOKEN DB QUERY (fallback): ${Date.now() - dbStart}ms`);
+
+        if (!user) {
+          console.log('⚠️ GET USER FROM TOKEN - User not found (fallback)');
+          return null;
+        }
+
+        console.log(`✅ GET USER FROM TOKEN SUCCESS (fallback) in ${Date.now() - startTime}ms`);
+        return { ...user, status: 'ACTIVE' as const };
+      }
+
+      throw error;
+    }
   }
 }

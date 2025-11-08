@@ -1,0 +1,47 @@
+{
+  "bankCode": "YESB",
+  "parserClasses": [
+    "MultiBankParser"
+  ],
+  "parserFiles": [
+    "tools/parsers/multi_bank_parser.py"
+  ],
+  "aliases": [
+    "YES BANK"
+  ],
+  "transactionFields": [
+    "amount",
+    "balance",
+    "bankCode",
+    "commodity",
+    "credit",
+    "date",
+    "date_iso",
+    "debit",
+    "description",
+    "line",
+    "page",
+    "raw",
+    "store"
+  ],
+  "metadataFields": [
+    "accountNumber",
+    "personName",
+    "transactionId",
+    "transferType",
+    "upiId"
+  ],
+  "statementMetadataFields": [
+    "accountHolderName",
+    "accountNumber",
+    "branch",
+    "closingBalance",
+    "ifsc",
+    "openingBalance",
+    "statementEndDate",
+    "statementStartDate",
+    "totalCredits",
+    "totalDebits",
+    "transactionCount"
+  ]
+}

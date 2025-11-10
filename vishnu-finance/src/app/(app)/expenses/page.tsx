@@ -1,18 +1,7 @@
-'use client';
+import { redirect } from 'next/navigation';
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+export const dynamic = 'force-dynamic';
 
 export default function ExpensesPage() {
-  const router = useRouter();
-
-  useEffect(() => {
-    router.replace('/transactions?type=EXPENSE');
-  }, [router]);
-
-  return (
-    <div className="flex items-center justify-center min-h-screen">
-      <p>Redirecting to Transactions...</p>
-    </div>
-  );
+  redirect('/transactions?type=EXPENSE');
 }

@@ -1,12 +1,7 @@
-'use client';
+import { redirect } from 'next/navigation';
 
-import React from 'react';
-import GoalsManagement from '@/components/management/goals-management';
+export const dynamic = 'force-dynamic';
 
-export default function GoalsPage() {
-  return (
-    <div className="container mx-auto px-3 sm:px-6 py-6">
-      <GoalsManagement />
-    </div>
-  );
+export default function RedirectGoalsPage() {
+  redirect('/plans?tab=goals');
 }

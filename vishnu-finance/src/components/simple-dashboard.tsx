@@ -30,7 +30,6 @@ import { hapticLight, hapticMedium, hapticError, hapticSuccess } from '@/lib/hap
 import { trackPullToRefresh, trackChartSeriesToggled, trackTransactionAdded, trackTransactionEdited } from '@/lib/analytics';
 import { prefersReducedMotion, getFadeAnimation, TIMING } from '@/lib/motion-utils';
 import { useToast } from '../contexts/ToastContext';
-import TransactionCard from './transaction-card';
 import TransactionFormModal, { TransactionFormData } from './transaction-form-modal';
 import TransactionAddSheet, { TransactionPreset } from './ui/transaction-add-sheet';
 import {
@@ -53,10 +52,9 @@ import { DateRange } from 'react-day-picker';
 import QuickRangeChips, { QuickRange } from './ui/quick-range-chips';
 import FilterSheet from './ui/filter-sheet';
 import FabButton from './ui/fab-button';
-import QuickActionsMenu from './ui/quick-actions-menu';
 import { Calendar as CalendarComponent } from './ui/calendar';
 
-interface SimpleDashboardData {
+export interface SimpleDashboardData {
   totalIncome: number;
   totalExpenses: number;
   totalCredits?: number;
@@ -230,14 +228,25 @@ const TransactionRow = memo(({
 
 TransactionRow.displayName = 'TransactionRow';
 
-export default function SimpleDashboard() {
+interface SimpleDashboardProps {
+  initialData?: SimpleDashboardData | null;
+  initialStartDate?: string;
+  initialEndDate?: string;
+}
+
+export default function SimpleDashboard({
+  initialData = null,
+  initialStartDate,
+  initialEndDate,
+}: SimpleDashboardProps) {
   const { user, loading: authLoading } = useAuth();
   const { addToast } = useToast();
   const [isUpdating, setIsUpdating] = useState(false);
   const [showLegend, setShowLegend] = useState<boolean>(false);
   const [isDateSheetOpen, setIsDateSheetOpen] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
-  const [cacheStatus, setCacheStatus] = useState<'fresh' | 'stale' | null>(null);
+  const [cacheStatus, setCacheStatus] = useState<'fresh' | 'stale' | null>(initialData ? 'fresh' : null);
+  const hasBootstrappedRef = useRef(Boolean(initialData));
   
   // Pull-to-refresh state
   const [pullDistance, setPullDistance] = useState(0);
@@ -257,14 +266,30 @@ export default function SimpleDashboard() {
   const now = new Date();
   const defaultStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const defaultEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+  const initialStart = initialStartDate ? new Date(initialStartDate) : defaultStart;
+  const initialEnd = initialEndDate ? new Date(initialEndDate) : defaultEnd;
   
-  const [startDate, setStartDate] = useState(defaultStart.toISOString().split('T')[0]);
-  const [endDate, setEndDate] = useState(defaultEnd.toISOString().split('T')[0]);
-  const [quickRange, setQuickRange] = useState<QuickRange>('month');
+  const [startDate, setStartDate] = useState(() =>
+    initialStartDate ?? initialStart.toISOString().split('T')[0]
+  );
+  const [endDate, setEndDate] = useState(() =>
+    initialEndDate ?? initialEnd.toISOString().split('T')[0]
+  );
+  const defaultStartISO = defaultStart.toISOString().split('T')[0];
+  const defaultEndISO = defaultEnd.toISOString().split('T')[0];
+
+  const [quickRange, setQuickRange] = useState<QuickRange>(() => {
+    if (initialStartDate && initialEndDate) {
+      if (initialStartDate !== defaultStartISO || initialEndDate !== defaultEndISO) {
+        return 'custom';
+      }
+    }
+    return 'month';
+  });
   
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
-    from: defaultStart,
-    to: defaultEnd,
+    from: new Date(initialStart.getTime()),
+    to: new Date(initialEnd.getTime()),
   });
 
   // Online/offline detection
@@ -283,8 +308,8 @@ export default function SimpleDashboard() {
   }, []);
 
   // Dashboard data state
-  const [dashboardData, setDashboardData] = useState<SimpleDashboardData | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [dashboardData, setDashboardData] = useState<SimpleDashboardData | null>(initialData);
+  const [isLoading, setIsLoading] = useState(!initialData);
   const [error, setError] = useState<Error | null>(null);
 
   // Fetch dashboard data
@@ -330,6 +355,10 @@ export default function SimpleDashboard() {
   // Load dashboard data on mount and when dates change
   useEffect(() => {
     if (user && !authLoading) {
+      if (hasBootstrappedRef.current) {
+        hasBootstrappedRef.current = false;
+        return;
+      }
       fetchDashboardData();
     }
   }, [user, authLoading, fetchDashboardData]);
@@ -490,13 +519,6 @@ export default function SimpleDashboard() {
         type: 'success',
         title: 'Transaction deleted',
         message: 'The transaction has been removed',
-        action: {
-          label: 'Undo',
-          onClick: async () => {
-            // TODO: Implement undo (would need to restore from backup)
-            hapticMedium();
-          },
-        },
         duration: 4000,
       });
       hapticSuccess();
@@ -628,7 +650,7 @@ export default function SimpleDashboard() {
   // Show authentication loading
   if (authLoading) {
     return (
-      <div className="container-fluid px-6 py-8">
+      <div className="container-fluid py-8">
         <PageSkeleton />
       </div>
     );
@@ -638,7 +660,7 @@ export default function SimpleDashboard() {
   if (!user) {
     return (
       <div className="min-h-screen bg-background pt-16">
-        <div className="container-fluid px-6">
+        <div className="container-fluid">
           <div className="text-center py-12">
             <h3 className="text-xl font-semibold text-foreground mb-4">Please Login</h3>
             <p className="text-muted-foreground mb-8">You need to be logged in to view your dashboard</p>
@@ -656,7 +678,7 @@ export default function SimpleDashboard() {
       <AnimatePresence mode="wait">
         <motion.div
           key="skeleton"
-          className="container-fluid px-6 py-8"
+          className="container-fluid py-8"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -671,7 +693,7 @@ export default function SimpleDashboard() {
   if (!dashboardData) {
     return (
       <div className="min-h-screen bg-background pt-16">
-        <div className="container-fluid px-6">
+        <div className="container-fluid">
           <div className="text-center py-12">
             <h3 className="text-lg font-semibold text-foreground mb-2">No Data Available</h3>
             <p className="text-muted-foreground mb-4">Start by adding your first credit or debit transaction</p>
@@ -717,7 +739,7 @@ export default function SimpleDashboard() {
       
       {/* Sticky Header - Only on mobile, hidden on desktop where nav bar exists */}
       <div className="lg:hidden sticky top-16 z-30 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
-        <div className="container-fluid px-3 sm:px-6 py-3 sm:py-4">
+        <div className="container-fluid py-3 sm:py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3 flex-1 min-w-0">
               {/* Avatar */}
@@ -821,6 +843,15 @@ export default function SimpleDashboard() {
               >
                 <RefreshCw className={`w-4 h-4 ${isUpdating || isLoading ? 'animate-spin' : ''}`} />
                 <span>Refresh</span>
+              </Button>
+              <Button
+                onClick={() => setIsAddSheetOpen(true)}
+                size="sm"
+                className="hidden gap-2 sm:flex"
+                aria-label="Add new transaction"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add Transaction</span>
               </Button>
             </div>
           </div>
@@ -1219,33 +1250,6 @@ export default function SimpleDashboard() {
             </div>
           </div>
 
-          {/* Quick Actions - Desktop: Card, Mobile: Floating Menu (replaced by QuickActionsMenu) */}
-          <Card className="hidden md:block">
-            <CardHeader>
-              <CardTitle className="text-base">Quick Actions</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <Link href="/income" className="block">
-                <Button variant="outline" className="w-full justify-start" size="sm">
-                  <TrendingUp className="w-4 h-4 mr-2" aria-hidden="true" />
-                  Add Income
-                </Button>
-              </Link>
-              <Link href="/expenses" className="block">
-                <Button variant="outline" className="w-full justify-start" size="sm">
-                  <TrendingDown className="w-4 h-4 mr-2" aria-hidden="true" />
-                  Add Expense
-                </Button>
-              </Link>
-              <Link href="/goals" className="block">
-                <Button variant="outline" className="w-full justify-start" size="sm">
-                  <Target className="w-4 h-4 mr-2" aria-hidden="true" />
-                  Set Goal
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
-
           {/* Recent Transactions Preview - Mobile: No Card, Desktop: Card */}
           <div>
             <Card className="hidden md:block">
@@ -1334,9 +1338,6 @@ export default function SimpleDashboard() {
         onClick={() => setIsAddSheetOpen(true)}
         aria-label="Add new transaction"
       />
-      
-      {/* Quick Actions Menu - Mobile Only (Floating Corner Icon) */}
-      <QuickActionsMenu position="bottom-left" />
       
       {/* Transaction Add Sheet with Presets */}
       <TransactionAddSheet
@@ -1455,7 +1456,7 @@ export default function SimpleDashboard() {
           transition={{ duration: 0.25 }}
           className="fixed top-16 left-0 right-0 z-40 bg-destructive/10 border-b border-destructive/20"
         >
-          <div className="container-fluid px-4 py-3 flex items-center justify-between">
+          <div className="container-fluid py-3 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <AlertCircle className="w-5 h-5 text-destructive" />
               <span className="text-sm font-medium">Failed to load dashboard data</span>

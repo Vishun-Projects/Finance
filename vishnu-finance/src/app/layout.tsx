@@ -8,6 +8,7 @@ import { CurrencyProvider } from "@/contexts/CurrencyContext";
 import { ToastProvider } from "@/contexts/ToastContext";
 import { LoadingProvider } from "@/contexts/LoadingContext";
 import { Toaster } from "@/components/ui/sonner";
+import { getCurrentUser } from "@/lib/auth/server-auth";
 
 export const metadata: Metadata = {
   title: "Vishnu Finance - Personal Finance Manager",
@@ -30,15 +31,17 @@ export const viewport: Viewport = {
   maximumScale: 5,
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const currentUser = await getCurrentUser();
+
   return (
     <html lang="en">
       <body>
-        <AuthProvider>
+        <AuthProvider initialUser={currentUser}>
           <ThemeProvider>
             <CurrencyProvider>
               <ToastProvider>

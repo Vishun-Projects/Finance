@@ -1,14 +1,7 @@
-'use client';
+import { redirect } from 'next/navigation';
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+export const dynamic = 'force-dynamic';
 
 export default function RegisterPage() {
-  const router = useRouter();
-  
-  useEffect(() => {
-    router.replace('/auth?tab=register');
-  }, [router]);
-
-  return null;
+  redirect('/auth?tab=register');
 }

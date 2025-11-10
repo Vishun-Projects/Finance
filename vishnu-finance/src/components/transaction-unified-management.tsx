@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Plus, Search, Filter, X, RefreshCw, Settings, CheckSquare, Square, Trash2, RotateCw, Tag, Layers, ChevronLeft, ChevronRight, Sparkles, Check, Calendar as CalendarIcon, FileText, Upload, AlertCircle, TrendingUp } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { useAuth } from '../hooks/useAuth';
+import { useAuth } from '@/contexts/AuthContext';
 import { useCurrency } from '../contexts/CurrencyContext';
 import { useToast } from '../contexts/ToastContext';
 import { Transaction, TransactionCategory } from '@/types';
@@ -18,10 +19,14 @@ import MobileHeader from './ui/mobile-header';
 import FilterSheet from './ui/filter-sheet';
 import QuickRangeChips, { QuickRange } from './ui/quick-range-chips';
 import { DateRangeFilter } from './ui/date-range-filter';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { Badge } from './ui/badge';
 import { Combobox } from './ui/combobox';
 import { Button } from './ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { calculateTotalsByCategory, formatCurrency } from '@/lib/transaction-utils';
+import { cn } from '@/lib/utils';
+import type { ISODateRange } from '@/lib/date-range';
 import DeleteConfirmationDialog from './delete-confirmation-dialog';
 
 interface BankTransaction {
@@ -49,19 +54,37 @@ interface BankTransaction {
   [key: string]: unknown;
 }
 
-export default function TransactionUnifiedManagement() {
+export interface TransactionsBootstrap {
+  transactions?: Transaction[];
+  categories?: { id: string; name: string; type: 'INCOME' | 'EXPENSE'; color?: string }[];
+  pagination?: { total: number; page: number; pageSize: number; totalPages: number };
+  totals?: { income: number; expense: number } | null;
+  range?: ISODateRange;
+  userId?: string;
+}
+
+interface TransactionUnifiedManagementProps {
+  bootstrap?: TransactionsBootstrap;
+}
+
+export default function TransactionUnifiedManagement({ bootstrap }: TransactionUnifiedManagementProps = {}) {
   const { user } = useAuth();
   const { formatCurrency: formatCurrencyFunc } = useCurrency();
   const { success, error: showError } = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
 
+  const resolvedUserId = user?.id ?? bootstrap?.userId ?? null;
+  const bootstrapRange = bootstrap?.range;
+
   // State
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [categories, setCategories] = useState<{ id: string; name: string; type: 'INCOME' | 'EXPENSE'; color?: string }[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [pagination, setPagination] = useState({ total: 0, page: 1, pageSize: 50, totalPages: 0 });
-  const [apiTotals, setApiTotals] = useState<{ income: number; expense: number } | null>(null);
+  const [transactions, setTransactions] = useState<Transaction[]>(bootstrap?.transactions ?? []);
+  const [categories, setCategories] = useState<{ id: string; name: string; type: 'INCOME' | 'EXPENSE'; color?: string }[]>(
+    bootstrap?.categories ?? [],
+  );
+  const [isLoading, setIsLoading] = useState(!(bootstrap?.transactions && bootstrap.transactions.length > 0));
+  const [pagination, setPagination] = useState(bootstrap?.pagination ?? { total: 0, page: 1, pageSize: 50, totalPages: 0 });
+  const [apiTotals, setApiTotals] = useState<{ income: number; expense: number } | null>(bootstrap?.totals ?? null);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
@@ -94,6 +117,13 @@ export default function TransactionUnifiedManagement() {
   const [tempFiles, setTempFiles] = useState<string[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+
+  const hasBootstrapTransactionsRef = useRef(Boolean(bootstrap?.transactions?.length));
+  const hasBootstrapCategoriesRef = useRef(Boolean(bootstrap?.categories?.length));
+  const filterBarRef = useRef<HTMLDivElement | null>(null);
+  const selectionToolbarRef = useRef<HTMLDivElement | null>(null);
+  const [filterPulse, setFilterPulse] = useState(false);
+  const [selectionPulse, setSelectionPulse] = useState(false);
 
   // Filters from URL
   const financialCategory = (searchParams.get('type') as TransactionCategory | 'ALL') || 'ALL';
@@ -156,8 +186,13 @@ export default function TransactionUnifiedManagement() {
     if (startDateParam && endDateParam) {
       return [startDateParam, endDateParam];
     }
+
+    if (bootstrapRange) {
+      return [bootstrapRange.startDate, bootstrapRange.endDate];
+    }
+
     return computeRange(quickRange);
-  }, [startDateParam, endDateParam, quickRange, computeRange]);
+  }, [startDateParam, endDateParam, quickRange, computeRange, bootstrapRange]);
 
   // Local filter state
   const [localSearch, setLocalSearch] = useState(searchTerm);
@@ -177,8 +212,23 @@ export default function TransactionUnifiedManagement() {
     setSelectedCategoryId(categoryIdParam);
   }, [categoryIdParam]);
 
+  useEffect(() => {
+    if (!filterPulse) return;
+    const timeout = window.setTimeout(() => setFilterPulse(false), 1200);
+    return () => window.clearTimeout(timeout);
+  }, [filterPulse]);
+
+  useEffect(() => {
+    if (!selectionPulse) return;
+    const timeout = window.setTimeout(() => setSelectionPulse(false), 1200);
+    return () => window.clearTimeout(timeout);
+  }, [selectionPulse]);
+
   // Update URL params
   const updateURLParams = useCallback((updates: Record<string, string | null>) => {
+    if (resolvedUserId) {
+      setIsLoading(true);
+    }
     const params = new URLSearchParams(searchParams.toString());
     Object.entries(updates).forEach(([key, value]) => {
       if (value === null || value === '') {
@@ -188,7 +238,7 @@ export default function TransactionUnifiedManagement() {
       }
     });
     router.push(`/transactions?${params.toString()}`);
-  }, [router, searchParams]);
+  }, [router, searchParams, resolvedUserId]);
 
   // Apply quick range
   const applyQuickRange = useCallback((range: QuickRange) => {
@@ -207,10 +257,12 @@ export default function TransactionUnifiedManagement() {
   }, [quickRange, startDate, endDate]);
 
   // Fetch transactions with pagination
-  const fetchTransactions = useCallback(async () => {
-    if (!user) return;
+  const fetchTransactions = useCallback(async ({ showSpinner = true }: { showSpinner?: boolean } = {}) => {
+    if (!resolvedUserId) return;
 
-    setIsLoading(true);
+    if (showSpinner) {
+      setIsLoading(true);
+    }
     try {
       const params = new URLSearchParams();
       if (financialCategory !== 'ALL') {
@@ -248,20 +300,20 @@ export default function TransactionUnifiedManagement() {
       if (data.pagination) {
         setPagination(data.pagination);
       }
-      if (data.totals) {
-        setApiTotals(data.totals);
-      }
+      setApiTotals(data.totals ?? null);
     } catch (error) {
       console.error('Error fetching transactions:', error);
       showError('Error', 'Failed to load transactions');
     } finally {
-      setIsLoading(false);
+      if (showSpinner) {
+        setIsLoading(false);
+      }
     }
-  }, [user, financialCategory, searchTerm, startDate, endDate, showDeleted, pageParam, getPageSize, showError, amountPreset, selectedCategoryId]);
+  }, [resolvedUserId, financialCategory, searchTerm, startDate, endDate, showDeleted, pageParam, getPageSize, showError, amountPreset, selectedCategoryId]);
 
   // Fetch categories
   const fetchCategories = useCallback(async () => {
-    if (!user) return;
+    if (!resolvedUserId) return;
 
     try {
       const response = await fetch('/api/categories');
@@ -272,16 +324,31 @@ export default function TransactionUnifiedManagement() {
     } catch (error) {
       console.error('Error fetching categories:', error);
     }
-  }, [user]);
+  }, [resolvedUserId]);
 
   // Effects
   useEffect(() => {
+    if (!resolvedUserId) {
+      return;
+    }
+
+    if (hasBootstrapCategoriesRef.current) {
+      hasBootstrapCategoriesRef.current = false;
+      return;
+    }
+
     fetchCategories();
-  }, [fetchCategories]);
+  }, [resolvedUserId, fetchCategories]);
 
   useEffect(() => {
-    fetchTransactions();
-  }, [fetchTransactions]);
+    if (!resolvedUserId) {
+      return;
+    }
+
+    const showSpinner = !hasBootstrapTransactionsRef.current;
+    hasBootstrapTransactionsRef.current = false;
+    fetchTransactions({ showSpinner });
+  }, [resolvedUserId, fetchTransactions]);
 
   // Update local search when URL changes
   useEffect(() => {
@@ -306,6 +373,97 @@ export default function TransactionUnifiedManagement() {
   const filteredTransactions = useMemo(() => {
     return transactions;
   }, [transactions]);
+
+  const formatAmount = useCallback(
+    (value: number) => {
+      const safeValue = Number.isFinite(value) ? value : 0;
+      return formatCurrencyFunc ? formatCurrencyFunc(safeValue) : formatCurrency(safeValue);
+    },
+    [formatCurrencyFunc],
+  );
+
+  const overviewMetrics = useMemo(() => {
+    const income = totals?.income ?? 0;
+    const expense = totals?.expense ?? 0;
+    return {
+      income,
+      expense,
+      net: income - expense,
+      count: filteredTransactions.length,
+    };
+  }, [totals, filteredTransactions]);
+
+  const { income, expense, net, count } = overviewMetrics;
+
+  const rangeLabel = useMemo(() => {
+    const labelByRange: Record<string, string> = {
+      month: 'This month',
+      lastMonth: 'Last month',
+      quarter: 'This quarter',
+      year: 'This year',
+      all: 'All time',
+    };
+    if (labelByRange[quickRange]) {
+      return labelByRange[quickRange];
+    }
+    if (startDate && endDate) {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      if (!Number.isNaN(start.getTime()) && !Number.isNaN(end.getTime())) {
+        const sameYear = start.getFullYear() === end.getFullYear();
+        const startLabel = format(start, sameYear ? 'd MMM' : 'd MMM yyyy');
+        const endLabel = format(end, 'd MMM yyyy');
+        return `${startLabel} - ${endLabel}`;
+      }
+    }
+    return 'Custom range';
+  }, [quickRange, startDate, endDate]);
+
+  const rangeSummary = useMemo(() => {
+    if (!startDate || !endDate) {
+      return '';
+    }
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+      return '';
+    }
+    const diffDays = Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+    const startLabel = format(start, 'd MMM yyyy');
+    const endLabel = format(end, 'd MMM yyyy');
+    return `${startLabel} - ${endLabel} (${diffDays} day${diffDays > 1 ? 's' : ''})`;
+  }, [startDate, endDate]);
+
+  const totalRecords = useMemo(() => {
+    return pagination.total && pagination.total > 0 ? pagination.total : count;
+  }, [count, pagination.total]);
+
+  const desktopMetrics = useMemo(
+    () => [
+      {
+        key: 'income',
+        label: 'Income',
+        value: formatAmount(income),
+        helper: 'Inflow this range',
+        tone: 'text-emerald-600 dark:text-emerald-400',
+      },
+      {
+        key: 'expense',
+        label: 'Spends',
+        value: formatAmount(expense),
+        helper: 'Outflow this range',
+        tone: 'text-rose-500 dark:text-rose-400',
+      },
+      {
+        key: 'net',
+        label: 'Net flow',
+        value: formatAmount(net),
+        helper: 'Income minus spends',
+        tone: net >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-500 dark:text-rose-400',
+      },
+    ],
+    [expense, formatAmount, income, net],
+  );
 
   // Handle save
   const handleSave = useCallback(async (data: TransactionFormData) => {
@@ -375,6 +533,50 @@ export default function TransactionUnifiedManagement() {
     }
     setSelectedIds(newSelected);
   }, [selectedIds]);
+
+  const clearSelection = useCallback(() => {
+    setSelectedIds(new Set());
+  }, [setSelectedIds]);
+
+  const clearAllFilters = useCallback(() => {
+    setLocalSearch('');
+    setSelectedCategoryId('');
+    updateURLParams({
+      search: null,
+      type: null,
+      range: null,
+      startDate: null,
+      endDate: null,
+      amountPreset: null,
+      categoryId: null,
+      page: '1',
+    });
+  }, [updateURLParams]);
+
+  const enableSelectionMode = useCallback(() => {
+    setShowSelectionMode(true);
+    setSelectionPulse(true);
+    if (typeof window !== 'undefined') {
+      window.requestAnimationFrame(() => {
+        selectionToolbarRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    }
+  }, []);
+
+  const openFilterSheet = useCallback(() => {
+    if (typeof window !== 'undefined' && window.innerWidth >= 768) {
+      setFilterPulse(true);
+      requestAnimationFrame(() => {
+        filterBarRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+      return;
+    }
+    setIsFilterOpen(true);
+  }, []);
+
+  const openImportDialog = useCallback(() => {
+    setShowFileDialog(true);
+  }, [setShowFileDialog]);
 
   const handleBulkDelete = useCallback(async () => {
     if (selectedIds.size === 0) {
@@ -593,6 +795,135 @@ export default function TransactionUnifiedManagement() {
     { value: '50to100k', label: '50–100k' },
     { value: 'gt100k', label: '>100k' },
   ];
+
+  const activeFilters = useMemo(() => {
+    const filters: string[] = [];
+    if (financialCategory && financialCategory !== 'ALL') {
+      const typeLabel: Record<string, string> = {
+        INCOME: 'Income',
+        EXPENSE: 'Expense',
+        TRANSFER: 'Transfer',
+        INVESTMENT: 'Investment',
+        OTHER: 'Other',
+      };
+      filters.push(typeLabel[financialCategory] ?? 'Type filter');
+    }
+    if (amountPreset && amountPreset !== 'all') {
+      const amountLabel: Record<string, string> = {
+        lt1k: '<1k',
+        '1to10k': '1–10k',
+        '10to50k': '10–50k',
+        '50to100k': '50–100k',
+        gt100k: '>100k',
+      };
+      filters.push(amountLabel[amountPreset] ?? 'Amount filter');
+    }
+    if (selectedCategoryId) {
+      const categoryLabel = categories.find((cat) => cat.id === selectedCategoryId)?.name;
+      if (categoryLabel) {
+        filters.push(categoryLabel);
+      }
+    }
+    if (searchTerm) {
+      filters.push(`Search: "${searchTerm}"`);
+    }
+    if (showDeleted) {
+      filters.push('Including deleted');
+    }
+    return filters;
+  }, [amountPreset, categories, financialCategory, searchTerm, selectedCategoryId, showDeleted]);
+
+  const heroChips = useMemo(() => {
+    const chips: string[] = [];
+    chips.push(`${totalRecords.toLocaleString()} record${totalRecords === 1 ? '' : 's'}`);
+    if (rangeSummary) {
+      chips.push(rangeSummary);
+    }
+    if (activeFilters.length > 0) {
+      chips.push(`${activeFilters.length} active filter${activeFilters.length > 1 ? 's' : ''}`);
+    }
+    return chips;
+  }, [activeFilters.length, rangeSummary, totalRecords]);
+
+  interface FocusRow {
+    key: string;
+    icon: LucideIcon;
+    label: string;
+    primary: string;
+    secondary: string;
+    actionLabel?: string;
+    onAction?: () => void;
+  }
+
+  const focusRows: FocusRow[] = useMemo(() => {
+    const rows: FocusRow[] = [];
+
+    if (activeFilters.length > 0) {
+      const filtersSummary =
+        activeFilters.length > 1
+          ? `${activeFilters[0]} • +${activeFilters.length - 1} more`
+          : activeFilters[0];
+      rows.push({
+        key: 'filters',
+        icon: Filter,
+        label: 'Filters active',
+        primary: filtersSummary,
+        secondary: 'Filters from the toolbar are currently applied.',
+        actionLabel: 'Review filters',
+        onAction: openFilterSheet,
+      });
+    }
+
+    if (showSelectionMode || selectedIds.size > 0) {
+      rows.push({
+        key: 'selection',
+        icon: CheckSquare,
+        label: 'Selection mode',
+        primary:
+          selectedIds.size > 0
+            ? `${selectedIds.size} ready for bulk actions`
+            : 'Selection mode is turned on',
+        secondary: 'Exit selection when you are done with bulk edits.',
+        actionLabel: selectedIds.size > 0 ? 'Clear selected' : 'Exit selection',
+        onAction: selectedIds.size > 0 ? clearSelection : () => setShowSelectionMode(false),
+      });
+    }
+
+    if (isImporting || parsedTransactions.length > 0) {
+      rows.push({
+        key: 'import',
+        icon: Upload,
+        label: 'Importer',
+        primary: isImporting
+          ? 'Import in progress — keep this tab open.'
+          : `${parsedTransactions.length} parsed entries waiting`,
+        secondary: 'Continue in the importer from the toolbar.',
+        actionLabel: 'Open importer',
+        onAction: openImportDialog,
+      });
+    }
+
+    if (rows.length === 0) {
+      rows.push({
+        key: 'all-clear',
+        icon: Check,
+        label: 'All clear',
+        primary: 'Nothing needs attention right now.',
+        secondary: 'Use the toolbar to filter, select, or import whenever you need.',
+      });
+    }
+
+    return rows;
+  }, [
+    activeFilters,
+    clearSelection,
+    isImporting,
+    openFilterSheet,
+    openImportDialog,
+    parsedTransactions.length,
+    selectedIds.size,
+    showSelectionMode,
+  ]);
 
   // Filtered parsed transactions for preview
   const filteredParsed = useMemo(() => {
@@ -980,16 +1311,22 @@ export default function TransactionUnifiedManagement() {
         right={
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setShowSelectionMode(!showSelectionMode)}
+              onClick={() => {
+                const next = !showSelectionMode;
+                setShowSelectionMode(next);
+                if (!next) {
+                  setSelectedIds(new Set());
+                }
+              }}
               className={`p-2 rounded-md hover:bg-muted ${showSelectionMode ? 'bg-primary/10' : ''}`}
-              aria-label={showSelectionMode ? 'Hide Selection' : 'Show Selection'}
+              aria-label={showSelectionMode ? 'Exit selection mode' : 'Enter selection mode'}
             >
               <CheckSquare className="w-5 h-5" />
             </button>
             <button
               onClick={() => setShowFileDialog(true)}
               className="p-2 rounded-md hover:bg-muted"
-              aria-label="Parse File"
+              aria-label="Open importer"
             >
               <FileText className="w-5 h-5" />
             </button>
@@ -1070,14 +1407,23 @@ export default function TransactionUnifiedManagement() {
                 variant={showSelectionMode ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => {
-                  setShowSelectionMode(!showSelectionMode);
-                  if (!showSelectionMode) {
+                  const next = !showSelectionMode;
+                  setShowSelectionMode(next);
+                  if (next) {
+                    setSelectionPulse(true);
+                    if (typeof window !== 'undefined') {
+                      window.requestAnimationFrame(() => {
+                        selectionToolbarRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                      });
+                    }
+                  } else {
                     setSelectedIds(new Set());
+                    setSelectionPulse(false);
                   }
                 }}
               >
                 <CheckSquare className="w-4 h-4 mr-2" />
-                {showSelectionMode ? 'Hide Selection' : 'Select'}
+                {showSelectionMode ? 'Exit selection mode' : 'Selection mode'}
               </Button>
               <Button
                 variant="outline"
@@ -1085,7 +1431,7 @@ export default function TransactionUnifiedManagement() {
                 onClick={() => setShowFileDialog(true)}
               >
                 <FileText className="w-4 h-4 mr-2" />
-                Parse File
+                Open importer
               </Button>
               <Button onClick={() => {
                 setEditingTransaction(null);
@@ -1099,9 +1445,111 @@ export default function TransactionUnifiedManagement() {
         </div>
       </div>
 
+      {/* Desktop Overview */}
+      <div className="hidden md:block border-b border-border/60 bg-background/80">
+        <div className="container mx-auto px-4 pb-6 pt-6">
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr),minmax(0,1fr)]">
+            <Card className="relative overflow-hidden border border-border/60 bg-card/95 text-card-foreground shadow-sm backdrop-blur-sm dark:border-border/40 dark:bg-background/80">
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/10 via-primary/0 to-primary/0 dark:from-primary/25 dark:via-primary/10 dark:to-transparent" />
+              <CardHeader className="relative z-10 space-y-4 pb-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    <Sparkles className="h-4 w-4 text-primary" />
+                    <span>Overview</span>
+                  </div>
+                  <Badge variant="outline" className="rounded-full border-border/50 bg-muted/30 px-3 py-1 text-xs font-medium text-muted-foreground dark:bg-muted/20">
+                    {rangeLabel}
+                  </Badge>
+                </div>
+                <div className="space-y-2">
+                  <CardTitle className="text-2xl font-semibold text-foreground">Cashflow snapshot</CardTitle>
+                  <CardDescription className="max-w-xl text-sm text-muted-foreground">
+                    Track inflow versus spend for the selected period. Numbers update automatically as you filter.
+                  </CardDescription>
+                </div>
+              </CardHeader>
+              <CardContent className="relative z-10 space-y-4 pb-5">
+                <div className="grid gap-3 lg:grid-cols-3">
+                  {desktopMetrics.map((metric) => (
+                    <div
+                      key={metric.key}
+                      className="rounded-2xl border border-border/60 bg-muted/20 p-4 dark:border-border/40 dark:bg-muted/10"
+                    >
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{metric.label}</p>
+                      <p className={`text-lg font-semibold ${metric.tone}`}>{metric.value}</p>
+                      <p className="text-xs text-muted-foreground">{metric.helper}</p>
+                    </div>
+                  ))}
+                </div>
+                {heroChips.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    {heroChips.map((chip) => (
+                      <span
+                        key={chip}
+                        className="rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground dark:bg-muted/20"
+                      >
+                        {chip}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+            <Card className="border border-border/60 bg-card/95 text-card-foreground shadow-sm dark:border-border/40 dark:bg-background/80">
+              <CardHeader className="space-y-3 pb-4">
+                <div className="flex items-center gap-2 text-primary">
+                  <Sparkles className="h-5 w-5" />
+                  <CardTitle className="text-xl font-semibold text-foreground">Next actions</CardTitle>
+                </div>
+                <CardDescription className="text-sm">
+                  Desktop shortcuts to keep reconciliations moving. Mobile retains the compact view you already use.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3 pb-5">
+                {focusRows.map((row) => {
+                  const Icon = row.icon;
+                  return (
+                    <div
+                      key={row.key}
+                      className="flex items-start justify-between gap-3 rounded-2xl border border-border/60 bg-muted/20 p-3 dark:border-border/40 dark:bg-muted/10"
+                    >
+                      <div className="flex items-start gap-3">
+                        <span className="rounded-full bg-primary/10 p-2 text-primary dark:bg-primary/20">
+                          <Icon className="h-4 w-4" />
+                        </span>
+                        <div className="space-y-1">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{row.label}</p>
+                          <p className="text-sm font-medium text-foreground">{row.primary}</p>
+                          <p className="text-xs text-muted-foreground">{row.secondary}</p>
+                        </div>
+                      </div>
+                      {row.actionLabel && row.onAction ? (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="-mr-1 mt-1 text-sm font-medium text-primary"
+                          onClick={row.onAction}
+                        >
+                          {row.actionLabel}
+                        </Button>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </div>
+
       {/* Selection Toolbar - Only show when selection mode is active */}
       {showSelectionMode && (
-        <div className="sticky top-16 md:top-32 z-20 bg-primary/5 border-b px-4 py-2">
+        <div
+          ref={selectionToolbarRef}
+          className={`sticky top-16 md:top-32 z-20 border-b px-4 py-2 transition-shadow ${
+            selectionPulse ? 'bg-primary/10 shadow-[0_0_0_3px_rgba(59,130,246,0.25)]' : 'bg-primary/5'
+          }`}
+        >
           <div className="container mx-auto flex items-center justify-between gap-4">
             <div className="flex items-center gap-2">
               <button
@@ -1205,133 +1653,183 @@ export default function TransactionUnifiedManagement() {
       )}
 
       {/* Filters - Desktop Only */}
-      <div className={`hidden md:block sticky ${showSelectionMode ? 'top-40' : 'top-32'} z-20 bg-background/95 backdrop-blur border-b`}>
-          <div className="container mx-auto px-4 py-3">
-            <div className="flex items-center gap-3 flex-wrap">
-              {/* Search */}
-              <div className="flex-1 min-w-[200px] max-w-md">
+      <div
+        ref={filterBarRef}
+        className={`hidden md:block sticky ${showSelectionMode ? 'top-40' : 'top-32'} z-20 bg-background/95 backdrop-blur border-b transition-shadow ${
+          filterPulse ? 'ring-2 ring-primary/40 shadow-lg' : ''
+        }`}
+      >
+        <div className="container mx-auto px-4 py-4">
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1.6fr),minmax(0,2fr),minmax(0,1.6fr)]">
+            {/* Search & category */}
+            <div className="rounded-2xl border border-border/60 bg-card/95 p-4 shadow-sm dark:border-border/40 dark:bg-background/80">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Find transactions</span>
+                {activeFilters.length > 0 && (
+                  <Button variant="ghost" size="sm" onClick={clearAllFilters} className="text-xs font-medium text-primary">
+                    Reset all
+                  </Button>
+                )}
+              </div>
+              <div className="mt-3 space-y-3">
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <input
                     type="text"
                     value={localSearch}
                     onChange={(e) => handleSearch(e.target.value)}
-                    placeholder="Search transactions..."
-                    className="w-full pl-10 pr-10 py-2 text-sm border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                    placeholder="Search description, store, person, or notes"
+                    className="w-full rounded-lg border border-border bg-background py-2.5 pl-10 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                   />
                   {localSearch && (
                     <button
                       onClick={() => handleSearch('')}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-muted rounded"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted"
                       aria-label="Clear search"
                     >
-                      <X className="w-3.5 h-3.5 text-muted-foreground" />
+                      <X className="h-3.5 w-3.5" />
                     </button>
                   )}
                 </div>
+                <div>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Category</span>
+                  <Select
+                    value={selectedCategoryId || 'all'}
+                    onValueChange={(value) => {
+                      setSelectedCategoryId(value === 'all' ? '' : value);
+                      updateURLParams({ categoryId: value === 'all' ? null : value, page: '1' });
+                    }}
+                  >
+                    <SelectTrigger className="mt-1 w-full">
+                      <SelectValue placeholder="All Categories" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Categories</SelectItem>
+                      {categories
+                        .filter((c) => !financialCategory || financialCategory === 'ALL' || c.type === financialCategory)
+                        .map((category) => (
+                          <SelectItem key={category.id} value={category.id}>
+                            <div className="flex items-center gap-2">
+                              {category.color && <div className="h-3 w-3 rounded-full" style={{ backgroundColor: category.color }} />}
+                              <span>{category.name}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
+            </div>
 
-              {/* Quick Filter Chips - Desktop */}
-              <div className="flex gap-2">
-                {typeOptions.map((option) => {
-                  const isActive = financialCategory === option.value || (option.value === 'ALL' && financialCategory === 'ALL');
-                  return (
-                    <button
-                      key={option.value}
-                      type="button"
-                      onClick={() => updateURLParams({ type: option.value, page: '1' })} // Reset to page 1
-                      className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
-                        isActive
-                          ? 'bg-primary text-primary-foreground'
-                          : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                      }`}
-                      aria-pressed={isActive}
-                    >
-                      {option.label}
-                    </button>
-                  );
-                })}
+            {/* Type & amount */}
+            <div className="rounded-2xl border border-border/60 bg-card/95 p-4 shadow-sm dark:border-border/40 dark:bg-background/80">
+              <div>
+                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Transaction type</span>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {typeOptions.map((option) => {
+                    const isActive = financialCategory === option.value || (option.value === 'ALL' && financialCategory === 'ALL');
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => updateURLParams({ type: option.value, page: '1' })}
+                        className={`rounded-full px-3 py-1.5 text-sm font-medium transition-all ${
+                          isActive ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/30' : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                        }`}
+                        aria-pressed={isActive}
+                      >
+                        {option.label}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-
-              {/* Amount Filter Chips */}
-              <div className="flex gap-2 flex-wrap">
-                {amountOptions.map((option) => {
-                  const isActive = amountPreset === option.value;
-                  return (
-                    <button
-                      key={option.value}
-                      type="button"
-                      onClick={() => updateURLParams({ amountPreset: option.value === 'all' ? null : option.value, page: '1' })}
-                      className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
-                        isActive
-                          ? 'bg-primary text-primary-foreground'
-                          : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                      }`}
-                      aria-pressed={isActive}
-                    >
-                      {option.label}
-                    </button>
-                  );
-                })}
+              <div className="mt-4">
+                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Amount range</span>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {amountOptions.map((option) => {
+                    const isActive = amountPreset === option.value;
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => updateURLParams({ amountPreset: option.value === 'all' ? null : option.value, page: '1' })}
+                        className={`rounded-full px-3 py-1.5 text-sm font-medium transition-all ${
+                          isActive ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/30' : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                        }`}
+                        aria-pressed={isActive}
+                      >
+                        {option.label}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
+            </div>
 
-              {/* Category Filter - Desktop */}
-              <Select 
-                value={selectedCategoryId || 'all'} 
-                onValueChange={(value) => {
-                  setSelectedCategoryId(value === 'all' ? '' : value);
-                  updateURLParams({ categoryId: value === 'all' ? null : value, page: '1' });
-                }}
-              >
-                <SelectTrigger className="w-[200px]">
-                  <SelectValue placeholder="All Categories" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Categories</SelectItem>
-                  {categories
-                    .filter(c => !financialCategory || financialCategory === 'ALL' || c.type === financialCategory)
-                    .map(category => (
-                      <SelectItem key={category.id} value={category.id}>
-                        <div className="flex items-center gap-2">
-                          {category.color && (
-                            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: category.color }} />
-                          )}
-                          <span>{category.name}</span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-
-              {/* Date Range */}
-              <DateRangeFilter
-                startDate={localStartDate}
-                endDate={localEndDate}
-                onRangeChange={(start, end, preset) => {
-                  setLocalStartDate(start);
-                  setLocalEndDate(end);
-                  updateURLParams({ startDate: start, endDate: end, range: preset });
-                }}
-              />
-
-              {/* Refresh */}
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={fetchTransactions}
-                disabled={isLoading}
-                className="flex-shrink-0"
-              >
-                <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-              </Button>
+            {/* Date & quality controls */}
+            <div className="rounded-2xl border border-border/60 bg-card/95 p-4 shadow-sm dark:border-border/40 dark:bg-background/80">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Date range</span>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => {
+                    void fetchTransactions();
+                  }}
+                  disabled={isLoading}
+                >
+                  <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+                </Button>
+              </div>
+              <div className="mt-3 overflow-hidden">
+                <QuickRangeChips value={quickRange} onChange={applyQuickRange} className="w-full justify-start px-1" />
+              </div>
+              <div className="mt-3">
+                <DateRangeFilter
+                  startDate={localStartDate}
+                  endDate={localEndDate}
+                  onRangeChange={(start, end, preset) => {
+                    setLocalStartDate(start);
+                    setLocalEndDate(end);
+                    updateURLParams({ startDate: start, endDate: end, range: preset });
+                  }}
+                  showPresets={false}
+                  className="w-full"
+                />
+              </div>
+              <label className="mt-4 flex items-center gap-2 rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-xs font-medium text-muted-foreground">
+                <input
+                  type="checkbox"
+                  checked={showDeleted}
+                  onChange={(e) => {
+                    setShowDeleted(e.target.checked);
+                    setSelectedIds(new Set());
+                  }}
+                  className="h-3.5 w-3.5 rounded border-border"
+                />
+                Include deleted transactions
+              </label>
             </div>
           </div>
+
+          {activeFilters.length > 0 && (
+            <div className="mt-4 flex flex-wrap items-center gap-2 rounded-2xl border border-border/60 bg-muted/20 px-4 py-3 text-xs text-muted-foreground shadow-sm dark:border-border/40">
+              <span className="font-semibold uppercase tracking-wide text-muted-foreground">Active filters</span>
+              {activeFilters.map((badge) => (
+                <span key={badge} className="rounded-full bg-background px-2.5 py-1 text-[11px] font-medium text-foreground shadow-sm">
+                  {badge}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
         </div>
 
       {/* Main Content */}
       <div className="container mx-auto px-4 py-4 md:py-6">
         {/* Summary Cards - Compact, always 2 columns */}
-        <div className="grid grid-cols-2 gap-2 md:gap-3 mb-3 md:mb-4">
+        <div className="grid grid-cols-2 gap-2 md:gap-3 mb-3 md:mb-4 md:hidden">
             <div className="bg-card rounded-lg border p-2.5 md:p-3">
               <div className="text-[10px] sm:text-xs text-muted-foreground mb-0.5">Total Income</div>
               <div className="text-base sm:text-lg md:text-xl font-bold text-green-600 dark:text-green-400 truncate">
@@ -1395,7 +1893,12 @@ export default function TransactionUnifiedManagement() {
                     )}
                   </button>
                 )}
-                <div className={showSelectionMode && selectedIds.has(transaction.id) ? 'ring-2 ring-primary rounded-lg' : ''}>
+                <div
+                  className={cn(
+                    'overflow-hidden rounded-2xl',
+                    showSelectionMode && selectedIds.has(transaction.id) && 'ring-2 ring-primary',
+                  )}
+                >
                   <TransactionCard
                     transaction={transaction}
                     onEdit={showSelectionMode ? undefined : (t) => {

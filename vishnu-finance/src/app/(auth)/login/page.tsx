@@ -1,14 +1,7 @@
-'use client';
+import { redirect } from 'next/navigation';
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+export const dynamic = 'force-dynamic';
 
 export default function LoginPage() {
-  const router = useRouter();
-  
-  useEffect(() => {
-    router.replace('/auth?tab=login');
-  }, [router]);
-
-  return null;
+  redirect('/auth?tab=login');
 }

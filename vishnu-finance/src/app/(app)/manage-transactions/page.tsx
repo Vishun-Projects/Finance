@@ -1,31 +1,28 @@
-'use client';
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import TransactionManagementTable from '@/components/transaction-management-table';
+import { Suspense } from 'react';
+import { requireUser } from '@/lib/auth/server-auth';
+import { RouteLoadingState } from '@/components/feedback/route-fallbacks';
+import { loadManagedTransactions } from '@/lib/loaders/manage-transactions';
+import { ManageTransactionsPageClient } from './page-client';
 
-export default function ManageTransactionsPage() {
+export const dynamic = 'force-dynamic';
+
+export default async function ManageTransactionsPage() {
+  await requireUser({ redirectTo: '/auth?tab=login' });
+
+  const initialData = await loadManagedTransactions();
 
   return (
-    <div className="container mx-auto py-8 px-4">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight">Manage Transactions</h1>
-        <p className="text-muted-foreground mt-2">
-          View, select, and delete transactions. Deleted transactions can be reimported.
-        </p>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Transaction Management</CardTitle>
-          <CardDescription>
-            Use this page to delete transactions for testing and reimporting bank statements.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <TransactionManagementTable />
-        </CardContent>
-      </Card>
-    </div>
+    <Suspense
+      fallback={
+        <RouteLoadingState
+          title="Loading transaction manager"
+          description="Preparing your transaction archive…"
+          className="min-h-[50vh]"
+        />
+      }
+    >
+      <ManageTransactionsPageClient initialData={initialData} />
+    </Suspense>
   );
 }
-

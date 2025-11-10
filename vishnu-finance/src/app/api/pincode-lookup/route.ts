@@ -47,10 +47,11 @@ export async function GET(request: NextRequest) {
     }
 
     const data = await response.json();
+    const result = Array.isArray(data) ? data[0] : data;
     
     // Parse the response structure from postalpincode.in
-    if (data.Status === 'Success' && data.PostOffice && data.PostOffice.length > 0) {
-      const postOffice = data.PostOffice[0];
+    if (result?.Status === 'Success' && result.PostOffice && result.PostOffice.length > 0) {
+      const postOffice = result.PostOffice[0];
       
       return NextResponse.json({
         success: true,

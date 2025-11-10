@@ -31,10 +31,16 @@ export async function fetchLocationByPincode(pincode: string): Promise<PincodeRe
     };
   }
 
+  // Prefer the server-side proxy to avoid CORS issues
+  const proxyResult = await fetchLocationByPincodeAlternative(pincode);
+  if (proxyResult.success || proxyResult.error) {
+    return proxyResult;
+  }
+
+  // Fallback to direct fetch (should rarely be needed)
   try {
-    // Try the Search-By-Pincode endpoint first
     const url = `http://www.postalpincode.in/api/pincode/${pincode}`;
-    
+
     const response = await fetch(url, {
       method: 'GET',
       headers: {
@@ -43,16 +49,19 @@ export async function fetchLocationByPincode(pincode: string): Promise<PincodeRe
     });
 
     if (!response.ok) {
-      // If API fails, try alternative endpoint
-      return await fetchLocationByPincodeAlternative(pincode);
+      return {
+        success: false,
+        error: 'Unable to fetch location data. Please try again later.'
+      };
     }
 
     const data = await response.json();
-    
-    // Parse the response structure from postalpincode.in
-    if (data.Status === 'Success' && data.PostOffice && data.PostOffice.length > 0) {
-      const postOffice = data.PostOffice[0];
-      
+    console.log('[Pincode Lookup] Direct API response:', data);
+    const result = Array.isArray(data) ? data[0] : data;
+
+    if (result?.Status === 'Success' && result.PostOffice && result.PostOffice.length > 0) {
+      const postOffice = result.PostOffice[0];
+
       return {
         success: true,
         data: {
@@ -70,16 +79,10 @@ export async function fetchLocationByPincode(pincode: string): Promise<PincodeRe
     };
   } catch (error) {
     console.error('Error fetching pincode data:', error);
-    
-    // Try alternative method
-    try {
-      return await fetchLocationByPincodeAlternative(pincode);
-    } catch (altError) {
-      return {
-        success: false,
-        error: 'Unable to fetch location data. Please try again later.'
-      };
-    }
+    return {
+      success: false,
+      error: 'Unable to fetch location data. Please try again later.'
+    };
   }
 }
 
@@ -91,15 +94,21 @@ async function fetchLocationByPincodeAlternative(pincode: string): Promise<Pinco
     // Use the server-side API route that proxies the request
     const response = await fetch(`/api/pincode-lookup?pincode=${pincode}`, {
       method: 'GET',
+      cache: 'no-store',
     });
 
     if (!response.ok) {
-      throw new Error('Pincode lookup failed');
+      return {
+        success: false,
+        error: 'Unable to fetch location data. Please try again later.'
+      };
     }
 
     const data = await response.json();
+    console.log('[Pincode Lookup] Proxy response:', data);
     return data;
   } catch (error) {
+    console.error('Error calling pincode proxy:', error);
     return {
       success: false,
       error: 'Unable to fetch location data. Please try again later.'

@@ -1,17 +1,14 @@
 import type { NextConfig } from "next";
 
-const strictBuild = process.env.NEXT_STRICT_BUILD === 'true';
-
 const outputMode = process.env.NEXT_OUTPUT_MODE === 'export' ? 'export' : undefined;
 
 const nextConfig: NextConfig = {
   ...(outputMode ? { output: outputMode } : {}),
-  // Allow overriding strict mode via env flag
   eslint: {
-    ignoreDuringBuilds: !strictBuild,
+    ignoreDuringBuilds: false,
   },
   typescript: {
-    ignoreBuildErrors: !strictBuild,
+    ignoreBuildErrors: false,
   },
   
   // Performance optimizations

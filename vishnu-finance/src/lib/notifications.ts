@@ -19,12 +19,14 @@ export interface NotificationAction {
   icon?: string;
 }
 
+const isBrowser = typeof window !== 'undefined';
+
 class NotificationService {
   private permission: NotificationPermission = 'default';
   private isSupported: boolean = false;
 
   constructor() {
-    this.isSupported = 'Notification' in window;
+    this.isSupported = isBrowser && 'Notification' in window;
     this.permission = this.isSupported ? Notification.permission : 'denied';
   }
 
@@ -193,45 +195,50 @@ class NotificationService {
   }
 
   // Schedule a notification for later (using setTimeout)
-  scheduleNotification(options: NotificationOptions, delay: number): NodeJS.Timeout {
+  scheduleNotification(options: NotificationOptions, delay: number): NodeJS.Timeout | null {
+    if (!this.isSupported) {
+      return null;
+    }
     return setTimeout(() => {
-      this.showNotification(options);
+      void this.showNotification(options);
     }, delay);
   }
 
   // Cancel a scheduled notification
-  cancelScheduledNotification(timeoutId: NodeJS.Timeout): void {
-    clearTimeout(timeoutId);
+  cancelScheduledNotification(timeoutId: NodeJS.Timeout | null): void {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
   }
 }
 
-// Create a singleton instance
-export const notificationService = new NotificationService();
+// Create a singleton instance only when running in the browser
+export const notificationService = isBrowser ? new NotificationService() : null;
 
 // Hook for using notifications in React components
 export function useNotifications() {
   return {
-    requestPermission: () => notificationService.requestPermission(),
-    showNotification: (options: NotificationOptions) => notificationService.showNotification(options),
-    showSuccess: (title: string, body?: string) => notificationService.showSuccess(title, body),
-    showError: (title: string, body?: string) => notificationService.showError(title, body),
-    showWarning: (title: string, body?: string) => notificationService.showWarning(title, body),
-    showInfo: (title: string, body?: string) => notificationService.showInfo(title, body),
+    requestPermission: () => notificationService?.requestPermission() ?? Promise.resolve(false),
+    showNotification: (options: NotificationOptions) => notificationService?.showNotification(options) ?? Promise.resolve(null),
+    showSuccess: (title: string, body?: string) => notificationService?.showSuccess(title, body) ?? Promise.resolve(null),
+    showError: (title: string, body?: string) => notificationService?.showError(title, body) ?? Promise.resolve(null),
+    showWarning: (title: string, body?: string) => notificationService?.showWarning(title, body) ?? Promise.resolve(null),
+    showInfo: (title: string, body?: string) => notificationService?.showInfo(title, body) ?? Promise.resolve(null),
     showTransactionAlert: (type: 'income' | 'expense', amount: number, description: string) => 
-      notificationService.showTransactionAlert(type, amount, description),
+      notificationService?.showTransactionAlert(type, amount, description) ?? Promise.resolve(null),
     showGoalProgress: (goalTitle: string, progress: number) => 
-      notificationService.showGoalProgress(goalTitle, progress),
+      notificationService?.showGoalProgress(goalTitle, progress) ?? Promise.resolve(null),
     showDeadlineReminder: (deadlineTitle: string, daysLeft: number) => 
-      notificationService.showDeadlineReminder(deadlineTitle, daysLeft),
+      notificationService?.showDeadlineReminder(deadlineTitle, daysLeft) ?? Promise.resolve(null),
     showBudgetAlert: (category: string, spent: number, budget: number) => 
-      notificationService.showBudgetAlert(category, spent, budget),
+      notificationService?.showBudgetAlert(category, spent, budget) ?? Promise.resolve(null),
     showMarketUpdate: (symbol: string, change: number, changePercent: number) => 
-      notificationService.showMarketUpdate(symbol, change, changePercent),
-    isSupported: notificationService.isNotificationSupported(),
-    permission: notificationService.getPermissionStatus(),
+      notificationService?.showMarketUpdate(symbol, change, changePercent) ?? Promise.resolve(null),
+    isSupported: notificationService?.isNotificationSupported() ?? false,
+    permission: notificationService?.getPermissionStatus() ?? 'denied',
     scheduleNotification: (options: NotificationOptions, delay: number) => 
-      notificationService.scheduleNotification(options, delay),
-    cancelScheduledNotification: (timeoutId: NodeJS.Timeout) => 
-      notificationService.cancelScheduledNotification(timeoutId),
+      notificationService?.scheduleNotification(options, delay) ?? null,
+    cancelScheduledNotification: (timeoutId: NodeJS.Timeout | null) => 
+      notificationService?.cancelScheduledNotification(timeoutId ?? null),
   };
 }

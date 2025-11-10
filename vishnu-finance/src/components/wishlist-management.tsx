@@ -81,16 +81,35 @@ export default function WishlistManagement() {
     
     try {
       const response = await fetch(`/api/wishlist?userId=${user.id}`);
-      if (response.ok) {
-        const data = await response.json();
-        // Parse tags from JSON strings to arrays and ensure estimatedCost is a number
-        const processedData = data.map((item: any) => ({
-          ...item,
-          estimatedCost: Number(item.estimatedCost),
-          tags: typeof item.tags === 'string' ? JSON.parse(item.tags) : item.tags || []
-        }));
-        setWishlistItems(processedData);
+      const raw = await response.json();
+
+      if (!response.ok) {
+        console.error('Error response when fetching wishlist items:', raw);
+        showError('Error', raw?.error || 'Failed to fetch wishlist items');
+        setWishlistItems([]);
+        return;
       }
+
+      const items = Array.isArray(raw)
+        ? raw
+        : Array.isArray(raw?.data)
+          ? raw.data
+          : [];
+
+      if (!Array.isArray(items)) {
+        console.error('Unexpected wishlist payload shape:', raw);
+        showError('Error', 'Unexpected response format for wishlist items');
+        setWishlistItems([]);
+        return;
+      }
+
+      // Parse tags from JSON strings to arrays and ensure estimatedCost is a number
+      const processedData = items.map((item: any) => ({
+        ...item,
+        estimatedCost: Number(item.estimatedCost),
+        tags: typeof item.tags === 'string' ? JSON.parse(item.tags) : item.tags || []
+      }));
+      setWishlistItems(processedData);
     } catch (error) {
       console.error('Error fetching wishlist items:', error);
       showError('Error', 'Failed to fetch wishlist items');

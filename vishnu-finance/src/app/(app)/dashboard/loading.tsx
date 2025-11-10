@@ -1,10 +1,11 @@
-import { LoadingSpinner } from '@/components/feedback/loading-spinner';
+import { RouteLoadingState } from '@/components/feedback/route-fallbacks';
 
 export default function DashboardLoading() {
   return (
-    <div className="flex justify-center items-center min-h-[400px]">
-      <LoadingSpinner size="lg" text="Loading dashboard..." />
-    </div>
+    <RouteLoadingState
+      title="Loading your dashboard"
+      description="Syncing latest balances and transactions…"
+      className="min-h-[400px]"
+    />
   );
 }
-

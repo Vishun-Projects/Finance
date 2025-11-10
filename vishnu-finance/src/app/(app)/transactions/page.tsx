@@ -1,23 +1,52 @@
-'use client';
 
 import { Suspense } from 'react';
-import TransactionUnifiedManagement from '@/components/transaction-unified-management';
+import TransactionsPageClient from './page-client';
+import { RouteLoadingState } from '@/components/feedback/route-fallbacks';
+import { requireUser } from '@/lib/auth/server-auth';
+import { getCurrentMonthRange } from '@/lib/date-range';
+import { loadTransactionsBootstrap, loadTransactionCategories } from '@/lib/loaders/transactions';
 
-function TransactionsContent() {
-  return <TransactionUnifiedManagement />;
-}
+export const dynamic = 'force-dynamic';
 
-export default function TransactionsPage() {
+export default async function TransactionsPage() {
+  const user = await requireUser({ redirectTo: '/auth?tab=login' });
+  const range = getCurrentMonthRange();
+
+  let transactionsData: Awaited<ReturnType<typeof loadTransactionsBootstrap>> | null = null;
+  let categories: Awaited<ReturnType<typeof loadTransactionCategories>> = [];
+
+  try {
+    const [transactionsResult, categoriesResult] = await Promise.all([
+      loadTransactionsBootstrap({ startDate: range.startDate, endDate: range.endDate }),
+      loadTransactionCategories(),
+    ]);
+
+    transactionsData = transactionsResult;
+    categories = categoriesResult;
+  } catch (error) {
+    console.error('[transactions] bootstrap fetch failed', error);
+  }
+
+  const bootstrap = {
+    transactions: transactionsData?.transactions ?? [],
+    pagination: transactionsData?.pagination,
+    totals: transactionsData?.totals ?? null,
+    categories,
+    range,
+    userId: user.id,
+  };
+
   return (
-    <Suspense fallback={
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading transactions...</p>
-        </div>
-      </div>
-    }>
-      <TransactionsContent />
+    <Suspense
+      fallback={
+        <RouteLoadingState
+          title="Loading transactions"
+          description="Preparing your latest financial activity…"
+          className="min-h-[50vh]"
+        />
+      }
+    >
+      <TransactionsPageClient bootstrap={bootstrap} />
     </Suspense>
   );
 }

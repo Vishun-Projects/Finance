@@ -1,10 +1,11 @@
-import { LoadingSpinner } from '@/components/feedback/loading-spinner';
+import { RouteLoadingState } from '@/components/feedback/route-fallbacks';
 
 export default function GoalsLoading() {
   return (
-    <div className="flex justify-center items-center min-h-[400px]">
-      <LoadingSpinner size="lg" text="Loading goals..." />
-    </div>
+    <RouteLoadingState
+      title="Loading goals"
+      description="Preparing your financial goals dashboard…"
+      className="min-h-[50vh]"
+    />
   );
 }
-

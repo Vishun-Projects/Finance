@@ -1,12 +1,7 @@
-'use client';
+import { redirect } from 'next/navigation';
 
-import React from 'react';
-import WishlistManagement from '@/components/management/wishlist-management';
+export const dynamic = 'force-dynamic';
 
-export default function WishlistPage() {
-  return (
-    <div className="container mx-auto px-4 py-8">
-      <WishlistManagement />
-    </div>
-  );
+export default function RedirectWishlistPage() {
+  redirect('/plans?tab=wishlist');
 }

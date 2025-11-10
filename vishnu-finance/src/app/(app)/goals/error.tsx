@@ -1,0 +1,33 @@
+'use client';
+
+import { useEffect } from 'react';
+import { RouteErrorState } from '@/components/feedback/route-error-state';
+
+export default function GoalsError({
+  error,
+  reset,
+}: {
+  error: Error & { digest?: string };
+  reset: () => void;
+}) {
+  useEffect(() => {
+    console.error('[goals-error]', error);
+  }, [error]);
+
+  return (
+    <RouteErrorState
+      title="Unable to load goals"
+      description="We encountered an issue retrieving your goals. Please try again."
+    >
+      <button
+        type="button"
+        onClick={reset}
+        className="rounded-md border border-border bg-card px-3 py-1.5 font-medium text-foreground shadow-sm transition hover:bg-muted"
+      >
+        Retry
+      </button>
+    </RouteErrorState>
+  );
+}
+
+

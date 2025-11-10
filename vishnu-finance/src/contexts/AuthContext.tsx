@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo, useCallback } from 'react';
 
-interface User {
+export interface User {
   id: string;
   email: string;
   name?: string;
@@ -36,9 +36,15 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+interface AuthProviderProps {
+  children: ReactNode;
+  initialUser?: User | null;
+}
+
+export function AuthProvider({ children, initialUser }: AuthProviderProps) {
+  const hasInitialSnapshot = typeof initialUser !== 'undefined';
+  const [user, setUser] = useState<User | null>(hasInitialSnapshot ? initialUser ?? null : null);
+  const [loading, setLoading] = useState(!hasInitialSnapshot);
   const [error, setError] = useState<string | null>(null);
 
   const checkAuth = useCallback(async () => {
@@ -75,8 +81,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    if (hasInitialSnapshot) {
+      setUser(initialUser ?? null);
+      setLoading(false);
+      return;
+    }
     checkAuth();
-  }, [checkAuth]);
+  }, [hasInitialSnapshot, initialUser, checkAuth]);
 
   const login = useCallback(async (email: string, password: string): Promise<User | null> => {
     const startTime = Date.now();

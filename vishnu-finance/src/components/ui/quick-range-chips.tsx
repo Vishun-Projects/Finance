@@ -56,7 +56,7 @@ export default function QuickRangeChips({ value, onChange, className, announceCh
         aria-atomic="true"
       />
       
-      <div className={cn('-mx-1 flex flex-wrap gap-2', className)}>
+      <div className={cn('flex flex-wrap gap-2', className)}>
         {OPTIONS.map(opt => {
           const isActive = value === opt.key;
           

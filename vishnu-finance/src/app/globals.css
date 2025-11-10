@@ -1,6 +1,9 @@
+/* stylelint-disable at-rule-no-unknown */
+/* csslint ignore:start */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+/* csslint ignore:end */
 
 /* CSS Variables for Theme Colors */
 :root {
@@ -153,50 +156,50 @@ html.dark > body {
 
 /* High Contrast Mode */
 .high-contrast {
-  --background: 0 0% 0%;
-  --foreground: 0 0% 100%;
-  --card: 0 0% 0%;
-  --card-foreground: 0 0% 100%;
-  --popover: 0 0% 0%;
-  --popover-foreground: 0 0% 100%;
-  --primary: 0 0% 100%;
-  --primary-foreground: 0 0% 0%;
-  --secondary: 0 0% 20%;
-  --secondary-foreground: 0 0% 100%;
-  --muted: 0 0% 20%;
-  --muted-foreground: 0 0% 80%;
-  --accent: 0 0% 20%;
-  --accent-foreground: 0 0% 100%;
-  --destructive: 0 0% 100%;
-  --destructive-foreground: 0 0% 0%;
-  --border: 0 0% 100%;
-  --input: 0 0% 100%;
-  --ring: 0 0% 100%;
-  
+  --background: 240 12% 6%;
+  --foreground: 240 9% 96%;
+  --card: 240 10% 8%;
+  --card-foreground: 240 9% 96%;
+  --popover: 240 12% 8%;
+  --popover-foreground: 240 9% 96%;
+  --primary: 240 9% 98%;
+  --primary-foreground: 240 18% 8%;
+  --secondary: 240 11% 18%;
+  --secondary-foreground: 240 8% 92%;
+  --muted: 240 10% 18%;
+  --muted-foreground: 240 7% 70%;
+  --accent: 240 11% 22%;
+  --accent-foreground: 240 9% 96%;
+  --destructive: 0 65% 58%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 240 10% 32%;
+  --input: 240 10% 32%;
+  --ring: 240 10% 52%;
+
   /* Semantic Colors - High Contrast */
-  --success: 0 0% 100%;
-  --success-foreground: 0 0% 0%;
-  --warning: 0 0% 100%;
-  --warning-foreground: 0 0% 0%;
-  --error: 0 0% 100%;
-  --error-foreground: 0 0% 0%;
-  --info: 0 0% 100%;
-  --info-foreground: 0 0% 0%;
+  --success: 137 64% 45%;
+  --success-foreground: 0 0% 100%;
+  --warning: 45 96% 51%;
+  --warning-foreground: 45 100% 10%;
+  --error: 0 72% 58%;
+  --error-foreground: 0 0% 98%;
+  --info: 210 96% 53%;
+  --info-foreground: 0 0% 100%;
 }
 
 /* Force high contrast styles - Override Tailwind completely */
 html.high-contrast {
-  background-color: #000000 !important;
-  color: #FFFFFF !important;
+  background-color: #101018 !important;
+  color: #f5f5f7 !important;
 }
 
 html.high-contrast body {
-  background-color: #000000 !important;
-  color: #FFFFFF !important;
+  background-color: #101018 !important;
+  color: #f5f5f7 !important;
 }
 
 html.high-contrast * {
-  border-color: #FFFFFF !important;
+  border-color: #2f2f3a !important;
 }
 
 html.high-contrast .bg-background,
@@ -208,103 +211,103 @@ html.high-contrast .bg-background\/10 {
 html.high-contrast .bg-card,
 html.high-contrast .bg-card\/50,
 html.high-contrast .bg-card\/10 {
-  background-color: #000000 !important;
-  border: 2px solid #FFFFFF !important;
+  background-color: #14141f !important;
+  border: 1px solid #3a3a47 !important;
 }
 
 html.high-contrast .text-foreground {
-  color: #FFFFFF !important;
+  color: #f5f5f7 !important;
 }
 
 html.high-contrast .text-muted-foreground {
-  color: #CCCCCC !important;
+  color: #b1b1c0 !important;
 }
 
 html.high-contrast .border-border {
-  border-color: #FFFFFF !important;
+  border-color: #2f2f3a !important;
 }
 
 html.high-contrast .bg-muted {
-  background-color: #000000 !important;
-  border: 1px solid #FFFFFF !important;
+  background-color: #14141f !important;
+  border: 1px solid #3a3a47 !important;
 }
 
 html.high-contrast .bg-accent {
-  background-color: #000000 !important;
-  border: 1px solid #FFFFFF !important;
+  background-color: #191926 !important;
+  border: 1px solid #3a3a47 !important;
 }
 
 /* Navigation specific overrides */
 html.high-contrast .nav-top {
-  background-color: #000000 !important;
-  border-bottom: 2px solid #FFFFFF !important;
+  background-color: #101018 !important;
+  border-bottom: 1px solid #2f2f3a !important;
 }
 
 html.high-contrast .nav-item {
-  color: #FFFFFF !important;
+  color: #f5f5f7 !important;
   border: 1px solid transparent !important;
 }
 
 html.high-contrast .nav-item:hover {
-  background-color: #333333 !important;
-  border: 1px solid #FFFFFF !important;
+  background-color: #1d1d2a !important;
+  border: 1px solid #3a3a47 !important;
 }
 
 /* Card specific overrides */
 html.high-contrast .minimal-card {
-  background-color: #000000 !important;
-  border: 2px solid #FFFFFF !important;
-  color: #FFFFFF !important;
+  background-color: #14141f !important;
+  border: 1px solid #3a3a47 !important;
+  color: #f5f5f7 !important;
 }
 
 html.high-contrast .stat-card {
-  background-color: #000000 !important;
-  border: 2px solid #FFFFFF !important;
-  color: #FFFFFF !important;
+  background-color: #14141f !important;
+  border: 1px solid #3a3a47 !important;
+  color: #f5f5f7 !important;
 }
 
 /* Button overrides */
 html.high-contrast .minimal-button-primary {
-  background-color: #FFFFFF !important;
-  color: #000000 !important;
-  border: 2px solid #FFFFFF !important;
+  background-color: #f5f5f7 !important;
+  color: #0b0b12 !important;
+  border: 1px solid #d7d7e0 !important;
 }
 
 html.high-contrast .minimal-button-primary:hover {
-  background-color: #CCCCCC !important;
-  color: #000000 !important;
+  background-color: #dedee6 !important;
+  color: #0b0b12 !important;
 }
 
 /* Additional Tailwind overrides */
 html.high-contrast .bg-white {
-  background-color: #000000 !important;
+  background-color: #101018 !important;
 }
 
 html.high-contrast .text-white {
-  color: #FFFFFF !important;
+  color: #f5f5f7 !important;
 }
 
 html.high-contrast .text-black {
-  color: #000000 !important;
+  color: #0b0b12 !important;
 }
 
 html.high-contrast .border-gray-200,
 html.high-contrast .border-gray-300,
 html.high-contrast .border-gray-400 {
-  border-color: #FFFFFF !important;
+  border-color: #2f2f3a !important;
 }
 
 /* Nuclear option - Override ALL possible Tailwind classes */
 html.high-contrast [class*="bg-"]:not([class*="bg-white"]):not([class*="bg-black"]) {
-  background-color: #000000 !important;
+  background-color: #14141f !important;
 }
 
 html.high-contrast [class*="text-"]:not([class*="text-white"]):not([class*="text-black"]) {
-  color: #FFFFFF !important;
+  color: #f5f5f7 !important;
 }
 
 html.high-contrast [class*="border-"]:not([class*="border-white"]):not([class*="border-black"]) {
-  border-color: #FFFFFF !important;
+  border-color: #3a3a47 !important;
 }
 
 /* Specific overrides for common dashboard elements */
@@ -325,30 +328,30 @@ html.high-contrast .wishlist-item,
 html.high-contrast .goal-item,
 html.high-contrast .expense-item,
 html.high-contrast .income-item {
-  background-color: #000000 !important;
-  border: 2px solid #FFFFFF !important;
-  color: #FFFFFF !important;
+  background-color: #14141f !important;
+  border: 1px solid #3a3a47 !important;
+  color: #f5f5f7 !important;
 }
 
 html.high-contrast .stat-card,
 html.high-contrast .summary-card {
-  background-color: #000000 !important;
-  border: 2px solid #FFFFFF !important;
-  color: #FFFFFF !important;
+  background-color: #14141f !important;
+  border: 1px solid #3a3a47 !important;
+  color: #f5f5f7 !important;
 }
 
 html.high-contrast .filter-button,
 html.high-contrast .tab-button {
-  background-color: #000000 !important;
-  border: 1px solid #FFFFFF !important;
-  color: #FFFFFF !important;
+  background-color: #14141f !important;
+  border: 1px solid #3a3a47 !important;
+  color: #f5f5f7 !important;
 }
 
 html.high-contrast .filter-button.active,
 html.high-contrast .tab-button.active {
-  background-color: #FFFFFF !important;
-  color: #000000 !important;
-  border: 2px solid #FFFFFF !important;
+  background-color: #f5f5f7 !important;
+  color: #0b0b12 !important;
+  border: 1px solid #d7d7e0 !important;
 }
 
 /* Dark Theme - Proper button and card styling */
@@ -653,7 +656,7 @@ body {
   border-radius: 0.75rem;
   display: flex;
   align-items: center;
-  justify-center: center;
+  justify-content: center;
   transition: all 0.3s ease;
 }
 
@@ -690,9 +693,15 @@ body {
 }
 
 .minimal-button-primary {
-  @apply bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 rounded-lg font-medium transition-colors;
   background-color: hsl(var(--primary));
   color: hsl(var(--primary-foreground));
+  padding: 0.5rem 1rem;
+  border-radius: 0.75rem;
+  font-weight: 500;
+  transition: background-color 0.2s ease, color 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .minimal-button-primary:hover {
@@ -700,9 +709,15 @@ body {
 }
 
 .minimal-button-secondary {
-  @apply bg-secondary text-secondary-foreground hover:bg-secondary/80 px-4 py-2 rounded-lg font-medium transition-colors;
   background-color: hsl(var(--secondary));
   color: hsl(var(--secondary-foreground));
+  padding: 0.5rem 1rem;
+  border-radius: 0.75rem;
+  font-weight: 500;
+  transition: background-color 0.2s ease, color 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .minimal-button-secondary:hover {
@@ -734,7 +749,11 @@ body {
 }
 
 .nav-item {
-  @apply px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: color 0.2s ease, background-color 0.2s ease, transform 0.2s ease;
   color: hsl(var(--muted-foreground));
 }
 
@@ -997,6 +1016,7 @@ body {
   margin-right: auto;
   padding-left: 1rem;
   padding-right: 1rem;
+  max-width: min(100%, 1200px);
 }
 
 @media (min-width: 640px) {
@@ -1060,7 +1080,9 @@ body {
   z-index: 40;
 }
 .fab-btn {
-  @apply rounded-full shadow-strong transition-smooth;
+  border-radius: 9999px;
+  box-shadow: 0 12px 25px hsl(var(--primary) / 0.25);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
   height: 56px;
   width: 56px;
   display: flex;
@@ -1094,8 +1116,15 @@ body {
   gap: 0.5rem;
 }
 .bottom-action-btn {
-  @apply btn-touch rounded-lg font-medium transition-smooth;
+  min-height: 44px;
+  min-width: 44px;
+  border-radius: 0.75rem;
+  font-weight: 500;
+  transition: color 0.2s ease, background-color 0.2s ease;
   height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* Page padding helper so content isn't hidden behind bar */
@@ -1174,9 +1203,11 @@ body {
 
 @layer base {
   * {
-    @apply border-border;
+    border-color: hsl(var(--border));
   }
   body {
-    @apply bg-background text-foreground;
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
   }
 }
+/* stylelint-enable at-rule-no-unknown */

@@ -113,7 +113,7 @@ export async function GET(request: NextRequest) {
             financialCategory: t.financialCategory,
           }));
         } catch (error) {
-          console.warn('⚠️ Failed to fetch from Transaction model, falling back to IncomeSource');
+          console.warn('⚠️ Failed to fetch from Transaction model, falling back to IncomeSource', error);
         }
         
         // Also fetch legacy IncomeSource records if Transaction model doesn't have enough
@@ -170,7 +170,7 @@ export async function GET(request: NextRequest) {
             const newLegacy = legacyIncomes.filter((inc: any) => !existingIds.has(inc.id));
             incomes = [...incomes, ...newLegacy].slice(0, pageSize);
           } catch (error) {
-            console.warn('⚠️ Failed to fetch legacy IncomeSource records');
+            console.warn('⚠️ Failed to fetch legacy IncomeSource records', error);
           }
       }
       
@@ -196,7 +196,7 @@ export async function GET(request: NextRequest) {
           return incomes;
     } catch (error: any) {
       // Use raw SQL fallback if Prisma validation fails (new fields not recognized)
-      console.log('⚠️ INCOME GET - Using raw SQL fallback');
+      console.log('⚠️ INCOME GET - Using raw SQL fallback', error);
       const params: any[] = [userId];
       let query = `
         SELECT id, name, amount, frequency, categoryId, startDate, endDate, 
@@ -292,7 +292,7 @@ export async function GET(request: NextRequest) {
         });
       } catch (mappingError) {
         // Gracefully continue without mappings if table doesn't exist
-        console.warn('⚠️ Entity mapping feature not available (table may not exist). Continuing without name mapping.');
+        console.warn('⚠️ Entity mapping feature not available (table may not exist). Continuing without name mapping.', mappingError);
         // Incomes remain unchanged (original names kept)
       }
     }

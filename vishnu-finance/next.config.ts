@@ -32,6 +32,18 @@ const nextConfig: NextConfig = {
     dangerouslyAllowSVG: true,
     contentDispositionType: 'attachment',
     contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'lh3.googleusercontent.com',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'api.dicebear.com',
+        pathname: '/**',
+      },
+    ],
   },
   
   // Compiler optimizations
@@ -44,6 +56,50 @@ const nextConfig: NextConfig = {
   
   // Webpack optimizations
   webpack: (config, { dev, isServer }) => {
+    // Use webpack's IgnorePlugin to ignore .node binary files
+    const webpack = require('webpack');
+    config.plugins = config.plugins || [];
+    config.plugins.push(
+      new webpack.IgnorePlugin({
+        resourceRegExp: /\.node$/,
+      })
+    );
+    
+    // Mark native modules as external for server builds
+    if (isServer) {
+      const originalExternals = config.externals;
+      
+      // Create a function to handle externals
+      const externalHandler = ({ request }: { request?: string }, callback: (err?: Error | null, result?: string) => void) => {
+        // Exclude @napi-rs/canvas and its native dependencies
+        if (
+          request === '@napi-rs/canvas' ||
+          request?.startsWith('@napi-rs/canvas/') ||
+          request?.includes('@napi-rs/canvas-win32-x64-msvc') ||
+          request?.includes('skia.win32-x64-msvc.node') ||
+          request === 'pdf-parse'
+        ) {
+          return callback(null, `commonjs ${request}`);
+        }
+        
+        // Call original externals handler if it exists
+        if (typeof originalExternals === 'function') {
+          return originalExternals({ request }, callback);
+        }
+        
+        callback();
+      };
+      
+      // Set externals based on current type
+      if (Array.isArray(originalExternals)) {
+        config.externals = [...originalExternals, externalHandler];
+      } else if (typeof originalExternals === 'function') {
+        config.externals = [originalExternals, externalHandler];
+      } else {
+        config.externals = [originalExternals, externalHandler].filter(Boolean);
+      }
+    }
+    
     if (!dev && !isServer) {
       // Production optimizations
       config.optimization = {

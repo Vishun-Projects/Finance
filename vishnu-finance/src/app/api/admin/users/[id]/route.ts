@@ -3,13 +3,14 @@ import { prisma } from '@/lib/db';
 import { AuthService } from '@/lib/auth';
 import { writeAuditLog, extractRequestMeta } from '@/lib/audit';
 
-async function requireSuperuser(request: NextRequest) {
+type AuthenticatedUser = Awaited<ReturnType<typeof AuthService.getUserFromToken>>;
+
+async function requireSuperuser(request: NextRequest): Promise<AuthenticatedUser | null> {
   const token = request.cookies.get('auth-token');
   if (!token) {
     return null;
   }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const user = (await AuthService.getUserFromToken(token.value)) as any;
+  const user = await AuthService.getUserFromToken(token.value);
   if (!user || !user.isActive || user.role !== 'SUPERUSER') {
     return null;
   }

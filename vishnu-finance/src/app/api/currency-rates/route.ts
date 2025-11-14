@@ -1,11 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { getCachedRates, setCachedRates, isCacheValid } from '@/lib/currency-rates-cache';
 
 // Configure route caching - external API data
 export const dynamic = 'force-dynamic';
 export const revalidate = 300; // Revalidate every 5 minutes
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const now = Date.now();
     

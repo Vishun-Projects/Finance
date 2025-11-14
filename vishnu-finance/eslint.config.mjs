@@ -19,11 +19,15 @@ const eslintConfig = [
       "build/**",
       "next-env.d.ts",
       "legacy/**",
+      "public/**",
+      "scripts/**",
+      "tmp/**",
+      "tailwind.config.js",
     ],
   },
   {
     rules: {
-      "@typescript-eslint/no-explicit-any": "warn",
+      "@typescript-eslint/no-explicit-any": "off",
       "@typescript-eslint/no-unsafe-function-type": "warn",
     },
   },

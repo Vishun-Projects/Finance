@@ -1,18 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { AnimatePresence, motion } from 'framer-motion';
-import GoalsPageClient from '@/app/(app)/goals/page-client';
-import DeadlinesPageClient from '@/app/(app)/deadlines/page-client';
-import WishlistPageClient from '@/app/(app)/wishlist/page-client';
-import type { Goal } from '@/types/goals';
-import type { Deadline, DeadlinesResponse } from '@/types/deadlines';
-import type { WishlistResponse, WishlistItem } from '@/types/wishlist';
-import type { LucideIcon } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType } from "react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { AnimatePresence, motion } from "framer-motion";
+import GoalsPageClient from "@/app/(app)/goals/page-client";
+import DeadlinesPageClient from "@/app/(app)/deadlines/page-client";
+import WishlistPageClient from "@/app/(app)/wishlist/page-client";
+import type { Goal } from "@/types/goals";
+import type { DeadlinesResponse } from "@/types/deadlines";
+import type { WishlistResponse } from "@/types/wishlist";
 import {
   AlarmClock,
   ArrowRight,
@@ -22,8 +21,21 @@ import {
   ShoppingBag,
   Sparkles,
   Target,
-} from 'lucide-react';
-import { normalizeGoals } from '@/lib/utils/goal-normalize';
+} from "lucide-react";
+import { normalizeGoals } from "@/lib/utils/goal-normalize";
+import {
+  buildDeadlineSecondary,
+  formatCurrency,
+  formatDateLabel,
+  formatPriorityLabel,
+  usePlansInsights,
+  type TabKey,
+} from "@/hooks/use-plans-insights";
+import { MobileWorkspaceChips } from "@/components/plans/mobile/mobile-workspace-chips";
+import { MobileSnapshotCard } from "@/components/plans/mobile/mobile-snapshot-card";
+import { MobileWorkspaceCard } from "@/components/plans/mobile/mobile-workspace-card";
+import { MobileActionMenu } from "@/components/plans/mobile/mobile-action-menu";
+import { MobileWorkspaceSheet } from "@/components/plans/mobile/mobile-workspace-sheet";
 
 export interface PlansBootstrap {
   goals: Goal[];
@@ -37,17 +49,18 @@ interface PlansPageClientProps {
   defaultTab?: string;
 }
 
-const TAB_CONFIG = [
-  { value: 'goals', label: 'Goals', description: 'Track your financial targets' },
-  { value: 'deadlines', label: 'Deadlines', description: 'Stay ahead of important dates' },
-  { value: 'wishlist', label: 'Wishlist', description: 'Prioritise upcoming purchases' },
-] as const;
+const TAB_VALUES: TabKey[] = ["goals", "deadlines", "wishlist"];
 
-export default function PlansPageClient({ bootstrap, userId, defaultTab = 'goals' }: PlansPageClientProps) {
-  const [activeTab, setActiveTab] = useState<string>(
-    TAB_CONFIG.some((tab) => tab.value === defaultTab) ? defaultTab : 'goals',
-  );
-  const [highlightedTab, setHighlightedTab] = useState<string | null>(null);
+type IconComponent = ComponentType<{ className?: string }>;
+
+export default function PlansPageClient({ bootstrap, userId, defaultTab = "goals" }: PlansPageClientProps) {
+  const initialTab: TabKey = TAB_VALUES.includes(defaultTab as TabKey)
+    ? (defaultTab as TabKey)
+    : "goals";
+
+  const [activeTab, setActiveTab] = useState<TabKey>(initialTab);
+  const [highlightedTab, setHighlightedTab] = useState<TabKey | null>(null);
+  const [mobileWorkspace, setMobileWorkspace] = useState<TabKey | null>(null);
   const tabsSectionRef = useRef<HTMLDivElement | null>(null);
   const [goals, setGoals] = useState<Goal[]>(() => normalizeGoals(bootstrap.goals));
 
@@ -60,141 +73,28 @@ export default function PlansPageClient({ bootstrap, userId, defaultTab = 'goals
     setGoals((prev) => (goalsEqual(prev, normalized) ? prev : normalized));
   }, []);
 
-  const goalStats = useMemo(() => {
-    const total = goals.length;
-    const completed = goals.filter((goal) => goal.status === 'COMPLETED').length;
-    const active = goals.filter((goal) => goal.status !== 'COMPLETED').length;
-    const invested = goals.reduce((sum, goal) => sum + (goal.currentAmount ?? 0), 0);
-    const target = goals.reduce((sum, goal) => sum + (goal.targetAmount ?? 0), 0);
-    const progressPercent = target ? Math.min(Math.round((invested / target) * 100), 100) : 0;
-    return { total, completed, active, invested, target, progressPercent };
-  }, [goals]);
-
-  const deadlineStats = useMemo(() => {
-    const entries = bootstrap.deadlines.data ?? [];
-    const total = entries.length;
-    const paid = entries.filter((deadline) => deadline.isCompleted).length;
-    const today = new Date();
-    const upcoming = entries.filter((deadline) => !deadline.isCompleted && new Date(deadline.dueDate) >= today).length;
-    const overdue = entries.filter((deadline) => !deadline.isCompleted && new Date(deadline.dueDate) < today).length;
-    return { total, paid, upcoming, overdue };
-  }, [bootstrap.deadlines]);
-
-  const wishlistStats = useMemo(() => {
-    const items = bootstrap.wishlist.data ?? [];
-    const total = items.length;
-    const completed = items.filter((item) => item.isCompleted).length;
-    const pending = total - completed;
-    const totalCost = items.reduce((sum, item) => sum + (item.estimatedCost ?? 0), 0);
-    const nextPriority = items
-      .filter((item) => !item.isCompleted)
-      .sort((a, b) => priorityRank(b.priority) - priorityRank(a.priority))[0]?.title;
-    return { total, completed, pending, totalCost, nextPriority };
-  }, [bootstrap.wishlist]);
-
-  const highlightedGoal = useMemo(() => {
-    const activeGoals = goals.filter((goal) => goal.status !== 'COMPLETED');
-    if (activeGoals.length === 0) {
-      return null;
-    }
-    return [...activeGoals].sort((a, b) => {
-      const priorityDifference = priorityRank(b.priority) - priorityRank(a.priority);
-      if (priorityDifference !== 0) {
-        return priorityDifference;
-      }
-      const aDate = toComparableDate(a.targetDate);
-      const bDate = toComparableDate(b.targetDate);
-      if (aDate && bDate) {
-        return aDate.getTime() - bDate.getTime();
-      }
-      if (aDate) return -1;
-      if (bDate) return 1;
-      return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-    })[0];
-  }, [goals]);
-
-  const nextDeadline = useMemo(() => {
-    const entries = bootstrap.deadlines.data ?? [];
-    const incomplete = entries.filter((deadline) => !deadline.isCompleted);
-    if (incomplete.length === 0) {
-      return null;
-    }
-    return [...incomplete].sort((a, b) => {
-      const aDate = toComparableDate(a.dueDate);
-      const bDate = toComparableDate(b.dueDate);
-      if (aDate && bDate) {
-        return aDate.getTime() - bDate.getTime();
-      }
-      if (aDate) return -1;
-      if (bDate) return 1;
-      return 0;
-    })[0];
-  }, [bootstrap.deadlines]);
-
-  const nextWishlist = useMemo(() => {
-    const items = bootstrap.wishlist.data ?? [];
-    const pending = items.filter((item) => !item.isCompleted);
-    if (pending.length === 0) {
-      return null;
-    }
-    return [...pending].sort((a, b) => {
-      const priorityDifference = priorityRank(b.priority) - priorityRank(a.priority);
-      if (priorityDifference !== 0) {
-        return priorityDifference;
-      }
-      const aDate = toComparableDate(a.targetDate);
-      const bDate = toComparableDate(b.targetDate);
-      if (aDate && bDate) {
-        return aDate.getTime() - bDate.getTime();
-      }
-      if (aDate) return -1;
-      if (bDate) return 1;
-      return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-    })[0];
-  }, [bootstrap.wishlist]);
-
-  const tabSummaries = useMemo(
-    () => ({
-      goals: `${goalStats.active} active`,
-      deadlines: `${deadlineStats.upcoming} upcoming`,
-      wishlist: `${wishlistStats.pending} pending`,
-    }),
-    [deadlineStats, goalStats, wishlistStats],
-  );
+  const {
+    goalStats,
+    deadlineStats,
+    wishlistStats,
+    highlightedGoal,
+    nextDeadline,
+    nextWishlist,
+    planFilterOptions,
+    tabSummaries,
+    mobileWorkspaceCards,
+  } = usePlansInsights({
+    goals,
+    deadlines: bootstrap.deadlines,
+    wishlist: bootstrap.wishlist,
+  });
 
   const overviewUpdatedLabel = useMemo(() => {
-    return new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium' }).format(new Date());
+    return new Intl.DateTimeFormat("en-IN", { dateStyle: "medium" }).format(new Date());
   }, []);
 
-  const planFilterOptions = useMemo(
-    () => [
-      {
-        value: 'goals' as const,
-        label: 'Goals',
-        description: tabSummaries.goals,
-        helper: `${goalStats.completed} completed • ${goalStats.total} total`,
-        icon: ClipboardCheck,
-      },
-      {
-        value: 'deadlines' as const,
-        label: 'Deadlines',
-        description: tabSummaries.deadlines,
-        helper: `${deadlineStats.overdue} overdue • ${deadlineStats.paid} paid`,
-        icon: CalendarDays,
-      },
-      {
-        value: 'wishlist' as const,
-        label: 'Wishlist',
-        description: tabSummaries.wishlist,
-        helper: `${wishlistStats.completed} completed • ${wishlistStats.total} total`,
-        icon: HeartHandshake,
-      },
-    ],
-    [deadlineStats.overdue, deadlineStats.paid, goalStats.completed, goalStats.total, tabSummaries, wishlistStats.completed, wishlistStats.total],
-  );
-
   const handleWorkspaceNavigate = useCallback(
-    (tab: string, { autoScroll = true }: { autoScroll?: boolean } = {}) => {
+    (tab: TabKey, { autoScroll = true }: { autoScroll?: boolean } = {}) => {
       setActiveTab(tab);
       setHighlightedTab(tab);
       if (autoScroll && typeof window !== 'undefined') {
@@ -206,6 +106,59 @@ export default function PlansPageClient({ bootstrap, userId, defaultTab = 'goals
     [],
   );
 
+  const openMobileWorkspace = useCallback(
+    (tab: TabKey) => {
+      setActiveTab(tab);
+      setMobileWorkspace(tab);
+    },
+    [],
+  );
+
+  const renderWorkspaceContent = useCallback(
+    (tab: TabKey) => {
+      switch (tab) {
+        case "goals":
+          return (
+            <GoalsPageClient
+              initialGoals={goals}
+              userId={userId}
+              layoutVariant="embedded"
+              onGoalsChange={handleGoalsChange}
+            />
+          );
+        case "deadlines":
+          return (
+            <DeadlinesPageClient
+              initialDeadlines={bootstrap.deadlines}
+              userId={userId}
+              layoutVariant="embedded"
+            />
+          );
+        case "wishlist":
+          return (
+            <WishlistPageClient
+              initialWishlist={bootstrap.wishlist}
+              userId={userId}
+              layoutVariant="embedded"
+            />
+          );
+        default:
+          return null;
+      }
+    },
+    [bootstrap.deadlines, bootstrap.wishlist, goals, handleGoalsChange, userId],
+  );
+
+  const closeMobileWorkspace = useCallback(() => {
+    setMobileWorkspace(null);
+  }, []);
+
+  const handleTabValueChange = useCallback((value: string) => {
+    if (isTabKey(value)) {
+      setActiveTab(value as TabKey);
+    }
+  }, []);
+
   useEffect(() => {
     if (!highlightedTab) return;
     const timeout = window.setTimeout(() => setHighlightedTab(null), 1400);
@@ -214,7 +167,7 @@ export default function PlansPageClient({ bootstrap, userId, defaultTab = 'goals
 
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 pb-20 pt-4 sm:px-6 lg:px-8">
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 pb-16 pt-4 sm:px-6 md:pb-20 lg:px-8">
       <header className="space-y-4">
         <Badge variant="outline" className="w-fit rounded-full border-primary/40 bg-primary/5 px-3 py-1 text-xs font-medium text-primary">
           Plans workspace
@@ -227,7 +180,36 @@ export default function PlansPageClient({ bootstrap, userId, defaultTab = 'goals
         </div>
       </header>
 
+      <div className="md:hidden space-y-6">
+        <MobileWorkspaceChips
+          active={mobileWorkspace ?? activeTab}
+          options={planFilterOptions}
+          onSelect={openMobileWorkspace}
+        />
+
+        <MobileSnapshotCard
+          goalStats={goalStats}
+          deadlineStats={deadlineStats}
+          wishlistStats={wishlistStats}
+          updatedLabel={overviewUpdatedLabel}
+        />
+
+        <div className="space-y-4">
+          {mobileWorkspaceCards.map((workspace) => (
+            <MobileWorkspaceCard
+              key={workspace.value}
+              data={workspace}
+              onOpen={() => openMobileWorkspace(workspace.value)}
+            />
+          ))}
+        </div>
+
+        <MobileActionMenu onOpenWorkspace={openMobileWorkspace} />
+      </div>
+
+      <div className="hidden md:flex md:flex-col md:gap-8">
       <section className="grid gap-4 lg:grid-cols-[minmax(0,1.35fr),minmax(0,1fr)]">
+          <div className="space-y-4">
         <Card className="relative overflow-hidden border border-border/60 bg-card/95 text-card-foreground shadow-lg backdrop-blur-sm dark:border-border/40 dark:bg-background/80">
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/10 via-primary/0 to-primary/0 dark:from-primary/25 dark:via-primary/10 dark:to-transparent" />
           <CardHeader className="relative z-10 space-y-4 pb-4 sm:pb-6">
@@ -287,6 +269,7 @@ export default function PlansPageClient({ bootstrap, userId, defaultTab = 'goals
             </div>
           </CardContent>
         </Card>
+          </div>
 
         <Card className="border border-border/60 bg-card/95 text-card-foreground shadow-sm dark:border-border/40 dark:bg-background/80">
           <CardHeader className="space-y-3 pb-3 sm:pb-4">
@@ -341,39 +324,12 @@ export default function PlansPageClient({ bootstrap, userId, defaultTab = 'goals
         </Card>
       </section>
 
-      {/* Mobile quick navigation */}
-      <div className="md:hidden sticky top-16 z-20 bg-background/95 backdrop-blur border-b px-4 py-2.5">
-        <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-          {planFilterOptions.map((option) => {
-            const Icon = option.icon;
-            const isActive = activeTab === option.value;
-            return (
-              <button
-                key={option.value}
-                type="button"
-                onClick={() => handleWorkspaceNavigate(option.value)}
-                className={`flex min-w-[140px] flex-1 items-center gap-2 rounded-full border px-3 py-1.5 text-left text-xs font-medium transition-colors ${
-                  isActive
-                    ? 'border-primary bg-primary/10 text-primary'
-                    : 'border-border/60 bg-muted/50 text-muted-foreground hover:bg-muted'
-                }`}
-                aria-pressed={isActive}
-              >
-                <Icon className="h-4 w-4 flex-shrink-0" />
-                <span className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{option.label}</span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Desktop filters */}
-      <div className="hidden md:block sticky top-28 z-20 border-b bg-background/90 backdrop-blur">
+        <div className="sticky top-28 z-20 border-b bg-background/90 backdrop-blur">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-3 px-6 py-4">
-          <div className="flex-1 min-w-[220px] max-w-sm">
+            <div className="min-w-[220px] flex-1 max-w-sm">
             <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Workspace</div>
             <p className="text-sm text-muted-foreground">
-              Choose a plan area to focus on. Buttons below mirror the mobile chips.
+                Choose a plan area to focus on. Buttons below mirror the mobile view.
             </p>
           </div>
           <div className="flex flex-1 flex-wrap justify-end gap-3">
@@ -414,16 +370,16 @@ export default function PlansPageClient({ bootstrap, userId, defaultTab = 'goals
             Switch tabs to add, edit, or complete items across your plans.
           </p>
         </div>
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+          <Tabs value={activeTab} onValueChange={handleTabValueChange} className="space-y-4">
           <TabsList className="flex w-full gap-2 overflow-x-auto rounded-2xl bg-muted/40 p-1 md:grid md:grid-cols-3 md:overflow-visible [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-            {TAB_CONFIG.map((tab) => (
+              {planFilterOptions.map((option) => (
               <TabsTrigger
-                key={tab.value}
-                value={tab.value}
+                  key={option.value}
+                  value={option.value}
                 className="min-w-[150px] flex h-auto flex-col items-start gap-1 rounded-xl px-3 py-2 text-left text-sm font-medium leading-tight text-muted-foreground transition-colors data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow md:min-w-0"
               >
-                <span>{tab.label}</span>
-                <span className="text-xs text-muted-foreground">{tabSummaries[tab.value]}</span>
+                  <span>{option.label}</span>
+                  <span className="text-xs text-muted-foreground">{tabSummaries[option.value]}</span>
               </TabsTrigger>
             ))}
           </TabsList>
@@ -500,37 +456,33 @@ export default function PlansPageClient({ bootstrap, userId, defaultTab = 'goals
         </TabsContent>
       </Tabs>
       </section>
+      </div>
+
+      <MobileWorkspaceSheet
+        open={mobileWorkspace !== null}
+        activeWorkspace={mobileWorkspace}
+        planFilterOptions={planFilterOptions}
+        tabSummaries={tabSummaries}
+        onOpenChange={(open) => {
+          if (!open) {
+            closeMobileWorkspace();
+          } else if (!mobileWorkspace) {
+            openMobileWorkspace(activeTab);
+          }
+        }}
+        onWorkspaceSelect={openMobileWorkspace}
+        renderContent={renderWorkspaceContent}
+      />
     </div>
   );
 }
 
-function buildDeadlineSecondary(deadline: Deadline) {
-  const amount =
-    typeof deadline.amount === 'number' && Number.isFinite(deadline.amount) && deadline.amount > 0
-      ? `${formatCurrency(deadline.amount)} • `
-      : '';
-  const dueLabel = formatDateLabel(deadline.dueDate);
-  const overdue = !deadline.isCompleted && isDatePast(deadline.dueDate);
-  const statusLabel = overdue ? 'Overdue' : 'Upcoming';
-  return `${amount}Due ${dueLabel}${statusLabel ? ` • ${statusLabel}` : ''}`;
-}
-
-function priorityRank(priority?: WishlistItem['priority']) {
-  switch (priority) {
-    case 'CRITICAL':
-      return 4;
-    case 'HIGH':
-      return 3;
-    case 'MEDIUM':
-      return 2;
-    case 'LOW':
-    default:
-      return 1;
-  }
+function isTabKey(value: string): value is TabKey {
+  return TAB_VALUES.includes(value as TabKey);
 }
 
 interface ReminderRowProps {
-  icon: LucideIcon;
+  icon: IconComponent;
   label: string;
   primary: string;
   secondary: string;
@@ -567,7 +519,7 @@ function ReminderRow({ icon: Icon, label, primary, secondary, actionLabel, onAct
 }
 
 interface HeroStatProps {
-  icon: LucideIcon;
+  icon: IconComponent;
   label: string;
   primary: string;
   secondary: string;
@@ -586,58 +538,6 @@ function HeroStat({ icon: Icon, label, primary, secondary }: HeroStatProps) {
       </div>
     </div>
   );
-}
-
-function formatCurrency(value?: number | null) {
-  const amount = typeof value === 'number' && Number.isFinite(value) ? value : 0;
-  return new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
-    maximumFractionDigits: 0,
-  }).format(amount);
-}
-
-function formatDateLabel(value?: string | null) {
-  const parsed = toComparableDate(value);
-  if (!parsed) {
-    return 'No date set';
-  }
-  const today = new Date();
-  const options: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short' };
-  if (parsed.getFullYear() !== today.getFullYear()) {
-    options.year = 'numeric';
-  }
-  return new Intl.DateTimeFormat('en-IN', options).format(parsed);
-}
-
-function formatPriorityLabel(priority?: WishlistItem['priority']) {
-  if (!priority) {
-    return 'Medium';
-  }
-  return priority.charAt(0) + priority.slice(1).toLowerCase();
-}
-
-function toComparableDate(value?: string | null) {
-  if (!value) {
-    return null;
-  }
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    return null;
-  }
-  return parsed;
-}
-
-function isDatePast(value?: string | null) {
-  const parsed = toComparableDate(value);
-  if (!parsed) {
-    return false;
-  }
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const compare = new Date(parsed);
-  compare.setHours(0, 0, 0, 0);
-  return compare.getTime() < today.getTime();
 }
 
 function goalsEqual(a: Goal[], b: Goal[]) {

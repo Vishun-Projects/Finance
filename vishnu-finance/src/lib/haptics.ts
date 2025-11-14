@@ -20,7 +20,7 @@ const getHapticsPlugin = (): HapticsPlugin | null => {
     if ('Capacitor' in window && (window as any).Capacitor?.Plugins?.Haptics) {
       return (window as any).Capacitor.Plugins.Haptics;
     }
-  } catch (error) {
+  } catch {
     // Capacitor not available, will use fallback
   }
   

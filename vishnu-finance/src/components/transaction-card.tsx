@@ -7,8 +7,6 @@ import {
   Trash2,
   ChevronDown,
   ChevronUp,
-  Store,
-  User,
   Tag,
   Calendar,
   Receipt,
@@ -117,11 +115,13 @@ export default function TransactionCard({
             </div>
 
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium sm:text-base">
-                {transaction.description || "No description"}
+              {/* Name/Store/Person FIRST (most important) */}
+              <p className="truncate text-sm font-semibold sm:text-base text-foreground">
+                {transaction.personName || transaction.store || "Unknown"}
               </p>
 
               <div className="mt-1 flex flex-wrap items-center gap-2">
+                {/* Category SECOND */}
                 <span
                   className="rounded-full px-2 py-0.5 text-[11px] font-medium"
                   style={{
@@ -132,24 +132,16 @@ export default function TransactionCard({
                   {categoryName}
                 </span>
 
-                {transaction.store && (
-                  <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                    <Store className="h-3 w-3" />
-                    <span className="max-w-[120px] truncate sm:max-w-none">
-                      {transaction.store}
-                    </span>
+                {/* Description THIRD (if different from name) */}
+                {transaction.description && 
+                 transaction.description !== transaction.personName && 
+                 transaction.description !== transaction.store && (
+                  <span className="text-[11px] text-muted-foreground truncate max-w-[200px]">
+                    {transaction.description}
                   </span>
                 )}
 
-                {transaction.personName && (
-                  <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                    <User className="h-3 w-3" />
-                    <span className="max-w-[120px] truncate sm:max-w-none">
-                      {transaction.personName}
-                    </span>
-                  </span>
-                )}
-
+                {/* Date */}
                 <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
                   <Calendar className="h-3 w-3" />
                   <span>{formatTransactionDate(transaction.transactionDate)}</span>

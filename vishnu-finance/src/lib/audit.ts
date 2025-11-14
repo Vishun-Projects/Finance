@@ -4,10 +4,15 @@ import { prisma } from './db';
 export type AuditEvent =
   | 'USER_LOGIN'
   | 'USER_LOGOUT'
+  | 'USER_OAUTH_LOGIN'
+  | 'USER_OAUTH_REGISTER'
   | 'DOCUMENT_UPLOAD'
   | 'DOCUMENT_DELETE'
   | 'DOCUMENT_DOWNLOAD'
   | 'DOCUMENT_STATUS_CHANGE'
+  | 'SUPER_DOCUMENT_UPLOAD'
+  | 'SUPER_DOCUMENT_UPDATE'
+  | 'SUPER_DOCUMENT_DELETE'
   | 'BANK_MAPPING_CREATE'
   | 'BANK_MAPPING_UPDATE'
   | 'BANK_MAPPING_DELETE'
@@ -60,12 +65,18 @@ export async function writeAuditLog(payload: AuditPayload) {
   } = payload;
 
   try {
-    if (!(prisma as Record<string, unknown>).auditLog || typeof (prisma as any).auditLog?.create !== 'function') {
+    const prismaWithAudit = prisma as unknown as {
+      auditLog?: {
+        create?: (...args: any[]) => Promise<unknown>;
+      };
+    };
+
+    if (!prismaWithAudit.auditLog || typeof prismaWithAudit.auditLog.create !== 'function') {
       console.warn('⚠️ Audit log table not available yet. Skipping audit write.');
       return;
     }
 
-    await (prisma as any).auditLog.create({
+    await prismaWithAudit.auditLog.create({
       data: {
         actorId,
         event,

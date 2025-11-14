@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Plus, 
   Edit, 
@@ -10,18 +10,13 @@ import {
   Calendar,
   TrendingUp,
   Calculator,
-  FileText,
   MapPin,
   Users,
   Award,
   History,
   ArrowUpRight,
-  ArrowDownRight,
   Clock,
   CheckCircle,
-  AlertCircle,
-  ChevronDown,
-  ChevronUp,
   Search,
   Filter,
   Download,
@@ -39,7 +34,6 @@ export default function SalaryStructureManagement() {
   const [showForm, setShowForm] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [editingStructure, setEditingStructure] = useState<SalaryStructure | null>(null);
-  const [selectedStructure, setSelectedStructure] = useState<SalaryStructure | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'active' | 'inactive'>('all');
 
@@ -67,14 +61,7 @@ export default function SalaryStructureManagement() {
   const [deductionName, setDeductionName] = useState('');
   const [deductionAmount, setDeductionAmount] = useState('');
 
-  useEffect(() => {
-    if (user && !authLoading) {
-      fetchSalaryStructures();
-      fetchSalaryHistory();
-    }
-  }, [user, authLoading]);
-
-  const fetchSalaryStructures = async () => {
+  const fetchSalaryStructures = useCallback(async () => {
     if (!user) return;
     
     try {
@@ -91,9 +78,9 @@ export default function SalaryStructureManagement() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
 
-  const fetchSalaryHistory = async () => {
+  const fetchSalaryHistory = useCallback(async () => {
     if (!user) return;
     
     try {
@@ -107,7 +94,14 @@ export default function SalaryStructureManagement() {
     } catch (error) {
       console.error('Error fetching salary history:', error);
     }
-  };
+  }, [user]);
+
+  useEffect(() => {
+    if (user && !authLoading) {
+      void fetchSalaryStructures();
+      void fetchSalaryHistory();
+    }
+  }, [user, authLoading, fetchSalaryStructures, fetchSalaryHistory]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -258,19 +258,62 @@ class StatementMetadataExtractor:
                 if not text:
                     return info
                 
-                # Extract account number
+                # Extract account number - enhanced patterns
                 acc_patterns = [
-                    r'account\s+#\s*(\d+)',
-                    r'account\s+no[:\s]+(\d+)',
-                    r'account\s+number[:\s]+(\d+)',
-                    r'a/c\s+no[:\s]+(\d+)',
+                    r'account\s+#\s*:?\s*(\d{8,20})',  # Account #: 1234567890
+                    r'account\s+no[:\s]+:?\s*(\d{8,20})',  # Account No: 1234567890
+                    r'account\s+number[:\s]+:?\s*(\d{8,20})',  # Account Number: 1234567890
+                    r'a/c\s+no[:\s]+:?\s*(\d{8,20})',  # A/C No: 1234567890
+                    r'a/c[:\s]+:?\s*(\d{8,20})',  # A/C: 1234567890
+                    r'acc[:\s]+:?\s*(\d{8,20})',  # Acc: 1234567890
+                    r'account\s+details[^\n]*(\d{8,20})',  # Account Details ... 1234567890
+                    r'account\s+information[^\n]*(\d{8,20})',  # Account Information ... 1234567890
+                    # Patterns with spaces/dashes (e.g., "1234 5678 9012")
+                    r'account\s+#\s*:?\s*((?:\d{4}\s*){2,5})',  # Account #: 1234 5678 9012
+                    r'account\s+no[:\s]+:?\s*((?:\d{4}\s*){2,5})',  # Account No: 1234 5678 9012
                 ]
                 
                 for pattern in acc_patterns:
                     match = re.search(pattern, text, re.IGNORECASE)
                     if match:
-                        info['accountNumber'] = match.group(1)
-                        break
+                        account_num = re.sub(r'[\s-]+', '', match.group(1))  # Remove spaces and dashes
+                        # Validate: account numbers are typically 8-20 digits
+                        if len(account_num) >= 8 and len(account_num) <= 20:
+                            info['accountNumber'] = account_num
+                            break
+                
+                # If still not found, try extracting from tables (for some bank formats)
+                if not info['accountNumber']:
+                    try:
+                        with pdfplumber.open(str(pdf_path)) as pdf:
+                            for page in pdf.pages[:3]:  # Check first 3 pages
+                                tables = page.extract_tables()
+                                for table in tables:
+                                    if not table:
+                                        continue
+                                    for row in table:
+                                        if not row:
+                                            continue
+                                        row_text = ' '.join(str(cell) for cell in row if cell)
+                                        # Look for account number patterns in table cells
+                                        for pattern in [
+                                            r'(\d{8,20})',  # Any 8-20 digit number
+                                        ]:
+                                            matches = re.findall(pattern, row_text)
+                                            for match in matches:
+                                                if len(match) >= 8 and len(match) <= 20:
+                                                    # Additional validation: not a date, not a transaction ID
+                                                    if not re.match(r'^\d{2}/\d{2}/\d{4}$', match):  # Not a date
+                                                        info['accountNumber'] = match
+                                                        break
+                                        if info['accountNumber']:
+                                            break
+                                    if info['accountNumber']:
+                                        break
+                                if info['accountNumber']:
+                                    break
+                    except Exception as e:
+                        print(f"Error extracting account number from tables: {e}")
                 
                 # Extract IFSC
                 ifsc_patterns = [
@@ -316,6 +359,93 @@ class StatementMetadataExtractor:
             print(f"Error extracting account info: {e}")
         
         return info
+    
+    @staticmethod
+    def extract_closing_balance(pdf_path: Path, bank_code: str, transactions_df: Optional[pd.DataFrame] = None) -> Optional[float]:
+        """
+        Extract closing balance from statement.
+        Priority: Statement header/summary > Calculate from transactions > Last transaction balance
+        
+        Args:
+            pdf_path: Path to PDF file
+            bank_code: Bank code (IDIB, HDFC, etc.)
+            transactions_df: DataFrame of parsed transactions (optional)
+            
+        Returns:
+            Closing balance as float, or None if not found
+        """
+        try:
+            with pdfplumber.open(str(pdf_path)) as pdf:
+                # Extract text from first page
+                first_page = pdf.pages[0]
+                text = first_page.extract_text()
+                
+                if not text:
+                    text = ""
+                
+                # Method 1: Extract from statement header/summary (ACCOUNT SUMMARY section)
+                closing_balance = StatementMetadataExtractor._extract_closing_from_text(text, bank_code)
+                if closing_balance is not None:
+                    return closing_balance
+                
+                # Method 2: Check last page for summary
+                if len(pdf.pages) > 1:
+                    last_page = pdf.pages[-1]
+                    last_text = last_page.extract_text()
+                    if last_text:
+                        closing_balance = StatementMetadataExtractor._extract_closing_from_text(last_text, bank_code)
+                        if closing_balance is not None:
+                            return closing_balance
+                
+                # Method 3: Calculate from transactions if available
+                if transactions_df is not None and not transactions_df.empty:
+                    calculated = StatementMetadataExtractor.calculate_closing_balance(
+                        transactions_df, None  # Will use last transaction balance
+                    )
+                    if calculated is not None:
+                        return calculated
+        except Exception as e:
+            print(f"Error extracting closing balance: {e}")
+        
+        return None
+    
+    @staticmethod
+    def _extract_closing_from_text(text: str, bank_code: str) -> Optional[float]:
+        """Extract closing balance from statement text"""
+        # Common patterns for closing/ending balance
+        patterns = [
+            # Ending Balance INR 7,305.17 (IDIB format)
+            r'ending\s+balance\s+inr\s+([0-9,]+\.?\d*)',
+            # Closing Balance: INR 7,305.17
+            r'closing\s+balance[:\s]+inr\s+([0-9,]+\.?\d*)',
+            # Ending Balance: 1234.56
+            r'ending\s+balance[:\s]+([0-9,]+\.?\d*)',
+            # Closing Balance: 1234.56
+            r'closing\s+balance[:\s]+([0-9,]+\.?\d*)',
+            # Ending Balance: Rs. 1,234.56
+            r'ending\s+balance[:\s]+(?:rs\.?|inr)?\s*([0-9,]+\.?\d*)',
+            # CB: 1234.56
+            r'\b(?:cb|c\.?\s*b\.?)\s*[:\s]+([0-9,]+\.?\d*)',
+            # Statement Summary Closing Balance
+            r'statement\s+summary[^\n]*closing\s*balance[:\s]+([0-9,]+\.?\d*)',
+            # ACCOUNT SUMMARY section (IDIB format) - Ending Balance
+            r'account\s+summary[^\n]*ending\s*balance[:\s]+inr\s+([0-9,]+\.?\d*)',
+            r'account\s+summary[^\n]*ending\s*balance[:\s]+([0-9,]+\.?\d*)',
+            # After "Total Debits" line, look for ending balance
+            r'total\s+debits[^\n]*ending\s*balance[:\s]+inr\s+([0-9,]+\.?\d*)',
+            r'total\s+debits[^\n]*ending\s*balance[:\s]+([0-9,]+\.?\d*)',
+        ]
+        
+        for pattern in patterns:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                try:
+                    balance_str = match.group(1).replace(',', '')
+                    return float(balance_str)
+                except (ValueError, AttributeError):
+                    continue
+        
+        return None
     
     @staticmethod
     def calculate_closing_balance(transactions_df: pd.DataFrame, opening_balance: Optional[float] = None) -> Optional[float]:
@@ -405,19 +535,118 @@ class StatementMetadataExtractor:
         account_info = StatementMetadataExtractor.extract_account_info(pdf_path, bank_code)
         metadata.update(account_info)
         
-        # Calculate totals from transactions
+        # Extract closing balance from PDF (PRIORITY - use PDF value, not calculated)
+        metadata['closingBalance'] = StatementMetadataExtractor.extract_closing_balance(
+            pdf_path, bank_code, transactions_df
+        )
+        
+        # Extract totals from PDF summary if available (more accurate than transaction sums)
+        totals_from_pdf = StatementMetadataExtractor._extract_totals_from_pdf(pdf_path, bank_code)
+        if totals_from_pdf.get('totalCredits') is not None:
+            metadata['totalCredits'] = totals_from_pdf['totalCredits']
+        if totals_from_pdf.get('totalDebits') is not None:
+            metadata['totalDebits'] = totals_from_pdf['totalDebits']
+        
+        # Calculate totals from transactions (fallback if not found in PDF)
         if transactions_df is not None and not transactions_df.empty:
             metadata['transactionCount'] = len(transactions_df)
             
-            if 'debit' in transactions_df.columns:
+            # Only use transaction totals if not already extracted from PDF
+            if metadata['totalDebits'] == 0.0 and 'debit' in transactions_df.columns:
                 metadata['totalDebits'] = float(transactions_df['debit'].sum())
-            if 'credit' in transactions_df.columns:
+            if metadata['totalCredits'] == 0.0 and 'credit' in transactions_df.columns:
                 metadata['totalCredits'] = float(transactions_df['credit'].sum())
             
-            # Calculate closing balance
-            metadata['closingBalance'] = StatementMetadataExtractor.calculate_closing_balance(
-                transactions_df, metadata['openingBalance']
-            )
+            # If closing balance not found in PDF, calculate it
+            if metadata['closingBalance'] is None:
+                metadata['closingBalance'] = StatementMetadataExtractor.calculate_closing_balance(
+                    transactions_df, metadata['openingBalance']
+                )
         
         return metadata
+    
+    @staticmethod
+    def _extract_totals_from_pdf(pdf_path: Path, bank_code: str) -> Dict[str, Optional[float]]:
+        """
+        Extract total credits and debits from PDF summary section
+        
+        Returns:
+            Dictionary with totalCredits and totalDebits
+        """
+        totals = {
+            'totalCredits': None,
+            'totalDebits': None
+        }
+        
+        try:
+            with pdfplumber.open(str(pdf_path)) as pdf:
+                # Check first page
+                first_page = pdf.pages[0]
+                text = first_page.extract_text()
+                
+                if not text:
+                    text = ""
+                
+                # Extract from ACCOUNT SUMMARY section (IDIB format)
+                # Pattern: "Total Credits: + INR 349,988.00" or "Total Credits + INR 349,988.00"
+                credit_patterns = [
+                    r'total\s+credits[:\s]+\+?\s*inr\s+([0-9,]+\.?\d*)',
+                    r'total\s+credits[:\s]+\+?\s*([0-9,]+\.?\d*)',
+                    r'credits[:\s]+\+?\s*inr\s+([0-9,]+\.?\d*)',
+                ]
+                
+                for pattern in credit_patterns:
+                    match = re.search(pattern, text, re.IGNORECASE)
+                    if match:
+                        try:
+                            totals['totalCredits'] = float(match.group(1).replace(',', ''))
+                            break
+                        except (ValueError, AttributeError):
+                            continue
+                
+                # Pattern: "Total Debits: - INR 342,709.83" or "Total Debits - INR 342,709.83"
+                debit_patterns = [
+                    r'total\s+debits[:\s]-\s*inr\s+([0-9,]+\.?\d*)',
+                    r'total\s+debits[:\s]-?\s*([0-9,]+\.?\d*)',
+                    r'debits[:\s]-\s*inr\s+([0-9,]+\.?\d*)',
+                ]
+                
+                for pattern in debit_patterns:
+                    match = re.search(pattern, text, re.IGNORECASE)
+                    if match:
+                        try:
+                            totals['totalDebits'] = float(match.group(1).replace(',', ''))
+                            break
+                        except (ValueError, AttributeError):
+                            continue
+                
+                # If not found on first page, check last page
+                if (totals['totalCredits'] is None or totals['totalDebits'] is None) and len(pdf.pages) > 1:
+                    last_page = pdf.pages[-1]
+                    last_text = last_page.extract_text()
+                    if last_text:
+                        # Try same patterns on last page
+                        for pattern in credit_patterns:
+                            if totals['totalCredits'] is None:
+                                match = re.search(pattern, last_text, re.IGNORECASE)
+                                if match:
+                                    try:
+                                        totals['totalCredits'] = float(match.group(1).replace(',', ''))
+                                        break
+                                    except (ValueError, AttributeError):
+                                        continue
+                        
+                        for pattern in debit_patterns:
+                            if totals['totalDebits'] is None:
+                                match = re.search(pattern, last_text, re.IGNORECASE)
+                                if match:
+                                    try:
+                                        totals['totalDebits'] = float(match.group(1).replace(',', ''))
+                                        break
+                                    except (ValueError, AttributeError):
+                                        continue
+        except Exception as e:
+            print(f"Error extracting totals from PDF: {e}")
+        
+        return totals
 

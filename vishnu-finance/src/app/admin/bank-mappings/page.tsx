@@ -107,7 +107,7 @@ export default function AdminBankMappingsPage() {
     if (form.mappingConfig.trim()) {
       try {
         parsedConfig = JSON.parse(form.mappingConfig);
-      } catch (error) {
+      } catch {
         showError("Invalid JSON", "Mapping configuration must be valid JSON.");
         return;
       }

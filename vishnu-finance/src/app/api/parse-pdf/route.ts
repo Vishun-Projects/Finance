@@ -13,7 +13,6 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData();
     const file = formData.get('pdf') as File;
     const bankHint = (formData.get('bank') as string | null)?.toLowerCase() || '';
-    const dryRun = (formData.get('dryRun') as string | null) === 'true';
     
     console.log('🔍 PDF API: Form data received');
     console.log('🔍 PDF API: File details:', {
@@ -76,6 +75,7 @@ def main():
     
     # First try bank-specific parser (supports SBIN, IDIB, KKBK, HDFC, MAHB)
     metadata = None
+    detected_bank = None
     try:
         import sys
         import os
@@ -84,6 +84,7 @@ def main():
             sys.path.insert(0, parsers_path)
         from bank_detector import BankDetector
         detected_bank = BankDetector.detect_from_file(pdf_path)
+        print(f"Detected bank: {detected_bank}", file=sys.stderr)
         if detected_bank in ['SBIN', 'IDIB', 'KKBK', 'KKBK_V2', 'HDFC', 'MAHB']:
             # Add tools directory to path
             tools_path = os.path.join(os.path.dirname(os.path.dirname(PDF_FILE)), 'tools')
@@ -98,6 +99,8 @@ def main():
                 df = result
                 metadata = None
             print(f"Bank-specific parser ({detected_bank}) extracted {len(df)} transactions", file=sys.stderr)
+            if metadata:
+                print(f"Metadata extracted: openingBalance={metadata.get('openingBalance')}, accountNumber={metadata.get('accountNumber')}", file=sys.stderr)
             if not df.empty:
                 # Success with bank-specific parser
                 pass
@@ -109,7 +112,13 @@ def main():
                     df_temp = parse_bank_statement_accurately(pdf_path)
                     if df_temp is not None and not df_temp.empty:
                         df = df_temp
-                        metadata = None
+                        # Try to extract metadata even if parser didn't return it
+                        if not metadata:
+                            try:
+                                from parsers.statement_metadata import StatementMetadataExtractor
+                                metadata = StatementMetadataExtractor.extract_all_metadata(pdf_path, detected_bank or 'UNKNOWN', df)
+                            except Exception as meta_err:
+                                print(f"Metadata extraction error: {meta_err}", file=sys.stderr)
                     print(f"Accurate parser extracted {len(df)} transactions", file=sys.stderr)
                 except Exception as e:
                     print(f"Accurate parser error: {e}", file=sys.stderr)
@@ -129,13 +138,19 @@ def main():
             elif df is None:
                 df = df_temp
                 print(f"Accurate parser extracted {len(df)} transactions", file=sys.stderr)
+            # Try to extract metadata
+            if not metadata and df is not None and not df.empty:
+                try:
+                    from parsers.statement_metadata import StatementMetadataExtractor
+                    metadata = StatementMetadataExtractor.extract_all_metadata(pdf_path, detected_bank or 'UNKNOWN', df)
+                except Exception as meta_err:
+                    print(f"Metadata extraction error: {meta_err}", file=sys.stderr)
         except Exception as e:
             print(f"Accurate parser failed: {e}", file=sys.stderr)
             if df is None:
                 df = pd.DataFrame()
     
     # Final fallback: try bank-specific parser without bank code
-    metadata = None
     if df is None or df.empty:
         try:
             from bank_statement_parser import parse_bank_statement
@@ -145,31 +160,54 @@ def main():
                 df, metadata = result
             else:
                 df = result
-                metadata = None
+                # Try to extract metadata if not already extracted
+                if not metadata and df is not None and not df.empty:
+                    try:
+                        from parsers.statement_metadata import StatementMetadataExtractor
+                        metadata = StatementMetadataExtractor.extract_all_metadata(pdf_path, detected_bank or 'UNKNOWN', df)
+                    except Exception as meta_err:
+                        print(f"Metadata extraction error: {meta_err}", file=sys.stderr)
             print(f"Bank-specific parser (auto-detect) extracted {len(df)} transactions", file=sys.stderr)
         except Exception as e:
             print(f"Bank-specific parser fallback also failed: {e}", file=sys.stderr)
             if df is None:
                 df = pd.DataFrame()
     
+    # Ensure metadata is always a dict (even if empty) for consistent JSON output
+    if metadata is None:
+        metadata = {}
+    elif not isinstance(metadata, dict):
+        metadata = {}
+    
+    # If no transactions found, still return metadata if available
     if df.empty:
         result = {
             "success": True, 
             "transactions": [], 
             "count": 0,
-            "metadata": metadata if metadata else {}
+            "metadata": metadata
         }
-        with open(JSON_FILE, 'w') as f:
-            json.dump(result, f)
-        print(json.dumps(result))
+        with open(JSON_FILE, 'w', encoding='utf-8') as f:
+            json.dump(result, f, ensure_ascii=False)
+        print(json.dumps(result, ensure_ascii=False))
         return
     
     # Convert metadata datetime objects to ISO strings for JSON serialization
+    # Ensure metadata is always a dict
+    if not metadata:
+        metadata = {}
+    
     if metadata:
         if metadata.get('statementStartDate') and hasattr(metadata['statementStartDate'], 'isoformat'):
             metadata['statementStartDate'] = metadata['statementStartDate'].isoformat()
+        elif metadata.get('statementStartDate'):
+            # Already a string, keep as is
+            pass
         if metadata.get('statementEndDate') and hasattr(metadata['statementEndDate'], 'isoformat'):
             metadata['statementEndDate'] = metadata['statementEndDate'].isoformat()
+        elif metadata.get('statementEndDate'):
+            # Already a string, keep as is
+            pass
     
     # Convert dates and ensure JSON-serializable - CRITICAL: Use strict DD/MM/YYYY for MAHB/SBM
     def normalize_date(date_val, bank_code=None):
@@ -264,7 +302,7 @@ def main():
             "success": True, 
             "transactions": json.loads(json_records), 
             "count": int(len(df)),
-            "metadata": metadata if metadata else {}
+            "metadata": metadata  # Always include metadata (even if empty dict)
         }
         with open(JSON_FILE, 'w', encoding='utf-8') as f:
             json.dump(result, f, ensure_ascii=False)
@@ -277,9 +315,9 @@ def main():
                 "success": True, 
                 "transactions": [], 
                 "count": len(df), 
-                "metadata": metadata if metadata else {},
+                "metadata": metadata,  # Always include metadata
                 "file": JSON_FILE
-            }))
+            }, ensure_ascii=False))
     except Exception as e:
         print(f"JSON serialization error: {e}", file=sys.stderr)
         # Final fallback: basic dict conversion
@@ -296,7 +334,7 @@ def main():
             "success": True, 
             "transactions": records, 
             "count": len(records),
-            "metadata": metadata if metadata else {}
+            "metadata": metadata  # Always include metadata (even if empty dict)
         }
         with open(JSON_FILE, 'w', encoding='utf-8') as f:
             json.dump(result, f, ensure_ascii=False)
@@ -324,54 +362,61 @@ if __name__ == "__main__":
       // Keep temporary script for later cleanup
       console.log('📁 PDF API: Temporary script will be cleaned up after import');
 
-      // Parse JSON - first try stdout, then fallback to JSON file, then CSV file
+      // Parse JSON - always read from JSON file (more reliable than stdout)
       let transactions: any[] = [];
       let transactionCount = 0;
-      
       let metadata: any = null;
+      
+      // Always read from JSON file first (most reliable)
       try {
-        // Try to parse from stdout first
-        const trimmed = stdout.trim();
-        let jsonText = '';
-        const firstBrace = trimmed.lastIndexOf('{');
-        const lastBrace = trimmed.lastIndexOf('}');
-        if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-          jsonText = trimmed.slice(firstBrace, lastBrace + 1);
-        }
-        if (jsonText) {
-          const parsed = JSON.parse(jsonText);
-          if (parsed.file) {
-            // Output indicates JSON was written to file
-            const fileContent = await readFile(jsonOutput, 'utf-8');
-            const fileParsed = JSON.parse(fileContent);
-            transactions = Array.isArray(fileParsed?.transactions) ? fileParsed.transactions : [];
-            transactionCount = fileParsed?.count || 0;
-            metadata = fileParsed?.metadata || null;
-          } else {
-            transactions = Array.isArray(parsed?.transactions) ? parsed.transactions : [];
-            transactionCount = parsed?.count || 0;
-            metadata = parsed?.metadata || null;
-          }
+        const fileContent = await readFile(jsonOutput, 'utf-8');
+        const parsed = JSON.parse(fileContent);
+        transactions = Array.isArray(parsed?.transactions) ? parsed.transactions : [];
+        transactionCount = parsed?.count || 0;
+        metadata = parsed?.metadata || null;
+        console.log(`✅ PDF API: Read ${transactions.length} transactions from JSON file`);
+        if (metadata) {
+          console.log('✅ PDF API: Metadata extracted:', {
+            hasOpeningBalance: metadata.openingBalance !== null && metadata.openingBalance !== undefined,
+            hasClosingBalance: metadata.closingBalance !== null && metadata.closingBalance !== undefined,
+            hasAccountNumber: !!metadata.accountNumber,
+            hasIFSC: !!metadata.ifsc,
+            hasBranch: !!metadata.branch,
+            hasAccountHolder: !!metadata.accountHolderName,
+            hasStatementDates: !!(metadata.statementStartDate && metadata.statementEndDate),
+          });
+        } else {
+          console.log('⚠️ PDF API: No metadata found in JSON file');
         }
       } catch (error) {
-        console.log('⚠️ PDF API: Failed to parse stdout, trying JSON file...');
-      }
-      
-      // If stdout parsing failed or returned empty, try reading from JSON file
-      if (transactions.length === 0 || !metadata) {
+        console.log('⚠️ PDF API: Failed to read JSON file, trying stdout...', error);
+        
+        // Fallback: Try parsing stdout (but be more careful)
         try {
-          const fileContent = await readFile(jsonOutput, 'utf-8');
-          const parsed = JSON.parse(fileContent);
-          if (transactions.length === 0) {
-            transactions = Array.isArray(parsed?.transactions) ? parsed.transactions : [];
-            transactionCount = parsed?.count || 0;
+          const trimmed = stdout.trim();
+          // Find JSON object in stdout - look for complete JSON structure
+          const jsonMatch = trimmed.match(/\{[\s\S]*"transactions"[\s\S]*\}/);
+          if (jsonMatch) {
+            const parsed = JSON.parse(jsonMatch[0]);
+            if (parsed.file) {
+              // Output indicates JSON was written to file, try reading it again
+              try {
+                const fileContent = await readFile(jsonOutput, 'utf-8');
+                const fileParsed = JSON.parse(fileContent);
+                transactions = Array.isArray(fileParsed?.transactions) ? fileParsed.transactions : [];
+                transactionCount = fileParsed?.count || 0;
+                metadata = fileParsed?.metadata || null;
+              } catch {
+                console.log('⚠️ PDF API: Failed to read JSON file after stdout indicated file path');
+              }
+            } else {
+              transactions = Array.isArray(parsed?.transactions) ? parsed.transactions : [];
+              transactionCount = parsed?.count || 0;
+              metadata = parsed?.metadata || null;
+            }
           }
-          if (!metadata && parsed?.metadata) {
-            metadata = parsed.metadata;
-          }
-          console.log(`✅ PDF API: Read ${transactions.length} transactions from JSON file`);
-        } catch (error) {
-          console.log('⚠️ PDF API: Failed to read JSON file, trying CSV...');
+        } catch {
+          console.log('⚠️ PDF API: Failed to parse stdout as well');
         }
       }
 
@@ -409,21 +454,34 @@ if __name__ == "__main__":
       console.log('📁 PDF API: Keeping files for import:', { filepath, csvOutput, tempScriptPath });
 
       console.log('✅ PDF API: Success! Returning', transactions.length, 'transactions');
-      if (metadata) {
+      
+      // Always include metadata (even if empty) - ensure it's an object
+      const finalMetadata = metadata && typeof metadata === 'object' ? metadata : {};
+      
+      if (finalMetadata && Object.keys(finalMetadata).length > 0) {
         console.log('✅ PDF API: Metadata included:', {
-          openingBalance: metadata.openingBalance,
-          accountNumber: metadata.accountNumber,
-          statementPeriod: metadata.statementStartDate && metadata.statementEndDate 
-            ? `${metadata.statementStartDate} to ${metadata.statementEndDate}` 
-            : 'N/A'
+          openingBalance: finalMetadata.openingBalance,
+          closingBalance: finalMetadata.closingBalance,
+          accountNumber: finalMetadata.accountNumber,
+          ifsc: finalMetadata.ifsc,
+          branch: finalMetadata.branch,
+          accountHolderName: finalMetadata.accountHolderName,
+          statementPeriod: finalMetadata.statementStartDate && finalMetadata.statementEndDate 
+            ? `${finalMetadata.statementStartDate} to ${finalMetadata.statementEndDate}` 
+            : 'N/A',
+          totalCredits: finalMetadata.totalCredits,
+          totalDebits: finalMetadata.totalDebits,
+          transactionCount: finalMetadata.transactionCount,
         });
+      } else {
+        console.log('⚠️ PDF API: No metadata extracted from PDF');
       }
       
       return NextResponse.json({ 
         success: true, 
         transactions, 
-        count: transactions.length,
-        metadata: metadata || undefined,
+        count: transactionCount || transactions.length,
+        metadata: finalMetadata,  // Always include metadata (even if empty)
         tempFiles: [filepath, csvOutput, tempScriptPath].filter(Boolean)
       });
 

@@ -20,9 +20,7 @@ import {
   Loader2,
   Plus,
   RefreshCw,
-  ShoppingCart,
   Tag,
-  Target,
   Trash2,
 } from 'lucide-react';
 
@@ -45,8 +43,31 @@ interface WishlistFormState {
   markCompleted: boolean;
 }
 
+type WishlistApiItem = WishlistItem & { tags?: string[] | string | null };
+
 const PRIORITY_OPTIONS: WishlistPriority[] = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
 const STATUS_FILTERS: Array<'all' | 'completed' | 'pending'> = ['all', 'completed', 'pending'];
+
+function parseTags(tags: unknown): string[] {
+  if (Array.isArray(tags)) {
+    return tags.filter((tag): tag is string => typeof tag === 'string' && tag.length > 0);
+  }
+  if (typeof tags === 'string') {
+    const trimmed = tags.trim();
+    if (!trimmed) {
+      return [];
+    }
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) {
+        return parsed.filter((tag): tag is string => typeof tag === 'string' && tag.length > 0);
+      }
+    } catch (error) {
+      console.warn('[wishlist] failed to parse tags', error);
+    }
+  }
+  return [];
+}
 
 function formatCurrency(amount?: number): string {
   if (!amount) return '—';
@@ -105,14 +126,13 @@ export default function WishlistPageClient({ initialWishlist, userId, layoutVari
         }
         const data = (await response.json()) as WishlistResponse;
         const normalised = Array.isArray(data?.data)
-          ? (data.data.map((item: any) => ({
-              ...item,
-              tags: Array.isArray(item.tags)
-                ? item.tags
-                : typeof item.tags === 'string' && item.tags.length
-                  ? JSON.parse(item.tags)
-                  : [],
-            })) as WishlistItem[])
+          ? (data.data.map((item) => {
+              const apiItem = item as WishlistApiItem;
+              return {
+                ...apiItem,
+                tags: parseTags(apiItem.tags),
+              };
+            }) as WishlistItem[])
           : [];
         setItems(normalised);
       } catch (error) {

@@ -26,7 +26,6 @@ export const CACHE_TTL = {
 
 // PERFORMANCE: Cache size limits to prevent memory issues
 const MAX_CACHE_SIZE = 1000; // Maximum number of cache entries
-const MAX_CACHE_SIZE_MB = 100; // Maximum cache size in MB (approximate)
 
 // Cache metrics for monitoring
 let cacheHits = 0;
@@ -115,9 +114,14 @@ export function clearUserCache(userId: string): void {
   }
 }
 
+type CacheHandler = (
+  request: NextRequest,
+  ...args: any[]
+) => Promise<NextResponse | Response> | NextResponse | Response;
+
 // Cache middleware for API routes
 export function withCache(options: CacheOptions = {}) {
-  return function (handler: Function) {
+  return function (handler: CacheHandler): CacheHandler {
     return async function (request: NextRequest, ...args: any[]) {
       if (options.skipCache) {
         return handler(request, ...args);

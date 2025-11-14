@@ -14,13 +14,6 @@ export const prisma = globalForPrisma.prisma ?? new PrismaClient({
       url: process.env.DATABASE_URL,
     },
   },
-  // Connection pooling optimization
-  __internal: {
-    engine: {
-      connectTimeout: 10000, // 10 seconds
-      queryTimeout: 30000,   // 30 seconds
-    },
-  },
 })
 
 // CRITICAL FIX: Ensure singleton pattern works in BOTH development AND production
@@ -44,21 +37,3 @@ process.on('SIGTERM', async () => {
   process.exit(0)
 })
 
-// Performance monitoring
-if (process.env.NODE_ENV === 'development') {
-  prisma.$on('query', (e) => {
-    if (e.duration > 1000) { // Log slow queries (>1s)
-      console.warn(`🐌 Slow query detected: ${e.duration}ms - ${e.query}`)
-    }
-  })
-}
-
-// Connection pool monitoring (production-safe)
-let connectionCount = 0
-prisma.$on('query' as any, () => {
-  connectionCount++
-  // Log connection pool stats every 100 queries
-  if (connectionCount % 100 === 0 && process.env.NODE_ENV === 'development') {
-    console.log(`📊 Connection pool usage: ${connectionCount} queries processed`)
-  }
-})

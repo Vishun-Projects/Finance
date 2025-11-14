@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
+import type { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import { AuthService } from '@/lib/auth';
 
-async function requireSuperuser(request: NextRequest) {
+type AuthenticatedUser = Awaited<ReturnType<typeof AuthService.getUserFromToken>>;
+
+async function requireSuperuser(request: NextRequest): Promise<AuthenticatedUser | null> {
   const token = request.cookies.get('auth-token');
   if (!token) {
     return null;
   }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const user = (await AuthService.getUserFromToken(token.value)) as any;
+  const user = await AuthService.getUserFromToken(token.value);
   if (!user || !user.isActive || user.role !== 'SUPERUSER') {
     return null;
   }
@@ -32,12 +34,12 @@ export async function GET(request: NextRequest) {
     const statusParam = params.get('status');
     const userStatus = params.get('userStatus') as 'ACTIVE' | 'FROZEN' | 'SUSPENDED' | null;
 
-    const where: Record<string, unknown> = {};
+    const where: Prisma.UserWhereInput = {};
 
     if (search) {
       where.OR = [
-        { email: { contains: search, mode: 'insensitive' } },
-        { name: { contains: search, mode: 'insensitive' } },
+        { email: { contains: search } },
+        { name: { contains: search } },
       ];
     }
 
@@ -55,49 +57,48 @@ export async function GET(request: NextRequest) {
       where.status = userStatus;
     }
 
-    const query = {
-      where,
-      orderBy: { createdAt: 'desc' },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        role: true,
-        isActive: true,
-        status: true,
-        createdAt: true,
-        updatedAt: true,
-        lastLogin: true,
-        _count: {
-          select: {
-            uploadedDocuments: true,
-            transactions: true,
-          },
-        },
-        uploadedDocuments: {
-          orderBy: { createdAt: 'desc' },
-          take: 1,
-          select: { createdAt: true },
-        },
-        transactions: {
-          orderBy: { transactionDate: 'desc' },
-          take: 1,
-          select: { transactionDate: true },
-        },
-        accountStatements: {
-          orderBy: { importedAt: 'desc' },
-          take: 1,
-          select: { importedAt: true },
+    const baseSelect: Prisma.UserSelect = {
+      id: true,
+      email: true,
+      name: true,
+      role: true,
+      isActive: true,
+      status: true,
+      createdAt: true,
+      updatedAt: true,
+      lastLogin: true,
+      _count: {
+        select: {
+          uploadedDocuments: true,
+          transactions: true,
         },
       },
-    } as const;
+      uploadedDocuments: {
+        orderBy: { createdAt: 'desc' },
+        take: 1,
+        select: { createdAt: true },
+      },
+      transactions: {
+        orderBy: { transactionDate: 'desc' },
+        take: 1,
+        select: { transactionDate: true },
+      },
+      accountStatements: {
+        orderBy: { importedAt: 'desc' },
+        take: 1,
+        select: { importedAt: true },
+      },
+    };
+
+    const query: Prisma.UserFindManyArgs = {
+      where,
+      orderBy: { createdAt: 'desc' },
+      select: baseSelect,
+    };
 
     let usersResult: unknown;
     try {
-      usersResult = await prisma.user.findMany(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        query as any
-      );
+      usersResult = await prisma.user.findMany(query);
     } catch (error) {
       if (!isMissingStatusColumn(error)) {
         throw error;
@@ -111,16 +112,15 @@ export async function GET(request: NextRequest) {
       }
 
       console.warn('⚠️ Admin users API - status column missing, falling back to legacy schema');
-      const { status: _status, ...legacySelect } = query.select as Record<string, unknown>;
-      void _status;
-      const legacyQuery = {
+      const legacySelect: Prisma.UserSelect = {
+        ...baseSelect,
+        status: undefined,
+      };
+      const legacyQuery: Prisma.UserFindManyArgs = {
         ...query,
         select: legacySelect,
       };
-      usersResult = await prisma.user.findMany(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        legacyQuery as any
-      );
+      usersResult = await prisma.user.findMany(legacyQuery);
       usersResult = (usersResult as Array<Record<string, unknown>>).map(user => ({ ...user, status: 'ACTIVE' }));
     }
 

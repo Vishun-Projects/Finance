@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { X, Save, Store, User } from 'lucide-react';
+import { Save, Store, User } from 'lucide-react';
 import { Transaction, TransactionCategory } from '@/types';
 import { Combobox, ComboboxOption } from './ui/combobox';
 import { Button } from './ui/button';
@@ -124,7 +124,17 @@ export default function TransactionFormModal({
         }
       }
     }
-  }, [formData.description, formData.upiId, formData.store, formData.personName, formData.financialCategory, categories]);
+  }, [
+    formData.description,
+    formData.upiId,
+    formData.store,
+    formData.personName,
+    formData.financialCategory,
+    formData.creditAmount,
+    formData.debitAmount,
+    formData.categoryId,
+    categories,
+  ]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

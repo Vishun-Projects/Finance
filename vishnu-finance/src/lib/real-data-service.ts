@@ -25,6 +25,10 @@ export interface RealDashboardData {
   goalProgress: any[];
   upcomingBills: any[];
   financialMilestones: any[];
+  recurringMonthlyIncome: number;
+  wishlistCount: number;
+  salaryStructureCount: number;
+  recurringItemCount: number;
 }
 
 export class RealDataService {
@@ -75,6 +79,9 @@ export class RealDataService {
       const currentMonth = new Date();
       const startOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
       const endOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
+      const wishlistCount = wishlistItems.length;
+      const salaryStructureCount = salaryStructures.length;
+      const recurringItemCount = recurringItems.length;
 
       // Calculate total income for current month (including one-time income)
       const totalIncomeThisMonth = incomeSources.reduce((sum, source) => {
@@ -240,7 +247,7 @@ export class RealDataService {
         categoryBreakdown,
         financialHealthScore,
         emergencyFundMonths: this.calculateEmergencyFundMonths(monthlyExpenses, goals),
-        debtToIncomeRatio: this.calculateDebtToIncomeRatio(monthlyIncome, expenses),
+        debtToIncomeRatio: this.calculateDebtToIncomeRatio(totalIncomeThisMonth, expenses),
         userPersona,
         personalizedInsights,
         behavioralAlerts,
@@ -248,7 +255,11 @@ export class RealDataService {
         spendingPatterns,
         goalProgress,
         upcomingBills,
-        financialMilestones
+        financialMilestones,
+        recurringMonthlyIncome,
+        wishlistCount,
+        salaryStructureCount,
+        recurringItemCount,
       };
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
@@ -426,13 +437,25 @@ export class RealDataService {
   }
 
   // Analyze spending patterns
-  private static analyzeSpendingPatterns(expenses: any[]): any {
-    const patterns = {
+  private static analyzeSpendingPatterns(expenses: any[]): {
+    totalTransactions: number;
+    averageTransaction: number;
+    mostExpensiveCategory: string;
+    spendingTrend: string;
+    topCategories: Array<{ category: string; total: number }>;
+  } {
+    const patterns: {
+      totalTransactions: number;
+      averageTransaction: number;
+      mostExpensiveCategory: string;
+      spendingTrend: string;
+      topCategories: Array<{ category: string; total: number }>;
+    } = {
       totalTransactions: expenses.length,
       averageTransaction: 0,
       mostExpensiveCategory: '',
       spendingTrend: 'stable',
-      topCategories: []
+      topCategories: [],
     };
 
     if (expenses.length > 0) {
@@ -451,7 +474,10 @@ export class RealDataService {
         .sort((a, b) => b[1] - a[1]);
       
       patterns.mostExpensiveCategory = sortedCategories[0]?.[0] || 'Other';
-      patterns.topCategories = sortedCategories.slice(0, 3);
+      patterns.topCategories = sortedCategories.slice(0, 3).map(([category, total]) => ({
+        category,
+        total,
+      }));
     }
 
     return patterns;

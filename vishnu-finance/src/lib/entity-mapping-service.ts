@@ -51,7 +51,7 @@ export async function getCanonicalNamesBatch(
           entityType: true,
         },
       });
-    } catch (prismaError) {
+    } catch {
       try {
         const placeholders = entityTypes.map(() => '?').join(',');
         const sqlResult = await prisma.$queryRawUnsafe<
@@ -62,7 +62,7 @@ export async function getCanonicalNamesBatch(
           ...entityTypes,
         );
         mappings = Array.isArray(sqlResult) ? sqlResult : [];
-      } catch (sqlError) {
+      } catch {
         console.warn(
           '⚠️ Entity mappings table does not exist. Returning original names. Run migrations to enable entity mapping feature.',
         );

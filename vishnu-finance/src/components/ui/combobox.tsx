@@ -103,8 +103,8 @@ export function Combobox({
               {filteredOptions.map((option) => (
                 <CommandItem
                   key={option.value}
-                  value={option.value}
                   onSelect={() => handleSelect(option.value)}
+                  data-value={option.value}
                 >
                   <Check
                     className={cn(

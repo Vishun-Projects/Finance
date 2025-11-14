@@ -96,11 +96,56 @@ def parse_bank_statement(file_path: Path, bank_code: Optional[str] = None) -> tu
     if not df.empty:
         df = deduplicate_transactions(df)
     
-    # Post-parse validation
+    # Extract statement metadata (MANDATORY - always attempt extraction)
+    metadata = None
+    try:
+        if file_path.suffix.lower() == '.pdf':
+            # Try to extract metadata from parser first
+            try:
+                metadata = parser.extract_statement_metadata(file_path, df if not df.empty else None)
+            except Exception as parser_meta_err:
+                print(f"Parser metadata extraction failed: {parser_meta_err}", file=sys.stderr)
+                metadata = None
+            
+            # If parser didn't return metadata, try direct extraction
+            if not metadata or (isinstance(metadata, dict) and not any(metadata.values())):
+                try:
+                    from parsers.statement_metadata import StatementMetadataExtractor
+                    metadata = StatementMetadataExtractor.extract_all_metadata(file_path, bank_code, df if not df.empty else None)
+                    print(f"Direct metadata extraction: openingBalance={metadata.get('openingBalance')}, accountNumber={metadata.get('accountNumber')}", file=sys.stderr)
+                except Exception as direct_meta_err:
+                    print(f"Direct metadata extraction failed: {direct_meta_err}", file=sys.stderr)
+                    metadata = {}
+            
+            # Convert datetime objects to ISO strings for JSON serialization
+            if metadata and isinstance(metadata, dict):
+                if metadata.get('statementStartDate') and hasattr(metadata['statementStartDate'], 'isoformat'):
+                    metadata['statementStartDate'] = metadata['statementStartDate'].isoformat()
+                elif metadata.get('statementStartDate'):
+                    # Already a string, keep as is
+                    pass
+                if metadata.get('statementEndDate') and hasattr(metadata['statementEndDate'], 'isoformat'):
+                    metadata['statementEndDate'] = metadata['statementEndDate'].isoformat()
+                elif metadata.get('statementEndDate'):
+                    # Already a string, keep as is
+                    pass
+    except Exception as e:
+        print(f"Metadata extraction error (non-critical): {e}", file=sys.stderr)
+        import traceback
+        traceback.print_exc(file=sys.stderr)
+        metadata = {}  # Return empty dict instead of None
+    
+    # Ensure metadata is always a dict
+    if metadata is None:
+        metadata = {}
+    elif not isinstance(metadata, dict):
+        metadata = {}
+    
+    # Post-parse validation (after metadata extraction)
     if not df.empty:
         try:
             from parsers.data_validator import DataValidator
-            validation_result = DataValidator.validate_transactions(df, bank_code)
+            validation_result = DataValidator.validate_transactions(df, bank_code, metadata)
             
             # Print validation report if there are errors
             if validation_result.get('errors') or validation_result.get('warnings'):
@@ -114,19 +159,6 @@ def parse_bank_statement(file_path: Path, bank_code: Optional[str] = None) -> tu
         except Exception as e:
             # Don't fail parsing if validation fails
             print(f"Validation error (non-critical): {e}")
-    
-    # Extract statement metadata
-    metadata = None
-    try:
-        if file_path.suffix.lower() == '.pdf':
-            metadata = parser.extract_statement_metadata(file_path, df if not df.empty else None)
-            # Convert datetime objects to ISO strings for JSON serialization
-            if metadata and metadata.get('statementStartDate'):
-                metadata['statementStartDate'] = metadata['statementStartDate'].isoformat() if hasattr(metadata['statementStartDate'], 'isoformat') else str(metadata['statementStartDate'])
-            if metadata and metadata.get('statementEndDate'):
-                metadata['statementEndDate'] = metadata['statementEndDate'].isoformat() if hasattr(metadata['statementEndDate'], 'isoformat') else str(metadata['statementEndDate'])
-    except Exception as e:
-        print(f"Metadata extraction error (non-critical): {e}")
     
     return df, metadata
 

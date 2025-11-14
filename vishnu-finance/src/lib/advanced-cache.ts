@@ -439,7 +439,7 @@ export class CacheInvalidation {
 
   static async invalidateByPattern(pattern: string): Promise<void> {
     // Invalidate caches matching pattern
-    for (const [name, cache] of cacheManager['caches'].entries()) {
+    for (const name of cacheManager['caches'].keys()) {
       // This would need to be implemented based on cache structure
       console.log(`Invalidating cache ${name} with pattern ${pattern}`);
     }
@@ -447,7 +447,7 @@ export class CacheInvalidation {
 
   static async invalidateByTags(tags: string[]): Promise<void> {
     // Invalidate caches by tags
-    for (const [name, cache] of cacheManager['caches'].entries()) {
+    for (const cache of cacheManager['caches'].values()) {
       cache.invalidateByTags(tags);
     }
   }

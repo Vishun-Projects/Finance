@@ -1,5 +1,5 @@
 // Performance monitoring and analytics system
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 
 // Performance metrics store (in production, use a proper monitoring service)
 const metricsStore = new Map<string, {
@@ -90,7 +90,8 @@ export class PerformanceMonitor {
   }
 
   // Track user interactions
-  static trackUserInteraction(userId: string, action: string, metadata?: any) {
+  static trackUserInteraction(userId: string, action: string, _metadata?: any) {
+    void _metadata;
     const key = `user:${userId}`;
     const existing = userAnalyticsStore.get(key) || {
       pageViews: 0,
@@ -220,8 +221,10 @@ export class PerformanceMonitor {
 }
 
 // Performance middleware
-export function performanceMiddleware(handler: Function) {
-  return async function (request: NextRequest, ...args: any[]) {
+type MonitoringHandler<TArgs extends any[], TResult> = (request: NextRequest, ...args: TArgs) => Promise<TResult> | TResult;
+
+export function performanceMiddleware<TArgs extends any[], TResult>(handler: MonitoringHandler<TArgs, TResult>) {
+  return async function (request: NextRequest, ...args: TArgs): Promise<TResult> {
     const startTime = performance.now();
     const endpoint = `${request.method} ${request.nextUrl.pathname}`;
     
@@ -248,8 +251,8 @@ export function performanceMiddleware(handler: Function) {
 }
 
 // User analytics middleware
-export function userAnalyticsMiddleware(handler: Function) {
-  return async function (request: NextRequest, ...args: any[]) {
+export function userAnalyticsMiddleware<TArgs extends any[], TResult>(handler: MonitoringHandler<TArgs, TResult>) {
+  return async function (request: NextRequest, ...args: TArgs): Promise<TResult> {
     const userId = request.headers.get('x-user-id');
     const endpoint = request.nextUrl.pathname;
     

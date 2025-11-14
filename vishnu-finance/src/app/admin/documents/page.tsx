@@ -24,6 +24,8 @@ import { useToast } from "@/contexts/ToastContext";
 import { Switch } from "@/components/ui/switch";
 import { formatFileSize, validateDeleteMode } from "@/lib/document-utils";
 
+type DocumentVisibility = "PUBLIC" | "ORGANIZATION" | "PRIVATE";
+
 type AdminDocument = {
   id: string;
   originalName: string;
@@ -33,7 +35,7 @@ type AdminDocument = {
   updatedAt: string;
   deletedAt?: string | null;
   isDeleted: boolean;
-  visibility: "PRIVATE" | "ORGANIZATION" | "PUBLIC";
+  visibility: DocumentVisibility;
   sourceType: "USER_UPLOAD" | "BANK_STATEMENT" | "PORTAL_RESOURCE" | "SYSTEM";
   owner?: { id: string; email: string | null; name: string | null } | null;
   ownerId?: string | null;
@@ -62,9 +64,12 @@ export default function AdminDocumentsPage() {
   }>({ open: false, document: null, mode: "document-only", submitting: false });
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [ownerIdInput, setOwnerIdInput] = useState("");
-  const [visibilityInput, setVisibilityInput] = useState<"PUBLIC" | "ORGANIZATION" | "PRIVATE">("ORGANIZATION");
+  const [visibilityInput, setVisibilityInput] = useState<DocumentVisibility>("ORGANIZATION");
   const [bankCodeInput, setBankCodeInput] = useState("");
   const [notes, setNotes] = useState("");
+
+  const isDocumentVisibility = (value: string): value is DocumentVisibility =>
+    value === "PUBLIC" || value === "ORGANIZATION" || value === "PRIVATE";
 
   const fetchDocuments = async () => {
     setLoading(true);
@@ -182,9 +187,10 @@ export default function AdminDocumentsPage() {
           : "Document restored successfully.",
       );
       fetchDocuments();
-    } catch (error: any) {
+    } catch (error) {
       console.error("Admin restore document failed:", error);
-      showError("Error", error?.message || "Unable to restore document");
+      const message = error instanceof Error ? error.message : "Unable to restore document";
+      showError("Error", message);
       setLoading(false);
     }
   };
@@ -238,7 +244,14 @@ export default function AdminDocumentsPage() {
             </div>
             <div className="space-y-2">
               <Label>Visibility</Label>
-              <Select value={visibilityInput} onValueChange={value => setVisibilityInput(value as any)}>
+              <Select
+                value={visibilityInput}
+                onValueChange={value => {
+                  if (isDocumentVisibility(value)) {
+                    setVisibilityInput(value);
+                  }
+                }}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select visibility" />
                 </SelectTrigger>

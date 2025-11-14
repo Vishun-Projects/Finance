@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
     const avatarsDir = join(process.cwd(), 'public', 'avatars');
     try {
       await mkdir(avatarsDir, { recursive: true });
-    } catch (error) {
+    } catch {
       // Directory might already exist, that's fine
     }
 

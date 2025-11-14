@@ -163,6 +163,10 @@ useEffect(() => {
 }, []);
 
 
+  const getCurrencySymbol = useCallback((currency: string): string => {
+    return CURRENCY_SYMBOLS[currency] || currency;
+  }, []);
+
   const formatCurrency = useCallback((amount: number, currency?: string): string => {
     const targetCurrency = currency || selectedCurrency;
     const symbol = getCurrencySymbol(targetCurrency);
@@ -182,14 +186,14 @@ useEffect(() => {
         minimumFractionDigits: 0,
         maximumFractionDigits: 2,
       }).format(amount);
-    } catch (error) {
+    } catch {
       // Fallback formatting if Intl.NumberFormat fails
       return `${symbol}${amount.toLocaleString('en-US', { 
         minimumFractionDigits: 0, 
         maximumFractionDigits: 2 
       })}`;
     }
-  }, [selectedCurrency]);
+  }, [selectedCurrency, getCurrencySymbol]);
 
   const convertCurrency = useCallback((amount: number, fromCurrency: string, toCurrency: string): number => {
     if (fromCurrency === toCurrency) return amount;
@@ -203,10 +207,6 @@ useEffect(() => {
     const usdAmount = amount / exchangeRates[fromCurrency];
     return usdAmount * exchangeRates[toCurrency];
   }, [exchangeRates]);
-
-  const getCurrencySymbol = useCallback((currency: string): string => {
-    return CURRENCY_SYMBOLS[currency] || currency;
-  }, []);
 
   const handleSetSelectedCurrency = useCallback((currency: string) => {
     setSelectedCurrency(currency);

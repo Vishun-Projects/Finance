@@ -58,7 +58,7 @@ export class AuthService {
     try {
       const decoded = jwt.verify(token, JWT_SECRET) as JWTPayload;
       return decoded;
-    } catch (error) {
+    } catch {
       return null;
     }
   }
@@ -68,7 +68,7 @@ export class AuthService {
     try {
       const decoded = jwt.verify(token, JWT_REFRESH_SECRET) as RefreshTokenPayload;
       return decoded;
-    } catch (error) {
+    } catch {
       return null;
     }
   }
@@ -95,6 +95,10 @@ export class AuthService {
     console.log(`⏱️ DB QUERY (findUnique): ${Date.now() - dbStart1}ms`);
 
     if (existingUser) {
+      // Check if user is OAuth-only
+      if (existingUser.oauthProvider && !existingUser.password) {
+        throw new Error('This email is already registered with Google. Please use "Sign in with Google" instead.');
+      }
       throw new Error('User already exists with this email');
     }
 
@@ -173,6 +177,12 @@ export class AuthService {
     if (!user.isActive) {
       console.log('❌ LOGIN API - Account is deactivated');
       throw new Error('Account is deactivated');
+    }
+
+    // Check if user has a password (OAuth users may not have one)
+    if (!user.password) {
+      console.log('❌ LOGIN API - User has no password (OAuth user)');
+      throw new Error('This account uses Google sign-in. Please use "Sign in with Google" instead.');
     }
 
     // Check if password is hashed (starts with $2b$)
@@ -331,5 +341,77 @@ export class AuthService {
 
       throw error;
     }
+  }
+
+  // OAuth: Find or create user from OAuth provider
+  static async findOrCreateOAuthUser(googleUser: {
+    email: string;
+    name: string;
+    picture?: string;
+    sub: string; // Google user ID
+  }) {
+    const startTime = Date.now();
+    console.log('🔐 OAUTH - Finding or creating user:', googleUser.email);
+
+    // Check if user exists by email
+    const dbStart1 = Date.now();
+    let user = await prisma.user.findUnique({
+      where: { email: googleUser.email }
+    });
+    console.log(`⏱️ DB QUERY (findUnique by email): ${Date.now() - dbStart1}ms`);
+
+    if (user) {
+      // User exists - check if OAuth is linked
+      if (!user.oauthProvider || user.oauthId !== googleUser.sub) {
+        console.log('🔐 OAUTH - Linking OAuth to existing account');
+        // Link OAuth to existing account
+        const dbStart2 = Date.now();
+        user = await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            oauthProvider: 'google',
+            oauthId: googleUser.sub,
+            avatarUrl: googleUser.picture || user.avatarUrl,
+          }
+        });
+        console.log(`⏱️ DB QUERY (update OAuth): ${Date.now() - dbStart2}ms`);
+      } else {
+        console.log('🔐 OAUTH - OAuth already linked');
+      }
+    } else {
+      // Create new user
+      console.log('🔐 OAUTH - Creating new OAuth user');
+      const dbStart2 = Date.now();
+      user = await prisma.user.create({
+        data: {
+          email: googleUser.email,
+          name: googleUser.name,
+          avatarUrl: googleUser.picture,
+          oauthProvider: 'google',
+          oauthId: googleUser.sub,
+          password: null, // No password for OAuth users
+          role: 'USER',
+        }
+      });
+      console.log(`⏱️ DB QUERY (create OAuth user): ${Date.now() - dbStart2}ms`);
+    }
+
+    console.log(`✅ OAUTH - User found/created in ${Date.now() - startTime}ms`);
+    return user;
+  }
+
+  // OAuth: Generate access token for OAuth user
+  static generateOAuthToken(user: {
+    id: string;
+    email: string;
+    name: string | null;
+    role: 'USER' | 'SUPERUSER';
+  }): string {
+    return this.generateToken({
+      userId: user.id,
+      email: user.email,
+      name: user.name || undefined,
+      role: user.role,
+    });
   }
 }

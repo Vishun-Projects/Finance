@@ -47,6 +47,11 @@ export default function AdminUsersPage() {
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive" | "frozen" | "suspended">("all");
   const [updatingUserId, setUpdatingUserId] = useState<string | null>(null);
 
+  const isRoleFilterValue = (value: string): value is "ALL" | "USER" | "SUPERUSER" =>
+    value === "ALL" || value === "USER" || value === "SUPERUSER";
+  const isStatusFilterValue = (value: string): value is "all" | "active" | "inactive" | "frozen" | "suspended" =>
+    value === "all" || value === "active" || value === "inactive" || value === "frozen" || value === "suspended";
+
   const fetchUsers = async () => {
     setLoading(true);
     try {
@@ -147,7 +152,14 @@ export default function AdminUsersPage() {
               placeholder="Search by name or email"
               className="w-full sm:w-56"
             />
-            <Select value={roleFilter} onValueChange={value => setRoleFilter(value as any)}>
+            <Select
+              value={roleFilter}
+              onValueChange={value => {
+                if (isRoleFilterValue(value)) {
+                  setRoleFilter(value);
+                }
+              }}
+            >
               <SelectTrigger className="w-full sm:w-40">
                 <SelectValue placeholder="Role" />
               </SelectTrigger>
@@ -157,7 +169,14 @@ export default function AdminUsersPage() {
                 <SelectItem value="SUPERUSER">Superusers</SelectItem>
               </SelectContent>
             </Select>
-            <Select value={statusFilter} onValueChange={value => setStatusFilter(value as any)}>
+            <Select
+              value={statusFilter}
+              onValueChange={value => {
+                if (isStatusFilterValue(value)) {
+                  setStatusFilter(value);
+                }
+              }}
+            >
               <SelectTrigger className="w-full sm:w-40">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>

@@ -1,25 +1,17 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Plus, 
   Target, 
   TrendingUp, 
   Calendar, 
   DollarSign, 
-  Edit, 
   Trash2,
   RefreshCw,
   AlertCircle,
   X,
   CheckCircle,
-  Clock,
-  AlertTriangle,
-  Search,
-  Filter,
-  Download,
-  BarChart3,
-  PieChart,
   ArrowLeft,
   Save
 } from 'lucide-react';
@@ -49,9 +41,6 @@ export default function GoalsManagement() {
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'completed' | 'paused'>('all');
-  const [filterPriority, setFilterPriority] = useState<'all' | 'low' | 'medium' | 'high' | 'critical'>('all');
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -71,13 +60,7 @@ export default function GoalsManagement() {
   };
 
   // Fetch goals on component mount
-  useEffect(() => {
-    if (user && !authLoading) {
-      fetchGoals();
-    }
-  }, [user, authLoading]);
-
-  const fetchGoals = async () => {
+  const fetchGoals = useCallback(async () => {
     if (!user) return;
     
     try {
@@ -97,7 +80,13 @@ export default function GoalsManagement() {
     } finally {
       setIsFetching(false);
     }
-  };
+  }, [user]);
+
+  useEffect(() => {
+    if (user && !authLoading) {
+      void fetchGoals();
+    }
+  }, [user, authLoading, fetchGoals]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;

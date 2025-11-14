@@ -139,7 +139,7 @@ export function suggestCategory(
   financialCategory: 'INCOME' | 'EXPENSE' | 'TRANSFER' | 'INVESTMENT' | 'OTHER',
   context: DetectionContext
 ): string | null {
-  const { description, store, upiId, amount } = context;
+  const { description, store, upiId } = context;
   const text = (description || store || upiId || '').toLowerCase();
   
   if (financialCategory === 'INCOME') {

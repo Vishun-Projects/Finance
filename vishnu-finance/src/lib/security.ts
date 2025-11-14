@@ -12,9 +12,14 @@ const RATE_LIMITS = {
 } as const;
 
 // Rate limiting middleware
+type SecurityHandler = (
+  request: NextRequest,
+  ...args: any[]
+) => Promise<NextResponse | Response> | NextResponse | Response;
+
 export function rateLimit(limitType: keyof typeof RATE_LIMITS) {
-  return function (handler: Function) {
-    return async function (request: NextRequest, ...args: any[]) {
+  return function (handler: SecurityHandler): SecurityHandler {
+    return async function (request: NextRequest, ...args: any[]): Promise<NextResponse | Response> {
       const ip = resolveClientIp(request);
       const key = `${ip}:${limitType}`;
       const limit = RATE_LIMITS[limitType];
@@ -152,8 +157,8 @@ export function securityHeaders(response: NextResponse): NextResponse {
 }
 
 // Input sanitization middleware
-export function sanitizeInput(handler: Function) {
-  return async function (request: NextRequest, ...args: any[]) {
+export function sanitizeInput(handler: SecurityHandler): SecurityHandler {
+  return async function (request: NextRequest, ...args: any[]): Promise<NextResponse | Response> {
     // Sanitize request body if it exists
     if (request.method !== 'GET' && request.method !== 'HEAD') {
       try {
@@ -168,7 +173,7 @@ export function sanitizeInput(handler: Function) {
         });
         
         return handler(sanitizedRequest, ...args);
-      } catch (error) {
+      } catch {
         // If JSON parsing fails, continue with original request
         return handler(request, ...args);
       }
@@ -200,8 +205,8 @@ function sanitizeObject(obj: any): any {
 }
 
 // Authentication middleware
-export function requireAuth(handler: Function) {
-  return async function (request: NextRequest, ...args: any[]) {
+export function requireAuth(handler: SecurityHandler): SecurityHandler {
+  return async function (request: NextRequest, ...args: any[]): Promise<NextResponse | Response> {
     const authToken = request.cookies.get('auth-token');
     
     if (!authToken) {
@@ -228,6 +233,7 @@ export function requireAuth(handler: Function) {
       
       return handler(request, ...args);
     } catch (error) {
+      console.error('Authentication middleware failed:', error);
       return NextResponse.json(
         { error: 'Authentication failed' },
         { status: 401 }

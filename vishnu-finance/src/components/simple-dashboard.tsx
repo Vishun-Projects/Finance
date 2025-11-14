@@ -12,9 +12,7 @@ import {
   RefreshCw,
   Filter,
   Plus,
-  User,
   Clock,
-  Wifi,
   WifiOff,
   Edit,
   Trash2,
@@ -28,7 +26,7 @@ import UserValidation from './user-validation';
 import PageSkeleton from './page-skeleton';
 import { hapticLight, hapticMedium, hapticError, hapticSuccess } from '@/lib/haptics';
 import { trackPullToRefresh, trackChartSeriesToggled, trackTransactionAdded, trackTransactionEdited } from '@/lib/analytics';
-import { prefersReducedMotion, getFadeAnimation, TIMING } from '@/lib/motion-utils';
+import { prefersReducedMotion } from '@/lib/motion-utils';
 import { useToast } from '../contexts/ToastContext';
 import TransactionFormModal, { TransactionFormData } from './transaction-form-modal';
 import TransactionAddSheet, { TransactionPreset } from './ui/transaction-add-sheet';
@@ -46,7 +44,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Avatar } from './ui/avatar';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { DateRangePicker } from './ui/date-range-picker';
 import { DateRange } from 'react-day-picker';
 import QuickRangeChips, { QuickRange } from './ui/quick-range-chips';
@@ -158,18 +155,13 @@ CompactMetricCard.displayName = 'CompactMetricCard';
 const TransactionRow = memo(({
   transaction,
   onTap,
-  onEdit,
-  onDelete,
   isPending = false,
 }: {
   transaction: SimpleDashboardData['recentTransactions'][0];
   onTap?: () => void;
-  onEdit?: () => void;
-  onDelete?: () => void;
   isPending?: boolean;
 }) => {
   const isCredit = transaction.type === 'credit' || transaction.type === 'income' || transaction.amount > 0;
-  const isDebit = transaction.type === 'debit' || transaction.type === 'expense' || transaction.amount < 0;
   const storeName = transaction.store || 'no name';
   
   const handleTap = () => {
@@ -377,21 +369,6 @@ export default function SimpleDashboard({
     return 280; // desktop
   }, []);
 
-  // Responsive chart height
-  useEffect(() => {
-    const computeHeight = () => {
-      const width = typeof window !== 'undefined' ? window.innerWidth : 1024;
-      if (width < 640) return 180;
-      if (width < 1024) return 220;
-      return 280;
-    };
-    const onResize = () => {
-      // Chart height is memoized, but we can trigger re-render if needed
-    };
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, []);
-
   // Optimize chart data for mobile (aggregate if too many points)
   const optimizedChartData = useMemo(() => {
     const data = dashboardData?.monthlyTrends;
@@ -418,6 +395,7 @@ export default function SimpleDashboard({
       const latency = Date.now() - startTime;
       trackPullToRefresh({ latency, success: false }, user?.id);
       hapticError();
+    console.error('Dashboard refresh failed:', error);
     } finally {
       setIsUpdating(false);
     }
@@ -528,6 +506,7 @@ export default function SimpleDashboard({
         title: 'Delete failed',
         message: 'Could not delete transaction. Please try again.',
       });
+    console.error('Transaction delete failed:', error);
     } finally {
       setPendingTransactions(prev => {
         const next = new Set(prev);
@@ -713,7 +692,7 @@ export default function SimpleDashboard({
     <AnimatePresence mode="wait">
       <motion.div
         key={dashboardData ? 'content' : 'loading'}
-        className="w-full bg-background pb-20 lg:pb-8 relative"
+        className="w-full bg-background pb-16 md:pb-20 lg:pb-8 relative"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
@@ -1267,8 +1246,6 @@ export default function SimpleDashboard({
                         key={transaction.id} 
                         transaction={transaction}
                         onTap={() => handleTransactionTap(transaction)}
-                        onEdit={() => handleTransactionEdit(transaction)}
-                        onDelete={() => handleTransactionDelete(transaction)}
                         isPending={pendingTransactions.has(transaction.id)}
                       />
                     ))}
@@ -1309,8 +1286,6 @@ export default function SimpleDashboard({
                       key={transaction.id} 
                       transaction={transaction}
                       onTap={() => handleTransactionTap(transaction)}
-                      onEdit={() => handleTransactionEdit(transaction)}
-                      onDelete={() => handleTransactionDelete(transaction)}
                       isPending={pendingTransactions.has(transaction.id)}
                     />
                   ))}
@@ -1333,7 +1308,7 @@ export default function SimpleDashboard({
 
       {/* FAB - Mobile Only (Add Transaction) */}
       <FabButton
-        icon={<Plus className="w-6 h-6" />}
+        icon={<Plus className="h-5 w-5" />}
         label="Add Transaction"
         onClick={() => setIsAddSheetOpen(true)}
         aria-label="Add new transaction"
@@ -1542,6 +1517,7 @@ export default function SimpleDashboard({
               message: 'Failed to save transaction',
             });
             hapticError();
+          console.error('Transaction save failed:', error);
           }
         }}
         categories={[]}

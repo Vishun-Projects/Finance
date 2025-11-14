@@ -54,7 +54,6 @@ export function ManageTransactionsPageClient({ initialData }: ManageTransactions
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [confirmRestoreOpen, setConfirmRestoreOpen] = useState(false);
-  const [modalMode, setModalMode] = useState<'delete' | 'restore'>('delete');
   const [deleteMode, setDeleteMode] = useState<DeleteMode>('selection');
   const [restoreMode, setRestoreMode] = useState<RestoreMode>('selection');
   const [loading, setLoading] = useState(false);
@@ -454,7 +453,6 @@ export function ManageTransactionsPageClient({ initialData }: ManageTransactions
               <Button
                 className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90"
                 onClick={() => {
-                  setModalMode('delete');
                   setDeleteMode('selection');
                   setConfirmDeleteOpen(true);
                 }}
@@ -466,7 +464,6 @@ export function ManageTransactionsPageClient({ initialData }: ManageTransactions
               <Button
                 className="gap-2 border border-border bg-card text-foreground hover:bg-muted"
                 onClick={() => {
-                  setModalMode('restore');
                   setRestoreMode('selection');
                   setConfirmRestoreOpen(true);
                 }}
@@ -592,7 +589,6 @@ function TransactionsTable({ data, selectedIds, onSelect, loading }: Transaction
         <tbody className="divide-y divide-border bg-card text-sm text-foreground">
           {data.map((transaction) => {
             const isSelected = selectedIds.has(transaction.id);
-            const amount = transaction.creditAmount ?? transaction.debitAmount ?? 0;
             const formattedDate = transaction.transactionDate
               ? format(new Date(transaction.transactionDate), 'dd MMM yyyy')
               : '—';

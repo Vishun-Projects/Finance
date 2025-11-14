@@ -72,7 +72,8 @@ export async function GET(request: NextRequest) {
     
     // Sorting
     const sortField = searchParams.get('sortField') || 'transactionDate';
-    const sortDirection = searchParams.get('sortDirection') || 'desc';
+    const sortDirectionParam = searchParams.get('sortDirection');
+    const sortDirection: 'asc' | 'desc' = sortDirectionParam === 'asc' ? 'asc' : 'desc';
 
     // Build where clause
     const where: any = {
@@ -89,9 +90,13 @@ export async function GET(request: NextRequest) {
       where.financialCategory = financialCategory;
     }
 
-    // Category filter
+    // Category filter (handle "uncategorized" special case)
     if (categoryId) {
-      where.categoryId = categoryId;
+      if (categoryId === 'uncategorized') {
+        where.categoryId = null;
+      } else {
+        where.categoryId = categoryId;
+      }
     }
 
     // Date range filter
@@ -148,7 +153,6 @@ export async function GET(request: NextRequest) {
     const hasSearchTerm = searchTerm && searchTerm.trim().length > 0;
 
     // Build orderBy
-    let orderBy: any = {};
     const validSortFields: Record<string, string> = {
       date: 'transactionDate',
       transactionDate: 'transactionDate',
@@ -158,7 +162,7 @@ export async function GET(request: NextRequest) {
     };
     
     const dbSortField = validSortFields[sortField] || 'transactionDate';
-    orderBy[dbSortField] = sortDirection;
+    const orderBy: Record<string, 'asc' | 'desc'> = { [dbSortField]: sortDirection };
 
     // Fetch transactions
     let transactions: any[] = [];

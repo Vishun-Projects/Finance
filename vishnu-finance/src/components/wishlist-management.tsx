@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import Image from 'next/image';
 import { 
   Plus, 
-  Gift, 
   DollarSign, 
   Calendar, 
   Tag, 
@@ -11,15 +11,8 @@ import {
   Trash2,
   CheckCircle,
   Clock,
-  AlertTriangle,
-  RefreshCw,
-  Search,
-  Filter,
-  Download,
   Star,
-  ShoppingCart,
-  Heart,
-  Target
+  Search,
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { useCurrency } from '../contexts/CurrencyContext';
@@ -70,13 +63,7 @@ export default function WishlistManagement() {
 
   // formatCurrency is now provided by the CurrencyContext
 
-  useEffect(() => {
-    if (user && !authLoading) {
-      fetchWishlistItems();
-    }
-  }, [user, authLoading]);
-
-  const fetchWishlistItems = async () => {
+  const fetchWishlistItems = useCallback(async () => {
     if (!user) return;
     
     try {
@@ -116,7 +103,13 @@ export default function WishlistManagement() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user, showError]);
+
+  useEffect(() => {
+    if (user && !authLoading) {
+      void fetchWishlistItems();
+    }
+  }, [user, authLoading, fetchWishlistItems]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -341,6 +334,44 @@ export default function WishlistManagement() {
               <Star className="w-6 h-6" />
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Search & Status Filters */}
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="relative w-full md:w-80">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(event) => setSearchTerm(event.target.value)}
+            placeholder="Search wishlist items…"
+            className="w-full rounded-md border border-border bg-card py-2 pl-10 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            aria-label="Search wishlist"
+          />
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {(['all', 'pending', 'completed'] as const).map((status) => {
+            const isActive = filterStatus === status;
+            const label =
+              status === 'all'
+                ? `All (${totalCount})`
+                : status === 'completed'
+                  ? `Completed (${wishlistItems.filter((item) => item.isCompleted).length})`
+                  : `Pending (${wishlistItems.filter((item) => !item.isCompleted).length})`;
+            return (
+              <button
+                key={status}
+                onClick={() => setFilterStatus(status)}
+                className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                  isActive ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground hover:bg-accent'
+                }`}
+                type="button"
+              >
+                {label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -620,14 +651,18 @@ export default function WishlistManagement() {
             </div>
 
             {item.imageUrl && (
-              <img
-                src={item.imageUrl}
-                alt={item.title}
-                className="w-full h-32 object-cover rounded-md mb-3"
-                onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-                  e.currentTarget.style.display = 'none';
-                }}
-              />
+              <div className="relative mb-3 h-32 w-full overflow-hidden rounded-md">
+                <Image
+                  src={item.imageUrl}
+                  alt={item.title}
+                  fill
+                  className="object-cover"
+                  sizes="(max-width: 768px) 100vw, 33vw"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
+              </div>
             )}
 
             <h3 className={`font-semibold text-lg mb-2 ${item.isCompleted ? 'line-through' : ''}`}>

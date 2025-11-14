@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 // Routes that don't require authentication
-const publicRoutes = ['/login', '/register', '/auth'];
+const publicRoutes = ['/login', '/register', '/auth', '/api/auth/oauth/google', '/api/auth/oauth/google/callback'];
 const adminPrefix = '/admin';
 
 const decodeJwt = (token: string) => {

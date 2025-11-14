@@ -14,13 +14,11 @@ import { cn } from '@/lib/utils';
 import {
   ArrowUpRight,
   CheckCircle,
-  ClipboardList,
   Goal as GoalIcon,
   Loader2,
   Plus,
   RefreshCw,
   Target,
-  TrendingUp,
   Trash2,
 } from 'lucide-react';
 import { normalizeGoals } from '@/lib/utils/goal-normalize';

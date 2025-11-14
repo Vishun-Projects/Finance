@@ -6,25 +6,6 @@ import { promisify } from 'util';
 
 const execAsync = promisify(exec);
 
-// Supported file types
-const SUPPORTED_TYPES = {
-  'application/pdf': 'pdf',
-  'application/vnd.ms-excel': 'xls',
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
-  'application/msword': 'doc',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
-  'text/plain': 'txt'
-};
-
-const FILE_EXTENSIONS = {
-  'pdf': '.pdf',
-  'xls': '.xls',
-  'xlsx': '.xlsx',
-  'doc': '.doc',
-  'docx': '.docx',
-  'txt': '.txt'
-};
-
 export async function POST(request: NextRequest) {
   console.log('🔍 Multi-Format API: Starting request processing');
   
@@ -233,12 +214,12 @@ if __name__ == "__main__":
               transactions = Array.isArray(parsed?.transactions) ? parsed.transactions : [];
               transactionCount = parsed?.count || 0;
             }
-          } catch (e) {
-            console.log('⚠️ Multi-Format API: Failed to parse JSON from stdout, trying file...');
+          } catch (error) {
+            console.log('⚠️ Multi-Format API: Failed to parse JSON from stdout, trying file...', error);
           }
         }
       } catch (error) {
-        console.log('⚠️ Multi-Format API: Failed to parse JSON from stdout');
+        console.log('⚠️ Multi-Format API: Failed to parse JSON from stdout', error);
       }
 
       // If no transactions from JSON stdout, try reading JSON file
@@ -251,7 +232,7 @@ if __name__ == "__main__":
           transactionCount = parsed?.count || 0;
           console.log(`✅ Multi-Format API: Read ${transactions.length} transactions from JSON file`);
         } catch (error) {
-          console.log('⚠️ Multi-Format API: Failed to read JSON file, trying CSV...');
+          console.log('⚠️ Multi-Format API: Failed to read JSON file, trying CSV...', error);
         }
       }
 
@@ -308,7 +289,7 @@ if __name__ == "__main__":
       return NextResponse.json({
         success: true,
         transactions,
-        count: transactions.length,
+        count: transactionCount,
         fileType: fileType.toUpperCase(),
         message: `Successfully parsed ${transactions.length} transactions from ${fileType.toUpperCase()} file`,
         tempFiles: [filepath, csvOutput, tempScriptPath].filter(Boolean)

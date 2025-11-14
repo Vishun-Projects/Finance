@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '../../../lib/db';
-import { getCanonicalName, getCanonicalNamesBatch } from '@/lib/entity-mapping-service';
+import { getCanonicalNamesBatch } from '@/lib/entity-mapping-service';
 import { rateLimitMiddleware, getRouteType } from '../../../lib/rate-limit';
 
 // Configure route caching - user-specific dynamic data
@@ -115,13 +115,13 @@ export async function GET(request: NextRequest) {
             financialCategory: t.financialCategory,
           }));
         } catch (error) {
-          console.warn('⚠️ Failed to fetch from Transaction model, falling back to Expense');
+          console.warn('⚠️ Failed to fetch from Transaction model, falling back to Expense', error);
         }
         
         // Also fetch legacy Expense records if Transaction model doesn't have enough
         if (expenses.length < pageSize) {
           try {
-            let legacyExpenses = await (prisma as any).expense.findMany({
+            const legacyExpenses = await (prisma as any).expense.findMany({
               where: {
                 userId,
                 isDeleted: false,
@@ -171,14 +171,14 @@ export async function GET(request: NextRequest) {
             const newLegacy = legacyExpenses.filter((exp: any) => !existingIds.has(exp.id));
             expenses = [...expenses, ...newLegacy].slice(0, pageSize);
           } catch (error) {
-            console.warn('⚠️ Failed to fetch legacy Expense records');
+            console.warn('⚠️ Failed to fetch legacy Expense records', error);
           }
           }
           
           return expenses;
         } catch (error: any) {
         // Use raw SQL fallback if Prisma validation fails (new fields not recognized)
-        console.log('⚠️ EXPENSES GET - Using raw SQL fallback');
+        console.log('⚠️ EXPENSES GET - Using raw SQL fallback', error);
         const params: any[] = [userId];
         let query = `
           SELECT id, amount, description, date, categoryId, isRecurring, frequency,
@@ -253,7 +253,7 @@ export async function GET(request: NextRequest) {
         });
       } catch (mappingError) {
         // Gracefully continue without mappings if table doesn't exist
-        console.warn('⚠️ Entity mapping feature not available (table may not exist). Continuing without name mapping.');
+        console.warn('⚠️ Entity mapping feature not available (table may not exist). Continuing without name mapping.', mappingError);
         // Expenses remain unchanged (original names kept)
       }
     }

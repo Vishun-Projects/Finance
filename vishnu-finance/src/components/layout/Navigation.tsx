@@ -10,21 +10,18 @@ import {
   TrendingUp,
   Settings,
   User,
-  Menu,
-  X,
-  BookOpen,
+  MessageSquare,
   Heart,
   CalendarCheck,
 } from 'lucide-react';
 import { Avatar } from '@/components/ui/avatar';
-import { Button } from '@/components/ui/button';
 
 const primaryNavItemsConfig = [
   { href: '/dashboard', label: 'Dashboard', icon: Home },
   { href: '/financial-health', label: 'Health Score', icon: Heart },
   { href: '/transactions', label: 'Transactions', icon: TrendingUp, tooltip: 'Manage all income, expenses, and transactions' },
   { href: '/plans', label: 'Plans', icon: CalendarCheck, tooltip: 'Goals, deadlines, and wishlist' },
-  { href: '/education', label: 'Learn', icon: BookOpen },
+  { href: '/advisor', label: 'AI Advisor', icon: MessageSquare, tooltip: 'Get personalized financial advice powered by AI' },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 
@@ -36,22 +33,12 @@ const mobilePrimaryNavItems = primaryNavItemsConfig.slice(0, 5);
 export default function Navigation() {
   const { user, logout } = useAuth();
   const pathname = usePathname();
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
 
-  // Close mobile menu when clicking outside or navigating
-  useEffect(() => {
-    if (isMobileMenuOpen) {
-      const handleClickOutside = () => setIsMobileMenuOpen(false);
-      document.addEventListener('click', handleClickOutside);
-      return () => document.removeEventListener('click', handleClickOutside);
-    }
-  }, [isMobileMenuOpen]);
-
+  // Logout helper closes any open menus
   const handleLogout = async () => {
     await logout();
     setIsUserMenuOpen(false);
-    setIsMobileMenuOpen(false);
   };
 
   const activeByHref = useMemo(() => {
@@ -129,13 +116,13 @@ export default function Navigation() {
             {/* User Menu and Logout */}
             <div className="flex items-center gap-2 lg:gap-3">
               {/* Logout Button - Desktop only */}
-              <Button
-                 onClick={handleLogout}
-                className="hidden lg:flex items-center gap-2 rounded-md border border-transparent px-3 py-1.5 text-sm font-medium text-muted-foreground hover:border-border hover:text-foreground"
+              <button
+                onClick={handleLogout}
+                className="hidden lg:flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all duration-200"
                 aria-label="Sign out"
               >
                 <span>Sign Out</span>
-              </Button>
+              </button>
               
               <div className="relative user-menu-container">
                 <button
@@ -198,55 +185,11 @@ export default function Navigation() {
                 )}
               </div>
 
-              {/* Mobile Menu Button */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setIsMobileMenuOpen(!isMobileMenuOpen);
-                }}
-                aria-label="Toggle navigation menu"
-                className="lg:hidden p-2 rounded-md hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                {isMobileMenuOpen ? (
-                  <X className="w-5 h-5 text-foreground" />
-                ) : (
-                  <Menu className="w-5 h-5 text-foreground" />
-                )}
-              </button>
+              {/* Mobile menu removed: bottom bar handles navigation */}
             </div>
           </div>
         </div>
-        {/* Mobile Navigation - Slide Down Menu */}
-        {isMobileMenuOpen && (
-          <div
-            className="border-t border-border bg-card/95 pb-4 pt-3 shadow-sm transition-all lg:hidden"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mx-auto grid w-full max-w-screen-md gap-1 px-3" role="navigation" aria-label="Mobile">
-              {primaryNavItemsConfig.map((item) => {
-                const Icon = item.icon;
-                const isActive = activeByHref.has(item.href);
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    aria-current={isActive ? 'page' : undefined}
-                    className={`flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors ${
-                      isActive
-                        ? 'bg-primary text-primary-foreground'
-                        : 'text-foreground hover:text-foreground hover:bg-accent'
-                    }`}
-                    onClick={() => setIsMobileMenuOpen(false)}
-                    title={item.tooltip || item.label}
-                  >
-                    <Icon className="w-5 h-5" />
-                    <span>{item.label}</span>
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-        )}
+        {/* Mobile slide-down menu removed in favour of persistent bottom bar */}
       </nav>
 
       {/* Mobile Bottom Tab Bar - Only on mobile, shows primary navigation */}
@@ -265,7 +208,6 @@ export default function Navigation() {
                     ? 'text-foreground bg-muted'
                     : 'text-muted-foreground hover:text-foreground hover:bg-accent'
                 }`}
-                onClick={() => setIsMobileMenuOpen(false)}
                 aria-label={item.label}
               >
                 <Icon className={`w-5 h-5 ${isActive ? 'scale-110' : ''} transition-transform`} />

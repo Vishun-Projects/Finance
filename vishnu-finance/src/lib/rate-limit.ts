@@ -35,7 +35,6 @@ setInterval(() => {
 function getIdentifier(request: Request): string {
   const url = new URL(request.url);
   const userId = url.searchParams.get('userId');
-  const authHeader = request.headers.get('authorization');
   
   // Try to get user ID from various sources
   if (userId) {

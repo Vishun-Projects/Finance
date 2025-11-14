@@ -8,7 +8,6 @@ export interface NotificationOptions {
   tag?: string;
   requireInteraction?: boolean;
   silent?: boolean;
-  timestamp?: number;
   actions?: NotificationAction[];
   data?: any;
 }
@@ -72,7 +71,6 @@ class NotificationService {
         tag: options.tag,
         requireInteraction: options.requireInteraction || false,
         silent: options.silent || false,
-        timestamp: options.timestamp || Date.now(),
         data: options.data,
       });
 

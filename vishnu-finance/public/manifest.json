@@ -1,7 +1,7 @@
 {
   "name": "Vishnu Finance - Personal Finance Manager",
   "short_name": "Vishnu Finance",
-  "description": "A comprehensive personal finance management application with AI insights",
+  "description": "A comprehensive personal finance management application",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#f0f0f0",

@@ -13,14 +13,15 @@ function isValidPlansTab(tab?: string): tab is PlansTab {
   return Boolean(tab && ALLOWED_TABS.includes(tab as PlansTab));
 }
 
-interface PlansPageProps {
-  searchParams?: { tab?: string };
-}
+type PlansPageProps = {
+  searchParams: Promise<{ tab?: string }>;
+};
 
 export const dynamic = 'force-dynamic';
 
 export default async function PlansPage({ searchParams }: PlansPageProps) {
   const user = await requireUser({ redirectTo: '/auth?tab=login' });
+  const resolvedSearchParams = await searchParams;
 
   const [goals, deadlines, wishlist] = await Promise.all([
     loadGoals(user.id),
@@ -34,7 +35,7 @@ export default async function PlansPage({ searchParams }: PlansPageProps) {
     wishlist,
   };
 
-  const defaultTab = isValidPlansTab(searchParams?.tab) ? searchParams!.tab : 'goals';
+  const defaultTab = isValidPlansTab(resolvedSearchParams?.tab) ? resolvedSearchParams.tab : 'goals';
 
   return (
     <Suspense

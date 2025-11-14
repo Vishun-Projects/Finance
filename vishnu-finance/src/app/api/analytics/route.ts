@@ -12,8 +12,6 @@ export const GET = withCache({ ttl: CACHE_TTL.ANALYTICS })(async function (reque
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
     const period = searchParams.get('period') || '6';
-    const type = searchParams.get('type'); // 'dashboard' or 'reports'
-
     if (!userId) {
       return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
     }

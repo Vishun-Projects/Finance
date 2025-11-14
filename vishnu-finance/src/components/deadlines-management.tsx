@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Plus, 
   Calendar, 
@@ -8,7 +8,6 @@ import {
   AlertTriangle, 
   CheckCircle, 
   X,
-  Edit,
   Trash2,
   RefreshCw,
   Filter,
@@ -16,7 +15,6 @@ import {
   Download,
   Repeat,
   DollarSign,
-  CreditCard,
   Building,
   Home,
   Car,
@@ -78,26 +76,13 @@ export default function DeadlinesManagement() {
     }
   };
 
-  const getStatusColor = (status: string, isCompleted: boolean) => {
-    if (isCompleted) return 'text-success';
-    if (status === 'OVERDUE') return 'text-error';
-    return 'text-warning';
-  };
-
   const getStatusIcon = (status: string, isCompleted: boolean) => {
     if (isCompleted) return <CheckCircle className="w-4 h-4" />;
     if (status === 'OVERDUE') return <AlertTriangle className="w-4 h-4" />;
     return <Clock className="w-4 h-4" />;
   };
 
-  // Fetch deadlines on component mount
-  useEffect(() => {
-    if (user && !authLoading) {
-      fetchDeadlines();
-    }
-  }, [user, authLoading]);
-
-  const fetchDeadlines = async () => {
+  const fetchDeadlines = useCallback(async () => {
     if (!user) return;
     
     try {
@@ -118,7 +103,14 @@ export default function DeadlinesManagement() {
     } finally {
       setIsFetching(false);
     }
-  };
+  }, [user]);
+
+  // Fetch deadlines on component mount
+  useEffect(() => {
+    if (user && !authLoading) {
+      void fetchDeadlines();
+    }
+  }, [user, authLoading, fetchDeadlines]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
@@ -683,7 +675,6 @@ export default function DeadlinesManagement() {
         ) : (
           <div className="space-y-4">
             {filteredDeadlines.map((deadline) => {
-              const statusColor = getStatusColor(deadline.status, deadline.isCompleted);
               const statusBadge = getStatusBadge(deadline.dueDate, deadline.isCompleted);
               const statusText = getStatusText(deadline.dueDate, deadline.isCompleted);
               const statusIcon = getStatusIcon(deadline.status, deadline.isCompleted);

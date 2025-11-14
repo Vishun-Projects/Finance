@@ -49,6 +49,14 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
+    if (validMimeTypes.length && file.type && !validMimeTypes.includes(file.type)) {
+      console.log('❌ Parse Bank Statement API: Unsupported MIME type:', file.type);
+      return NextResponse.json(
+        { error: 'Unsupported file MIME type. Please upload a valid bank statement file.' },
+        { status: 400 },
+      );
+    }
+
     // Create uploads directory if it doesn't exist
     const uploadsDir = join(process.cwd(), 'uploads');
     const toolsDir = join(process.cwd(), 'tools');
@@ -273,7 +281,7 @@ if __name__ == "__main__":
           }
         }
       } catch (error) {
-        console.log('⚠️ Parse Bank Statement API: Failed to parse JSON from stdout');
+        console.log('⚠️ Parse Bank Statement API: Failed to parse JSON from stdout', error);
       }
       
       // If stdout parsing failed, try reading JSON file
@@ -292,7 +300,7 @@ if __name__ == "__main__":
           }
           console.log(`✅ Parse Bank Statement API: Read ${transactions.length} transactions from JSON file`);
         } catch (error) {
-          console.log('⚠️ Parse Bank Statement API: Failed to read JSON file');
+          console.log('⚠️ Parse Bank Statement API: Failed to read JSON file', error);
         }
       }
 
@@ -318,7 +326,7 @@ if __name__ == "__main__":
       return NextResponse.json({
         success: true,
         transactions,
-        count: transactions.length,
+        count: transactionCount || transactions.length,
         bankType: detectedBankType,
         metadata: metadata || undefined,
         message: `Successfully parsed ${transactions.length} transactions from ${detectedBankType} statement`,

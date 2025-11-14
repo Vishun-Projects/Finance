@@ -13,7 +13,7 @@ class DataValidator:
     """Validates parsed transaction data for completeness and accuracy."""
     
     @staticmethod
-    def validate_transactions(df: pd.DataFrame, bank_code: Optional[str] = None) -> Dict:
+    def validate_transactions(df: pd.DataFrame, bank_code: Optional[str] = None, metadata: Optional[Dict] = None) -> Dict:
         """
         Validate transaction DataFrame for data integrity.
         
@@ -77,6 +77,14 @@ class DataValidator:
             result['errors'].extend(balance_issues['errors'])
         if balance_issues['warnings']:
             result['warnings'].extend(balance_issues['warnings'])
+        
+        # Validate statement balance reconciliation (opening + credits - debits = closing)
+        if metadata:
+            reconciliation_issues = DataValidator._validate_statement_balance_reconciliation(df, metadata)
+            if reconciliation_issues['errors']:
+                result['errors'].extend(reconciliation_issues['errors'])
+            if reconciliation_issues['warnings']:
+                result['warnings'].extend(reconciliation_issues['warnings'])
         
         # Validate transaction completeness
         completeness_issues = DataValidator._validate_completeness(df)
@@ -226,6 +234,79 @@ class DataValidator:
                 f"{balance_warnings} transactions have minor balance discrepancies "
                 "(likely due to rounding)"
             )
+        
+        return issues
+    
+    @staticmethod
+    def _validate_statement_balance_reconciliation(df: pd.DataFrame, metadata: Dict, tolerance: float = 0.01) -> Dict:
+        """
+        Validate statement-level balance reconciliation:
+        openingBalance + totalCredits - totalDebits = closingBalance
+        """
+        issues = {'errors': [], 'warnings': []}
+        
+        opening_balance = metadata.get('openingBalance')
+        closing_balance = metadata.get('closingBalance')
+        
+        if opening_balance is None or pd.isna(opening_balance):
+            issues['warnings'].append("Opening balance not found in metadata - cannot validate reconciliation")
+            return issues
+        
+        if closing_balance is None or pd.isna(closing_balance):
+            issues['warnings'].append("Closing balance not found in metadata - cannot validate reconciliation")
+            return issues
+        
+        # Calculate totals from transactions
+        total_debits = 0.0
+        total_credits = 0.0
+        
+        if 'debit' in df.columns:
+            total_debits = float(df['debit'].sum())
+        if 'credit' in df.columns:
+            total_credits = float(df['credit'].sum())
+        
+        # Calculate expected closing balance
+        expected_closing = float(opening_balance) + total_credits - total_debits
+        actual_closing = float(closing_balance)
+        discrepancy = abs(expected_closing - actual_closing)
+        
+        if discrepancy > tolerance:
+            if discrepancy > 1.0:
+                # Large discrepancy - error
+                issues['errors'].append(
+                    f"Statement balance reconciliation FAILED: "
+                    f"Opening (₹{opening_balance:.2f}) + Credits (₹{total_credits:.2f}) - Debits (₹{total_debits:.2f}) "
+                    f"= ₹{expected_closing:.2f}, but statement shows closing balance of ₹{actual_closing:.2f} "
+                    f"(discrepancy: ₹{discrepancy:.2f})"
+                )
+            else:
+                # Small discrepancy - warning (likely rounding)
+                issues['warnings'].append(
+                    f"Minor balance reconciliation discrepancy: ₹{discrepancy:.2f} "
+                    f"(expected: ₹{expected_closing:.2f}, actual: ₹{actual_closing:.2f}) - likely due to rounding"
+                )
+        else:
+            issues['warnings'].append("✅ Statement balance reconciliation successful")
+        
+        # Also check against metadata totals if available
+        metadata_debits = metadata.get('totalDebits')
+        metadata_credits = metadata.get('totalCredits')
+        
+        if metadata_debits is not None and metadata_credits is not None:
+            debits_diff = abs(total_debits - float(metadata_debits))
+            credits_diff = abs(total_credits - float(metadata_credits))
+            
+            if debits_diff > tolerance:
+                issues['warnings'].append(
+                    f"Total debits mismatch: transactions sum to ₹{total_debits:.2f}, "
+                    f"metadata shows ₹{metadata_debits:.2f} (difference: ₹{debits_diff:.2f})"
+                )
+            
+            if credits_diff > tolerance:
+                issues['warnings'].append(
+                    f"Total credits mismatch: transactions sum to ₹{total_credits:.2f}, "
+                    f"metadata shows ₹{metadata_credits:.2f} (difference: ₹{credits_diff:.2f})"
+                )
         
         return issues
     

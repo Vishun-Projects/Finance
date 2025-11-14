@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Plus, Search, Filter, X, RefreshCw, Settings, CheckSquare, Square, Trash2, RotateCw, Tag, Layers, ChevronLeft, ChevronRight, Sparkles, Check, Calendar as CalendarIcon, FileText, Upload, AlertCircle, TrendingUp } from 'lucide-react';
+import { Plus, Search, Filter, X, RefreshCw, CheckSquare, Square, Trash2, RotateCw, Tag, Layers, ChevronLeft, ChevronRight, Sparkles, Check, Calendar as CalendarIcon, FileText, Upload, AlertCircle, TrendingUp } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
@@ -311,15 +311,30 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
     }
   }, [resolvedUserId, financialCategory, searchTerm, startDate, endDate, showDeleted, pageParam, getPageSize, showError, amountPreset, selectedCategoryId]);
 
-  // Fetch categories
+  // Fetch categories (only those with transactions)
   const fetchCategories = useCallback(async () => {
     if (!resolvedUserId) return;
 
     try {
+      // Fetch all categories first
       const response = await fetch('/api/categories');
       if (response.ok) {
-        const data = await response.json();
-        setCategories(data || []);
+        const allCategories = await response.json() || [];
+        
+        // Fetch categories that have transactions
+        const categoriesWithTransactionsResponse = await fetch(`/api/transactions/categories-used?userId=${resolvedUserId}`);
+        if (categoriesWithTransactionsResponse.ok) {
+          const usedCategoryIds = await categoriesWithTransactionsResponse.json() || [];
+          const usedCategoryIdsSet = new Set(usedCategoryIds);
+          
+          // Filter to only show categories that have transactions
+          const usedCategories = allCategories.filter((c: any) => usedCategoryIdsSet.has(c.id));
+          
+          setCategories(usedCategories);
+        } else {
+          // Fallback: show all categories if API fails
+          setCategories(allCategories);
+        }
       }
     } catch (error) {
       console.error('Error fetching categories:', error);
@@ -552,16 +567,6 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
       page: '1',
     });
   }, [updateURLParams]);
-
-  const enableSelectionMode = useCallback(() => {
-    setShowSelectionMode(true);
-    setSelectionPulse(true);
-    if (typeof window !== 'undefined') {
-      window.requestAnimationFrame(() => {
-        selectionToolbarRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      });
-    }
-  }, []);
 
   const openFilterSheet = useCallback(() => {
     if (typeof window !== 'undefined' && window.innerWidth >= 768) {
@@ -1222,6 +1227,8 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
       const importPayload: any = { 
         userId: user.id, 
         records: normalized,
+        useAICategorization: true, // Enable AI categorization
+        validateBalance: true, // Enable balance validation
         ...(documentMeta ? { document: documentMeta } : {}),
       };
       
@@ -1229,6 +1236,10 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
       if (statementMetadata) {
         importPayload.metadata = statementMetadata;
       }
+      
+      // Update progress message
+      setImportProgress(10);
+      console.log('📤 Sending import request with AI categorization and balance validation...');
       
       const response = await fetch('/api/import-bank-statement', {
         method: 'POST',
@@ -1246,20 +1257,54 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
       
       let message = `Inserted ${totalInserted} records (${incomeCount} income, ${expenseCount} expenses), ${result.duplicates || 0} duplicates`;
       
-      if (result.warnings && result.warnings.length > 0) {
-        result.warnings.forEach((warning: string) => {
-          console.warn('  -', warning);
-        });
+      // Show categorization results
+      if (result.categorizedCount !== undefined) {
+        message += `. ${result.categorizedCount} transactions auto-categorized`;
       }
       
+      // Show balance validation results
+      if (result.balanceValidationResult) {
+        const validation = result.balanceValidationResult;
+        if (!validation.isValid && validation.discrepancy > 1.0) {
+          // Only show as failed if there's a significant discrepancy
+          message += `. ⚠️ Balance validation failed (discrepancy: ₹${validation.discrepancy?.toFixed(2) || 'N/A'})`;
+        } else if (validation.discrepancy > 0.01 && validation.discrepancy <= 1.0) {
+          message += `. ⚠️ Minor balance discrepancy: ₹${validation.discrepancy.toFixed(2)}`;
+        } else if (validation.discrepancy <= 0.01) {
+          message += `. ✅ Balance validation passed`;
+        } else {
+          // No discrepancy calculated or validation passed
+          message += `. ✅ Balance validated`;
+        }
+        
+        if (!validation.accountNumberValid) {
+          message += `. ⚠️ Account number not extracted`;
+        }
+      } else if (result.balanceValidation?.warning) {
+        message += `. Note: ${result.balanceValidation.warning}`;
+      }
+      
+      // Display warnings
+      if (result.warnings && result.warnings.length > 0) {
+        const warningMessages = result.warnings.slice(0, 5); // Show first 5 warnings
+        warningMessages.forEach((warning: string) => {
+          console.warn('  -', warning);
+        });
+        if (result.warnings.length > 5) {
+          console.warn(`  ... and ${result.warnings.length - 5} more warnings`);
+        }
+      }
+      
+      // Display errors
       if (result.errors && result.errors.length > 0) {
         result.errors.forEach((error: string) => {
           showError('Import Error', error);
         });
       }
       
-      if (result.balanceValidation?.warning) {
-        message += `. Note: ${result.balanceValidation.warning}`;
+      // Show detailed balance validation summary if available
+      if (result.balanceValidationResult?.summary) {
+        console.log('Balance Validation Summary:', result.balanceValidationResult.summary);
       }
       
       success('Imported', message);
@@ -1303,7 +1348,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
   };
 
   return (
-    <div className="w-full bg-background pb-20 lg:pb-6">
+    <div className="w-full bg-background pb-16 md:pb-20 lg:pb-6">
       {/* Mobile Header */}
       <MobileHeader
         title="Transactions"
@@ -1901,11 +1946,13 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                 >
                   <TransactionCard
                     transaction={transaction}
-                    onEdit={showSelectionMode ? undefined : (t) => {
+                    onEdit={showSelectionMode || transaction.documentId ? undefined : (t) => {
+                      // Disable edit for imported transactions (have documentId)
                       setEditingTransaction(t);
                       setShowForm(true);
                     }}
-                    onDelete={showSelectionMode ? undefined : (t) => {
+                    onDelete={showSelectionMode || transaction.documentId ? undefined : (t) => {
+                      // Disable delete for imported transactions (have documentId)
                       setDeletingTransaction(t);
                       setShowDeleteDialog(true);
                     }}
@@ -2108,14 +2155,20 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
             <div>
               <label className="block text-sm font-medium mb-2">Category</label>
               <Select value={selectedCategoryId || 'all'} onValueChange={(value) => {
-                setSelectedCategoryId(value === 'all' ? '' : value);
-                updateURLParams({ categoryId: value === 'all' ? null : value, page: '1' });
+                if (value === 'uncategorized') {
+                  setSelectedCategoryId('uncategorized');
+                  updateURLParams({ categoryId: 'uncategorized', page: '1' });
+                } else {
+                  setSelectedCategoryId(value === 'all' ? '' : value);
+                  updateURLParams({ categoryId: value === 'all' ? null : value, page: '1' });
+                }
               }}>
                 <SelectTrigger>
                   <SelectValue placeholder="All Categories" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Categories</SelectItem>
+                  <SelectItem value="uncategorized">Uncategorized</SelectItem>
                   {categories
                     .filter(c => !financialCategory || financialCategory === 'ALL' || c.type === financialCategory)
                     .map(category => (
@@ -2408,7 +2461,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
       {/* FAB - Mobile */}
       {!showSelectionMode && (
         <FabButton
-          icon={<Plus className="w-6 h-6" />}
+          icon={<Plus className="h-5 w-5" />}
           label="Add Transaction"
           onClick={() => {
             setEditingTransaction(null);
@@ -2630,6 +2683,121 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                   </div>
                 )}
               </div>
+
+              {/* Account Details from PDF */}
+              {statementMetadata && (
+                <div className="bg-blue-50 dark:bg-blue-950/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
+                  <div className="flex items-center space-x-3 mb-4">
+                    <FileText className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+                    <h4 className="text-lg font-semibold text-foreground">Account Details from PDF</h4>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {statementMetadata.accountNumber && (
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground mb-1">Account Number</p>
+                        <p className="text-sm font-mono text-foreground bg-background px-2 py-1 rounded border">
+                          {statementMetadata.accountNumber}
+                        </p>
+                      </div>
+                    )}
+                    {statementMetadata.ifsc && (
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground mb-1">IFSC Code</p>
+                        <p className="text-sm font-mono text-foreground bg-background px-2 py-1 rounded border">
+                          {statementMetadata.ifsc}
+                        </p>
+                      </div>
+                    )}
+                    {statementMetadata.branch && (
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground mb-1">Branch</p>
+                        <p className="text-sm text-foreground bg-background px-2 py-1 rounded border">
+                          {statementMetadata.branch}
+                        </p>
+                      </div>
+                    )}
+                    {statementMetadata.accountHolderName && (
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground mb-1">Account Holder</p>
+                        <p className="text-sm text-foreground bg-background px-2 py-1 rounded border">
+                          {statementMetadata.accountHolderName}
+                        </p>
+                      </div>
+                    )}
+                    {statementMetadata.openingBalance !== null && statementMetadata.openingBalance !== undefined && (
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground mb-1">Opening Balance</p>
+                        <p className="text-sm font-semibold text-foreground bg-background px-2 py-1 rounded border">
+                          ₹{Number(statementMetadata.openingBalance).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                    )}
+                    {statementMetadata.closingBalance !== null && statementMetadata.closingBalance !== undefined && (
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground mb-1">Closing Balance</p>
+                        <p className="text-sm font-semibold text-foreground bg-background px-2 py-1 rounded border">
+                          ₹{Number(statementMetadata.closingBalance).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                    )}
+                    {statementMetadata.statementStartDate && (
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground mb-1">Statement Period (Start)</p>
+                        <p className="text-sm text-foreground bg-background px-2 py-1 rounded border">
+                          {new Date(statementMetadata.statementStartDate).toLocaleDateString('en-IN', { 
+                            year: 'numeric', 
+                            month: 'long', 
+                            day: 'numeric' 
+                          })}
+                        </p>
+                      </div>
+                    )}
+                    {statementMetadata.statementEndDate && (
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground mb-1">Statement Period (End)</p>
+                        <p className="text-sm text-foreground bg-background px-2 py-1 rounded border">
+                          {new Date(statementMetadata.statementEndDate).toLocaleDateString('en-IN', { 
+                            year: 'numeric', 
+                            month: 'long', 
+                            day: 'numeric' 
+                          })}
+                        </p>
+                      </div>
+                    )}
+                    {statementMetadata.totalCredits !== undefined && (
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground mb-1">Total Credits</p>
+                        <p className="text-sm font-semibold text-green-600 dark:text-green-400 bg-background px-2 py-1 rounded border">
+                          ₹{Number(statementMetadata.totalCredits).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                    )}
+                    {statementMetadata.totalDebits !== undefined && (
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground mb-1">Total Debits</p>
+                        <p className="text-sm font-semibold text-red-600 dark:text-red-400 bg-background px-2 py-1 rounded border">
+                          ₹{Number(statementMetadata.totalDebits).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                    )}
+                    {statementMetadata.transactionCount !== undefined && (
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground mb-1">Transaction Count</p>
+                        <p className="text-sm font-semibold text-foreground bg-background px-2 py-1 rounded border">
+                          {statementMetadata.transactionCount}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                  {(!statementMetadata.accountNumber && !statementMetadata.ifsc && !statementMetadata.branch && !statementMetadata.accountHolderName) && (
+                    <div className="mt-3 p-2 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800 rounded">
+                      <p className="text-xs text-yellow-800 dark:text-yellow-200">
+                        ⚠️ Account details could not be extracted from this PDF. The transactions will still be imported.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Split View: Raw Data (Left) and Processed Data (Right) */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

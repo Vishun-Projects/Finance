@@ -1,6 +1,6 @@
 # Vishnu Finance - Personal Finance Management Application
 
-A modern, responsive personal finance management application built with Next.js, TypeScript, and Tailwind CSS. This application helps users track their income, expenses, goals, and financial progress with advanced analytics and AI-powered insights.
+A modern, responsive personal finance management application built with Next.js, TypeScript, and Tailwind CSS. This application helps users track their income, expenses, goals, and financial progress with advanced analytics.
 
 ## 🚀 Features
 
@@ -11,11 +11,10 @@ A modern, responsive personal finance management application built with Next.js,
 - **Salary Structure Management**: Track salary changes and history with detailed breakdowns
 - **Goals Management**: Set and track financial goals with progress visualization
 - **Deadlines Management**: Manage recurring and one-time financial deadlines
-- **Reports & Analytics**: Advanced financial reporting with AI insights
+- **Reports & Analytics**: Advanced financial reporting
 - **Wishlist Management**: Track desired purchases with price monitoring
 
 ### Advanced Features
-- **AI-Powered Insights**: Get personalized financial recommendations
 - **Market Data Integration**: Real-time market trends and analysis
 - **Recurring Transactions**: Automated tracking of regular income/expenses
 - **Salary History Tracking**: Complete audit trail of salary changes
@@ -52,7 +51,6 @@ vishnu-finance/
 │   ├── app/                    # Next.js App Router
 │   │   ├── api/               # API routes
 │   │   │   ├── analytics/     # Financial analytics
-│   │   │   ├── ai-insights/   # AI recommendations
 │   │   │   ├── expenses/      # Expense management
 │   │   │   ├── income/        # Income management
 │   │   │   ├── goals/         # Goals tracking
@@ -167,7 +165,6 @@ ALPHA_VANTAGE_API_KEY="your-alpha-vantage-key"
 ### Advanced Models
 - **Category**: Transaction categorization
 - **RecurringItem**: Recurring transactions
-- **AIInsight**: AI-generated recommendations
 - **MarketData**: Market trends and data
 
 ## 🧰 Superuser & Admin Portal
@@ -193,7 +190,6 @@ Once authenticated, visit `/admin` to access the dashboard, document library, an
 
 ### Advanced APIs
 - `GET /api/analytics` - Financial analytics data
-- `POST /api/ai-insights` - AI-powered insights
 - `GET /api/market-data` - Real-time market data
 - `GET /api/salary-structure` - Salary information
 - `GET /api/salary-history` - Salary change history
@@ -235,12 +231,6 @@ The application implements a skeleton UI pattern for optimal user experience:
 - [ ] Investment portfolio tracking
 - [ ] Tax planning and optimization
 
-### Phase 3: AI & Automation
-- [ ] Smart categorization
-- [ ] Automated expense tracking
-- [ ] Predictive analytics
-- [ ] Personalized recommendations
-- [ ] Voice input support
 
 ### Phase 4: Social Features
 - [ ] Family account sharing

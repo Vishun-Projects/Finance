@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { useLoading } from '../contexts/LoadingContext';
 import { AlertTriangle, CheckCircle, XCircle, Info } from 'lucide-react';
 
 interface ValidationRule {
@@ -47,7 +46,6 @@ const validationRules: ValidationRule[] = [
 
 export default function UserValidation() {
   const { user } = useAuth();
-  const { setLoading } = useLoading();
   const [validations, setValidations] = useState<ValidationRule[]>([]);
   const [isVisible, setIsVisible] = useState(true);
 

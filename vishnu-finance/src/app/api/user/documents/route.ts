@@ -4,10 +4,13 @@ import { mkdir, writeFile } from 'fs/promises';
 import { randomUUID } from 'crypto';
 import { Buffer } from 'buffer';
 import { prisma } from '@/lib/db';
+import type { DocumentVisibility } from '@prisma/client';
 import { AuthService } from '@/lib/auth';
 import { writeAuditLog, extractRequestMeta } from '@/lib/audit';
 
 const UPLOAD_DIR = join(process.cwd(), 'uploads', 'user-docs');
+
+const ALLOWED_VISIBILITIES: DocumentVisibility[] = ['PRIVATE', 'ORGANIZATION', 'PUBLIC'];
 
 const transformDocument = (doc: any) => ({
   id: doc.id,
@@ -40,19 +43,21 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const includePortalDocs = searchParams.get('includePortal') !== 'false';
     const bankCodeFilter = searchParams.get('bankCode');
-    const visibility = searchParams.get('visibility');
+    const visibilityParam = searchParams.get('visibility');
+    const visibilityFilter = visibilityParam && ALLOWED_VISIBILITIES.includes(visibilityParam as DocumentVisibility)
+      ? (visibilityParam as DocumentVisibility)
+      : null;
+    const portalVisibilities = ALLOWED_VISIBILITIES.filter((value) => value !== 'PRIVATE');
 
     const documents = await prisma.document.findMany({
       where: {
         OR: [
           { ownerId: user.id },
-          ...(includePortalDocs
-            ? [{ visibility: { in: ['ORGANIZATION', 'PUBLIC'] } }]
-            : []),
+          ...(includePortalDocs ? [{ visibility: { in: portalVisibilities } }] : []),
         ],
         isDeleted: false,
         ...(bankCodeFilter ? { bankCode: bankCodeFilter } : {}),
-        ...(visibility ? { visibility } : {}),
+        ...(visibilityFilter ? { visibility: visibilityFilter } : {}),
       },
       orderBy: { createdAt: 'desc' },
       include: {
@@ -92,9 +97,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'File is required' }, { status: 400 });
     }
 
-    const visibility = (formData.get('visibility') as string | null) || 'PRIVATE';
-    const allowedVisibility = ['PRIVATE', 'ORGANIZATION', 'PUBLIC'];
-    if (!allowedVisibility.includes(visibility)) {
+    const visibility = (formData.get('visibility') as DocumentVisibility | null) || 'PRIVATE';
+    if (!ALLOWED_VISIBILITIES.includes(visibility)) {
       return NextResponse.json({ error: 'Invalid visibility option' }, { status: 400 });
     }
 
@@ -111,7 +115,7 @@ export async function POST(request: NextRequest) {
         originalName: file.name,
         mimeType: file.type || 'application/octet-stream',
         fileSize: file.size ?? null,
-        visibility: visibility as any,
+        visibility,
         sourceType: 'USER_UPLOAD',
       },
       include: {

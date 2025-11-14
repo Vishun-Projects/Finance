@@ -2,7 +2,6 @@
 
 import React, { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { cn } from '@/lib/utils';
 import { prefersReducedMotion, TIMING, EASING } from '@/lib/motion-utils';
 
 interface FilterSheetProps {

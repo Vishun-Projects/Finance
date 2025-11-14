@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { getMonitoringData } from '@/lib/monitoring';
 import { requireAuth, securityHeaders } from '@/lib/security';
 
-export const GET = requireAuth(async function (request: NextRequest) {
+export const GET = requireAuth(async function () {
   try {
     const monitoringData = await getMonitoringData();
     

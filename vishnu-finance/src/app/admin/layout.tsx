@@ -3,11 +3,12 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ReactNode, useState } from 'react';
-import { Shield, FileText, Map, Home, Users, ClipboardList, Menu, X } from 'lucide-react';
+import { Shield, FileText, Map, Home, Users, ClipboardList, Menu, X, BookOpen } from 'lucide-react';
 
 const navItems = [
   { href: '/admin', label: 'Overview', icon: Home },
   { href: '/admin/documents', label: 'Documents', icon: FileText },
+  { href: '/admin/super-documents', label: 'Super Documents', icon: BookOpen },
   { href: '/admin/bank-mappings', label: 'Bank Mappings', icon: Map },
   { href: '/admin/users', label: 'Users', icon: Users },
   { href: '/admin/audit', label: 'Audit Logs', icon: ClipboardList },

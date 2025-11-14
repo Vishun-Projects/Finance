@@ -15,17 +15,26 @@ export function getDummyAvatarUrl(userId: string): string {
 /**
  * Get avatar URL - returns user's avatar if available, otherwise dummy avatar
  * One avatar per user, unisex
+ * 
+ * Handles two types of avatar URLs:
+ * 1. External URLs (e.g., Google OAuth): https://lh3.googleusercontent.com/...
+ * 2. Local uploaded avatars: /avatars/avatar_xxx.jpg
  */
 export function getAvatarUrl(avatarUrl: string | null | undefined, userId: string): string {
-  if (avatarUrl) {
-    // Return full URL if it's already a full URL, otherwise assume it's relative
-    if (avatarUrl.startsWith('http://') || avatarUrl.startsWith('https://')) {
-      return avatarUrl;
+  // Trim whitespace and check if avatarUrl is a valid non-empty string
+  const trimmedUrl = typeof avatarUrl === 'string' ? avatarUrl.trim() : null;
+  
+  if (trimmedUrl && trimmedUrl.length > 0) {
+    // Return full URL if it's already a full URL (external, e.g., Google OAuth)
+    if (trimmedUrl.startsWith('http://') || trimmedUrl.startsWith('https://')) {
+      return trimmedUrl;
     }
-    // Return relative path for local avatars
-    return avatarUrl.startsWith('/') ? avatarUrl : `/${avatarUrl}`;
+    // Return relative path for local avatars (e.g., /avatars/avatar_xxx.jpg)
+    // Ensure it starts with / for proper Next.js Image handling
+    return trimmedUrl.startsWith('/') ? trimmedUrl : `/${trimmedUrl}`;
   }
   
+  // Only return dummy avatar if no valid avatarUrl is provided
   return getDummyAvatarUrl(userId);
 }
 

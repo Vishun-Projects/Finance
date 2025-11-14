@@ -2,10 +2,10 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Wallet, ShoppingCart, ArrowLeftRight, DollarSign, TrendingUp, Receipt } from 'lucide-react';
+import { Wallet, ShoppingCart, ArrowLeftRight, TrendingUp, Receipt } from 'lucide-react';
 import FilterSheet from './filter-sheet';
 import { TransactionFormData } from '../transaction-form-modal';
-import { getWhileTap, prefersReducedMotion, TIMING } from '@/lib/motion-utils';
+import { getWhileTap, prefersReducedMotion } from '@/lib/motion-utils';
 import { hapticLight, hapticMedium } from '@/lib/haptics';
 import { trackPresetSelected, trackSheetActionSelected } from '@/lib/analytics';
 import { useAuth } from '@/contexts/AuthContext';

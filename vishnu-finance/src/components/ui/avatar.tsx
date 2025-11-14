@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Image from 'next/image';
-import { getAvatarUrl } from '@/lib/avatar-utils';
+import { getAvatarUrl, getDummyAvatarUrl } from '@/lib/avatar-utils';
 import { cn } from '@/lib/utils';
 
 interface AvatarProps {
@@ -29,22 +29,31 @@ export function Avatar({
 }: AvatarProps) {
   const avatarUrl = getAvatarUrl(src, userId);
   const sizeClass = sizeClasses[size];
+  const isExternalUrl = avatarUrl.startsWith('http://') || avatarUrl.startsWith('https://');
 
   return (
     <div className={cn('relative rounded-full overflow-hidden bg-gray-200 flex items-center justify-center', sizeClass, className)}>
-      {avatarUrl.startsWith('http') ? (
+      {isExternalUrl ? (
+        // Use regular img tag for external URLs (Google OAuth, etc.) for better compatibility
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={avatarUrl}
+          alt={alt}
+          className="w-full h-full object-cover"
+          onError={(e) => {
+            // Fallback to dummy avatar if external image fails to load
+            const target = e.target as HTMLImageElement;
+            target.src = getDummyAvatarUrl(userId);
+          }}
+        />
+      ) : (
+        // Use Next.js Image for local avatars (better optimization)
         <Image
           src={avatarUrl}
           alt={alt}
           fill
           className="object-cover"
-          unoptimized
-        />
-      ) : (
-        <img
-          src={avatarUrl}
-          alt={alt}
-          className="w-full h-full object-cover"
+          sizes="(max-width: 768px) 40px, 64px"
         />
       )}
     </div>

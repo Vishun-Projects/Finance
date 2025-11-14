@@ -292,15 +292,6 @@ export interface DashboardMetrics {
   monthlyTrend: 'increasing' | 'decreasing' | 'stable';
 }
 
-export interface AIInsight {
-  title: string;
-  content: string;
-  source: string;
-  relevance: number;
-  category: 'investment' | 'savings' | 'tax' | 'market' | 'general';
-  url?: string;
-  publishedAt?: Date;
-}
 
 export interface MarketData {
   symbol: string;

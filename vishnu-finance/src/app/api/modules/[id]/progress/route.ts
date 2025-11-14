@@ -11,7 +11,7 @@ export async function POST(
     const { id } = await params;
 
     // Update or create module progress
-    const moduleProgress = await prisma.moduleProgress.upsert({
+    const moduleProgress = await (prisma as any).moduleProgress.upsert({
       where: {
         userId_moduleId: {
           userId,
@@ -33,7 +33,7 @@ export async function POST(
     });
 
     // Update course progress based on module progress
-    const courseModule = await prisma.module.findUnique({
+    const courseModule = await (prisma as any).module.findUnique({
       where: { id },
       include: {
         course: {
@@ -49,11 +49,11 @@ export async function POST(
 
     if (courseModule) {
       const totalModules = courseModule.course.modules.length;
-      const completedModules = await prisma.moduleProgress.count({
+      const completedModules = await (prisma as any).moduleProgress.count({
         where: {
           userId,
           moduleId: {
-            in: courseModule.course.modules.map(m => m.id)
+            in: courseModule.course.modules.map((m: { id: string }) => m.id)
           },
           isCompleted: true
         }
@@ -62,7 +62,7 @@ export async function POST(
       const courseProgress = (completedModules / totalModules) * 100;
       const isCourseCompleted = courseProgress >= 100;
 
-      await prisma.courseProgress.upsert({
+      await (prisma as any).courseProgress.upsert({
         where: {
           userId_courseId: {
             userId,

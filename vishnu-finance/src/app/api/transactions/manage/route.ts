@@ -102,7 +102,7 @@ export async function GET(req: NextRequest) {
       }
     } catch (error: any) {
       // Transaction table doesn't exist yet
-      console.log('⚠️ Transaction table not available');
+      console.log('⚠️ Transaction table not available', error);
       return NextResponse.json({
         transactions: [],
         pagination: {

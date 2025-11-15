@@ -451,10 +451,10 @@ Return ONLY the JSON array, no other text.`;
           ];
           const category = fuzzyMatchCategory(suggestedCategoryName, allCategories) ||
             allCategories.find(
-              (c) =>
-                c.name.toLowerCase().trim() ===
-                suggestedCategoryName.toLowerCase()
-            );
+            (c) =>
+              c.name.toLowerCase().trim() ===
+              suggestedCategoryName.toLowerCase()
+          );
 
           if (category) {
             return {
@@ -587,11 +587,11 @@ async function categorizeLargeAmount(
   if (transaction.financialCategory === 'INCOME') {
     // If personName/UPI present → Transfer/Income, not Salary
     if (transaction.personName || (transaction as any).upiId) {
-      return {
-        categoryId: null,
+    return {
+      categoryId: null,
         categoryName: 'Transfer',
         confidence: 0.8,
-        source: 'rule',
+      source: 'rule',
         reasoning: `Large credit (₹${amount}) with personName/UPI indicates transfer, not salary`,
       };
     }
@@ -1388,11 +1388,11 @@ async function categorizeByBankTransfer(
       const salaryCheck = await detectSalaryVsTransfer(userId, transaction);
       
       if (salaryCheck.isSalary) {
-        return {
-          categoryId: null,
-          categoryName: 'Salary',
+      return {
+        categoryId: null,
+        categoryName: 'Salary',
           confidence: salaryCheck.confidence,
-          source: 'rule',
+        source: 'rule',
           reasoning: salaryCheck.reasoning,
         };
       } else {
@@ -2899,8 +2899,8 @@ export async function categorizeTransactions(
         const allCategories = await getAllCategories();
         const matchedCategory = fuzzyMatchCategory(commodityResult.categoryName, allCategories) ||
           allCategories.find(
-            (c) => c.name.toLowerCase().trim() === commodityResult.categoryName?.toLowerCase().trim()
-          );
+          (c) => c.name.toLowerCase().trim() === commodityResult.categoryName?.toLowerCase().trim()
+        );
         if (matchedCategory) {
           commodityResult.categoryId = matchedCategory.id;
         }
@@ -2941,8 +2941,8 @@ export async function categorizeTransactions(
         const allCategories = await getAllCategories();
         const matchedCategory = fuzzyMatchCategory(recurringMatch.categoryName, allCategories) ||
           allCategories.find(
-            (c) => c.name.toLowerCase().trim() === recurringMatch.categoryName?.toLowerCase().trim()
-          );
+          (c) => c.name.toLowerCase().trim() === recurringMatch.categoryName?.toLowerCase().trim()
+        );
         if (matchedCategory) {
           categoryId = matchedCategory.id;
         }
@@ -3007,8 +3007,8 @@ export async function categorizeTransactions(
           const allCategories = await getAllCategories();
           const matchedCategory = fuzzyMatchCategory(merchantLookup.categoryName || '', allCategories) ||
             allCategories.find(
-              (c) => c.name.toLowerCase().trim() === merchantLookup.categoryName?.toLowerCase().trim()
-            );
+            (c) => c.name.toLowerCase().trim() === merchantLookup.categoryName?.toLowerCase().trim()
+          );
           
           if (matchedCategory) {
             merchantLookupResult = {
@@ -3110,8 +3110,8 @@ export async function categorizeTransactions(
           const allCategories = await getAllCategories();
           const matchedCategory = fuzzyMatchCategory(ruleBased.categoryName, allCategories) ||
             allCategories.find(
-              (c) => c.name.toLowerCase().trim() === ruleBased.categoryName?.toLowerCase().trim()
-            );
+            (c) => c.name.toLowerCase().trim() === ruleBased.categoryName?.toLowerCase().trim()
+          );
           if (matchedCategory) {
             ruleBased.categoryId = matchedCategory.id;
           }

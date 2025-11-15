@@ -57,10 +57,14 @@ async function tryPythonParser(pdfBuffer: Buffer, bankHint: string): Promise<{ s
       return { success: true, data };
     } else {
       const errorText = await response.text();
+      console.error(`❌ PDF API: Python function returned error status ${response.status}:`, errorText);
       return { success: false, error: errorText };
     }
   } catch (error) {
-    console.log('⚠️ PDF API: Python function call failed, will try fallback:', error);
+    console.error('❌ PDF API: Python function call failed, will try fallback:', error);
+    if (error instanceof Error) {
+      console.error('Error details:', error.message, error.stack);
+    }
     return { 
       success: false, 
       error: error instanceof Error ? error.message : 'Unknown error' 

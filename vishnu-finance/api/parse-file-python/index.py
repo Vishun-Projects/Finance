@@ -8,20 +8,15 @@ import sys
 import os
 from pathlib import Path
 
-# Add tools directory to path
-project_root = Path('/var/task')
-tools_dir = project_root / 'tools'
-if tools_dir.exists():
-    sys.path.insert(0, str(tools_dir))
-else:
-    tools_dir = Path(__file__).parent.parent.parent / 'tools'
-    if str(tools_dir) not in sys.path:
-        sys.path.insert(0, str(tools_dir))
+# Add current directory to path for local imports
+current_dir = Path(__file__).parent
+sys.path.insert(0, str(current_dir))
+sys.path.insert(0, str(current_dir / 'parsers'))
 
 def handler(request):
     """Vercel serverless function handler"""
     try:
-        # Parse request body - Vercel passes request as dict with 'body' key (string)
+        # Parse request body
         if isinstance(request, dict):
             body_str = request.get('body', '{}')
             if isinstance(body_str, str):
@@ -63,9 +58,18 @@ def handler(request):
         file_path = tmp_file_path
         
         try:
-            # Import multi-format parser
-            # These imports are resolved at runtime via sys.path manipulation
-            from multi_format_parser import parse_file  # type: ignore
+            # Import multi-format parser from local directory
+            try:
+                from multi_format_parser import parse_file
+                print("✓ Imported parse_file", file=sys.stderr)
+            except ImportError as e:
+                print(f"✗ Failed to import parse_file: {e}", file=sys.stderr)
+                return {
+                    'statusCode': 500,
+                    'headers': {'Content-Type': 'application/json'},
+                    'body': json.dumps({'error': 'Failed to import parser', 'details': str(e)})
+                }
+            
             import pandas as pd
             
             # Parse file
@@ -98,21 +102,12 @@ def handler(request):
                     return None
             
             # Ensure date_iso exists
-            if 'date_iso' not in df.columns or df['date_iso'].isna().all():
-                if 'date' in df.columns:
-                    df['date_iso'] = df['date'].apply(normalize_date_iso)
-            
-            # Normalize all date_iso values
-            df['date_iso'] = df['date_iso'].apply(normalize_date_iso)
+            if 'date_iso' not in df.columns and 'date' in df.columns:
+                df['date_iso'] = df['date'].apply(normalize_date_iso)
             
             # Filter out invalid dates
-            initial_count = len(df)
-            df = df[df['date_iso'].notna()].copy()
-            
-            # Convert datetime columns to strings
-            for col in df.columns:
-                if pd.api.types.is_datetime64_any_dtype(df[col]):
-                    df[col] = df[col].dt.strftime('%Y-%m-%d')
+            if 'date_iso' in df.columns:
+                df = df[df['date_iso'].notna()].copy()
             
             # Convert to records
             transactions = df.to_dict('records')
@@ -128,8 +123,7 @@ def handler(request):
             result = {
                 'success': True,
                 'transactions': transactions,
-                'count': len(transactions),
-                'fileType': extension.upper().replace('.', '')
+                'count': len(transactions)
             }
             
             return {
@@ -149,7 +143,7 @@ def handler(request):
     except Exception as e:
         import traceback
         error_details = traceback.format_exc()
-        print(f"Error in multi-format parser: {error_details}", file=sys.stderr)
+        print(f"✗ Error in file parser: {error_details}", file=sys.stderr)
         return {
             'statusCode': 500,
             'headers': {'Content-Type': 'application/json'},
@@ -158,4 +152,3 @@ def handler(request):
                 'details': str(e)
             })
         }
-

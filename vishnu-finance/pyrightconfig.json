@@ -18,7 +18,13 @@
       "pythonVersion": "3.11",
       "extraPaths": [
         "tools",
-        "tools/parsers"
+        "tools/parsers",
+        "api/parse-pdf-python",
+        "api/parse-pdf-python/parsers",
+        "api/parse-bank-statement-python",
+        "api/parse-bank-statement-python/parsers",
+        "api/parse-file-python",
+        "api/parse-file-python/parsers"
       ]
     }
   ]

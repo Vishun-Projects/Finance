@@ -1,46 +1,22 @@
 """
 Vercel Python Serverless Function for PDF Parsing
-Handles PDF bank statement parsing using the existing Python parsers
+Handles PDF bank statement parsing using bundled parsers
 """
 import json
 import base64
 import sys
 import os
 from pathlib import Path
-import tempfile
 
-# Add tools directory to path
-# In Vercel, the project root is the deployment root
-# Try multiple possible paths
-possible_roots = [
-    Path('/var/task'),  # Vercel's deployment directory
-    Path(__file__).parent.parent.parent,  # Relative from api/parse-pdf-python/
-    Path.cwd(),  # Current working directory
-]
-
-tools_dir = None
-for root in possible_roots:
-    test_tools = root / 'tools'
-    if test_tools.exists() and (test_tools / 'parsers').exists():
-        tools_dir = test_tools
-        sys.path.insert(0, str(tools_dir))
-        sys.path.insert(0, str(tools_dir / 'parsers'))
-        break
-
-if not tools_dir:
-    # Last resort: try relative path from current file
-    tools_dir = Path(__file__).parent.parent.parent / 'tools'
-    if str(tools_dir) not in sys.path:
-        sys.path.insert(0, str(tools_dir))
-    parsers_dir = tools_dir / 'parsers'
-    if str(parsers_dir) not in sys.path:
-        sys.path.insert(0, str(parsers_dir))
+# Add current directory to path for local imports
+current_dir = Path(__file__).parent
+sys.path.insert(0, str(current_dir))
+sys.path.insert(0, str(current_dir / 'parsers'))
 
 def handler(request):
     """Vercel serverless function handler"""
     try:
-        # Parse request body - Vercel passes request as dict with 'body' key (string)
-        # In some cases, it might be a Request object
+        # Parse request body
         if isinstance(request, dict):
             body_str = request.get('body', '{}')
             if isinstance(body_str, str):
@@ -79,53 +55,46 @@ def handler(request):
         pdf_path = tmp_file_path
         
         try:
-            # Import parsers - handle import errors gracefully
+            # Import parsers from local directory
             import pandas as pd
             
-            # Try importing parsers with multiple fallback paths
-            BankDetector = None
-            parse_bank_statement = None
-            parse_bank_statement_accurately = None
-            StatementMetadataExtractor = None
-            
-            # Debug: Print sys.path for troubleshooting
-            print(f"Python sys.path: {sys.path}", file=sys.stderr)
-            print(f"Tools dir: {tools_dir}", file=sys.stderr)
-            if tools_dir:
-                print(f"Tools dir exists: {tools_dir.exists()}", file=sys.stderr)
-            
+            # Import with local paths
             try:
                 from parsers.bank_detector import BankDetector  # type: ignore
-                print("Successfully imported BankDetector from parsers.bank_detector", file=sys.stderr)
+                print("✓ Imported BankDetector from parsers.bank_detector", file=sys.stderr)
             except ImportError as e:
-                print(f"Failed to import from parsers.bank_detector: {e}", file=sys.stderr)
+                print(f"✗ Failed to import BankDetector: {e}", file=sys.stderr)
                 try:
                     from bank_detector import BankDetector  # type: ignore
-                    print("Successfully imported BankDetector from bank_detector", file=sys.stderr)
+                    print("✓ Imported BankDetector from bank_detector", file=sys.stderr)
                 except ImportError as e2:
-                    print(f"Failed to import BankDetector: {e2}", file=sys.stderr)
+                    print(f"✗ Failed to import BankDetector (fallback): {e2}", file=sys.stderr)
+                    BankDetector = None
             
             try:
                 from bank_statement_parser import parse_bank_statement  # type: ignore
-                print("Successfully imported parse_bank_statement", file=sys.stderr)
+                print("✓ Imported parse_bank_statement", file=sys.stderr)
             except ImportError as e:
-                print(f"Failed to import parse_bank_statement: {e}", file=sys.stderr)
+                print(f"✗ Failed to import parse_bank_statement: {e}", file=sys.stderr)
+                parse_bank_statement = None
             
             try:
                 from accurate_parser import parse_bank_statement_accurately  # type: ignore
-                print("Successfully imported parse_bank_statement_accurately", file=sys.stderr)
+                print("✓ Imported parse_bank_statement_accurately", file=sys.stderr)
             except ImportError as e:
-                print(f"Failed to import parse_bank_statement_accurately: {e}", file=sys.stderr)
+                print(f"✗ Failed to import parse_bank_statement_accurately: {e}", file=sys.stderr)
+                parse_bank_statement_accurately = None
             
             try:
                 from parsers.statement_metadata import StatementMetadataExtractor  # type: ignore
-                print("Successfully imported StatementMetadataExtractor from parsers.statement_metadata", file=sys.stderr)
+                print("✓ Imported StatementMetadataExtractor", file=sys.stderr)
             except ImportError:
                 try:
                     from statement_metadata import StatementMetadataExtractor  # type: ignore
-                    print("Successfully imported StatementMetadataExtractor from statement_metadata", file=sys.stderr)
+                    print("✓ Imported StatementMetadataExtractor (fallback)", file=sys.stderr)
                 except ImportError:
-                    print("StatementMetadataExtractor not available", file=sys.stderr)
+                    print("✗ StatementMetadataExtractor not available", file=sys.stderr)
+                    StatementMetadataExtractor = None
             
             df = None
             metadata = None
@@ -145,7 +114,7 @@ def handler(request):
                             metadata = None
                         
                         if df is not None and not df.empty:
-                            print(f"Bank-specific parser extracted {len(df)} transactions", file=sys.stderr)
+                            print(f"✓ Bank-specific parser extracted {len(df)} transactions", file=sys.stderr)
                         else:
                             # Try accurate parser as fallback
                             if parse_bank_statement_accurately:
@@ -153,11 +122,11 @@ def handler(request):
                                     df_temp = parse_bank_statement_accurately(pdf_path)
                                     if df_temp is not None and not df_temp.empty:
                                         df = df_temp
-                                        print(f"Accurate parser (fallback) extracted {len(df)} transactions", file=sys.stderr)
+                                        print(f"✓ Accurate parser (fallback) extracted {len(df)} transactions", file=sys.stderr)
                                 except Exception as e:
-                                    print(f"Accurate parser (fallback) error: {e}", file=sys.stderr)
+                                    print(f"✗ Accurate parser (fallback) error: {e}", file=sys.stderr)
                 except Exception as e:
-                    print(f"Bank detection/parsing error: {e}", file=sys.stderr)
+                    print(f"✗ Bank detection/parsing error: {e}", file=sys.stderr)
                     import traceback
                     traceback.print_exc(file=sys.stderr)
             
@@ -166,7 +135,7 @@ def handler(request):
                 try:
                     df = parse_bank_statement_accurately(pdf_path)
                     if df is not None and not df.empty:
-                        print(f"Accurate parser extracted {len(df)} transactions", file=sys.stderr)
+                        print(f"✓ Accurate parser extracted {len(df)} transactions", file=sys.stderr)
                         # Try to extract metadata
                         if not metadata and StatementMetadataExtractor:
                             try:
@@ -174,10 +143,10 @@ def handler(request):
                                     pdf_path, detected_bank or 'UNKNOWN', df
                                 )
                             except Exception as meta_err:
-                                print(f"Metadata extraction error: {meta_err}", file=sys.stderr)
+                                print(f"✗ Metadata extraction error: {meta_err}", file=sys.stderr)
                                 metadata = {}
                 except Exception as e:
-                    print(f"Accurate parser error: {e}", file=sys.stderr)
+                    print(f"✗ Accurate parser error: {e}", file=sys.stderr)
                     import traceback
                     traceback.print_exc(file=sys.stderr)
                     if df is None:
@@ -192,7 +161,7 @@ def handler(request):
                     else:
                         df = result
                     if df is not None and not df.empty:
-                        print(f"Generic parser extracted {len(df)} transactions", file=sys.stderr)
+                        print(f"✓ Generic parser extracted {len(df)} transactions", file=sys.stderr)
                     # Try to extract metadata if not already extracted
                     if not metadata and df is not None and not df.empty and StatementMetadataExtractor:
                         try:
@@ -200,10 +169,10 @@ def handler(request):
                                 pdf_path, detected_bank or 'UNKNOWN', df
                             )
                         except Exception as meta_err:
-                            print(f"Metadata extraction error: {meta_err}", file=sys.stderr)
+                            print(f"✗ Metadata extraction error: {meta_err}", file=sys.stderr)
                             metadata = {}
                 except Exception as e:
-                    print(f"Fallback parser error: {e}", file=sys.stderr)
+                    print(f"✗ Fallback parser error: {e}", file=sys.stderr)
                     import traceback
                     traceback.print_exc(file=sys.stderr)
                     if df is None:
@@ -212,7 +181,7 @@ def handler(request):
             # If still no data, create empty DataFrame
             if df is None:
                 df = pd.DataFrame()
-                print("Warning: All parsers failed, returning empty DataFrame", file=sys.stderr)
+                print("✗ Warning: All parsers failed, returning empty DataFrame", file=sys.stderr)
             
             # Ensure metadata is a dict
             if metadata is None:
@@ -278,7 +247,7 @@ def handler(request):
     except Exception as e:
         import traceback
         error_details = traceback.format_exc()
-        print(f"Error in PDF parser: {error_details}", file=sys.stderr)
+        print(f"✗ Error in PDF parser: {error_details}", file=sys.stderr)
         return {
             'statusCode': 500,
             'headers': {'Content-Type': 'application/json'},
@@ -287,4 +256,3 @@ def handler(request):
                 'details': str(e)
             })
         }
-

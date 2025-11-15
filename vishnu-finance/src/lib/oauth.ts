@@ -3,7 +3,26 @@ import { OAuth2Client } from 'google-auth-library';
 
 const GOOGLE_OAUTH_CLIENT_ID = process.env.GOOGLE_OAUTH_CLIENT_ID;
 const GOOGLE_OAUTH_CLIENT_SECRET = process.env.GOOGLE_OAUTH_CLIENT_SECRET;
-const GOOGLE_OAUTH_REDIRECT_URI = process.env.GOOGLE_OAUTH_REDIRECT_URI || 'http://localhost:3000/api/auth/oauth/google/callback';
+
+// Determine redirect URI based on environment
+const getRedirectURI = (): string => {
+  // If explicitly set in env, use that
+  if (process.env.GOOGLE_OAUTH_REDIRECT_URI) {
+    return process.env.GOOGLE_OAUTH_REDIRECT_URI;
+  }
+  
+  // Check if we're in production (Vercel)
+  const isProduction = process.env.VERCEL || process.env.NODE_ENV === 'production';
+  
+  if (isProduction) {
+    return 'https://vishun-finance.vercel.app/api/auth/oauth/google/callback';
+  }
+  
+  // Default to localhost for development
+  return 'http://localhost:3000/api/auth/oauth/google/callback';
+};
+
+const GOOGLE_OAUTH_REDIRECT_URI = getRedirectURI();
 
 if (!GOOGLE_OAUTH_CLIENT_ID || !GOOGLE_OAUTH_CLIENT_SECRET) {
   console.warn('⚠️ Google OAuth credentials not set. OAuth authentication will not work.');

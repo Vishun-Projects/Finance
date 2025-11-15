@@ -3,8 +3,9 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { retryWithBackoff } from './gemini';
 
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
-const GOOGLE_CUSTOM_SEARCH_API_KEY = process.env.GOOGLE_CUSTOM_SEARCH_API_KEY;
-const GOOGLE_CUSTOM_SEARCH_ENGINE_ID = process.env.GOOGLE_CUSTOM_SEARCH_ENGINE_ID;
+// Use provided credentials or fallback to environment variables
+const GOOGLE_CUSTOM_SEARCH_API_KEY = process.env.GOOGLE_CUSTOM_SEARCH_API_KEY || 'AIzaSyBXldcBbMnOvvLISw84bdbGDuo6OJn6STs';
+const GOOGLE_CUSTOM_SEARCH_ENGINE_ID = process.env.GOOGLE_CUSTOM_SEARCH_ENGINE_ID || '3711b19706be74dea';
 
 const genAI = GOOGLE_API_KEY ? new GoogleGenerativeAI(GOOGLE_API_KEY) : null;
 
@@ -75,6 +76,7 @@ async function lookupFromCache(
 
 /**
  * Lookup merchant category using Google Custom Search API
+ * Enhanced with better category detection and confidence scoring
  */
 async function lookupWithGoogleSearch(
   merchantName: string
@@ -84,48 +86,107 @@ async function lookupWithGoogleSearch(
   }
 
   try {
-    const searchQuery = `${merchantName} merchant category business type India`;
-    const url = `https://www.googleapis.com/customsearch/v1?key=${GOOGLE_CUSTOM_SEARCH_API_KEY}&cx=${GOOGLE_CUSTOM_SEARCH_ENGINE_ID}&q=${encodeURIComponent(searchQuery)}&num=3`;
+    // Enhanced search query for better results
+    const searchQuery = `${merchantName} business type category India merchant store`;
+    const url = `https://www.googleapis.com/customsearch/v1?key=${GOOGLE_CUSTOM_SEARCH_API_KEY}&cx=${GOOGLE_CUSTOM_SEARCH_ENGINE_ID}&q=${encodeURIComponent(searchQuery)}&num=5`;
 
     const response = await fetch(url, {
-      signal: AbortSignal.timeout(5000), // 5 second timeout
+      signal: AbortSignal.timeout(8000), // 8 second timeout
     });
 
     if (!response.ok) {
+      const errorText = await response.text().catch(() => 'Unknown error');
+      console.warn(`Google Custom Search API error: ${response.status} - ${errorText}`);
       return null;
     }
 
     const data = await response.json();
     const items = data.items || [];
 
-    // Extract category from search results
-    // Look for common category keywords in snippets
-    const snippets = items.map((item: any) => 
-      (item.snippet || '').toLowerCase() + ' ' + (item.title || '').toLowerCase()
+    if (items.length === 0) {
+      return null;
+    }
+
+    // Extract category from search results with better analysis
+    // Combine all text from snippets, titles, and links
+    const allText = items.map((item: any) => 
+      [
+        item.snippet || '',
+        item.title || '',
+        item.displayLink || '',
+        item.link || ''
+      ].join(' ').toLowerCase()
     ).join(' ');
 
-    const categoryKeywords: Record<string, string[]> = {
-      'Groceries': ['grocery', 'supermarket', 'food store', 'retail'],
-      'Food & Dining': ['restaurant', 'cafe', 'food', 'dining', 'eatery'],
-      'Shopping': ['shop', 'store', 'retail', 'mall', 'outlet'],
-      'Healthcare': ['pharmacy', 'medical', 'hospital', 'clinic', 'health'],
-      'Transportation': ['fuel', 'petrol', 'gas station', 'transport'],
-      'Entertainment': ['cinema', 'movie', 'theater', 'entertainment'],
-      'Utilities': ['utility', 'bill', 'service', 'provider'],
-      'Education': ['school', 'college', 'education', 'institute'],
-      'Insurance': ['insurance', 'premium', 'policy'],
-      'Investment': ['investment', 'financial', 'mutual fund'],
+    // Enhanced category keywords with more variations
+    const categoryKeywords: Record<string, { keywords: string[]; confidence: number }> = {
+      'Groceries': { 
+        keywords: ['grocery', 'supermarket', 'food store', 'retail', 'kirana', 'provision', 'vegetable', 'fruit'], 
+        confidence: 0.85 
+      },
+      'Food & Dining': { 
+        keywords: ['restaurant', 'cafe', 'food', 'dining', 'eatery', 'hotel', 'dhaba', 'tiffin', 'catering'], 
+        confidence: 0.85 
+      },
+      'Shopping': { 
+        keywords: ['shop', 'store', 'retail', 'mall', 'outlet', 'boutique', 'showroom', 'market'], 
+        confidence: 0.80 
+      },
+      'Healthcare': { 
+        keywords: ['pharmacy', 'medical', 'hospital', 'clinic', 'health', 'medicine', 'doctor', 'diagnostic'], 
+        confidence: 0.85 
+      },
+      'Transportation': { 
+        keywords: ['fuel', 'petrol', 'gas station', 'transport', 'taxi', 'auto', 'uber', 'ola'], 
+        confidence: 0.80 
+      },
+      'Entertainment': { 
+        keywords: ['cinema', 'movie', 'theater', 'entertainment', 'multiplex', 'amusement'], 
+        confidence: 0.80 
+      },
+      'Utilities': { 
+        keywords: ['utility', 'bill', 'service', 'provider', 'recharge', 'mobile', 'internet', 'electricity'], 
+        confidence: 0.80 
+      },
+      'Education': { 
+        keywords: ['school', 'college', 'education', 'institute', 'university', 'tuition', 'coaching'], 
+        confidence: 0.85 
+      },
+      'Insurance': { 
+        keywords: ['insurance', 'premium', 'policy', 'lic', 'health insurance'], 
+        confidence: 0.85 
+      },
+      'Investment': { 
+        keywords: ['investment', 'financial', 'mutual fund', 'stock', 'trading', 'broker'], 
+        confidence: 0.80 
+      },
+      'Family': {
+        keywords: ['family', 'relative', 'personal', 'friend'],
+        confidence: 0.75
+      },
     };
 
-    for (const [category, keywords] of Object.entries(categoryKeywords)) {
-      if (keywords.some(keyword => snippets.includes(keyword))) {
-        return {
-          categoryName: category,
-          categoryId: null,
-          confidence: 0.75,
-          source: 'google_search',
-        };
+    // Find best matching category with highest confidence
+    let bestMatch: { category: string; confidence: number } | null = null;
+    
+    for (const [category, config] of Object.entries(categoryKeywords)) {
+      const keywordMatches = config.keywords.filter(keyword => allText.includes(keyword));
+      if (keywordMatches.length > 0) {
+        // More keyword matches = higher confidence
+        const matchScore = Math.min(1.0, config.confidence + (keywordMatches.length * 0.05));
+        if (!bestMatch || matchScore > bestMatch.confidence) {
+          bestMatch = { category, confidence: matchScore };
+        }
       }
+    }
+
+    if (bestMatch) {
+      return {
+        categoryName: bestMatch.category,
+        categoryId: null,
+        confidence: Math.min(0.95, bestMatch.confidence),
+        source: 'google_search',
+      };
     }
 
     return null;
@@ -280,8 +341,15 @@ export async function lookupMerchantCategory(
     }
   }
 
-  // 3. Fallback to Gemini (if enabled)
+  // 3. Fallback to Gemini (if enabled and quota not exceeded)
   if (!result && MERCHANT_LOOKUP_CONFIG.FALLBACK_TO_GEMINI && genAI) {
+    // Check if Gemini quota is exceeded (skip to avoid wasted API calls)
+    const { isGeminiQuotaExceeded } = await import('./gemini');
+    if (isGeminiQuotaExceeded()) {
+      console.log(`⏭️ Skipping Gemini merchant lookup for "${storeName}" - quota exceeded`);
+      return null;
+    }
+    
     try {
       result = await lookupWithGemini(storeName);
       if (result && result.categoryName && result.confidence >= MERCHANT_LOOKUP_CONFIG.CONFIDENCE_THRESHOLD) {
@@ -290,7 +358,13 @@ export async function lookupMerchantCategory(
         return result;
       }
     } catch (error) {
-      console.error('Gemini lookup failed:', error);
+      // Check if quota was exceeded during the call
+      const { isGeminiQuotaExceeded: checkQuota } = await import('./gemini');
+      if (checkQuota()) {
+        console.log(`⏭️ Gemini quota exceeded during lookup for "${storeName}"`);
+      } else {
+        console.error('Gemini lookup failed:', error);
+      }
     }
   }
 

@@ -1,0 +1,26 @@
+{
+  "include": [
+    "api/**/*.py",
+    "tools/**/*.py"
+  ],
+  "exclude": [
+    "**/node_modules",
+    "**/__pycache__",
+    "**/.next"
+  ],
+  "reportMissingImports": "warning",
+  "reportMissingTypeStubs": false,
+  "pythonVersion": "3.11",
+  "typeCheckingMode": "basic",
+  "executionEnvironments": [
+    {
+      "root": ".",
+      "pythonVersion": "3.11",
+      "extraPaths": [
+        "tools",
+        "tools/parsers"
+      ]
+    }
+  ]
+}
+

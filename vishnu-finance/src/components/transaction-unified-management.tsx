@@ -117,6 +117,12 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
   const [tempFiles, setTempFiles] = useState<string[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+  const [categorizationProgress, setCategorizationProgress] = useState<{
+    total: number;
+    categorized: number;
+    progress: number;
+    isActive: boolean;
+  } | null>(null);
 
   const hasBootstrapTransactionsRef = useRef(Boolean(bootstrap?.transactions?.length));
   const hasBootstrapCategoriesRef = useRef(Boolean(bootstrap?.categories?.length));
@@ -311,30 +317,16 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
     }
   }, [resolvedUserId, financialCategory, searchTerm, startDate, endDate, showDeleted, pageParam, getPageSize, showError, amountPreset, selectedCategoryId]);
 
-  // Fetch categories (only those with transactions)
+  // Fetch all categories (not just those with transactions)
   const fetchCategories = useCallback(async () => {
     if (!resolvedUserId) return;
 
     try {
-      // Fetch all categories first
+      // Fetch all categories - show ALL categories, not just used ones
       const response = await fetch('/api/categories');
       if (response.ok) {
         const allCategories = await response.json() || [];
-        
-        // Fetch categories that have transactions
-        const categoriesWithTransactionsResponse = await fetch(`/api/transactions/categories-used?userId=${resolvedUserId}`);
-        if (categoriesWithTransactionsResponse.ok) {
-          const usedCategoryIds = await categoriesWithTransactionsResponse.json() || [];
-          const usedCategoryIdsSet = new Set(usedCategoryIds);
-          
-          // Filter to only show categories that have transactions
-          const usedCategories = allCategories.filter((c: any) => usedCategoryIdsSet.has(c.id));
-          
-          setCategories(usedCategories);
-        } else {
-          // Fallback: show all categories if API fails
-          setCategories(allCategories);
-        }
+        setCategories(allCategories);
       }
     } catch (error) {
       console.error('Error fetching categories:', error);
@@ -644,7 +636,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
     }
   }, [selectedIds, transactions, fetchTransactions, success, showError]);
 
-  // Auto-categorize by UPI/Account Number
+  // Auto-categorize using full categorization service (rules + AI + patterns)
   const handleAutoCategorizeByUpiAccount = useCallback(async () => {
     if (selectedIds.size === 0) {
       showError('Error', 'Please select transactions to categorize');
@@ -653,97 +645,133 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
 
     setIsBulkUpdating(true);
     try {
-      const selectedTransactions = transactions.filter(t => selectedIds.has(t.id));
+      const selectedTransactions = transactions.filter(t => selectedIds.has(t.id) && !t.categoryId);
       
-      // Fetch all transactions to find patterns (not just selected ones)
-      // This helps find categories for UPI/account numbers that appear in other transactions
-      const allTransactionsResponse = await fetch('/api/transactions?includeTotals=false');
-      let allTransactions: Transaction[] = [];
-      if (allTransactionsResponse.ok) {
-        const data = await allTransactionsResponse.json();
-        allTransactions = data.transactions || [];
-      }
-
-      // Use all transactions for pattern matching, but only apply to selected ones
-      const categorySuggestions = new Map<string, string>();
-      
-      selectedTransactions.forEach(selectedT => {
-        if (selectedT.categoryId) {
-          // Already categorized, skip
-          return;
-        }
-
-        // Find transactions with same UPI ID or Account Number
-        const matchingTransactions = allTransactions.filter(t => {
-          if (t.id === selectedT.id) return false; // Exclude self
-          
-          // Match by UPI ID
-          if (selectedT.upiId && t.upiId && 
-              selectedT.upiId.toLowerCase().trim() === t.upiId.toLowerCase().trim()) {
-            return true;
-          }
-          
-          // Match by Account Number
-          if (selectedT.accountNumber && t.accountNumber && 
-              selectedT.accountNumber.trim() === t.accountNumber.trim()) {
-            return true;
-          }
-          
-          return false;
-        });
-
-        // Find most common category among matching transactions
-        if (matchingTransactions.length > 0) {
-          const categoryCounts = new Map<string, number>();
-          matchingTransactions.forEach(t => {
-            if (t.categoryId) {
-              categoryCounts.set(t.categoryId, (categoryCounts.get(t.categoryId) || 0) + 1);
-            }
-          });
-
-          if (categoryCounts.size > 0) {
-            const mostCommon = Array.from(categoryCounts.entries())
-              .sort((a, b) => b[1] - a[1])[0][0];
-            categorySuggestions.set(selectedT.id, mostCommon);
-          }
-        }
-      });
-
-      if (categorySuggestions.size === 0) {
-        showError('Info', 'No category patterns found. Please categorize some transactions with the same UPI/Account manually first.');
+      if (selectedTransactions.length === 0) {
+        showError('Info', 'All selected transactions are already categorized');
         setIsBulkUpdating(false);
         return;
       }
 
-      // Apply category suggestions
-      const updates = Array.from(categorySuggestions.entries()).map(([id, categoryId]) => ({
-        id,
-        categoryId,
-      }));
+      console.log(`🤖 Starting auto-categorization for ${selectedTransactions.length} transactions...`);
 
-      const results = await Promise.allSettled(
-        updates.map(update => 
-          fetch(`/api/transactions/${update.id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ categoryId: update.categoryId }),
-          })
-        )
-      );
+      // Prepare transactions for categorization API
+      const transactionsToCategorize = selectedTransactions.map(t => {
+        // Handle transactionDate - could be Date object or string
+        let dateStr = '';
+        if (t.transactionDate) {
+          if (t.transactionDate instanceof Date) {
+            dateStr = t.transactionDate.toISOString().split('T')[0];
+          } else {
+            // Handle as Date or string (from Prisma)
+            const dateValue = t.transactionDate as Date | string;
+            if (typeof dateValue === 'string') {
+              // Already a string, extract date part if needed
+              dateStr = dateValue.split('T')[0].substring(0, 10);
+            } else {
+              // Try to convert to Date
+              const date = new Date(dateValue as any);
+              if (!isNaN(date.getTime())) {
+                dateStr = date.toISOString().split('T')[0];
+              }
+            }
+          }
+        }
+        
+        return {
+          description: t.description || '',
+          store: t.store || undefined,
+          commodity: t.notes || undefined,
+          amount: (t.creditAmount > 0 ? t.creditAmount : t.debitAmount) || 0,
+          date: dateStr || new Date().toISOString().split('T')[0], // Fallback to today if invalid
+          financialCategory: t.financialCategory as 'INCOME' | 'EXPENSE' | 'TRANSFER' | 'INVESTMENT' | 'OTHER',
+          personName: t.personName || undefined,
+          upiId: t.upiId || undefined,
+          accountNumber: t.accountNumber || undefined,
+          accountHolderName: user?.name || undefined,
+        };
+      });
 
-      const successCount = results.filter(r => r.status === 'fulfilled').length;
-      success('Success', `Auto-categorized ${successCount} transaction(s) based on UPI/Account patterns`);
+      // Call categorization API endpoint
+      const response = await fetch('/api/transactions/categorize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user?.id,
+          transactions: transactionsToCategorize,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: 'Failed to categorize transactions' }));
+        throw new Error(error.error || 'Failed to categorize transactions');
+      }
+
+      const categorizationResults = await response.json();
+      
+      if (!Array.isArray(categorizationResults) || categorizationResults.length !== selectedTransactions.length) {
+        throw new Error('Invalid categorization response');
+      }
+
+      // Apply categorization results using batch update to avoid rate limiting
+      const updates = selectedTransactions
+        .map((t, idx) => {
+          const result = categorizationResults[idx];
+          if (result && result.categoryId) {
+            return {
+              id: t.id,
+              categoryId: result.categoryId,
+              financialCategory: result.financialCategory || t.financialCategory,
+            };
+          }
+          return null;
+        })
+        .filter((u): u is NonNullable<typeof u> => u !== null);
+
+      if (updates.length === 0) {
+        showError('Info', 'No categories could be determined for the selected transactions. Try categorizing a few manually first to build patterns.');
+        setIsBulkUpdating(false);
+        return;
+      }
+
+      // Use batch update endpoint to avoid 429 rate limit errors
+      const batchResponse = await fetch('/api/transactions/batch-update', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user?.id,
+          updates,
+        }),
+      });
+
+      if (!batchResponse.ok) {
+        const error = await batchResponse.json().catch(() => ({ error: 'Failed to update transactions' }));
+        throw new Error(error.error || 'Failed to update transactions');
+      }
+
+      const batchResult = await batchResponse.json();
+      const successCount = batchResult.succeeded || 0;
+      const categorizedCount = categorizationResults.filter(r => r.categoryId).length;
+
+      if (successCount > 0) {
+        success('Success', `Auto-categorized ${successCount} transaction(s) using AI and rule-based categorization`);
+      } else if (categorizedCount > 0) {
+        showError('Warning', `Found categories for ${categorizedCount} transactions but failed to apply them`);
+      } else {
+        showError('Info', 'No categories could be determined for the selected transactions. Try categorizing a few manually first to build patterns.');
+      }
+
       setSelectedIds(new Set());
       setShowBulkCategorize(false);
       setBulkCategoryId('');
       fetchTransactions();
     } catch (error) {
       console.error('Error auto-categorizing transactions:', error);
-      showError('Error', 'Failed to auto-categorize transactions');
+      showError('Error', error instanceof Error ? error.message : 'Failed to auto-categorize transactions');
     } finally {
       setIsBulkUpdating(false);
     }
-  }, [selectedIds, transactions, fetchTransactions, success, showError]);
+  }, [selectedIds, transactions, user, fetchTransactions, success, showError]);
 
   const handleBulkCategorize = useCallback(async () => {
     if (selectedIds.size === 0 || !bulkCategoryId) {
@@ -1101,6 +1129,81 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
   };
 
   // Import parsed transactions using batch API
+  // Poll for categorization progress
+  const pollCategorizationProgress = async (transactionIds: string[], userId: string) => {
+    const maxAttempts = 60; // Poll for up to 5 minutes (5 second intervals)
+    let attempts = 0;
+    
+    // Set initial progress state
+    setCategorizationProgress({
+      total: transactionIds.length,
+      categorized: 0,
+      progress: 0,
+      isActive: true,
+    });
+    
+    const poll = async () => {
+      try {
+        const response = await fetch(
+          `/api/transactions/categorize-background?userId=${userId}&transactionIds=${transactionIds.join(',')}`
+        );
+        
+        if (response.ok) {
+          const status = await response.json();
+          const progress = status.progress || 0;
+          const categorized = status.categorized || 0;
+          const total = status.total || transactionIds.length;
+          
+          // Update progress state
+          setCategorizationProgress({
+            total,
+            categorized,
+            progress,
+            isActive: true,
+          });
+          
+          if (progress >= 100 || status.remaining === 0) {
+            // Categorization complete
+            setCategorizationProgress({
+              total,
+              categorized,
+              progress: 100,
+              isActive: false,
+            });
+            success(`✅ Categorization complete! ${categorized} transactions categorized.`);
+            // Refresh transactions to show updated categories
+            router.refresh();
+            // Clear progress after 3 seconds
+            setTimeout(() => setCategorizationProgress(null), 3000);
+            return;
+          }
+          
+          // Continue polling if not complete
+          if (attempts < maxAttempts) {
+            attempts++;
+            setTimeout(poll, 5000); // Poll every 5 seconds
+          } else {
+            // Max attempts reached, but keep showing progress
+            setCategorizationProgress({
+              total,
+              categorized,
+              progress,
+              isActive: true, // Keep active so user knows it's still running
+            });
+            success(`⏱️ Categorization in progress: ${categorized}/${total} completed. It will continue in the background.`);
+          }
+        }
+      } catch (error) {
+        console.error('Error polling categorization status:', error);
+        // Don't show error to user - it's background process
+        // But keep progress visible
+      }
+    };
+    
+    // Start polling after 2 seconds
+    setTimeout(poll, 2000);
+  };
+
   const handleImportParsedTransactions = async () => {
     if (!parsedTransactions.length || !user?.id) return;
 
@@ -1224,10 +1327,14 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
         fileSize: selectedFile.size,
       } : undefined;
 
+      // Use background categorization for large imports (>100 transactions) for better performance
+      const useBackgroundCategorization = normalized.length > 100;
+      
       const importPayload: any = { 
         userId: user.id, 
         records: normalized,
         useAICategorization: true, // Enable AI categorization
+        categorizeInBackground: useBackgroundCategorization, // Use background for large imports
         validateBalance: true, // Enable balance validation
         ...(documentMeta ? { document: documentMeta } : {}),
       };
@@ -1257,8 +1364,16 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
       
       let message = `Inserted ${totalInserted} records (${incomeCount} income, ${expenseCount} expenses), ${result.duplicates || 0} duplicates`;
       
-      // Show categorization results
-      if (result.categorizedCount !== undefined) {
+      // Handle background categorization
+      if (result.backgroundCategorization?.started) {
+        message += `. 🚀 Background categorization started for ${result.backgroundCategorization.total} transactions`;
+        
+        // Start polling for categorization progress
+        if (result.backgroundCategorization.transactionIds?.length > 0) {
+          pollCategorizationProgress(result.backgroundCategorization.transactionIds, user.id);
+        }
+      } else if (result.categorizedCount !== undefined) {
+        // Show immediate categorization results
         message += `. ${result.categorizedCount} transactions auto-categorized`;
       }
       
@@ -1349,6 +1464,36 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
 
   return (
     <div className="w-full bg-background pb-16 md:pb-20 lg:pb-6">
+      {/* Categorization Progress Indicator - Mobile */}
+      {categorizationProgress && categorizationProgress.isActive && (
+        <div className="md:hidden sticky top-0 z-50 bg-primary/10 border-b border-primary/20 backdrop-blur-sm">
+          <div className="px-4 py-2">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-primary animate-pulse flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <span className="text-xs font-medium truncate">
+                    Auto-categorizing...
+                  </span>
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">
+                    {categorizationProgress.categorized}/{categorizationProgress.total}
+                  </span>
+                </div>
+                <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-primary transition-all duration-500 rounded-full"
+                    style={{ width: `${categorizationProgress.progress}%` }}
+                  />
+                </div>
+                <div className="text-xs text-muted-foreground mt-0.5 text-center">
+                  {categorizationProgress.progress}% complete
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Mobile Header */}
       <MobileHeader
         title="Transactions"
@@ -1390,6 +1535,31 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
           </div>
         }
       />
+
+      {/* Categorization Progress Indicator */}
+      {categorizationProgress && categorizationProgress.isActive && (
+        <div className="sticky top-0 z-50 bg-primary/10 border-b border-primary/20 backdrop-blur-sm">
+          <div className="container mx-auto px-4 py-3">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 flex-1">
+                <Sparkles className="w-4 h-4 text-primary animate-pulse" />
+                <span className="text-sm font-medium">
+                  Auto-categorizing transactions...
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  {categorizationProgress.categorized}/{categorizationProgress.total} ({categorizationProgress.progress}%)
+                </span>
+              </div>
+              <div className="w-32 md:w-48 h-2 bg-muted rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-primary transition-all duration-500 rounded-full"
+                  style={{ width: `${categorizationProgress.progress}%` }}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Desktop Header */}
       <div className="hidden md:block sticky top-16 z-30 bg-background/80 backdrop-blur border-b">

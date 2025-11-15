@@ -16,10 +16,14 @@ const defaultCategories = [
   { name: 'Dividends', type: 'INCOME', color: '#84CC16', isDefault: true },
   { name: 'Interest', type: 'INCOME', color: '#F97316', isDefault: true },
   { name: 'Gifts & Donations', type: 'INCOME', color: '#EC4899', isDefault: true },
+  { name: 'Refund', type: 'INCOME', color: '#10B981', isDefault: true },
+  { name: 'Transfer', type: 'INCOME', color: '#6366F1', isDefault: true },
+  { name: 'Income', type: 'INCOME', color: '#8B5CF6', isDefault: true },
   { name: 'Other Income', type: 'INCOME', color: '#6B7280', isDefault: true },
 
   // Expense Categories
   { name: 'Food & Dining', type: 'EXPENSE', color: '#10B981', isDefault: true },
+  { name: 'Groceries', type: 'EXPENSE', color: '#22C55E', isDefault: true },
   { name: 'Transportation', type: 'EXPENSE', color: '#F59E0B', isDefault: true },
   { name: 'Housing', type: 'EXPENSE', color: '#3B82F6', isDefault: true },
   { name: 'Utilities', type: 'EXPENSE', color: '#8B5CF6', isDefault: true },
@@ -34,6 +38,10 @@ const defaultCategories = [
   { name: 'Debt Payment', type: 'EXPENSE', color: '#DC2626', isDefault: true },
   { name: 'Taxes', type: 'EXPENSE', color: '#7C2D12', isDefault: true },
   { name: 'Charity & Donations', type: 'EXPENSE', color: '#059669', isDefault: true },
+  { name: 'Investment', type: 'EXPENSE', color: '#9333EA', isDefault: true },
+  { name: 'Family', type: 'EXPENSE', color: '#F472B6', isDefault: true },
+  { name: 'Fees & Charges', type: 'EXPENSE', color: '#DC2626', isDefault: true },
+  { name: 'Miscellaneous', type: 'EXPENSE', color: '#9CA3AF', isDefault: true },
   { name: 'Other Expenses', type: 'EXPENSE', color: '#6B7280', isDefault: true },
 ];
 

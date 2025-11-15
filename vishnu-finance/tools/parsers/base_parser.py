@@ -14,10 +14,15 @@ try:
     from .date_validator import DateValidator, parse_date_strict
     from .amount_validator import AmountValidator, parse_amount_strict
     from .statement_metadata import StatementMetadataExtractor
+    from .ai_parser import AIParser
 except ImportError:
     from date_validator import DateValidator, parse_date_strict
     from amount_validator import AmountValidator, parse_amount_strict
     from statement_metadata import StatementMetadataExtractor
+    try:
+        from ai_parser import AIParser
+    except ImportError:
+        AIParser = None  # AI parser not available
 
 
 class BaseBankParser(ABC):
@@ -26,6 +31,57 @@ class BaseBankParser(ABC):
     def __init__(self, bank_code: str):
         """Initialize parser with bank code."""
         self.bank_code = bank_code
+    
+    def normalize_text(self, text: str) -> str:
+        """
+        Normalize text to fix spacing issues in UPI IDs, person names, and store names.
+        
+        Args:
+            text: Raw text with potential spacing issues
+            
+        Returns:
+            Normalized text with spacing issues fixed
+        """
+        if not text:
+            return text
+        
+        # Fix spacing in UPI IDs: /mamtavishw akarma0948@okhdfcbank -> /mamtavishwakarma0948@okhdfcbank
+        # Pattern: word boundary, alphanumeric, space, alphanumeric, @
+        text = re.sub(r'([a-z0-9])\s+([a-z0-9]+@[a-z0-9.]+)', r'\1\2', text, flags=re.IGNORECASE)
+        
+        # Fix spacing in UPI IDs that are part of paths: /mamtavishw akarma0948@okhdfcbank
+        text = re.sub(r'(/[a-z0-9]+)\s+([a-z0-9]+@[a-z0-9.]+)', r'\1\2', text, flags=re.IGNORECASE)
+        
+        # Fix spacing in person names within UPI IDs: manishavish wakarma2463@okaxis -> manishavishwakarma2463@okaxis
+        # Pattern: letters, space, letters+digits, @
+        text = re.sub(r'([a-z]+)\s+([a-z]+\d+@[a-z0-9.]+)', r'\1\2', text, flags=re.IGNORECASE)
+        
+        # Fix spacing in UPI IDs with person names: /manishavish wakarma2463@okaxis
+        text = re.sub(r'(/[a-z]+)\s+([a-z]+\d+@[a-z0-9.]+)', r'\1\2', text, flags=re.IGNORECASE)
+        
+        # Fix spacing in person names that are clearly part of UPI transactions
+        # Pattern: /NAME PART1 PART2@ -> /NAMEPART1PART2@ (but preserve actual name parts)
+        # Only fix if it's clearly a UPI ID pattern
+        text = re.sub(r'([A-Z][A-Z\s]+)\s+([A-Z][A-Z\s]*@[a-z0-9.]+)', 
+                     lambda m: m.group(1).replace(' ', '') + ' ' + m.group(2) if '@' in m.group(2) else m.group(0),
+                     text)
+        
+        # Fix spacing in store names that are part of transaction codes
+        # Pattern: CODE/STORE NAME / -> CODE/STORENAME /
+        # But be careful not to break actual multi-word store names
+        # Only fix if it's followed by technical terms like /UPI, /BRANCH, etc.
+        text = re.sub(r'([A-Z0-9]+)/([A-Z][A-Z\s]+?)\s+/(UPI|BRANCH|ATM|XXXXX)', 
+                     lambda m: m.group(1) + '/' + m.group(2).replace(' ', '') + ' /' + m.group(3),
+                     text, flags=re.IGNORECASE)
+        
+        # Fix spacing in account numbers and transaction IDs
+        # Pattern: space between digits that should be together
+        text = re.sub(r'(\d)\s+(\d{4,})', r'\1\2', text)  # Fix broken account numbers
+        
+        # Normalize multiple spaces to single space
+        text = re.sub(r'\s+', ' ', text)
+        
+        return text.strip()
     
     @abstractmethod
     def parse_pdf(self, pdf_path) -> pd.DataFrame:
@@ -37,9 +93,63 @@ class BaseBankParser(ABC):
         """Parse Excel file and return DataFrame of transactions."""
         pass
     
+    def parse_with_ai_fallback(
+        self,
+        description: str,
+        raw_text: str = '',
+        previous_date: Optional[str] = None
+    ) -> Optional[Dict]:
+        """
+        Parse transaction description using AI as fallback when standard parsing fails.
+        
+        Args:
+            description: Transaction description
+            raw_text: Raw transaction text
+            previous_date: Previous transaction date for context
+            
+        Returns:
+            Dictionary with parsed fields or None if AI parsing fails
+        """
+        if not AIParser:
+            return None
+        
+        try:
+            result = AIParser.parse_transaction_with_ai(
+                description,
+                raw_text,
+                self.bank_code,
+                previous_date
+            )
+            
+            if result:
+                # Convert AI result to transaction dict format
+                transaction = {
+                    'store': result.get('store'),
+                    'personName': result.get('personName'),
+                    'upiId': result.get('upiId'),
+                    'commodity': result.get('commodity'),
+                    'transferType': result.get('transferType'),
+                    'transactionId': result.get('transactionId'),
+                    'branch': result.get('branch'),
+                    'description': result.get('cleanDescription') or description,
+                    'parsingMethod': result.get('parsingMethod', 'ai_fallback'),
+                    'parsingConfidence': result.get('parsingConfidence', 0.7),
+                }
+                
+                # If AI extracted date, use it
+                if result.get('date'):
+                    transaction['date_iso'] = result.get('date')
+                
+                return transaction
+        except Exception as e:
+            print(f"⚠️ AI parsing fallback error: {e}")
+        
+        return None
+    
     def extract_store_and_commodity(self, description: str) -> Tuple[Optional[str], Optional[str], str]:
         """
         Extract store name and commodity from transaction description.
+        Enhanced with AI fallback for complex descriptions.
         
         Args:
             description: Raw transaction description
@@ -47,6 +157,9 @@ class BaseBankParser(ABC):
         Returns:
             Tuple of (store_name, commodity, clean_description)
         """
+        # Normalize text first to fix spacing issues
+        description = self.normalize_text(description)
+        
         store = None
         commodity = None
         clean_description = description
@@ -65,19 +178,49 @@ class BaseBankParser(ABC):
         
         # Pattern to match: TRANSACTION_CODE/Store Name /other_info /commodity
         # Example: YESB0PTMUPI/Sangam Stationery Stores /XXXXX /pens
+        # Also handle: /mamtavishwakarma0948@okhdfcbank ANCH : ATM SERVICE BRANCH
+        # And: HDFC0002504/MAMTA - INR 60.00 MUNSHEELAL VISHWAKARMA
         
         # Extract store name (text after first slash, before next slash or UPI/code)
-        store_match = re.search(r'^[A-Z0-9]+/([^/]+?)(?:\s*/\s*(?:[A-Z0-9@]+|UPI|BRANCH)|$)', description)
-        if store_match:
-            store = store_match.group(1).strip()
-            store = re.sub(r'\s+', ' ', store).strip()
-            
-            # Clean store name - remove any remaining technical terms
-            store = re.sub(r'\s*(?:Date|Transaction|Details|Debits|Credits|Balance)\s*.*$', '', store, flags=re.IGNORECASE).strip()
-            
-            # If store is empty or just whitespace after cleaning, discard it
-            if not store or len(store) < 2:
-                store = None
+        # Improved pattern to handle UPI IDs and person names
+        store_patterns = [
+            # Standard pattern: CODE/Store Name /...
+            r'^[A-Z0-9]+/([^/]+?)(?:\s*/\s*(?:[A-Z0-9@]+|UPI|BRANCH|ATM\s+SERVICE)|$)',
+            # UPI pattern: /upiid@bank /...
+            r'^/([a-z0-9]+@[a-z0-9.]+)(?:\s+[A-Z\s:]+|$)',
+            # Bank code pattern: HDFC0002504/NAME - AMOUNT NAME
+            r'^[A-Z]{4}\d+/([A-Z\s]+?)(?:\s*-\s*INR|$)',
+        ]
+        
+        for pattern in store_patterns:
+            store_match = re.search(pattern, description, re.IGNORECASE)
+            if store_match:
+                store = store_match.group(1).strip()
+                store = re.sub(r'\s+', ' ', store).strip()
+                
+                # Clean store name - remove any remaining technical terms
+                store = re.sub(r'\s*(?:Date|Transaction|Details|Debits|Credits|Balance)\s*.*$', '', store, flags=re.IGNORECASE).strip()
+                
+                # Remove common suffixes that aren't part of store name
+                store = re.sub(r'\s*(?:ANCH|ATM|SERVICE|BRANCH).*$', '', store, flags=re.IGNORECASE).strip()
+                
+                # If store is empty or just whitespace after cleaning, discard it
+                if store and len(store) >= 2:
+                    break
+                else:
+                    store = None
+        
+        # If no store found, try to extract person name from UPI transactions
+        if not store:
+            # Pattern: /name@upi / or name@upi in description
+            upi_name_match = re.search(r'/([a-z0-9]+@[a-z0-9.]+)', description, re.IGNORECASE)
+            if upi_name_match:
+                # Extract name part before @
+                upi_id = upi_name_match.group(1)
+                name_part = upi_id.split('@')[0]
+                # If it looks like a name (has letters), use it as store
+                if re.search(r'[a-z]', name_part, re.IGNORECASE):
+                    store = name_part
         
         # Extract commodity - look for meaningful words at the end
         commodity_patterns = [
@@ -171,6 +314,9 @@ class BaseBankParser(ABC):
         if 'date_iso' not in transaction or not transaction['date_iso']:
             if 'date' in transaction:
                 transaction['date_iso'] = self.parse_date(transaction['date'])
+                # If date parsing failed, set flag
+                if not transaction['date_iso']:
+                    transaction['hasInvalidDate'] = True
         
         # Ensure numeric fields - use strict amount parsing
         for field in ['amount', 'debit', 'credit', 'balance']:
@@ -183,6 +329,16 @@ class BaseBankParser(ABC):
                     # Try to convert to string and parse
                     transaction[field] = self.parse_amount(str(transaction[field]))
         
+        # Check for zero amount and set flag
+        debit = transaction.get('debit', 0)
+        credit = transaction.get('credit', 0)
+        if debit == 0 and credit == 0:
+            transaction['hasZeroAmount'] = True
+        
+        # Normalize description text first
+        if 'description' in transaction and transaction['description']:
+            transaction['description'] = self.normalize_text(transaction['description'])
+        
         # Extract store and commodity if not already done
         if 'description' in transaction and transaction['description']:
             if 'store' not in transaction or not transaction['store']:
@@ -190,6 +346,11 @@ class BaseBankParser(ABC):
                 transaction['store'] = store
                 transaction['commodity'] = commodity
                 transaction['description'] = clean_desc
+        
+        # Normalize other text fields
+        for field in ['store', 'personName', 'upiId', 'branch']:
+            if field in transaction and transaction[field] and isinstance(transaction[field], str):
+                transaction[field] = self.normalize_text(transaction[field])
         
         # Set bank code
         transaction['bankCode'] = self.bank_code
@@ -213,6 +374,14 @@ class BaseBankParser(ABC):
         # Ensure both fields exist and are non-negative
         transaction['debit'] = abs(float(debit)) if debit > 0 else 0.0
         transaction['credit'] = abs(float(credit)) if credit > 0 else 0.0
+        
+        # Check for zero amount again after normalization
+        if transaction['debit'] == 0 and transaction['credit'] == 0:
+            transaction['hasZeroAmount'] = True
+        
+        # Preserve data quality flags if they exist
+        # (isPartialData, hasInvalidDate, hasZeroAmount, parsingMethod, parsingConfidence)
+        # These flags are set by parsers and should be preserved
         
         # Remove legacy 'type' field if present (we use credit/debit now)
         if 'type' in transaction:

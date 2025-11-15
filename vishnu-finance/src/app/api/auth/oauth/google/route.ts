@@ -27,6 +27,14 @@ export async function GET(request: NextRequest) {
       path: '/',
     });
 
+    cookieStore.set('oauth_provider', 'google', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 10 * 60, // 10 minutes
+      path: '/',
+    });
+
     // Generate OAuth URL
     const authUrl = generateGoogleOAuthURL(codeChallenge, state);
 

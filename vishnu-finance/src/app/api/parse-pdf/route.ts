@@ -4,8 +4,69 @@ import { join } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { tmpdir } from 'os';
+// Dynamic import for Node.js parser fallback
+const parsePDFWithNode = async (filePath: string, bankHint?: string) => {
+  try {
+    const { parsePDFWithNode: parser } = await import('@/lib/parsers/node-pdf-parser');
+    return await parser(filePath, bankHint);
+  } catch (error) {
+    console.error('Failed to load Node.js parser:', error);
+    return { success: false, transactions: [], count: 0, metadata: {} };
+  }
+};
 
 const execAsync = promisify(exec);
+
+/**
+ * Try to call Python serverless function for PDF parsing
+ */
+async function tryPythonParser(pdfBuffer: Buffer, bankHint: string): Promise<{ success: boolean; data?: any; error?: string }> {
+  try {
+    // Determine base URL for Python function
+    // In Vercel production, use VERCEL_URL
+    // In local development, use localhost
+    let baseUrl: string;
+    if (process.env.VERCEL_URL) {
+      baseUrl = `https://${process.env.VERCEL_URL}`;
+    } else if (process.env.VERCEL) {
+      // Vercel preview deployments
+      baseUrl = `https://${process.env.VERCEL_URL}`;
+    } else {
+      // Local development
+      baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    }
+    
+    const pythonFunctionUrl = `${baseUrl}/api/parse-pdf-python`;
+    
+    // Convert buffer to base64
+    const pdfBase64 = pdfBuffer.toString('base64');
+    
+    const response = await fetch(pythonFunctionUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        pdf_data: pdfBase64,
+        bank: bankHint,
+      }),
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      return { success: true, data };
+    } else {
+      const errorText = await response.text();
+      return { success: false, error: errorText };
+    }
+  } catch (error) {
+    console.log('⚠️ PDF API: Python function call failed, will try fallback:', error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Unknown error' 
+    };
+  }
+}
 
 export async function POST(request: NextRequest) {
   console.log('🔍 PDF API: Starting request processing');
@@ -56,6 +117,34 @@ export async function POST(request: NextRequest) {
     await writeFile(filepath, buffer);
     console.log('✅ PDF API: File saved successfully');
 
+    // Strategy 1: Try Python serverless function first (production)
+    try {
+      console.log('🐍 PDF API: Attempting Python serverless function...');
+      const pythonResult = await tryPythonParser(buffer, bankHint);
+      
+      if (pythonResult.success && pythonResult.data) {
+        console.log('✅ PDF API: Python parser succeeded');
+        const result = pythonResult.data;
+        
+        // Clean up file
+        try {
+          await unlink(filepath);
+        } catch {}
+        
+        return NextResponse.json({
+          success: result.success || true,
+          transactions: result.transactions || [],
+          count: result.count || 0,
+          metadata: result.metadata || {},
+        });
+      } else {
+        console.log('⚠️ PDF API: Python parser failed, trying local Python execution...');
+      }
+    } catch (error) {
+      console.log('⚠️ PDF API: Python function error, trying fallback:', error);
+    }
+
+    // Strategy 2: Try local Python execution (development/local)
     try {
       // Update the Python script to use the uploaded file
       const csvOutput = join(uploadsDir, `extracted_${Date.now()}.csv`);
@@ -495,14 +584,43 @@ if __name__ == "__main__":
       });
 
     } catch (error) {
+      console.error('❌ PDF API: Local Python execution failed:', error);
+      
+      // Strategy 3: Fallback to Node.js parser
+      try {
+        console.log('📄 PDF API: Attempting Node.js fallback parser...');
+        const nodeResult = await parsePDFWithNode(filepath, bankHint);
+        
+        if (nodeResult.success && nodeResult.transactions.length > 0) {
+          console.log(`✅ PDF API: Node.js parser succeeded with ${nodeResult.transactions.length} transactions`);
+          
+          // Clean up file
+          try {
+            await unlink(filepath);
+          } catch {}
+          
+          return NextResponse.json({
+            success: true,
+            transactions: nodeResult.transactions,
+            count: nodeResult.count,
+            metadata: nodeResult.metadata || {},
+            warning: 'Parsed using fallback parser. Results may be less accurate than Python parser.',
+          });
+        } else {
+          console.log('⚠️ PDF API: Node.js parser found no transactions');
+        }
+      } catch (nodeError) {
+        console.error('❌ PDF API: Node.js parser also failed:', nodeError);
+      }
+      
       // Clean up files on error
       try {
         await unlink(filepath);
       } catch {}
       
-      console.error('❌ PDF API: PDF parsing error:', error);
+      console.error('❌ PDF API: All parsing methods failed');
       return NextResponse.json({ 
-        error: 'Failed to parse PDF. Please ensure it\'s a valid bank statement.',
+        error: 'Failed to parse PDF. Please ensure it\'s a valid bank statement. All parsing methods (Python serverless, local Python, and Node.js fallback) failed.',
         details: error instanceof Error ? error.message : 'Unknown error'
       }, { status: 500 });
     }

@@ -121,8 +121,12 @@ class MultiBankParser(BaseBankParser):
         return pd.DataFrame(transactions) if transactions else pd.DataFrame()
     
     def _parse_table_row(self, row: List, page: int, line: int) -> Optional[Dict]:
-        """Parse a table row into a transaction dictionary."""
-        if not row or len(row) < 2:
+        """
+        Parse a table row into a transaction dictionary.
+        LENIENT: Accepts partial data and uses AI fallback when needed.
+        """
+        # LENIENT: Try parsing even with minimal columns (2 instead of 3+)
+        if not row or len(row) < 1:
             return None
         
         try:
@@ -186,8 +190,26 @@ class MultiBankParser(BaseBankParser):
                         details = pd
                         break
             
-            if not date_str:
-                return None
+            # LENIENT PARSING: Try to extract whatever data is available
+            # If date parsing fails, try AI or use previous date
+            date_iso = self.parse_date(date_str) if date_str else None
+            
+            # If date parsing failed, try AI to extract date from description
+            if not date_iso and details:
+                ai_result = self.parse_with_ai_fallback(details, ' '.join([str(c) for c in row if c]))
+                if ai_result and ai_result.get('date_iso'):
+                    date_iso = ai_result.get('date_iso')
+            
+            # If still no date, try to infer from context (will be flagged as hasInvalidDate)
+            if not date_iso:
+                # Try AI parsing for the entire row
+                raw_text = ' '.join([str(c) for c in row if c])
+                ai_result = self.parse_with_ai_fallback(details or raw_text, raw_text)
+                if ai_result and ai_result.get('date_iso'):
+                    date_iso = ai_result.get('date_iso')
+                else:
+                    # Last resort: use a default date (will be flagged)
+                    date_iso = None  # Will be handled by import route
             
             # If no details but we have amounts, still create transaction
             if not details:
@@ -195,19 +217,38 @@ class MultiBankParser(BaseBankParser):
                 if not details:
                     details = f"Transaction {line}"
             
-            date_iso = self.parse_date(date_str)
-            if not date_iso:
-                return None
-            
+            # Parse amounts with lenient handling
             debit = self.parse_amount(debit_str) if debit_str else 0
             credit = self.parse_amount(credit_str) if credit_str else 0
             balance = self.parse_amount(balance_str) if balance_str else None
             
-            if debit == 0 and credit == 0:
-                return None
+            # LENIENT: Don't filter zero amounts - store with flag
+            # if debit == 0 and credit == 0:
+            #     return None
             
+            # Try standard metadata extraction
             metadata = self._extract_metadata(details)
             store, commodity, clean_description = self.extract_store_and_commodity(details)
+            
+            # If standard parsing returned minimal data, try AI enhancement
+            if (not store and not metadata.get('personName') and not metadata.get('upiId')) or \
+               (not commodity and len(clean_description) < 10):
+                ai_result = self.parse_with_ai_fallback(details, ' '.join([str(c) for c in row if c]))
+                if ai_result:
+                    # Enhance with AI results
+                    if ai_result.get('store') and not store:
+                        store = ai_result.get('store')
+                    if ai_result.get('personName') and not metadata.get('personName'):
+                        metadata['personName'] = ai_result.get('personName')
+                    if ai_result.get('upiId') and not metadata.get('upiId'):
+                        metadata['upiId'] = ai_result.get('upiId')
+                    if ai_result.get('commodity') and not commodity:
+                        commodity = ai_result.get('commodity')
+                    if ai_result.get('cleanDescription') and len(ai_result.get('cleanDescription', '')) > len(clean_description):
+                        clean_description = ai_result.get('cleanDescription')
+                    # Store parsing method
+                    metadata['parsingMethod'] = ai_result.get('parsingMethod', 'ai_fallback')
+                    metadata['parsingConfidence'] = ai_result.get('parsingConfidence', 0.7)
             
             if debit > 0:
                 transaction_type = 'expense'
@@ -217,10 +258,10 @@ class MultiBankParser(BaseBankParser):
                 amount = credit
             
             transaction = {
-                'date': date_str,
+                'date': date_str or '',
                 'date_iso': date_iso,
-                'description': clean_description or details,
-                'raw': details,
+                'description': clean_description or details or '',
+                'raw': details or '',
                 'amount': amount,
                 'type': transaction_type,
                 'debit': debit,
@@ -233,7 +274,18 @@ class MultiBankParser(BaseBankParser):
                 **metadata
             }
             
-            return self.normalize_transaction(transaction)
+            # Normalize transaction
+            normalized = self.normalize_transaction(transaction)
+            
+            # Set data quality flags
+            if not date_iso or not normalized.get('date_iso'):
+                normalized['hasInvalidDate'] = True
+            if debit == 0 and credit == 0:
+                normalized['hasZeroAmount'] = True
+            if not store and not metadata.get('personName') and not metadata.get('upiId'):
+                normalized['isPartialData'] = True
+            
+            return normalized
         
         except Exception as e:
             print(f"Error parsing table row: {e}")
@@ -427,6 +479,9 @@ class MultiBankParser(BaseBankParser):
         if not details:
             return metadata
         
+        # Normalize text first to fix spacing issues
+        details = self.normalize_text(details)
+        
         # Try to detect bank code in description
         for bank_code, patterns in self.BANK_CODES.items():
             for pattern in patterns:
@@ -434,24 +489,78 @@ class MultiBankParser(BaseBankParser):
                     metadata['bankCode'] = bank_code
                     break
         
+        # YES Bank UPI pattern: /mamtavishwakarma0948@okhdfcbank ANCH : ATM SERVICE BRANCH
+        # Also handle: manishavishwakarma2463@okaxis
+        yes_bank_upi_match = re.search(r'/([a-z0-9]+@[a-z0-9.]+)', details, re.IGNORECASE)
+        if yes_bank_upi_match:
+            metadata['transferType'] = 'UPI'
+            upi_id = yes_bank_upi_match.group(1)
+            metadata['upiId'] = upi_id
+            # Extract person name from UPI ID (part before @)
+            name_part = upi_id.split('@')[0]
+            # Remove trailing numbers to get name (e.g., "manishavishwakarma2463" -> "manishavishwakarma")
+            name_part = re.sub(r'\d+$', '', name_part)
+            if re.search(r'[a-z]', name_part, re.IGNORECASE) and len(name_part) >= 3:
+                # Capitalize properly: "manishavishwakarma" -> "Manishavishwakarma"
+                metadata['personName'] = name_part.title()
+        
+        # HDFC Bank pattern: HDFC0002504/MAMTA - INR 60.00 MUNSHEELAL VISHWAKARMA
+        hdfc_match = re.search(r'([A-Z]{4}\d+)/([A-Z\s]+?)(?:\s*-\s*INR|\s+INR)', details, re.IGNORECASE)
+        if hdfc_match:
+            metadata['transferType'] = 'UPI'
+            person_name = hdfc_match.group(2).strip()
+            # Extract full name if available: MAMTA MUNSHEELAL VISHWAKARMA
+            full_name_match = re.search(r'([A-Z\s]+?)(?:\s+INR|\s*-\s*INR|$)', details, re.IGNORECASE)
+            if full_name_match:
+                full_name = full_name_match.group(1).strip()
+                if len(full_name) > len(person_name):
+                    person_name = full_name
+            metadata['personName'] = person_name
+            # Extract UPI ID if present later in description
+            upi_match = re.search(r'([a-z0-9]+@[a-z0-9.]+)', details, re.IGNORECASE)
+            if upi_match:
+                metadata['upiId'] = upi_match.group(1)
+        
         # Generic UPI pattern detection
         upi_patterns = [
+            # Pattern: UPI/CODE/TXNID/NAME/UPI/UPIID
             r'UPI/([A-Z]+)/([A-Z0-9]+)/([^/]+?)/([A-Z]+)/([^/\s]+)',
-            r'/[A-Z]{4}\d+/[^/]+/([^/]+?)@[^/\s]+',
+            # Pattern: /BANKCODE/NAME/UPIID
+            r'/[A-Z]{4}\d+/([^/]+?)/([^/\s]+@[a-z0-9.]+)',
+            # Pattern: YESB0PTMUPI/NAME /XXXXX /UPIID
+            r'YESB[A-Z0-9]+/([^/]+?)/XXXXX/([^/\s]+@[a-z0-9.]+)',
         ]
         
         for pattern in upi_patterns:
             match = re.search(pattern, details, re.IGNORECASE)
             if match:
-                if len(match.groups()) >= 2:
-                    metadata['transferType'] = f"UPI/{match.group(1)}" if match.group(1) else "UPI"
-                if len(match.groups()) >= 3:
-                    metadata['transactionId'] = match.group(2).strip()
-                if len(match.groups()) >= 4:
-                    metadata['personName'] = match.group(3).strip()
-                if len(match.groups()) >= 6:
-                    metadata['upiId'] = match.group(5).strip()
-                return metadata
+                groups = match.groups()
+                if len(groups) >= 2:
+                    if not metadata['transferType']:
+                        metadata['transferType'] = f"UPI/{groups[0]}" if groups[0] and groups[0].isalpha() else "UPI"
+                if len(groups) >= 2 and not metadata['transactionId']:
+                    # Second group might be transaction ID or person name
+                    if groups[1] and re.match(r'^[A-Z0-9]+$', groups[1]):
+                        metadata['transactionId'] = groups[1].strip()
+                    elif groups[1] and not metadata['personName']:
+                        metadata['personName'] = groups[1].strip()
+                if len(groups) >= 3 and not metadata['personName']:
+                    metadata['personName'] = groups[2].strip() if groups[2] else None
+                if len(groups) >= 4:
+                    # Last group is usually UPI ID
+                    upi_candidate = groups[-1] if groups[-1] else None
+                    if upi_candidate and '@' in upi_candidate:
+                        metadata['upiId'] = upi_candidate.strip()
+                # If we found something useful, return
+                if metadata['transferType'] or metadata['personName'] or metadata['upiId']:
+                    return metadata
+        
+        # Extract transaction ID from various patterns
+        if not metadata['transactionId']:
+            # Pattern: UPI/numbers or /numbers/
+            txn_id_match = re.search(r'(?:UPI|/)(\d{10,})', details)
+            if txn_id_match:
+                metadata['transactionId'] = txn_id_match.group(1)
         
         return metadata
 

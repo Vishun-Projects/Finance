@@ -30,11 +30,11 @@ export async function GET() {
               if (now - stats.mtimeMs > maxAge) {
                 oldFiles.push(filepath);
               }
-            } catch (error) {
+            } catch {
               // File might have been deleted or doesn't exist, skip
             }
           }
-        } catch (error) {
+        } catch {
           // Subdirectory might not exist, skip
         }
       }
@@ -53,11 +53,11 @@ export async function GET() {
                 oldFiles.push(filepath);
               }
             }
-          } catch (error) {
+          } catch {
             // Skip if we can't stat
           }
         }
-      } catch (error) {
+      } catch {
         // Root directory might not be readable, skip
       }
       

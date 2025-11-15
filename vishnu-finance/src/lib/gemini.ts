@@ -9,6 +9,23 @@ if (!GOOGLE_API_KEY) {
 
 const genAI = new GoogleGenerativeAI(GOOGLE_API_KEY);
 
+// Global flag to track if Gemini quota is exceeded (prevents unnecessary API calls)
+let globalGeminiQuotaExceeded = false;
+
+/**
+ * Check if Gemini quota is exceeded
+ */
+export function isGeminiQuotaExceeded(): boolean {
+  return globalGeminiQuotaExceeded;
+}
+
+/**
+ * Reset quota exceeded flag (useful for testing or after quota reset)
+ */
+export function resetGeminiQuotaFlag(): void {
+  globalGeminiQuotaExceeded = false;
+}
+
 export interface DocumentSearchResult {
   documentId: string;
   title: string;
@@ -223,15 +240,30 @@ export async function retryWithBackoff<T>(
       const errorObj = error as any;
       const status = errorObj?.status || errorObj?.statusCode || errorObj?.response?.status;
       
+      // Check if it's a quota exceeded error (don't retry)
+      const isQuotaExceeded = 
+        errorMessage.includes('quota exceeded') ||
+        errorMessage.includes('Quota exceeded') ||
+        errorMessage.includes('exceeded your current quota') ||
+        errorMessage.includes('quotaValue') ||
+        (status === 429 && errorMessage.includes('quota'));
+      
+      if (isQuotaExceeded) {
+        // Set global flag to skip all future AI calls
+        globalGeminiQuotaExceeded = true;
+        console.error('🚫 Gemini API quota exceeded. Disabling AI features for this session.');
+        throw lastError;
+      }
+      
       // Check if it's a retryable error (503, 429, or network errors)
       const isRetryable = 
         status === 503 ||
-        status === 429 ||
+        (status === 429 && !isQuotaExceeded) ||
         errorMessage.includes('503') ||
-        errorMessage.includes('429') ||
+        (errorMessage.includes('429') && !isQuotaExceeded) ||
         errorMessage.includes('overloaded') ||
         errorMessage.includes('Service Unavailable') ||
-        errorMessage.includes('rate limit') ||
+        (errorMessage.includes('rate limit') && !isQuotaExceeded) ||
         errorMessage.includes('ECONNRESET') ||
         errorMessage.includes('ETIMEDOUT') ||
         errorMessage.includes('The model is overloaded');

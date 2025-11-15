@@ -328,6 +328,10 @@ class SBIParser(BaseBankParser):
         Returns:
             Dictionary with extracted metadata
         """
+        # Normalize text first to fix spacing issues
+        if details:
+            details = self.normalize_text(details)
+        
         metadata = {
             'transactionId': None,
             'personName': None,

@@ -344,51 +344,54 @@ export class AuthService {
   }
 
   // OAuth: Find or create user from OAuth provider
-  static async findOrCreateOAuthUser(googleUser: {
-    email: string;
-    name: string;
-    picture?: string;
-    sub: string; // Google user ID
-  }) {
+  static async findOrCreateOAuthUser(
+    oauthUser: {
+      email: string;
+      name: string;
+      picture?: string;
+      sub: string; // Provider user ID
+    },
+    provider: 'google' | 'microsoft' | 'apple'
+  ) {
     const startTime = Date.now();
-    console.log('🔐 OAUTH - Finding or creating user:', googleUser.email);
+    console.log(`🔐 OAUTH [${provider.toUpperCase()}] - Finding or creating user:`, oauthUser.email);
 
     // Check if user exists by email
     const dbStart1 = Date.now();
     let user = await prisma.user.findUnique({
-      where: { email: googleUser.email }
+      where: { email: oauthUser.email }
     });
     console.log(`⏱️ DB QUERY (findUnique by email): ${Date.now() - dbStart1}ms`);
 
     if (user) {
       // User exists - check if OAuth is linked
-      if (!user.oauthProvider || user.oauthId !== googleUser.sub) {
-        console.log('🔐 OAUTH - Linking OAuth to existing account');
+      if (!user.oauthProvider || user.oauthId !== oauthUser.sub || user.oauthProvider !== provider) {
+        console.log(`🔐 OAUTH [${provider.toUpperCase()}] - Linking OAuth to existing account`);
         // Link OAuth to existing account
         const dbStart2 = Date.now();
         user = await prisma.user.update({
           where: { id: user.id },
           data: {
-            oauthProvider: 'google',
-            oauthId: googleUser.sub,
-            avatarUrl: googleUser.picture || user.avatarUrl,
+            oauthProvider: provider,
+            oauthId: oauthUser.sub,
+            avatarUrl: oauthUser.picture || user.avatarUrl,
           }
         });
         console.log(`⏱️ DB QUERY (update OAuth): ${Date.now() - dbStart2}ms`);
       } else {
-        console.log('🔐 OAUTH - OAuth already linked');
+        console.log(`🔐 OAUTH [${provider.toUpperCase()}] - OAuth already linked`);
       }
     } else {
       // Create new user
-      console.log('🔐 OAUTH - Creating new OAuth user');
+      console.log(`🔐 OAUTH [${provider.toUpperCase()}] - Creating new OAuth user`);
       const dbStart2 = Date.now();
       user = await prisma.user.create({
         data: {
-          email: googleUser.email,
-          name: googleUser.name,
-          avatarUrl: googleUser.picture,
-          oauthProvider: 'google',
-          oauthId: googleUser.sub,
+          email: oauthUser.email,
+          name: oauthUser.name,
+          avatarUrl: oauthUser.picture,
+          oauthProvider: provider,
+          oauthId: oauthUser.sub,
           password: null, // No password for OAuth users
           role: 'USER',
         }
@@ -396,7 +399,7 @@ export class AuthService {
       console.log(`⏱️ DB QUERY (create OAuth user): ${Date.now() - dbStart2}ms`);
     }
 
-    console.log(`✅ OAUTH - User found/created in ${Date.now() - startTime}ms`);
+    console.log(`✅ OAUTH [${provider.toUpperCase()}] - User found/created in ${Date.now() - startTime}ms`);
     return user;
   }
 

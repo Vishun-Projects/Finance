@@ -1,11 +1,69 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFile, mkdir } from 'fs/promises';
+import { writeFile, mkdir, unlink } from 'fs/promises';
 import { join } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { tmpdir } from 'os';
 
 const execAsync = promisify(exec);
+
+// Dynamic import for Node.js parser fallback (PDF only)
+const parsePDFWithNode = async (filePath: string, bankHint?: string) => {
+  try {
+    const { parsePDFWithNode: parser } = await import('@/lib/parsers/node-pdf-parser');
+    return await parser(filePath, bankHint);
+  } catch (error) {
+    console.error('Failed to load Node.js parser:', error);
+    return { success: false, transactions: [], count: 0, metadata: {} };
+  }
+};
+
+/**
+ * Try to call Python serverless function for bank statement parsing
+ */
+async function tryPythonParser(fileBuffer: Buffer, fileType: string, bankType: string | null): Promise<{ success: boolean; data?: any; error?: string }> {
+  try {
+    // Determine base URL for Python function
+    let baseUrl: string;
+    if (process.env.VERCEL_URL) {
+      baseUrl = `https://${process.env.VERCEL_URL}`;
+    } else if (process.env.VERCEL) {
+      baseUrl = `https://${process.env.VERCEL_URL}`;
+    } else {
+      baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    }
+    
+    const pythonFunctionUrl = `${baseUrl}/api/parse-bank-statement-python`;
+    
+    const fileBase64 = fileBuffer.toString('base64');
+    
+    const response = await fetch(pythonFunctionUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        file_data: fileBase64,
+        file_type: fileType,
+        bankType: bankType || '',
+      }),
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      return { success: true, data };
+    } else {
+      const errorText = await response.text();
+      return { success: false, error: errorText };
+    }
+  } catch (error) {
+    console.log('⚠️ Parse Bank Statement API: Python function call failed, will try fallback:', error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Unknown error' 
+    };
+  }
+}
 
 export async function POST(request: NextRequest) {
   console.log('🏦 Parse Bank Statement API: Starting request processing');
@@ -82,6 +140,36 @@ export async function POST(request: NextRequest) {
     await writeFile(filepath, buffer);
     console.log('✅ Parse Bank Statement API: File saved successfully');
 
+    // Strategy 1: Try Python serverless function first (production)
+    try {
+      console.log('🐍 Parse Bank Statement API: Attempting Python serverless function...');
+      const pythonResult = await tryPythonParser(buffer, fileType, bankType);
+      
+      if (pythonResult.success && pythonResult.data) {
+        console.log('✅ Parse Bank Statement API: Python parser succeeded');
+        const result = pythonResult.data;
+        
+        // Clean up file
+        try {
+          await unlink(filepath);
+        } catch {}
+        
+        return NextResponse.json({
+          success: result.success || true,
+          transactions: result.transactions || [],
+          count: result.count || 0,
+          bankType: result.bankType || bankType || 'UNKNOWN',
+          metadata: result.metadata || {},
+          message: result.message || `Successfully parsed ${result.count || 0} transactions from ${result.bankType || bankType || 'UNKNOWN'} statement`,
+        });
+      } else {
+        console.log('⚠️ Parse Bank Statement API: Python parser failed, trying local Python execution...');
+      }
+    } catch (error) {
+      console.log('⚠️ Parse Bank Statement API: Python function error, trying fallback:', error);
+    }
+
+    // Strategy 2: Try local Python execution (development/local)
     try {
       const csvOutput = join(uploadsDir, `extracted_${Date.now()}.csv`);
       const jsonOutput = join(uploadsDir, `extracted_${Date.now()}.json`);
@@ -343,10 +431,50 @@ if __name__ == "__main__":
       });
 
     } catch (error) {
-      console.error('❌ Parse Bank Statement API: Parsing error:', error);
+      console.error('❌ Parse Bank Statement API: Local Python execution failed:', error);
+      
+      // Strategy 3: Fallback to Node.js parser (PDF only)
+      if (fileType === '.pdf') {
+        try {
+          console.log('📄 Parse Bank Statement API: Attempting Node.js fallback parser...');
+          const nodeResult = await parsePDFWithNode(filepath, bankType || undefined);
+          
+          if (nodeResult.success && nodeResult.transactions.length > 0) {
+            console.log(`✅ Parse Bank Statement API: Node.js parser succeeded with ${nodeResult.transactions.length} transactions`);
+            
+            // Clean up file
+            try {
+              await unlink(filepath);
+            } catch {}
+            
+            return NextResponse.json({
+              success: true,
+              transactions: nodeResult.transactions,
+              count: nodeResult.count,
+              bankType: bankType || 'UNKNOWN',
+              metadata: nodeResult.metadata || {},
+              warning: 'Parsed using fallback parser. Results may be less accurate than Python parser.',
+            });
+          } else {
+            console.log('⚠️ Parse Bank Statement API: Node.js parser found no transactions');
+          }
+        } catch (nodeError) {
+          console.error('❌ Parse Bank Statement API: Node.js parser also failed:', nodeError);
+        }
+      }
+      
+      // Clean up files on error
+      try {
+        await unlink(filepath);
+      } catch {}
+      
+      console.error('❌ Parse Bank Statement API: All parsing methods failed');
       return NextResponse.json({ 
-        error: 'Failed to parse bank statement. Please ensure it contains valid transaction data.',
-        details: error instanceof Error ? error.message : 'Unknown error'
+        error: 'Failed to parse bank statement. Please ensure it contains valid transaction data. All parsing methods failed.',
+        details: error instanceof Error ? error.message : 'Unknown error',
+        suggestion: fileType === '.pdf' 
+          ? 'For PDF files, try uploading a different bank statement format or ensure the file is not corrupted.'
+          : 'Please ensure the Excel file format is correct and contains transaction data.'
       }, { status: 500 });
     }
 

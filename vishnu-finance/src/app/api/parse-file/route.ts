@@ -7,6 +7,52 @@ import { tmpdir } from 'os';
 
 const execAsync = promisify(exec);
 
+/**
+ * Try to call Python serverless function for multi-format file parsing
+ */
+async function tryPythonParser(fileBuffer: Buffer, fileType: string): Promise<{ success: boolean; data?: any; error?: string }> {
+  try {
+    // Determine base URL for Python function
+    let baseUrl: string;
+    if (process.env.VERCEL_URL) {
+      baseUrl = `https://${process.env.VERCEL_URL}`;
+    } else if (process.env.VERCEL) {
+      baseUrl = `https://${process.env.VERCEL_URL}`;
+    } else {
+      baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    }
+    
+    const pythonFunctionUrl = `${baseUrl}/api/parse-file-python`;
+    
+    const fileBase64 = fileBuffer.toString('base64');
+    
+    const response = await fetch(pythonFunctionUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        file_data: fileBase64,
+        file_type: fileType,
+      }),
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      return { success: true, data };
+    } else {
+      const errorText = await response.text();
+      return { success: false, error: errorText };
+    }
+  } catch (error) {
+    console.log('⚠️ Multi-Format API: Python function call failed, will try fallback:', error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Unknown error' 
+    };
+  }
+}
+
 export async function POST(request: NextRequest) {
   console.log('🔍 Multi-Format API: Starting request processing');
   
@@ -68,6 +114,35 @@ export async function POST(request: NextRequest) {
     await writeFile(filepath, buffer);
     console.log('✅ Multi-Format API: File saved successfully');
 
+    // Strategy 1: Try Python serverless function first (production)
+    try {
+      console.log('🐍 Multi-Format API: Attempting Python serverless function...');
+      const pythonResult = await tryPythonParser(buffer, fileType);
+      
+      if (pythonResult.success && pythonResult.data) {
+        console.log('✅ Multi-Format API: Python parser succeeded');
+        const result = pythonResult.data;
+        
+        // Clean up file
+        try {
+          await unlink(filepath);
+        } catch {}
+        
+        return NextResponse.json({
+          success: result.success || true,
+          transactions: result.transactions || [],
+          count: result.count || 0,
+          fileType: result.fileType || fileType.toUpperCase().replace('.', ''),
+          message: result.message || `Successfully parsed ${result.count || 0} transactions from ${fileType.toUpperCase()} file`,
+        });
+      } else {
+        console.log('⚠️ Multi-Format API: Python parser failed, trying local Python execution...');
+      }
+    } catch (error) {
+      console.log('⚠️ Multi-Format API: Python function error, trying fallback:', error);
+    }
+
+    // Strategy 2: Try local Python execution (development/local)
     try {
       // Create a temporary Python script using the multi-format parser
       const csvOutput = join(uploadsDir, `extracted_${Date.now()}.csv`);
@@ -305,15 +380,21 @@ if __name__ == "__main__":
       });
 
     } catch (error) {
-      // Clean up files on error
+      console.error('❌ Multi-Format API: Local Python execution failed:', error);
+      
+      // Strategy 3: For non-PDF files, we don't have a Node.js fallback yet
+      // Return error with helpful message
       try {
         await unlink(filepath);
       } catch {}
       
-      console.error('❌ Multi-Format API: File parsing error:', error);
+      console.error('❌ Multi-Format API: All parsing methods failed');
       return NextResponse.json({ 
-        error: `Failed to parse ${fileType.toUpperCase()} file. Please ensure it contains valid transaction data.`,
-        details: error instanceof Error ? error.message : 'Unknown error'
+        error: `Failed to parse ${fileType.toUpperCase()} file. Please ensure it contains valid transaction data. All parsing methods (Python serverless and local Python) failed.`,
+        details: error instanceof Error ? error.message : 'Unknown error',
+        suggestion: fileType === '.pdf' 
+          ? 'For PDF files, try uploading a different bank statement format.'
+          : 'Please ensure the file format is correct and contains transaction data.'
       }, { status: 500 });
     }
 

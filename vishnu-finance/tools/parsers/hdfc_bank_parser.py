@@ -343,21 +343,48 @@ class HDFCBankParser(BaseBankParser):
         Returns:
             Dictionary of metadata
         """
-        metadata = {}
+        # Normalize text first to fix spacing issues
+        description = self.normalize_text(description)
+        
+        metadata = {
+            'transactionId': None,
+            'personName': None,
+            'accountNumber': None,
+            'transferType': None,
+            'upiId': None
+        }
+        
+        # HDFC Bank pattern: HDFC0002504/MAMTA - INR 60.00 MUNSHEELAL VISHWAKARMA
+        hdfc_match = re.search(r'([A-Z]{4}\d+)/([A-Z\s]+?)(?:\s*-\s*INR|\s+INR)', description, re.IGNORECASE)
+        if hdfc_match:
+            metadata['transferType'] = 'UPI'
+            person_name = hdfc_match.group(2).strip()
+            # Extract full name if available: MAMTA MUNSHEELAL VISHWAKARMA
+            full_name_match = re.search(r'([A-Z\s]+?)(?:\s+INR|\s*-\s*INR|$)', description, re.IGNORECASE)
+            if full_name_match:
+                full_name = full_name_match.group(1).strip()
+                if len(full_name) > len(person_name):
+                    person_name = full_name
+            metadata['personName'] = person_name
+            # Extract UPI ID if present later in description
+            upi_match = re.search(r'([a-z0-9]+@[a-z0-9.]+)', description, re.IGNORECASE)
+            if upi_match:
+                metadata['upiId'] = upi_match.group(1)
         
         # Extract UPI ID
         upi_match = re.search(r'UPI-([A-Z0-9@]+)', description)
-        if upi_match:
-            metadata['upi_id'] = upi_match.group(1)
+        if upi_match and not metadata['upiId']:
+            metadata['upiId'] = upi_match.group(1)
+            metadata['transferType'] = 'UPI'
         
         # Extract IFSC code
         ifsc_match = re.search(r'([A-Z]{4}0[A-Z0-9]{6})', description)
         if ifsc_match:
-            metadata['ifsc'] = ifsc_match.group(1)
+            metadata['accountNumber'] = ifsc_match.group(1)
         
         # Extract transaction ID
         txn_id_match = re.search(r'(\d{13,})', description)
-        if txn_id_match:
-            metadata['transaction_id'] = txn_id_match.group(1)
+        if txn_id_match and not metadata['transactionId']:
+            metadata['transactionId'] = txn_id_match.group(1)
         
         return metadata

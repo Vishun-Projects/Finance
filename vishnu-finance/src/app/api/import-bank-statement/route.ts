@@ -38,6 +38,12 @@ interface ImportRecord {
   raw?: string; // Original raw transaction text from PDF/Excel
   rawData?: string; // Deprecated - use raw instead
   balance?: number | string;
+  // Data quality fields
+  isPartialData?: boolean;
+  hasInvalidDate?: boolean;
+  hasZeroAmount?: boolean;
+  parsingMethod?: string;
+  parsingConfidence?: number;
 }
 
 export async function POST(request: NextRequest) {
@@ -45,7 +51,7 @@ export async function POST(request: NextRequest) {
   
   try {
     const body = await request.json();
-    const { userId, records, metadata, document, useAICategorization = true, validateBalance = true } = body as { 
+    const { userId, records, metadata, document, useAICategorization = true, validateBalance = true, categorizeInBackground = false, forceInsert = false } = body as { 
       userId: string; 
       records: ImportRecord[];
       metadata?: StatementMetadata;
@@ -58,7 +64,12 @@ export async function POST(request: NextRequest) {
       };
       useAICategorization?: boolean;
       validateBalance?: boolean;
+      categorizeInBackground?: boolean; // If true, skip categorization during import and do it in background
+      forceInsert?: boolean; // Skip duplicate check and force insert
     };
+    
+    // Log categorization settings
+    console.log(`📋 Categorization settings: useAICategorization=${useAICategorization}, categorizeInBackground=${categorizeInBackground}, records=${records.length}`);
 
     if (!userId || !Array.isArray(records)) {
       return NextResponse.json(
@@ -236,13 +247,46 @@ export async function POST(request: NextRequest) {
       }
     };
 
+    // Get statement date range from metadata for date inference
+    const statementStartDate = metadata?.statementStartDate ? new Date(metadata.statementStartDate) : null;
+    let lastValidDate: Date | null = null;
+
     // Normalize records with bank-specific fields and convert to credit/debit format
+    // LENIENT FILTERING: Store transactions with partial data instead of filtering them
     const normalized = records
-      .map((r) => {
+      .map((r, idx) => {
         // CRITICAL: Use date_iso if available (correctly parsed by strict DD/MM/YYYY parser)
         // Only fall back to date if date_iso is missing
         const dateInput = (r.date_iso || r.date) as string | Date | null | undefined;
-        const parsedDate = parseDate(dateInput);
+        let parsedDate = parseDate(dateInput);
+        let hasInvalidDate = false;
+        
+        // If date parsing failed, try to infer from context
+        if (!parsedDate || isNaN(parsedDate.getTime())) {
+          // Try to infer from previous transaction date
+          if (lastValidDate) {
+            parsedDate = new Date(lastValidDate);
+            hasInvalidDate = true;
+            console.warn(`⚠️ [${idx}] Date inference: using previous transaction date for missing/invalid date`);
+          } 
+          // Try to infer from statement date range
+          else if (statementStartDate) {
+            parsedDate = new Date(statementStartDate);
+            hasInvalidDate = true;
+            console.warn(`⚠️ [${idx}] Date inference: using statement start date for missing/invalid date`);
+          }
+          // Last resort: use current date (but flag it)
+          else {
+            parsedDate = new Date();
+            hasInvalidDate = true;
+            console.warn(`⚠️ [${idx}] Date inference: using current date as last resort for missing/invalid date`);
+          }
+        }
+        
+        // Update last valid date for next transaction
+        if (parsedDate && !isNaN(parsedDate.getTime())) {
+          lastValidDate = parsedDate;
+        }
         
         // Determine credit and debit amounts
         // CRITICAL: Ensure amounts are never negative - debitAmount and creditAmount must be >= 0
@@ -276,6 +320,9 @@ export async function POST(request: NextRequest) {
         debitAmount = Math.max(0, debitAmount);
         creditAmount = Math.max(0, creditAmount);
         
+        // Check if amount is zero
+        const hasZeroAmount = debitAmount === 0 && creditAmount === 0;
+        
         // Determine financial category (default based on debit/credit)
         let financialCategory: 'INCOME' | 'EXPENSE' | 'TRANSFER' | 'INVESTMENT' | 'OTHER' = 'EXPENSE';
         if (creditAmount > 0) {
@@ -303,9 +350,23 @@ export async function POST(request: NextRequest) {
           financialCategory = 'TRANSFER';
         }
         
+        // Handle missing description - use raw data or fallback
+        let description = (r.title || r.description || '').toString().trim();
+        const isPartialData = !description || hasZeroAmount || hasInvalidDate;
+        
+        if (!description) {
+          // Try to use raw data
+          description = (r.raw || r.rawData || '').toString().trim();
+          if (!description) {
+            // Last resort: use a generic description
+            description = 'Uncategorized Transaction';
+            console.warn(`⚠️ [${idx}] Missing description: using fallback "Uncategorized Transaction"`);
+          }
+        }
+        
         return {
-          description: (r.title || r.description || '').toString().trim(),
-          transactionDate: parsedDate,
+          description: description,
+          transactionDate: parsedDate!,
           creditAmount: creditAmount,
           debitAmount: debitAmount,
           financialCategory: financialCategory,
@@ -323,24 +384,38 @@ export async function POST(request: NextRequest) {
           balance: r.balance ? Number(r.balance) : null,
           // Save original raw transaction text from PDF/Excel
           rawData: r.raw || r.rawData || null,
+          // Data quality flags
+          isPartialData: isPartialData,
+          hasInvalidDate: hasInvalidDate,
+          hasZeroAmount: hasZeroAmount,
+          parsingMethod: r.parsingMethod || 'standard',
+          parsingConfidence: r.parsingConfidence || (isPartialData ? 0.5 : 1.0),
         };
       })
-      .filter((r) => {
-        // Log filtered transactions for debugging
-        if (!r.description) {
-          console.warn(`⚠️ Filtered transaction: missing description`);
-          return false;
-        }
-        if (r.creditAmount === 0 && r.debitAmount === 0) {
-          console.warn(`⚠️ Filtered transaction: zero amount - ${r.description.substring(0, 50)}`);
-          return false;
-        }
+      .filter((r, idx) => {
+        // LENIENT FILTERING: Only filter truly invalid records (completely empty)
+        // All other records are kept with appropriate flags
+        
+        // Only reject if transaction date is still invalid after inference attempts
         if (!r.transactionDate || isNaN(r.transactionDate.getTime())) {
-          console.warn(`⚠️ Filtered transaction: invalid date - ${r.description.substring(0, 50)}`);
+          console.warn(`⚠️ [${idx}] Filtered: completely invalid date after all inference attempts`);
           return false;
         }
+        
+        // Log partial data transactions but keep them
+        if (r.isPartialData) {
+          console.log(`ℹ️ [${idx}] Partial data transaction kept: hasInvalidDate=${r.hasInvalidDate}, hasZeroAmount=${r.hasZeroAmount}, missingDescription=${!r.description || r.description === 'Uncategorized Transaction'}`);
+        }
+        
         return true;
       });
+    
+    // Log normalization statistics
+    const normalizedCount = normalized.length;
+    const filteredCount = records.length - normalizedCount;
+    if (filteredCount > 0) {
+      console.log(`📊 Normalization: ${records.length} records → ${normalizedCount} valid (${filteredCount} filtered)`);
+    }
 
     // Apply entity mappings before saving to database
     if (userId && normalized.length > 0) {
@@ -388,9 +463,20 @@ export async function POST(request: NextRequest) {
     }
 
     // BATCH CATEGORIZATION BEFORE IMPORT (ensures consistency)
-    // Categorize entire batch at once to ensure same person/merchant gets same category
+    // Determine if we should use background categorization early
+    // ALWAYS trigger background categorization if:
+    // 1. categorizeInBackground is explicitly true, OR
+    // 2. normalized.length > 100 transactions (large import), OR
+    // 3. useAICategorization is true and normalized.length > 50 (any import with AI enabled and > 50 transactions)
+    // This ensures categorization happens for both small and large imports
+    const shouldUseBackground = categorizeInBackground || 
+                                 (normalized.length > 100 && useAICategorization) ||
+                                 (normalized.length > 50 && useAICategorization);
+    
+    // BATCH CATEGORIZATION BEFORE IMPORT (ensures consistency)
+    // Skip if background mode is enabled
     let categorizedCount = 0;
-    if (useAICategorization && userId && normalized.length > 0) {
+    if (useAICategorization && !shouldUseBackground && userId && normalized.length > 0) {
       try {
         console.log(`🤖 Starting batch categorization for ${normalized.length} transactions...`);
         
@@ -433,21 +519,56 @@ export async function POST(request: NextRequest) {
         
         // Prepare transactions for categorization
         const transactionsToCategorize = normalized
-          .filter(r => r.transactionDate !== null && !isNaN(r.transactionDate.getTime()))
-          .map(r => ({
-            description: r.description,
-            store: r.store,
-            commodity: r.notes, // Commodity is in notes field
-            amount: r.creditAmount > 0 ? r.creditAmount : r.debitAmount,
-            date: r.transactionDate!.toISOString().split('T')[0],
-            financialCategory: r.financialCategory,
-            personName: r.personName,
-            upiId: r.upiId,
-            accountHolderName: metadata?.accountHolderName || null,
-          }));
+          .filter((r): r is typeof r & { transactionDate: Date | string } => {
+            if (!r.transactionDate) return false;
+            // Handle both Date objects and strings
+            if (r.transactionDate instanceof Date) {
+              return !isNaN(r.transactionDate.getTime());
+            }
+            // If it's a string, try to parse it
+            const date = new Date(r.transactionDate);
+            return !isNaN(date.getTime());
+          })
+          .map(r => {
+            // Safely convert transactionDate to ISO string
+            let dateStr = '';
+            const txDate = r.transactionDate;
+            if (txDate instanceof Date) {
+              dateStr = txDate.toISOString().split('T')[0];
+            } else {
+              // Handle string or other types
+              const dateStrValue = String(txDate);
+              if (dateStrValue && dateStrValue.length >= 10) {
+                dateStr = dateStrValue.split('T')[0].substring(0, 10);
+              } else {
+                const date = new Date(txDate as string | number | Date);
+                if (!isNaN(date.getTime())) {
+                  dateStr = date.toISOString().split('T')[0];
+                }
+              }
+            }
+            
+            return {
+              description: r.description,
+              store: r.store,
+              commodity: r.notes, // Commodity is in notes field
+              amount: r.creditAmount > 0 ? r.creditAmount : r.debitAmount,
+              date: dateStr || new Date().toISOString().split('T')[0], // Fallback to today
+              financialCategory: r.financialCategory,
+              personName: r.personName,
+              upiId: r.upiId,
+              accountHolderName: metadata?.accountHolderName || null,
+            };
+          });
 
         // Categorize entire batch at once (ensures consistency)
+        console.log(`🤖 Categorizing ${transactionsToCategorize.length} transactions...`);
         const categorizationResults = await categorizeTransactions(userId, transactionsToCategorize);
+        
+        // Log categorization results
+        const foundWithId = categorizationResults.filter(r => r.categoryId).length;
+        const foundWithName = categorizationResults.filter(r => r.categoryName && !r.categoryId).length;
+        console.log(`📊 Categorization results: ${foundWithId} with ID, ${foundWithName} with name only, ${categorizationResults.length - foundWithId - foundWithName} uncategorized`);
         
         // Apply categories to normalized records
         for (let i = 0; i < normalized.length; i++) {
@@ -480,16 +601,22 @@ export async function POST(request: NextRequest) {
                   if (finalCategoryId) break;
                 }
               }
+              
+              if (!finalCategoryId) {
+                console.warn(`⚠️ Category name "${result.categoryName}" not found in database for transaction ${i}`);
+              }
             }
             
             if (finalCategoryId) {
               (normalized[i] as any).categoryId = finalCategoryId;
               categorizedCount++;
+            } else if (result.categoryName) {
+              console.warn(`⚠️ Failed to resolve category ID for "${result.categoryName}"`);
             }
           }
         }
-
-        console.log(`✅ Categorized ${categorizedCount}/${normalized.length} transactions`);
+        
+        console.log(`✅ Applied categories to ${categorizedCount}/${normalized.length} transactions`);
       } catch (error: any) {
         console.error('Error in batch categorization:', error);
         warnings.push(`AI categorization failed: ${error.message}. Continuing with import...`);
@@ -638,19 +765,34 @@ export async function POST(request: NextRequest) {
 
     // Deduplicate in-memory by (date, description, creditAmount, debitAmount)
     const seen = new Set<string>();
+    const duplicateKeys = new Set<string>();
+    let invalidDateCount = 0;
     const unique = normalized.filter((r) => {
-      if (!r.transactionDate || isNaN(r.transactionDate.getTime())) return false;
+      if (!r.transactionDate || isNaN(r.transactionDate.getTime())) {
+        invalidDateCount++;
+        return false;
+      }
       let dateStr = '';
       try {
         dateStr = r.transactionDate.toISOString().slice(0, 10);
       } catch {
-        dateStr = '';
+        invalidDateCount++;
+        return false;
       }
       const key = `${r.description}|${r.creditAmount}|${r.debitAmount}|${dateStr}`;
-      if (seen.has(key)) return false;
+      if (seen.has(key)) {
+        duplicateKeys.add(key);
+        return false;
+      }
       seen.add(key);
       return true;
     });
+    
+    // Log deduplication statistics
+    const duplicateCount = normalized.length - unique.length - invalidDateCount;
+    if (duplicateCount > 0 || invalidDateCount > 0) {
+      console.log(`📊 Deduplication: ${normalized.length} normalized → ${unique.length} unique (${duplicateCount} duplicates in file, ${invalidDateCount} invalid dates)`);
+    }
 
     let inserted = 0;
     let duplicates = 0;
@@ -670,72 +812,116 @@ export async function POST(request: NextRequest) {
       return { min, max };
     };
 
-    // Check for existing transactions
+    // Check for existing transactions (skip if forceInsert is true)
     const range = rangeFor(unique);
     let existing: any[] = [];
-    try {
-      // Check if transaction table exists
-      await (prisma as any).$queryRaw`SELECT 1 FROM transactions LIMIT 1`;
-      
-      // IMPORTANT: Use a wider date range to catch all potential duplicates
-      // Add 30 days buffer on each side to catch transactions that might have slight date variations
-      const expandedRange = range ? {
-        gte: new Date(range.min.getTime() - 30 * 24 * 60 * 60 * 1000), // 30 days before
-        lte: new Date(range.max.getTime() + 30 * 24 * 60 * 60 * 1000), // 30 days after
-      } : undefined;
-      
-      existing = await (prisma as any).transaction.findMany({
-        where: {
-          userId,
-          isDeleted: false,
-          ...(expandedRange ? { transactionDate: expandedRange } : {}),
-        },
-        select: { 
-          id: true, 
-          description: true, 
-          creditAmount: true, 
-          debitAmount: true, 
-          transactionDate: true 
-        },
-      });
-      
-      console.log(`🔍 Found ${existing.length} existing transactions in date range for deduplication`);
-    } catch (error: any) {
-      // Transaction table doesn't exist yet, skip deduplication
-      console.log('⚠️ Transaction table not available, skipping deduplication check', error);
-      existing = [];
-    }
+    let existingSet = new Set<string>();
     
-    // Build deduplication key for existing records
-    const existingSet = new Set(
-      existing.map((e: any) => {
-        try {
-          const date = new Date(e.transactionDate);
-          if (isNaN(date.getTime())) return null;
-          const desc = (e.description || '').substring(0, 50); // Match MySQL index prefix
-          return `${e.userId}|${desc}|${Number(e.creditAmount)}|${Number(e.debitAmount)}|${date.toISOString().slice(0,10)}|${e.isDeleted || false}`;
-        } catch {
-          return null;
+    if (!forceInsert) {
+      try {
+        // Check if transaction table exists
+        await (prisma as any).$queryRaw`SELECT 1 FROM transactions LIMIT 1`;
+        
+        // First, check if DB is actually empty (quick count check)
+        const totalCount = await (prisma as any).transaction.count({
+          where: { userId, isDeleted: false },
+        });
+        
+        if (totalCount === 0) {
+          console.log('✅ Database is empty for this user, skipping duplicate check');
+        } else {
+          // IMPORTANT: Use a wider date range to catch all potential duplicates
+          // Add 30 days buffer on each side to catch transactions that might have slight date variations
+          const expandedRange = range ? {
+            gte: new Date(range.min.getTime() - 30 * 24 * 60 * 60 * 1000), // 30 days before
+            lte: new Date(range.max.getTime() + 30 * 24 * 60 * 60 * 1000), // 30 days after
+          } : undefined;
+          
+          existing = await (prisma as any).transaction.findMany({
+            where: {
+              userId,
+              isDeleted: false,
+              ...(expandedRange ? { transactionDate: expandedRange } : {}),
+            },
+            select: { 
+              id: true, 
+              description: true, 
+              creditAmount: true, 
+              debitAmount: true, 
+              transactionDate: true,
+              transactionId: true,
+              accountNumber: true,
+            },
+          });
+          
+          console.log(`🔍 Found ${existing.length} existing transactions in date range for deduplication (total in DB: ${totalCount})`);
+          
+          // Build deduplication key for existing records
+          // Improved key: includes transactionId and accountNumber if available for better accuracy
+          existingSet = new Set(
+            existing.map((e: any) => {
+              try {
+                const date = new Date(e.transactionDate);
+                if (isNaN(date.getTime())) return null;
+                const desc = (e.description || '').substring(0, 50); // Match MySQL index prefix
+                const txnId = (e.transactionId || '').trim();
+                const accNum = (e.accountNumber || '').trim();
+                // Include transactionId and accountNumber if available for more accurate matching
+                const key = `${userId}|${desc}|${Number(e.creditAmount)}|${Number(e.debitAmount)}|${date.toISOString().slice(0,10)}|${txnId}|${accNum}|${e.isDeleted || false}`;
+                return key;
+              } catch {
+                return null;
+              }
+            }).filter((k: string | null): k is string => k !== null)
+          );
         }
-      }).filter((k: string | null): k is string => k !== null)
-    );
+      } catch (error: any) {
+        // Transaction table doesn't exist yet, skip deduplication
+        console.log('⚠️ Transaction table not available, skipping deduplication check', error);
+        existing = [];
+      }
+    } else {
+      console.log('⚡ Force insert mode: Skipping duplicate check');
+    }
     
     // Filter out duplicates before insertion (in-memory check)
     // Note: This helps but database constraint is the ultimate protection against race conditions
     const toInsert = unique.filter(r => {
       if (!r.transactionDate || isNaN(r.transactionDate.getTime())) return false;
+      
+      if (forceInsert) {
+        // Force insert mode: skip duplicate check
+        return true;
+      }
+      
       try {
         const desc = (r.description || '').substring(0, 50);
-        const key = `${userId}|${desc}|${r.creditAmount}|${r.debitAmount}|${r.transactionDate.toISOString().slice(0,10)}|false`;
-        return !existingSet.has(key);
+        const txnId = (r.transactionId || '').trim();
+        const accNum = (r.accountNumber || '').trim();
+        // Improved key: includes transactionId and accountNumber if available
+        const key = `${userId}|${desc}|${r.creditAmount}|${r.debitAmount}|${r.transactionDate.toISOString().slice(0,10)}|${txnId}|${accNum}|false`;
+        
+        const isDuplicate = existingSet.has(key);
+        if (isDuplicate) {
+          console.log(`🔍 Duplicate detected: ${desc.substring(0, 30)}... (${r.transactionDate.toISOString().slice(0,10)}, ${r.creditAmount > 0 ? `+${r.creditAmount}` : `-${r.debitAmount}`})`);
+        }
+        return !isDuplicate;
       } catch {
         return false;
       }
     });
     
-    duplicates += unique.length - toInsert.length;
+    const existingDuplicates = unique.length - toInsert.length;
+    duplicates += existingDuplicates;
     
-    console.log(`📊 Import summary: ${unique.length} unique transactions, ${toInsert.length} to insert, ${duplicates} duplicates`);
+    console.log(`📊 Import summary: ${records.length} total records → ${normalized.length} normalized → ${unique.length} unique → ${toInsert.length} to insert`);
+    console.log(`📊 Breakdown: ${records.length - normalized.length} filtered during normalization, ${normalized.length - unique.length} duplicates/invalid in file, ${existingDuplicates} existing in DB`);
+    
+    // If significant number of records lost, log warning
+    const totalLost = records.length - toInsert.length;
+    if (totalLost > 0 && totalLost > records.length * 0.1) {
+      console.warn(`⚠️ WARNING: ${totalLost} out of ${records.length} records were not inserted (${Math.round(totalLost / records.length * 100)}%)`);
+    }
     
     if (toInsert.length) {
       // Check if Transaction table exists before inserting
@@ -751,137 +937,80 @@ export async function POST(request: NextRequest) {
         }, { status: 400 });
       }
       
+      // Optimize batch size based on total count
+      // Larger batches = fewer round trips = faster imports
+      const batchSize = toInsert.length > 5000 ? 2000 : toInsert.length > 1000 ? 1000 : 500;
       const chunks: typeof toInsert[] = [];
-      for (let i = 0; i < toInsert.length; i += 500) {
-        chunks.push(toInsert.slice(i, i + 500));
+      for (let i = 0; i < toInsert.length; i += batchSize) {
+        chunks.push(toInsert.slice(i, i + batchSize));
       }
       
-      // Use database transaction to prevent race conditions
-      for (const chunk of chunks) {
-        // Process each chunk in a database transaction for atomicity
+      console.log(`📦 Processing ${toInsert.length} transactions in ${chunks.length} batches of ${batchSize}`);
+      
+      // Process batches with controlled parallelism for optimal performance
+      const CONCURRENT_BATCHES = 5; // Process 5 batches in parallel (optimized for MySQL)
+      
+      const processBatch = async (chunk: typeof toInsert, batchNum: number): Promise<{ inserted: number; credit: number; debit: number }> => {
         try {
-          await (prisma as any).$transaction(async (tx: any) => {
-            // Build data for insertion
-            const data = chunk.map(r => ({
-              userId,
-              transactionDate: r.transactionDate,
-              description: r.description,
-              creditAmount: r.creditAmount,
-              debitAmount: r.debitAmount,
-              financialCategory: r.financialCategory,
-              categoryId: (r as any).categoryId || null, // Use categorized categoryId if available
-              accountStatementId: accountStatement?.id || null,
-              notes: formatNotes(r),
-              // Bank-specific fields
-              bankCode: r.bankCode || null,
-              transactionId: r.transactionId || null,
-              accountNumber: r.accountNumber || null,
-              transferType: r.transferType || null,
-              personName: r.personName || null,
-              upiId: r.upiId || null,
-              branch: r.branch || null,
-              store: r.store || null,
-              balance: r.balance || null,
-              rawData: r.rawData || null,
-              documentId: documentRecord?.id || null,
-              receiptUrl: documentRecord
-                ? `/api/user/documents/${documentRecord.id}/download`
-                : null,
-            }));
-
-            // BULK INSERT: Use createMany for speed (much faster than one-by-one)
-            let chunkInserted = 0;
-            let chunkDuplicates = 0;
+          // Use raw SQL INSERT IGNORE for maximum performance (fastest method)
+          const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+          const values = chunk.map((r, idx) => {
+            // Generate unique ID
+            const id = `'${Date.now()}_${batchNum}_${idx}_${Math.random().toString(36).substr(2, 9)}'`;
+            if (!r.transactionDate) throw new Error('Transaction date is required');
+            const date = `'${r.transactionDate.toISOString().split('T')[0]}'`;
+            const desc = (r.description || '').replace(/'/g, "''").replace(/\\/g, '\\\\').substring(0, 500);
+            const credit = r.creditAmount || 0;
+            const debit = r.debitAmount || 0;
+            const categoryId = (r as any).categoryId ? `'${String((r as any).categoryId).replace(/'/g, "''")}'` : 'NULL';
+            const notes = formatNotes(r) ? `'${formatNotes(r).replace(/'/g, "''").replace(/\\/g, '\\\\').substring(0, 2000)}'` : 'NULL';
+            const personName = r.personName ? `'${(r.personName || '').replace(/'/g, "''").replace(/\\/g, '\\\\').substring(0, 200)}'` : 'NULL';
+            const store = r.store ? `'${(r.store || '').replace(/'/g, "''").replace(/\\/g, '\\\\').substring(0, 200)}'` : 'NULL';
+            const rawData = r.rawData ? `'${(r.rawData || '').replace(/'/g, "''").replace(/\\/g, '\\\\').substring(0, 5000)}'` : 'NULL';
+            const bankCode = r.bankCode ? `'${(r.bankCode || '').replace(/'/g, "''")}'` : 'NULL';
+            const transactionId = r.transactionId ? `'${(r.transactionId || '').replace(/'/g, "''")}'` : 'NULL';
+            const accountNumber = r.accountNumber ? `'${(r.accountNumber || '').replace(/'/g, "''")}'` : 'NULL';
+            const transferType = r.transferType ? `'${(r.transferType || '').replace(/'/g, "''")}'` : 'NULL';
+            const upiId = r.upiId ? `'${(r.upiId || '').replace(/'/g, "''")}'` : 'NULL';
+            const branch = r.branch ? `'${(r.branch || '').replace(/'/g, "''")}'` : 'NULL';
+            const balance = r.balance !== null && r.balance !== undefined ? Number(r.balance) : 'NULL';
+            const accountStatementId = accountStatement?.id ? `'${accountStatement.id}'` : 'NULL';
+            const receiptUrl = documentRecord ? `'${(`/api/user/documents/${documentRecord.id}/download`).replace(/'/g, "''")}'` : 'NULL';
+            const documentId = documentRecord?.id ? `'${documentRecord.id}'` : 'NULL';
+            // Data quality flags
+            const isPartialData = (r as any).isPartialData ? 1 : 0;
+            const hasInvalidDate = (r as any).hasInvalidDate ? 1 : 0;
+            const hasZeroAmount = (r as any).hasZeroAmount ? 1 : 0;
+            const parsingMethod = (r as any).parsingMethod ? `'${String((r as any).parsingMethod).replace(/'/g, "''")}'` : 'NULL';
+            const parsingConfidence = (r as any).parsingConfidence !== null && (r as any).parsingConfidence !== undefined ? Number((r as any).parsingConfidence) : 'NULL';
             
-            try {
-              // Try bulk insert first
-              const result = await tx.transaction.createMany({
-                data: data,
-                skipDuplicates: true, // Skip duplicates automatically
-              });
-              
-              chunkInserted = result.count;
-              chunkDuplicates = data.length - chunkInserted;
-              inserted += chunkInserted;
-              duplicates += chunkDuplicates;
-              
-              // Count credits and debits
-              for (const record of data) {
-                if (record.creditAmount > 0) creditInserted++;
-                if (record.debitAmount > 0) debitInserted++;
-              }
-            } catch (bulkError: any) {
-              // Fallback: If createMany fails, try raw SQL batch insert (fastest)
-              console.warn('⚠️ createMany failed, trying raw SQL batch insert:', bulkError.message);
-              
-              try {
-                // Use raw SQL for maximum performance (with proper escaping)
-                const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
-                const values = data.map((r, idx) => {
-                  // Generate cuid-like ID (simplified)
-                  const id = `'${Date.now()}_${idx}_${Math.random().toString(36).substr(2, 9)}'`;
-                  // transactionDate is guaranteed to be non-null since toInsert is filtered
-                  if (!r.transactionDate) throw new Error('Transaction date is required');
-                  const date = `'${r.transactionDate.toISOString().split('T')[0]}'`;
-                  const desc = (r.description || '').replace(/'/g, "''").replace(/\\/g, '\\\\');
-                  const credit = r.creditAmount || 0;
-                  const debit = r.debitAmount || 0;
-                  const categoryId = r.categoryId ? `'${r.categoryId}'` : 'NULL';
-                  const notes = r.notes ? `'${(r.notes || '').replace(/'/g, "''").replace(/\\/g, '\\\\')}'` : 'NULL';
-                  const personName = r.personName ? `'${(r.personName || '').replace(/'/g, "''").replace(/\\/g, '\\\\')}'` : 'NULL';
-                  const store = r.store ? `'${(r.store || '').replace(/'/g, "''").replace(/\\/g, '\\\\')}'` : 'NULL';
-                  const rawData = r.rawData ? `'${(r.rawData || '').replace(/'/g, "''").replace(/\\/g, '\\\\').substring(0, 5000)}'` : 'NULL';
-                  
-                  return `(${id},'${userId}',${date},'${desc}',${credit},${debit},'${r.financialCategory}',${categoryId},${r.accountStatementId ? `'${r.accountStatementId}'` : 'NULL'},${r.bankCode ? `'${r.bankCode}'` : 'NULL'},${r.transactionId ? `'${r.transactionId}'` : 'NULL'},${r.accountNumber ? `'${r.accountNumber}'` : 'NULL'},${r.transferType ? `'${r.transferType}'` : 'NULL'},${personName},${r.upiId ? `'${r.upiId}'` : 'NULL'},${r.branch ? `'${r.branch}'` : 'NULL'},${store},${rawData},${r.balance !== null && r.balance !== undefined ? r.balance : 'NULL'},${notes},${r.receiptUrl ? `'${r.receiptUrl}'` : 'NULL'},0,'${now}','${now}',${r.documentId ? `'${r.documentId}'` : 'NULL'})`;
-                }).join(',');
-                
-                // Batch insert with IGNORE for duplicates
-                // Note: INSERT IGNORE doesn't return count, so we need to check after
-                await tx.$executeRawUnsafe(`
-                  INSERT IGNORE INTO transactions 
-                  (id, userId, transactionDate, description, creditAmount, debitAmount, financialCategory, categoryId, accountStatementId, bankCode, transactionId, accountNumber, transferType, personName, upiId, branch, store, rawData, balance, notes, receiptUrl, isDeleted, createdAt, updatedAt, documentId)
-                  VALUES ${values}
-                `);
-                
-                // Count actual inserted by checking what was inserted (more accurate)
-                // Since INSERT IGNORE doesn't tell us count, we'll estimate based on unique constraint
-                // For now, assume all were inserted (duplicates will be caught by unique constraint)
-                chunkInserted = data.length;
-                inserted += chunkInserted;
-                
-                // Count credits and debits for all records (they were attempted to be inserted)
-                for (const record of data) {
-                  if (record.creditAmount > 0) creditInserted++;
-                  if (record.debitAmount > 0) debitInserted++;
-                }
-                
-                console.log(`✅ Raw SQL batch inserted ${chunkInserted} transactions (duplicates skipped by IGNORE)`);
-              } catch (sqlError: any) {
-                // Last resort: one-by-one (slow but reliable)
-                console.warn('⚠️ Batch insert failed, falling back to one-by-one:', sqlError.message);
-                let chunkInserted = 0;
-                for (const record of data) {
-                  try {
-                    await tx.transaction.create({ data: record });
-                    chunkInserted++;
-                    if (record.creditAmount > 0) creditInserted++;
-                    if (record.debitAmount > 0) debitInserted++;
-                  } catch (dupError: any) {
-                    if (dupError.code === 'P2002' || dupError.code === 1062) {
-                      duplicates++;
-                    }
-                  }
-                }
-                inserted += chunkInserted;
-              }
-            }
-          });
-        } catch (error: any) {
-          // If transaction fails entirely, try fallback: createMany with skipDuplicates
-          console.warn('⚠️ Transaction-level insert failed, trying batch insert with duplicate handling:', error.message);
+            return `(${id},'${userId}',${date},'${desc}',${credit},${debit},'${r.financialCategory}',${categoryId},${accountStatementId},${bankCode},${transactionId},${accountNumber},${transferType},${personName},${upiId},${branch},${store},${rawData},${balance},${notes},${receiptUrl},0,${isPartialData},${hasInvalidDate},${hasZeroAmount},${parsingMethod},${parsingConfidence},'${now}','${now}',${documentId})`;
+          }).join(',');
           
+          // Execute raw SQL INSERT IGNORE (fastest method, handles duplicates automatically)
+          await (prisma as any).$executeRawUnsafe(`
+            INSERT IGNORE INTO transactions 
+            (id, userId, transactionDate, description, creditAmount, debitAmount, financialCategory, categoryId, accountStatementId, bankCode, transactionId, accountNumber, transferType, personName, upiId, branch, store, rawData, balance, notes, receiptUrl, isDeleted, isPartialData, hasInvalidDate, hasZeroAmount, parsingMethod, parsingConfidence, createdAt, updatedAt, documentId)
+            VALUES ${values}
+          `);
+          
+          // Count credits and debits
+          let batchCredit = 0;
+          let batchDebit = 0;
+          for (const r of chunk) {
+            if (r.creditAmount > 0) batchCredit++;
+            if (r.debitAmount > 0) batchDebit++;
+          }
+          
+          return {
+            inserted: chunk.length, // INSERT IGNORE handles duplicates, so we count attempted
+            credit: batchCredit,
+            debit: batchDebit,
+          };
+        } catch (error: any) {
+          console.error(`❌ Batch ${batchNum} error:`, error.message);
+          // Fallback to Prisma createMany if raw SQL fails
           try {
-            // Fallback: Use createMany with individual error handling
             const data = chunk.map(r => ({
               userId,
               transactionDate: r.transactionDate,
@@ -889,7 +1018,7 @@ export async function POST(request: NextRequest) {
               creditAmount: r.creditAmount,
               debitAmount: r.debitAmount,
               financialCategory: r.financialCategory,
-              categoryId: (r as any).categoryId || null, // Use categorized categoryId if available
+              categoryId: (r as any).categoryId || null,
               accountStatementId: accountStatement?.id || null,
               notes: formatNotes(r),
               bankCode: r.bankCode || null,
@@ -903,42 +1032,77 @@ export async function POST(request: NextRequest) {
               balance: r.balance || null,
               rawData: r.rawData || null,
               documentId: documentRecord?.id || null,
-              receiptUrl: documentRecord
-                ? `/api/user/documents/${documentRecord.id}/download`
-                : null,
+              receiptUrl: documentRecord ? `/api/user/documents/${documentRecord.id}/download` : null,
+              // Data quality flags
+              isPartialData: (r as any).isPartialData || false,
+              hasInvalidDate: (r as any).hasInvalidDate || false,
+              hasZeroAmount: (r as any).hasZeroAmount || false,
+              parsingMethod: (r as any).parsingMethod || null,
+              parsingConfidence: (r as any).parsingConfidence || null,
             }));
-
-            // Insert individually to catch duplicates
-            let chunkInserted = 0;
-            const insertedRecords: typeof data = [];
-            for (const record of data) {
-              try {
-                await (prisma as any).transaction.create({ data: record });
-                chunkInserted++;
-                insertedRecords.push(record);
-              } catch (dupError: any) {
-                if (dupError.code === 'P2002' || dupError.code === 1062 || 
-                    (dupError.message && (dupError.message.includes('Duplicate') || dupError.message.includes('UNIQUE') || dupError.message.includes('Unique constraint')))) {
-                  duplicates++;
-                } else {
-                  console.error('❌ Insert error:', dupError);
-                  // Log the full error for debugging
-                  console.error('❌ Error details:', JSON.stringify(dupError, null, 2));
-                }
-              }
-            }
-            inserted += chunkInserted;
             
-            // Count credits and debits for successfully inserted records
-            for (const record of insertedRecords) {
-              if (record.creditAmount > 0) creditInserted++;
-              if (record.debitAmount > 0) debitInserted++;
+            const result = await (prisma as any).transaction.createMany({
+              data,
+              skipDuplicates: true,
+            });
+            
+            let batchCredit = 0;
+            let batchDebit = 0;
+            for (const r of chunk) {
+              if (r.creditAmount > 0) batchCredit++;
+              if (r.debitAmount > 0) batchDebit++;
             }
+            
+            return {
+              inserted: result.count,
+              credit: batchCredit,
+              debit: batchDebit,
+            };
           } catch (fallbackError: any) {
-            console.error('❌ Fallback insert also failed:', fallbackError);
-            errors.push(`Failed to insert chunk: ${fallbackError.message}`);
+            console.error(`❌ Batch ${batchNum} fallback also failed:`, fallbackError.message);
+            return { inserted: 0, credit: 0, debit: 0 };
           }
         }
+      };
+      
+      // Process batches in parallel with concurrency control
+      const processBatchesInParallel = async () => {
+        const results: Array<{ inserted: number; credit: number; debit: number }> = [];
+        
+        for (let i = 0; i < chunks.length; i += CONCURRENT_BATCHES) {
+          const batchGroup = chunks.slice(i, i + CONCURRENT_BATCHES);
+          const batchPromises = batchGroup.map((chunk, idx) => 
+            processBatch(chunk, i + idx + 1)
+          );
+          
+          const batchResults = await Promise.all(batchPromises);
+          results.push(...batchResults);
+          
+          // Aggregate results
+          for (const result of batchResults) {
+            inserted += result.inserted;
+            creditInserted += result.credit;
+            debitInserted += result.debit;
+          }
+          
+          console.log(`✅ Processed batches ${i + 1}-${Math.min(i + CONCURRENT_BATCHES, chunks.length)}/${chunks.length}`);
+        }
+        
+        return results;
+      };
+      
+      await processBatchesInParallel();
+      
+      // Note: Duplicates are handled by INSERT IGNORE, so we can't count them accurately from DB
+      // But we already counted existingDuplicates from the in-memory check above
+      // The actual DB duplicates (from INSERT IGNORE) would be: toInsert.length - inserted
+      // However, we already added existingDuplicates to the duplicates counter, so we don't double-count
+      // If INSERT IGNORE prevented some inserts, those are additional duplicates we didn't catch
+      const dbDuplicates = Math.max(0, toInsert.length - inserted);
+      if (dbDuplicates > 0 && dbDuplicates !== existingDuplicates) {
+        console.log(`📊 Additional duplicates caught by INSERT IGNORE: ${dbDuplicates - existingDuplicates}`);
+        // Don't add to duplicates counter - existingDuplicates already includes the in-memory check
+        // This is just for logging
       }
     }
 
@@ -965,6 +1129,138 @@ export async function POST(request: NextRequest) {
       userAgent: meta.userAgent,
     });
  
+    // If background categorization is enabled, fetch inserted transaction IDs and trigger background job
+    let backgroundJobStarted = false;
+    let insertedTransactionIds: string[] = [];
+    
+    // Re-evaluate shouldUseBackground based on actual inserted count (not just normalized length)
+    // This ensures we trigger background categorization even if some transactions were filtered
+    // Check if we determined shouldUseBackground earlier (for immediate categorization skip)
+    const earlierShouldUseBackground = categorizeInBackground || 
+                                      (normalized.length > 100 && useAICategorization) ||
+                                      (normalized.length > 50 && useAICategorization);
+    
+    const finalShouldUseBackground = categorizeInBackground || 
+                                     (inserted > 100 && useAICategorization) ||
+                                     (inserted > 50 && useAICategorization && normalized.length > 50) ||
+                                     earlierShouldUseBackground; // Use the earlier determination as fallback
+    
+    console.log(`🔍 Background categorization check: categorizeInBackground=${categorizeInBackground}, inserted=${inserted}, useAICategorization=${useAICategorization}, earlierShouldUseBackground=${earlierShouldUseBackground}, finalShouldUseBackground=${finalShouldUseBackground}`);
+    
+    // Use the final shouldUseBackground flag, but also check if we actually inserted transactions
+    if (finalShouldUseBackground && inserted > 0) {
+      try {
+        console.log(`🔍 Fetching transaction IDs for background categorization...`);
+        
+        // Fetch the IDs of recently inserted transactions
+        // Use a wider time window (5 minutes) and account statement ID if available
+        const timeWindow = new Date(Date.now() - 300000); // 5 minutes ago
+        
+        let recentTransactions = await prisma.transaction.findMany({
+          where: {
+            userId,
+            isDeleted: false,
+            createdAt: {
+              gte: timeWindow,
+            },
+            ...(accountStatement?.id ? { accountStatementId: accountStatement.id } : {}),
+          },
+          select: { id: true },
+          take: inserted * 2, // Get more than expected to account for timing
+          orderBy: { createdAt: 'desc' },
+        });
+        
+        // If account statement ID was used but no results, try without it
+        if (recentTransactions.length === 0 && accountStatement?.id) {
+          console.log(`⚠️ No transactions found with accountStatementId, trying without it...`);
+          recentTransactions = await prisma.transaction.findMany({
+            where: {
+              userId,
+              isDeleted: false,
+              createdAt: {
+                gte: timeWindow,
+              },
+            },
+            select: { id: true },
+            take: inserted * 2,
+            orderBy: { createdAt: 'desc' },
+          });
+        }
+        
+        insertedTransactionIds = recentTransactions.map(t => t.id);
+        
+        console.log(`📊 Found ${insertedTransactionIds.length} transaction IDs (expected: ${inserted})`);
+        
+        if (insertedTransactionIds.length > 0) {
+          // Trigger background categorization (fire and forget)
+          // For server-side calls, we need to pass the auth token
+          const baseUrl = process.env.VERCEL_URL 
+            ? `https://${process.env.VERCEL_URL}` 
+            : process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+          
+          // Get auth token from the original request to pass to background job
+          const authToken = request.cookies.get('auth-token');
+          const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+          
+          if (authToken) {
+            headers['Cookie'] = `auth-token=${authToken.value}`;
+          }
+          
+          console.log(`🚀 Starting background categorization for ${insertedTransactionIds.length} transactions via ${baseUrl}...`);
+          
+          fetch(`${baseUrl}/api/transactions/categorize-background`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              userId,
+              transactionIds: insertedTransactionIds,
+              batchSize: 100,
+            }),
+          })
+          .then(async (response) => {
+            if (response.ok) {
+              const result = await response.json().catch(() => ({}));
+              console.log(`✅ Background categorization job started successfully:`, result);
+              backgroundJobStarted = true;
+            } else {
+              const errorText = await response.text().catch(() => 'Unknown error');
+              console.error(`❌ Background categorization failed: ${response.status} ${response.statusText} - ${errorText}`);
+            }
+          })
+          .catch((error) => {
+            console.error('❌ Failed to trigger background categorization:', error);
+            // Fallback: If background categorization fails and we have transactions, try immediate categorization
+            if (inserted > 0 && inserted <= 200 && useAICategorization && !categorizeInBackground) {
+              console.log(`🔄 Background categorization failed, attempting immediate categorization as fallback...`);
+              // This will be handled by the existing immediate categorization logic below
+            }
+          });
+        } else {
+          console.warn(`⚠️ No transaction IDs found for background categorization (inserted: ${inserted}, timeWindow: ${timeWindow.toISOString()})`);
+          // Fallback: If we can't find transaction IDs but have inserted transactions, try immediate categorization
+          if (inserted > 0 && inserted <= 200 && useAICategorization && !categorizeInBackground) {
+            console.log(`🔄 Transaction IDs not found, attempting immediate categorization as fallback...`);
+            // This will be handled by the existing immediate categorization logic below
+          }
+        }
+      } catch (error) {
+        console.error('❌ Error starting background categorization:', error);
+        // Fallback: If background categorization fails and we have transactions, try immediate categorization
+        if (inserted > 0 && inserted <= 200 && useAICategorization && !categorizeInBackground) {
+          console.log(`🔄 Background categorization error, attempting immediate categorization as fallback...`);
+          // This will be handled by the existing immediate categorization logic below
+        }
+        // Continue - import was successful
+      }
+    } else {
+      if (!finalShouldUseBackground) {
+        console.log(`ℹ️ Background categorization skipped: categorizeInBackground=${categorizeInBackground}, inserted=${inserted}, useAICategorization=${useAICategorization}`);
+      }
+      if (inserted === 0) {
+        console.log(`ℹ️ No transactions inserted, skipping background categorization`);
+      }
+    }
+
     return NextResponse.json({ 
       inserted, 
       skipped: unique.length - inserted, 
@@ -985,7 +1281,7 @@ export async function POST(request: NextRequest) {
         accountNumberValid: balanceValidationResult.accountNumberValid,
         summary: formatValidationResult(balanceValidationResult),
       } : undefined,
-      categorizedCount,
+      categorizedCount: finalShouldUseBackground ? 0 : categorizedCount, // 0 if background mode
       deadlinesCreated,
       accountStatement: accountStatement ? {
         id: accountStatement.id,
@@ -994,6 +1290,14 @@ export async function POST(request: NextRequest) {
         statementStartDate: accountStatement.statementStartDate,
         statementEndDate: accountStatement.statementEndDate,
       } : undefined,
+      // Background job info
+      ...(finalShouldUseBackground && backgroundJobStarted ? {
+        backgroundCategorization: {
+          started: true,
+          transactionIds: insertedTransactionIds,
+          total: insertedTransactionIds.length,
+        },
+      } : {}),
     });
     
   } catch (error: any) {

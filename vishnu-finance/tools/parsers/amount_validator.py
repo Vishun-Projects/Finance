@@ -26,6 +26,7 @@ class AmountValidator:
     def parse_amount(amount_str: Optional[str], allow_negative: bool = False) -> float:
         """
         Parse amount string to float with full decimal precision.
+        Enhanced with multiple format attempts.
         
         Args:
             amount_str: Amount string (e.g., "1,500.00", "₹1,500.00", "1500")
@@ -42,24 +43,25 @@ class AmountValidator:
         if not amount_str or amount_str.lower() in ['none', 'nan', '', '-', 'n/a']:
             return 0.0
         
-        # Remove currency symbols
-        amount_str = AmountValidator._remove_currency_symbols(amount_str)
+        # Try multiple parsing strategies
+        # Strategy 1: Remove currency symbols and parse
+        cleaned = AmountValidator._remove_currency_symbols(amount_str)
         
         # Check for negative amounts
         is_negative = False
-        if amount_str.startswith('-'):
+        if cleaned.startswith('-'):
             is_negative = True
-            amount_str = amount_str[1:].strip()
+            cleaned = cleaned[1:].strip()
         
         # Remove commas and whitespace
-        amount_str = amount_str.replace(',', '').replace(' ', '')
+        cleaned = cleaned.replace(',', '').replace(' ', '')
         
-        if not amount_str:
+        if not cleaned:
             return 0.0
         
         try:
             # Parse as float (preserves all decimals)
-            amount = float(amount_str)
+            amount = float(cleaned)
             
             # Apply negative sign if needed
             if is_negative and allow_negative:
@@ -75,6 +77,28 @@ class AmountValidator:
             return amount
             
         except (ValueError, TypeError):
+            # Try alternative parsing: extract number from text
+            # Look for number patterns in the original string
+            number_patterns = [
+                r'([0-9,]+\.?\d*)',  # Standard number with optional decimal
+                r'([0-9]+\.\d{1,2})',  # Decimal number
+                r'([0-9,]+)',  # Integer with commas
+            ]
+            
+            for pattern in number_patterns:
+                match = re.search(pattern, amount_str)
+                if match:
+                    try:
+                        num_str = match.group(1).replace(',', '')
+                        amount = float(num_str)
+                        if is_negative:
+                            amount = -amount if allow_negative else 0.0
+                        if abs(amount) > 1e15:
+                            return 0.0
+                        return amount
+                    except (ValueError, TypeError):
+                        continue
+            
             return 0.0
     
     @staticmethod

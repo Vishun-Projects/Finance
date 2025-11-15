@@ -642,6 +642,13 @@ model Transaction {
   store             String?
   rawData           String?           @db.Text
   balance           Decimal?          @db.Decimal(12, 2)
+  // Data quality flags
+  isPartialData     Boolean           @default(false) // Transaction has missing/incomplete data
+  hasInvalidDate    Boolean           @default(false) // Date was inferred or defaulted
+  hasZeroAmount     Boolean           @default(false) // Amount is zero (might be reversal/balance entry)
+  parsingMethod     String?           // "standard", "ai", "ai_fallback", "inferred"
+  parsingConfidence Float?            // Confidence score (0-1) for parsed data
+  rawParsingData    Json?             // Store raw parsing attempt data for debugging
   // Metadata
   notes             String?
   receiptUrl        String?

@@ -375,12 +375,16 @@ def parse_bank_statement_accurately(pdf_path: Path) -> pd.DataFrame:
                 return None
         
         df['date_iso'] = df['date'].apply(format_date_iso)
-        # Filter out rows with invalid dates
+        # LENIENT: Don't filter out rows with invalid dates - store with flag
+        # Set hasInvalidDate flag for transactions without valid date_iso
         initial_count = len(df)
-        df = df[df['date_iso'].notna()].copy()
-        if len(df) < initial_count:
-            print(f"Filtered out {initial_count - len(df)} transactions with invalid dates")
-        print(f"After date validation: {len(df)} valid transactions")
+        invalid_date_count = df['date_iso'].isna().sum()
+        if invalid_date_count > 0:
+            df['hasInvalidDate'] = df['date_iso'].isna()
+            print(f"⚠️ {invalid_date_count} transactions with invalid dates (kept with hasInvalidDate flag)")
+        else:
+            df['hasInvalidDate'] = False
+        print(f"After date validation: {len(df)} transactions (all kept, {invalid_date_count} with invalid dates)")
     
     return df
 

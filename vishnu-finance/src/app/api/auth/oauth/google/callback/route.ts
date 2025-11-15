@@ -53,6 +53,7 @@ export async function GET(request: NextRequest) {
     // Clear OAuth cookies
     cookieStore.delete('oauth_code_verifier');
     cookieStore.delete('oauth_state');
+    cookieStore.delete('oauth_provider');
 
     // Exchange code for tokens
     console.log('🔐 OAUTH CALLBACK - Exchanging code for tokens');
@@ -63,8 +64,8 @@ export async function GET(request: NextRequest) {
     const googleUser = await verifyGoogleIdToken(idToken);
 
     // Find or create user
-    console.log('🔐 OAUTH CALLBACK - Finding or creating user');
-    const user = await AuthService.findOrCreateOAuthUser(googleUser);
+    console.log('🔐 OAUTH CALLBACK [GOOGLE] - Finding or creating user');
+    const user = await AuthService.findOrCreateOAuthUser(googleUser, 'google');
 
     if (!user.isActive) {
       console.error('❌ OAUTH CALLBACK - Account is deactivated');

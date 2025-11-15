@@ -18,10 +18,11 @@ export interface CategorizationSuggestion {
 }
 
 // Confidence thresholds for different pattern types
+// Lower thresholds allow more patterns to be learned, confidence will be used for prioritization
 const CONFIDENCE_THRESHOLDS = {
-  STORE: 0.6,   // Store patterns are most reliable
-  UPI: 0.7,     // UPI patterns are reliable
-  PERSON: 0.8,  // PersonName patterns are least reliable (only when store is NULL)
+  STORE: 0.5,   // Store patterns are most reliable (lower threshold = learn more patterns)
+  UPI: 0.5,     // UPI patterns are reliable (lower threshold = learn more patterns)
+  PERSON: 0.6,  // PersonName patterns (lower threshold = learn more patterns, confidence will prioritize)
 } as const;
 
 /**
@@ -119,7 +120,15 @@ async function learnStorePatterns(
       const normalizedShopName = shopName.toLowerCase();
       const totalCount = storeTotals.get(normalizedShopName) || 0;
       const frequency = Number(pattern.frequency);
-      const confidence = totalCount > 0 ? frequency / totalCount : 0;
+      
+      // Confidence based on:
+      // 1. Frequency ratio (how many times this category was used for this store)
+      // 2. Absolute frequency (more transactions = higher confidence)
+      // Formula: (frequency/totalCount) + log10(frequency+1)/10
+      // This gives higher confidence for more repeated transactions
+      const frequencyRatio = totalCount > 0 ? frequency / totalCount : 0;
+      const frequencyBonus = Math.min(0.3, Math.log10(frequency + 1) / 10); // Max 0.3 bonus
+      const confidence = Math.min(1.0, frequencyRatio + frequencyBonus);
 
       if (confidence < minConfidence) continue;
 
@@ -202,7 +211,15 @@ async function learnUPIPatterns(
       const normalizedShopName = shopName.toLowerCase();
       const totalCount = upiTotals.get(normalizedShopName) || 0;
       const frequency = Number(pattern.frequency);
-      const confidence = totalCount > 0 ? frequency / totalCount : 0;
+      
+      // Confidence based on:
+      // 1. Frequency ratio (how many times this category was used for this UPI)
+      // 2. Absolute frequency (more transactions = higher confidence)
+      // Formula: (frequency/totalCount) * (1 + log10(frequency+1)/10)
+      // This gives higher confidence for more repeated transactions
+      const frequencyRatio = totalCount > 0 ? frequency / totalCount : 0;
+      const frequencyBonus = Math.min(0.3, Math.log10(frequency + 1) / 10); // Max 0.3 bonus
+      const confidence = Math.min(1.0, frequencyRatio + frequencyBonus);
 
       if (confidence < minConfidence) continue;
 
@@ -228,13 +245,16 @@ async function learnUPIPatterns(
 }
 
 /**
- * Learn personName-based patterns (LOW PRIORITY - only when store is NULL)
+ * Learn personName-based patterns (IMPROVED - works even when store exists if confidence is high)
+ * Confidence increases with more repeated transactions
  */
 async function learnPersonPatterns(
   userId: string,
   minConfidence: number
 ): Promise<Map<string, ShopCategoryPattern>> {
   try {
+    // Learn from ALL personName transactions (not just when store is NULL)
+    // This allows person patterns to work even when store exists
     const patterns = await (prisma as any).$queryRaw`
       SELECT 
         t.personName as shopName,
@@ -246,7 +266,6 @@ async function learnPersonPatterns(
       WHERE t.userId = ${userId}
         AND t.personName IS NOT NULL
         AND t.personName != ''
-        AND t.store IS NULL
         AND t.categoryId IS NOT NULL
         AND t.isDeleted = false
       GROUP BY t.personName, t.categoryId, c.name
@@ -256,7 +275,8 @@ async function learnPersonPatterns(
     const patternMap = new Map<string, ShopCategoryPattern>();
     const personTotals = new Map<string, number>();
 
-    // Get totals for all personNames (only when store is NULL)
+    // Get totals for all personNames (from ALL transactions, not just when store is NULL)
+    // This allows person patterns to work even when store exists
     if (patterns.length > 0) {
       const totalsQuery = await (prisma as any).$queryRaw`
         SELECT 
@@ -266,7 +286,6 @@ async function learnPersonPatterns(
         WHERE t.userId = ${userId}
           AND t.personName IS NOT NULL
           AND t.personName != ''
-          AND t.store IS NULL
           AND t.isDeleted = false
         GROUP BY LOWER(TRIM(t.personName))
       `;
@@ -287,7 +306,15 @@ async function learnPersonPatterns(
       const normalizedShopName = shopName.toLowerCase();
       const totalCount = personTotals.get(normalizedShopName) || 0;
       const frequency = Number(pattern.frequency);
-      const confidence = totalCount > 0 ? frequency / totalCount : 0;
+      
+      // Confidence based on:
+      // 1. Frequency ratio (how many times this category was used for this person)
+      // 2. Absolute frequency (more transactions = higher confidence)
+      // Formula: (frequency/totalCount) * (1 + log10(frequency+1)/10)
+      // This gives higher confidence for more repeated transactions
+      const frequencyRatio = totalCount > 0 ? frequency / totalCount : 0;
+      const frequencyBonus = Math.min(0.3, Math.log10(frequency + 1) / 10); // Max 0.3 bonus
+      const confidence = Math.min(1.0, frequencyRatio + frequencyBonus);
 
       if (confidence < minConfidence) continue;
 

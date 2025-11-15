@@ -31,6 +31,7 @@ class DateValidator:
                    previous_date: Optional[str] = None) -> Optional[str]:
         """
         Parse date string to ISO format (YYYY-MM-DD) with strict validation.
+        Enhanced with multiple format attempts and context-based inference.
         
         Args:
             date_str: Date string to parse
@@ -53,18 +54,49 @@ class DateValidator:
         if bank_code:
             parsed = DateValidator._parse_bank_specific(date_str, bank_code)
             if parsed:
-                # Validate against statement period if provided
-                if DateValidator._validate_date_range(parsed, statement_start_date, statement_end_date):
-                    # Validate chronological order if previous date provided
-                    if previous_date is None or DateValidator._validate_chronological(previous_date, parsed):
+                # Validate against statement period if provided (relaxed - allow slight out of range)
+                if DateValidator._validate_date_range(parsed, statement_start_date, statement_end_date, relaxed=True):
+                    # Validate chronological order if previous date provided (relaxed)
+                    if previous_date is None or DateValidator._validate_chronological(previous_date, parsed, max_days_backward=30):
                         return parsed
         
         # Try generic parsing with auto-detection
         parsed = DateValidator._parse_generic(date_str, bank_code)
         if parsed:
-            if DateValidator._validate_date_range(parsed, statement_start_date, statement_end_date):
-                if previous_date is None or DateValidator._validate_chronological(previous_date, parsed):
+            if DateValidator._validate_date_range(parsed, statement_start_date, statement_end_date, relaxed=True):
+                if previous_date is None or DateValidator._validate_chronological(previous_date, parsed, max_days_backward=30):
                     return parsed
+        
+        # Try multiple format attempts as fallback
+        formats_to_try = [
+            ('%d/%m/%Y', 'DD/MM/YYYY'),
+            ('%d-%m-%Y', 'DD-MM-YYYY'),
+            ('%d %b %Y', 'DD MMM YYYY'),
+            ('%d %B %Y', 'DD MMMM YYYY'),
+            ('%Y-%m-%d', 'YYYY-MM-DD'),
+            ('%m/%d/%Y', 'MM/DD/YYYY'),
+        ]
+        
+        for fmt, fmt_name in formats_to_try:
+            try:
+                parsed = pd.to_datetime(date_str, format=fmt, errors='coerce')
+                if pd.notna(parsed):
+                    parsed_str = parsed.strftime('%Y-%m-%d')
+                    if DateValidator._validate_date_range(parsed_str, statement_start_date, statement_end_date, relaxed=True):
+                        if previous_date is None or DateValidator._validate_chronological(previous_date, parsed_str, max_days_backward=30):
+                            return parsed_str
+            except:
+                continue
+        
+        # Last resort: try pandas flexible parsing
+        try:
+            parsed = pd.to_datetime(date_str, dayfirst=True, errors='coerce')
+            if pd.notna(parsed):
+                parsed_str = parsed.strftime('%Y-%m-%d')
+                if DateValidator._validate_date_range(parsed_str, statement_start_date, statement_end_date, relaxed=True):
+                    return parsed_str
+        except:
+            pass
         
         return None
     
@@ -267,20 +299,30 @@ class DateValidator:
     
     @staticmethod
     def _validate_date_range(date_iso: str, start_date: Optional[str], 
-                             end_date: Optional[str]) -> bool:
-        """Validate date is within statement period."""
+                             end_date: Optional[str], relaxed: bool = False) -> bool:
+        """
+        Validate date is within statement period.
+        
+        Args:
+            date_iso: Date in ISO format
+            start_date: Statement start date
+            end_date: Statement end date
+            relaxed: If True, allow dates slightly outside range (up to 7 days) for timezone/processing issues
+        """
         if not start_date and not end_date:
             return True  # No range provided, assume valid
         
         try:
             date_val = pd.to_datetime(date_iso)
+            buffer_days = 7 if relaxed else 0
+            
             if start_date:
                 start_val = pd.to_datetime(start_date)
-                if date_val < start_val:
+                if date_val < start_val - pd.Timedelta(days=buffer_days):
                     return False
             if end_date:
                 end_val = pd.to_datetime(end_date)
-                if date_val > end_val:
+                if date_val > end_val + pd.Timedelta(days=buffer_days):
                     return False
             return True
         except:

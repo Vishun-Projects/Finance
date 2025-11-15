@@ -1,13 +1,11 @@
 {
-  "functions": {
-    "api/**/*.py": {
-      "runtime": "python3.11",
-      "maxDuration": 180
-    }
-  },
   "buildCommand": "npm run build",
   "installCommand": "npm install",
   "framework": "nextjs",
-  "regions": ["iad1"]
+  "regions": ["iad1"],
+  "functions": {
+    "api/**/*.py": {
+      "maxDuration": 180
+    }
+  }
 }
-

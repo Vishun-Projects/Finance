@@ -1,29 +1,64 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { unlink, readdir, stat } from 'fs/promises';
 import { join } from 'path';
+import { tmpdir } from 'os';
 
 export async function GET() {
   try {
-    // Clean up files older than 24 hours
-    const uploadsDir = join(process.cwd(), 'uploads');
+    // Clean up files older than 24 hours from temp directories
+    // In serverless environments, /tmp is automatically cleaned, but we handle it gracefully
+    const uploadsDir = join(tmpdir());
     
     try {
-      const files = await readdir(uploadsDir);
-      
-      const oldFiles = [];
+      // In serverless, /tmp is ephemeral and auto-cleaned, but we handle cleanup gracefully
+      // Check common temp subdirectories used by our APIs
+      const tempSubdirs = ['pdf-uploads', 'multi-format-uploads', 'bank-statement-uploads', 'user-docs', 'super-docs', 'admin-docs'];
+      const oldFiles: string[] = [];
       const now = Date.now();
       const maxAge = 24 * 60 * 60 * 1000; // 24 hours
       
-      for (const file of files) {
-        const filepath = join(uploadsDir, file);
+      // Try to clean up files in temp subdirectories
+      for (const subdir of tempSubdirs) {
         try {
-          const stats = await stat(filepath);
-          if (now - stats.mtimeMs > maxAge) {
-            oldFiles.push(filepath);
+          const subdirPath = join(uploadsDir, subdir);
+          const files = await readdir(subdirPath).catch(() => []);
+          
+          for (const file of files) {
+            const filepath = join(subdirPath, file);
+            try {
+              const stats = await stat(filepath);
+              if (now - stats.mtimeMs > maxAge) {
+                oldFiles.push(filepath);
+              }
+            } catch (error) {
+              // File might have been deleted or doesn't exist, skip
+            }
           }
         } catch (error) {
-          console.warn('⚠️ Could not stat file:', filepath, error);
+          // Subdirectory might not exist, skip
         }
+      }
+      
+      // Also check root temp directory for any orphaned files
+      try {
+        const rootFiles = await readdir(uploadsDir).catch(() => []);
+        for (const file of rootFiles) {
+          // Skip directories
+          const filepath = join(uploadsDir, file);
+          try {
+            const stats = await stat(filepath);
+            if (stats.isFile() && now - stats.mtimeMs > maxAge) {
+              // Only clean files that look like our temp files
+              if (file.includes('statement_') || file.includes('extracted_') || file.includes('temp_parser_')) {
+                oldFiles.push(filepath);
+              }
+            }
+          } catch (error) {
+            // Skip if we can't stat
+          }
+        }
+      } catch (error) {
+        // Root directory might not be readable, skip
       }
       
       // Delete old files

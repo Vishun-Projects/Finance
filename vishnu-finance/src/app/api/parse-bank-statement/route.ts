@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFile } from 'fs/promises';
+import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { tmpdir } from 'os';
 
 const execAsync = promisify(exec);
 
@@ -57,9 +58,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create uploads directory if it doesn't exist
-    const uploadsDir = join(process.cwd(), 'uploads');
+    // Use /tmp directory for serverless environments (Vercel, AWS Lambda, etc.)
+    // /tmp is the only writable directory in serverless functions
+    const uploadsDir = join(tmpdir(), 'bank-statement-uploads');
     const toolsDir = join(process.cwd(), 'tools');
+    
+    // Ensure uploads directory exists
+    try {
+      await mkdir(uploadsDir, { recursive: true });
+    } catch (error) {
+      // Directory might already exist, ignore error
+    }
     
     console.log('🏦 Parse Bank Statement API: Directories:', { uploadsDir, toolsDir });
     

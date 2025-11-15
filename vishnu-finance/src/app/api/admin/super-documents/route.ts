@@ -3,13 +3,17 @@ import { join } from 'path';
 import { mkdir, writeFile } from 'fs/promises';
 import { randomUUID } from 'crypto';
 import { Buffer } from 'buffer';
+import { tmpdir } from 'os';
 import { prisma } from '@/lib/db';
 import { AuthService } from '@/lib/auth';
 import { writeAuditLog, extractRequestMeta } from '@/lib/audit';
 import { processSuperDocument } from '@/lib/document-processor';
 import type { SuperDocumentCategory } from '@prisma/client';
 
-const SUPER_DOCS_UPLOAD_DIR = join(process.cwd(), 'uploads', 'super-docs');
+// Use /tmp for serverless environments (Vercel, AWS Lambda, etc.)
+// Note: For production, consider using cloud storage (S3, etc.) for persistent file storage
+// /tmp is ephemeral and files are automatically cleaned up after function execution
+const SUPER_DOCS_UPLOAD_DIR = join(tmpdir(), 'super-docs');
 
 const requireSuperuser = async (request: NextRequest) => {
   const token = request.cookies.get('auth-token');

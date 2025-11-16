@@ -4,6 +4,7 @@ import { join } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { tmpdir } from 'os';
+
 // Dynamic import for Node.js parser fallback
 const parsePDFWithNode = async (filePath: string, bankHint?: string) => {
   try {
@@ -36,7 +37,7 @@ async function tryPythonParser(pdfBuffer: Buffer, bankHint: string): Promise<{ s
       baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
     }
     
-    const pythonFunctionUrl = `${baseUrl}/api/parse-pdf-python`;
+    const pythonFunctionUrl = `${baseUrl}/api/parser`;
     
     // Convert buffer to base64
     const pdfBase64 = pdfBuffer.toString('base64');
@@ -47,8 +48,11 @@ async function tryPythonParser(pdfBuffer: Buffer, bankHint: string): Promise<{ s
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        pdf_data: pdfBase64,
-        bank: bankHint,
+        type: 'pdf',
+        payload: {
+          pdf_data: pdfBase64,
+          bank: bankHint,
+        }
       }),
     });
     
@@ -74,6 +78,7 @@ async function tryPythonParser(pdfBuffer: Buffer, bankHint: string): Promise<{ s
 
 export async function POST(request: NextRequest) {
   console.log('🔍 PDF API: Starting request processing');
+  
   
   try {
     const formData = await request.formData();
@@ -101,6 +106,8 @@ export async function POST(request: NextRequest) {
     // /tmp is the only writable directory in serverless functions
     const uploadsDir = join(tmpdir(), 'pdf-uploads');
     const toolsDir = join(process.cwd(), 'tools');
+    const toolsMasterDir = join(process.cwd(), 'tools-master');
+    const legacyToolsDir = join(process.cwd(), 'legacy', 'tools');
     
     // Ensure uploads directory exists
     try {
@@ -159,6 +166,8 @@ export async function POST(request: NextRequest) {
 import sys
 import os
 sys.path.append(r'${toolsDir.replace(/\\/g, '\\\\')}')
+sys.path.insert(0, r'${toolsMasterDir.replace(/\\/g, '\\\\')}')
+sys.path.insert(0, r'${legacyToolsDir.replace(/\\/g, '\\\\')}')
 
 PDF_FILE = r"${filepath.replace(/\\/g, '\\\\')}"
 BANK_HINT = r"${bankHint}"
@@ -172,6 +181,17 @@ def main():
     pdf_path = Path(PDF_FILE)
     if not pdf_path.exists():
         raise FileNotFoundError(f"PDF not found: {pdf_path}")
+
+    # Try unified master parser first
+    try:
+        from master_parser import parse as master_parse
+        parsed = master_parse(pdf_path, BANK_HINT)
+        with open(JSON_FILE, 'w', encoding='utf-8') as f:
+            json.dump(parsed, f, ensure_ascii=False, default=str)
+        print(json.dumps(parsed, ensure_ascii=False, default=str))
+        return
+    except Exception as master_err:
+        print(f"Master parser unavailable, falling back to legacy: {master_err}", file=sys.stderr)
 
     df = None
     
@@ -548,7 +568,14 @@ if __name__ == "__main__":
           success: true, 
           transactions: [], 
           count: 0,
-          tempFiles: [filepath, csvOutput, tempScriptPath].filter(Boolean)
+          tempFiles: [filepath, csvOutput, tempScriptPath].filter(Boolean),
+          debug: {
+            method: 'local_python',
+            inputs: { bankHint, filename },
+            files: { filepath, csvOutput, tempScriptPath },
+            stdoutSnippet: (stdout || '').slice(0, 2000),
+            stderrSnippet: (stderr || '').slice(0, 2000)
+          }
         });
       }
 
@@ -584,7 +611,21 @@ if __name__ == "__main__":
         transactions, 
         count: transactionCount || transactions.length,
         metadata: finalMetadata,  // Always include metadata (even if empty)
-        tempFiles: [filepath, csvOutput, tempScriptPath].filter(Boolean)
+        tempFiles: [filepath, csvOutput, tempScriptPath].filter(Boolean),
+        debug: {
+          method: 'local_python',
+          inputs: { bankHint, filename },
+          files: { filepath, csvOutput, tempScriptPath },
+          stdoutSnippet: (stdout || '').slice(0, 2000),
+          stderrSnippet: (stderr || '').slice(0, 2000),
+          codeFiles: [
+            'tools-master/master_parser.py',
+            'tools-master/extractors/generic.py',
+            'legacy/tools/accurate_parser.py',
+            'legacy/tools/bank_statement_parser.py'
+          ],
+          explanation: 'Parsed via unified master parser (compat mode), with normalization and legacy fallbacks.'
+        }
       });
 
     } catch (error) {
@@ -609,6 +650,12 @@ if __name__ == "__main__":
             count: nodeResult.count,
             metadata: nodeResult.metadata || {},
             warning: 'Parsed using fallback parser. Results may be less accurate than Python parser.',
+            debug: {
+              method: 'node_fallback',
+              inputs: { bankHint, filename },
+              codeFiles: ['src/lib/parsers/node-pdf-parser.ts'],
+              explanation: 'Used Node.js fallback parser due to Python failure. Extracted transactions using Node parser utilities.'
+            }
           });
         } else {
           console.log('⚠️ PDF API: Node.js parser found no transactions');
@@ -625,7 +672,11 @@ if __name__ == "__main__":
       console.error('❌ PDF API: All parsing methods failed');
       return NextResponse.json({ 
         error: 'Failed to parse PDF. Please ensure it\'s a valid bank statement. All parsing methods (Python serverless, local Python, and Node.js fallback) failed.',
-        details: error instanceof Error ? error.message : 'Unknown error'
+        details: error instanceof Error ? error.message : 'Unknown error',
+        debug: {
+          methodTried: ['serverless_python', 'local_python', 'node_fallback'],
+          inputs: { bankHint, filename }
+        }
       }, { status: 500 });
     }
 
@@ -633,7 +684,8 @@ if __name__ == "__main__":
     console.error('❌ PDF API: PDF upload error:', error);
     return NextResponse.json({ 
       error: 'Failed to process PDF',
-      details: error instanceof Error ? error.message : 'Unknown error'
+      details: error instanceof Error ? error.message : 'Unknown error',
+      debug: { stage: 'upload', error: error instanceof Error ? error.message : 'Unknown error' }
     }, { status: 500 });
   }
 }

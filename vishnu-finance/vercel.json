@@ -4,7 +4,7 @@
   "framework": "nextjs",
   "regions": ["iad1"],
   "functions": {
-    "api/**/*.py": {
+    "api/parser/**/*.py": {
       "maxDuration": 180
     }
   }

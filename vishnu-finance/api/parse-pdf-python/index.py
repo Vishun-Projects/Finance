@@ -55,180 +55,76 @@ def handler(request):
         pdf_path = tmp_file_path
         
         try:
-            # Import parsers from local directory
-            import pandas as pd
-            
-            # Import with local paths
+            # Prefer master parser (unified) and fallback to legacy if unavailable
             try:
-                from parsers.bank_detector import BankDetector  # type: ignore
-                print("✓ Imported BankDetector from parsers.bank_detector", file=sys.stderr)
-            except ImportError as e:
-                print(f"✗ Failed to import BankDetector: {e}", file=sys.stderr)
-                try:
-                    from bank_detector import BankDetector  # type: ignore
-                    print("✓ Imported BankDetector from bank_detector", file=sys.stderr)
-                except ImportError as e2:
-                    print(f"✗ Failed to import BankDetector (fallback): {e2}", file=sys.stderr)
-                    BankDetector = None
-            
-            try:
+                sys.path.insert(0, str(Path.cwd() / 'tools-master'))
+                from tools_master.master_parser import parse as master_parse  # type: ignore
+                print("✓ Using tools-master.master_parser", file=sys.stderr)
+                parsed = master_parse(pdf_path, bank_hint)
+                result = {
+                    'success': True,
+                    'transactions': parsed.get('transactions', []),
+                    'count': parsed.get('count', 0),
+                    'metadata': parsed.get('metadata', {}),
+                    'debug': parsed.get('debug', {}),
+                }
+            except Exception as master_err:
+                print(f"✗ Master parser unavailable, falling back to legacy: {master_err}", file=sys.stderr)
+                # Legacy path (preserve previous behavior)
+                import pandas as pd
                 from bank_statement_parser import parse_bank_statement  # type: ignore
-                print("✓ Imported parse_bank_statement", file=sys.stderr)
-            except ImportError as e:
-                print(f"✗ Failed to import parse_bank_statement: {e}", file=sys.stderr)
-                parse_bank_statement = None
-            
-            try:
                 from accurate_parser import parse_bank_statement_accurately  # type: ignore
-                print("✓ Imported parse_bank_statement_accurately", file=sys.stderr)
-            except ImportError as e:
-                print(f"✗ Failed to import parse_bank_statement_accurately: {e}", file=sys.stderr)
-                parse_bank_statement_accurately = None
-            
-            try:
-                from parsers.statement_metadata import StatementMetadataExtractor  # type: ignore
-                print("✓ Imported StatementMetadataExtractor", file=sys.stderr)
-            except ImportError:
                 try:
+                    from parsers.statement_metadata import StatementMetadataExtractor  # type: ignore
+                except Exception:
                     from statement_metadata import StatementMetadataExtractor  # type: ignore
-                    print("✓ Imported StatementMetadataExtractor (fallback)", file=sys.stderr)
-                except ImportError:
-                    print("✗ StatementMetadataExtractor not available", file=sys.stderr)
-                    StatementMetadataExtractor = None
-            
-            df = None
-            metadata = None
-            detected_bank = None
-            
-            # Try bank-specific parser first
-            if BankDetector:
-                try:
-                    detected_bank = BankDetector.detect_from_file(pdf_path)
-                    print(f"Detected bank: {detected_bank}", file=sys.stderr)
-                    if detected_bank in ['SBIN', 'IDIB', 'KKBK', 'KKBK_V2', 'HDFC', 'MAHB'] and parse_bank_statement:
-                        result = parse_bank_statement(pdf_path, detected_bank)
-                        if isinstance(result, tuple):
-                            df, metadata = result
+
+                df = None
+                metadata = None
+                if bank_hint:
+                    try:
+                        res = parse_bank_statement(pdf_path, bank_hint.upper())
+                        if isinstance(res, tuple):
+                            df, metadata = res
                         else:
-                            df = result
-                            metadata = None
-                        
-                        if df is not None and not df.empty:
-                            print(f"✓ Bank-specific parser extracted {len(df)} transactions", file=sys.stderr)
-                        else:
-                            # Try accurate parser as fallback
-                            if parse_bank_statement_accurately:
-                                try:
-                                    df_temp = parse_bank_statement_accurately(pdf_path)
-                                    if df_temp is not None and not df_temp.empty:
-                                        df = df_temp
-                                        print(f"✓ Accurate parser (fallback) extracted {len(df)} transactions", file=sys.stderr)
-                                except Exception as e:
-                                    print(f"✗ Accurate parser (fallback) error: {e}", file=sys.stderr)
-                except Exception as e:
-                    print(f"✗ Bank detection/parsing error: {e}", file=sys.stderr)
-                    import traceback
-                    traceback.print_exc(file=sys.stderr)
-            
-            # If still no transactions, try accurate parser
-            if (df is None or (hasattr(df, 'empty') and df.empty)) and parse_bank_statement_accurately:
-                try:
-                    df = parse_bank_statement_accurately(pdf_path)
-                    if df is not None and not df.empty:
-                        print(f"✓ Accurate parser extracted {len(df)} transactions", file=sys.stderr)
-                        # Try to extract metadata
-                        if not metadata and StatementMetadataExtractor:
-                            try:
-                                metadata = StatementMetadataExtractor.extract_all_metadata(
-                                    pdf_path, detected_bank or 'UNKNOWN', df
-                                )
-                            except Exception as meta_err:
-                                print(f"✗ Metadata extraction error: {meta_err}", file=sys.stderr)
-                                metadata = {}
-                except Exception as e:
-                    print(f"✗ Accurate parser error: {e}", file=sys.stderr)
-                    import traceback
-                    traceback.print_exc(file=sys.stderr)
-                    if df is None:
-                        df = pd.DataFrame()
-            
-            # Final fallback: try bank-specific parser without bank code
-            if (df is None or (hasattr(df, 'empty') and df.empty)) and parse_bank_statement:
-                try:
-                    result = parse_bank_statement(pdf_path)
-                    if isinstance(result, tuple):
-                        df, metadata = result
-                    else:
-                        df = result
-                    if df is not None and not df.empty:
-                        print(f"✓ Generic parser extracted {len(df)} transactions", file=sys.stderr)
-                    # Try to extract metadata if not already extracted
-                    if not metadata and df is not None and not df.empty and StatementMetadataExtractor:
-                        try:
-                            metadata = StatementMetadataExtractor.extract_all_metadata(
-                                pdf_path, detected_bank or 'UNKNOWN', df
-                            )
-                        except Exception as meta_err:
-                            print(f"✗ Metadata extraction error: {meta_err}", file=sys.stderr)
-                            metadata = {}
-                except Exception as e:
-                    print(f"✗ Fallback parser error: {e}", file=sys.stderr)
-                    import traceback
-                    traceback.print_exc(file=sys.stderr)
-                    if df is None:
-                        df = pd.DataFrame()
-            
-            # If still no data, create empty DataFrame
-            if df is None:
-                df = pd.DataFrame()
-                print("✗ Warning: All parsers failed, returning empty DataFrame", file=sys.stderr)
-            
-            # Ensure metadata is a dict
-            if metadata is None:
-                metadata = {}
-            elif not isinstance(metadata, dict):
-                metadata = {}
-            
-            # Convert DataFrame to JSON
-            if df is not None and hasattr(df, 'to_dict'):
-                # Normalize dates
+                            df = res
+                    except Exception:
+                        pass
+                if df is None or (hasattr(df, 'empty') and df.empty):
+                    try:
+                        tmp = parse_bank_statement_accurately(pdf_path)
+                        if tmp is not None and not tmp.empty:
+                            df = tmp
+                    except Exception:
+                        pass
+                if metadata is None and df is not None and not df.empty and StatementMetadataExtractor:
+                    try:
+                        metadata = StatementMetadataExtractor.extract_all_metadata(pdf_path, bank_hint or 'UNKNOWN', df)
+                    except Exception:
+                        metadata = {}
+                if df is None:
+                    df = pd.DataFrame()
                 if 'date_iso' not in df.columns and 'date' in df.columns:
                     def normalize_date(date_val):
                         if pd.isna(date_val):
                             return None
                         try:
-                            date_str = str(date_val).strip()
-                            parsed = pd.to_datetime(date_str, dayfirst=True, errors='coerce')
+                            parsed = pd.to_datetime(str(date_val).strip(), dayfirst=True, errors='coerce')
                             if pd.notna(parsed):
                                 return parsed.strftime('%Y-%m-%d')
                             return None
                         except:
                             return None
                     df['date_iso'] = df['date'].apply(normalize_date)
-                
-                # Filter out invalid dates
                 if 'date_iso' in df.columns:
                     df = df[df['date_iso'].notna()].copy()
-                
-                # Convert to records
-                transactions = df.to_dict('records')
-                
-                # Convert datetime objects to strings
-                for trans in transactions:
-                    for key, value in trans.items():
-                        if hasattr(value, 'isoformat'):
-                            trans[key] = value.isoformat()
-                        elif pd.isna(value):
-                            trans[key] = None
-            else:
-                transactions = []
-            
-            result = {
-                'success': True,
-                'transactions': transactions,
-                'count': len(transactions),
-                'metadata': metadata
-            }
+                transactions = df.to_dict('records') if hasattr(df, 'to_dict') else []
+                result = {
+                    'success': True,
+                    'transactions': transactions,
+                    'count': len(transactions),
+                    'metadata': metadata or {}
+                }
             
             return {
                 'statusCode': 200,

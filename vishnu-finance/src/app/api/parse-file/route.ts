@@ -22,7 +22,7 @@ async function tryPythonParser(fileBuffer: Buffer, fileType: string): Promise<{ 
       baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
     }
     
-    const pythonFunctionUrl = `${baseUrl}/api/parse-file-python`;
+    const pythonFunctionUrl = `${baseUrl}/api/parser`;
     
     const fileBase64 = fileBuffer.toString('base64');
     
@@ -32,8 +32,11 @@ async function tryPythonParser(fileBuffer: Buffer, fileType: string): Promise<{ 
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        file_data: fileBase64,
-        file_type: fileType,
+        type: 'file',
+        payload: {
+          file_data: fileBase64,
+          file_type: fileType,
+        }
       }),
     });
     

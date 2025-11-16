@@ -49,6 +49,7 @@ interface ImportRecord {
 export async function POST(request: NextRequest) {
   console.log('🏦 Import Bank Statement API: Starting request');
   
+  
   try {
     const body = await request.json();
     const { userId, records, metadata, document, useAICategorization = true, validateBalance = true, categorizeInBackground = false, forceInsert = false } = body as { 
@@ -1297,7 +1298,7 @@ export async function POST(request: NextRequest) {
           transactionIds: insertedTransactionIds,
           total: insertedTransactionIds.length,
         },
-      } : {}),
+      } : {})
     });
     
   } catch (error: any) {

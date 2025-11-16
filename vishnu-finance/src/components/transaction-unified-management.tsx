@@ -97,6 +97,9 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
   const [showBulkCategorize, setShowBulkCategorize] = useState(false);
   const [bulkCategoryId, setBulkCategoryId] = useState<string>('');
   const [isBulkUpdating, setIsBulkUpdating] = useState(false);
+  // Inline debug info
+  const [parseDebug, setParseDebug] = useState<any>(null);
+  const [importDebug, setImportDebug] = useState<any>(null);
   const [showDeleted, setShowDeleted] = useState(false);
   const [showSelectionMode, setShowSelectionMode] = useState(false); // Toggle checkbox visibility
   
@@ -1067,6 +1070,8 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
     setIsParsingFile(true);
     setParseProgress(5);
     setFileError(null);
+    setParseDebug(null);
+    setImportDebug(null);
 
     try {
       // Simulate progressive parse progress up to 90%
@@ -1090,6 +1095,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
           throw new Error(err.error || 'Failed to parse PDF');
         }
         const data = await res.json();
+        if (data?.debug) setParseDebug(data.debug);
         
         const transactionsToSet = data.transactions || [];
         setParsedTransactions(transactionsToSet);
@@ -1113,6 +1119,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
         throw new Error(errorData.error || `Failed to parse file (Status: ${response.status})`);
       }
       const data = await response.json();
+      if (data?.debug) setParseDebug(data.debug);
       setParsedTransactions(data.transactions || []);
       setTempFiles(data.tempFiles || []);
       setShowCsvPreview(true);
@@ -1358,6 +1365,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
         throw new Error(err.error || 'Batch import failed');
       }
       const result = await response.json();
+      if (result) setImportDebug({ request: { count: normalized.length, useAICategorization: true, categorizeInBackground: useBackgroundCategorization }, response: result });
       const incomeCount = result.incomeInserted || 0;
       const expenseCount = result.expenseInserted || 0;
       const totalInserted = result.inserted || (incomeCount + expenseCount);
@@ -1464,6 +1472,50 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
 
   return (
     <div className="w-full bg-background pb-16 md:pb-20 lg:pb-6">
+      {/* Always-visible Debug Panels */}
+      <div className="px-4 md:px-6 lg:px-8 mt-4 mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="rounded-lg border p-3 bg-card">
+          <div className="text-sm font-semibold mb-1">Parser Debug (PDF parsing)</div>
+          {parseDebug ? (
+            <>
+              {parseDebug.method && (
+                <p className="text-xs mb-1"><span className="font-medium">Method:</span> {parseDebug.method}</p>
+              )}
+              {parseDebug.explanation && (
+                <p className="text-xs mb-2 text-muted-foreground">{parseDebug.explanation}</p>
+              )}
+              {parseDebug.codeFiles && Array.isArray(parseDebug.codeFiles) && (
+                <div className="mb-2">
+                  <p className="text-xs font-medium">Code files referenced:</p>
+                  <ul className="list-disc pl-4 text-xs">
+                    {parseDebug.codeFiles.map((f: string, idx: number) => (<li key={idx}>{f}</li>))}
+                  </ul>
+                </div>
+              )}
+              <pre className="text-xs overflow-auto max-h-64 bg-muted/40 p-2 rounded">{JSON.stringify(parseDebug, null, 2)}</pre>
+            </>
+          ) : (
+            <pre className="text-xs overflow-auto max-h-64 bg-muted/40 p-2 rounded">
+{JSON.stringify({ message: 'No parse data yet. Select a PDF and click Parse.' }, null, 2)}
+            </pre>
+          )}
+        </div>
+        <div className="rounded-lg border p-3 bg-card">
+          <div className="text-sm font-semibold mb-1">Import Debug (DB import)</div>
+          {importDebug ? (
+            <>
+              {importDebug.request && (
+                <p className="text-xs mb-1"><span className="font-medium">Requested:</span> {importDebug.request.count} transactions, AI={String(importDebug.request.useAICategorization)}, Background={String(importDebug.request.categorizeInBackground)}</p>
+              )}
+              <pre className="text-xs overflow-auto max-h-64 bg-muted/40 p-2 rounded">{JSON.stringify(importDebug, null, 2)}</pre>
+            </>
+          ) : (
+            <pre className="text-xs overflow-auto max-h-64 bg-muted/40 p-2 rounded">
+{JSON.stringify({ message: 'No import yet. After parsing, click Import to see details.' }, null, 2)}
+            </pre>
+          )}
+        </div>
+      </div>
       {/* Categorization Progress Indicator - Mobile */}
       {categorizationProgress && categorizationProgress.isActive && (
         <div className="md:hidden sticky top-0 z-50 bg-primary/10 border-b border-primary/20 backdrop-blur-sm">
@@ -2736,6 +2788,21 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                     Selected: {selectedFile.name}
                   </p>
                 )}
+
+                <div className="mt-4 space-y-3">
+                  <div className="rounded-lg border p-3">
+                    <div className="text-sm font-medium mb-1">Parse Debug</div>
+                    <pre className="text-xs overflow-auto max-h-64 bg-muted/40 p-2 rounded">
+{JSON.stringify(parseDebug ?? { message: 'No parse data yet. Select a PDF and click Parse.' }, null, 2)}
+                    </pre>
+                  </div>
+                  <div className="rounded-lg border p-3">
+                    <div className="text-sm font-medium mb-1">Import Debug</div>
+                    <pre className="text-xs overflow-auto max-h-64 bg-muted/40 p-2 rounded">
+{JSON.stringify(importDebug ?? { message: 'No import yet. After parsing, click Import to see details.' }, null, 2)}
+                    </pre>
+                  </div>
+                </div>
               </div>
 
               {/* Error Display */}

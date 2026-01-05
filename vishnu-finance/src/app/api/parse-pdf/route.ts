@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { writeFile, readFile, unlink, mkdir } from 'fs/promises';
+import { existsSync } from 'fs';
 import { join } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -36,12 +37,12 @@ async function tryPythonParser(pdfBuffer: Buffer, bankHint: string): Promise<{ s
       // Local development
       baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
     }
-    
+
     const pythonFunctionUrl = `${baseUrl}/api/parser`;
-    
+
     // Convert buffer to base64
     const pdfBase64 = pdfBuffer.toString('base64');
-    
+
     const response = await fetch(pythonFunctionUrl, {
       method: 'POST',
       headers: {
@@ -55,7 +56,7 @@ async function tryPythonParser(pdfBuffer: Buffer, bankHint: string): Promise<{ s
         }
       }),
     });
-    
+
     if (response.ok) {
       const data = await response.json();
       // Python serverless functions may return {statusCode, body} format
@@ -68,7 +69,7 @@ async function tryPythonParser(pdfBuffer: Buffer, bankHint: string): Promise<{ s
           } else {
             return { success: false, error: parsedBody.error || 'Python parser failed' };
           }
-        } catch (e) {
+        } catch (_e) {
           return { success: false, error: data.body || 'Failed to parse Python response' };
         }
       }
@@ -90,33 +91,33 @@ async function tryPythonParser(pdfBuffer: Buffer, bankHint: string): Promise<{ s
     if (error instanceof Error) {
       console.error('Error details:', error.message, error.stack);
     }
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Unknown error' 
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
     };
   }
 }
 
 export async function POST(request: NextRequest) {
   // #region agent log
-  fetch('http://127.0.0.1:7244/ingest/6a07c0bd-f817-41ee-a7bf-a7a39cb5dabd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'parse-pdf/route.ts:100',message:'POST handler called',data:{url:request.url,method:request.method},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+  fetch('http://127.0.0.1:7244/ingest/6a07c0bd-f817-41ee-a7bf-a7a39cb5dabd', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'parse-pdf/route.ts:100', message: 'POST handler called', data: { url: request.url, method: request.method }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'A' }) }).catch(() => { });
   // #endregion
   console.log('🔍 PDF API: Starting request processing');
-  
-  
+
+
   try {
     // #region agent log
-    fetch('http://127.0.0.1:7244/ingest/6a07c0bd-f817-41ee-a7bf-a7a39cb5dabd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'parse-pdf/route.ts:105',message:'Before formData parsing',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+    fetch('http://127.0.0.1:7244/ingest/6a07c0bd-f817-41ee-a7bf-a7a39cb5dabd', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'parse-pdf/route.ts:105', message: 'Before formData parsing', data: {}, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'C' }) }).catch(() => { });
     // #endregion
     const formData = await request.formData();
     // #region agent log
-    fetch('http://127.0.0.1:7244/ingest/6a07c0bd-f817-41ee-a7bf-a7a39cb5dabd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'parse-pdf/route.ts:107',message:'After formData parsing',data:{hasFormData:!!formData},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+    fetch('http://127.0.0.1:7244/ingest/6a07c0bd-f817-41ee-a7bf-a7a39cb5dabd', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'parse-pdf/route.ts:107', message: 'After formData parsing', data: { hasFormData: !!formData }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'C' }) }).catch(() => { });
     // #endregion
     const file = formData.get('pdf') as File;
     const bankHint = (formData.get('bank') as string | null)?.toLowerCase() || '';
-    
+
     // #region agent log
-    fetch('http://127.0.0.1:7244/ingest/6a07c0bd-f817-41ee-a7bf-a7a39cb5dabd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'parse-pdf/route.ts:110',message:'File extracted from formData',data:{hasFile:!!file,fileName:file?.name,fileType:file?.type,fileSize:file?.size,bankHint},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+    fetch('http://127.0.0.1:7244/ingest/6a07c0bd-f817-41ee-a7bf-a7a39cb5dabd', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'parse-pdf/route.ts:110', message: 'File extracted from formData', data: { hasFile: !!file, fileName: file?.name, fileType: file?.type, fileSize: file?.size, bankHint }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'D' }) }).catch(() => { });
     // #endregion
     console.log('🔍 PDF API: Form data received');
     console.log('🔍 PDF API: File details:', {
@@ -124,10 +125,10 @@ export async function POST(request: NextRequest) {
       type: file?.type,
       size: file?.size
     });
-    
+
     if (!file) {
       // #region agent log
-      fetch('http://127.0.0.1:7244/ingest/6a07c0bd-f817-41ee-a7bf-a7a39cb5dabd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'parse-pdf/route.ts:117',message:'Early return - no file',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+      fetch('http://127.0.0.1:7244/ingest/6a07c0bd-f817-41ee-a7bf-a7a39cb5dabd', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'parse-pdf/route.ts:117', message: 'Early return - no file', data: {}, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'D' }) }).catch(() => { });
       // #endregion
       console.log('❌ PDF API: No file provided');
       return NextResponse.json({ error: 'No PDF file provided' }, { status: 400 });
@@ -135,7 +136,7 @@ export async function POST(request: NextRequest) {
 
     if (file.type !== 'application/pdf') {
       // #region agent log
-      fetch('http://127.0.0.1:7244/ingest/6a07c0bd-f817-41ee-a7bf-a7a39cb5dabd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'parse-pdf/route.ts:122',message:'Early return - invalid file type',data:{fileType:file.type},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+      fetch('http://127.0.0.1:7244/ingest/6a07c0bd-f817-41ee-a7bf-a7a39cb5dabd', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'parse-pdf/route.ts:122', message: 'Early return - invalid file type', data: { fileType: file.type }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'D' }) }).catch(() => { });
       // #endregion
       console.log('❌ PDF API: Invalid file type:', file.type);
       return NextResponse.json({ error: 'File must be a PDF' }, { status: 400 });
@@ -147,22 +148,22 @@ export async function POST(request: NextRequest) {
     const toolsDir = join(process.cwd(), 'tools');
     const toolsMasterDir = join(process.cwd(), 'tools-master');
     const legacyToolsDir = join(process.cwd(), 'legacy', 'tools');
-    
+
     // Ensure uploads directory exists
     try {
       await mkdir(uploadsDir, { recursive: true });
     } catch {
       // Directory might already exist, ignore error
     }
-    
+
     console.log('🔍 PDF API: Directories:', { uploadsDir, toolsDir });
-    
+
     // Convert File to Buffer and save
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
     const filename = `statement_${Date.now()}.pdf`;
     const filepath = join(uploadsDir, filename);
-    
+
     console.log('🔍 PDF API: Saving file to:', filepath);
     await writeFile(filepath, buffer);
     console.log('✅ PDF API: File saved successfully');
@@ -174,16 +175,16 @@ export async function POST(request: NextRequest) {
       try {
         console.log('🐍 PDF API: Attempting Python serverless function...');
         const pythonResult = await tryPythonParser(buffer, bankHint);
-        
+
         if (pythonResult.success && pythonResult.data) {
           console.log('✅ PDF API: Python parser succeeded');
           const result = pythonResult.data;
-          
+
           // Clean up file
           try {
             await unlink(filepath);
-          } catch {}
-          
+          } catch { }
+
           return NextResponse.json({
             success: result.success || true,
             transactions: result.transactions || [],
@@ -208,21 +209,21 @@ export async function POST(request: NextRequest) {
     console.log('🐍 PDF API: Starting local Python execution...');
     console.log('📁 PDF API: File path:', filepath);
     console.log('📁 PDF API: Tools directory:', toolsDir);
-    
+
     try {
       // Check if Python is available
       try {
         const { stdout: pythonVersion } = await execAsync('python --version');
         console.log('✅ PDF API: Python found:', pythonVersion.trim());
-      } catch (pythonCheckError) {
+      } catch (_pythonCheckError) {
         console.error('❌ PDF API: Python not found in PATH. Please ensure Python is installed.');
         throw new Error('Python is not available. Please install Python to use the PDF parser.');
       }
-      
+
       // Update the Python script to use the uploaded file
       const csvOutput = join(uploadsDir, `extracted_${Date.now()}.csv`);
       const jsonOutput = join(uploadsDir, `extracted_${Date.now()}.json`);
-      
+
       // Create a temporary Python script that writes output to file instead of stdout
       const tempScript = `
 import sys
@@ -533,13 +534,13 @@ if __name__ == "__main__":
       // Execute the Python script
       console.log('🔍 PDF API: Executing Python script:', tempScriptPath);
       console.log('🔍 PDF API: Python command:', `python "${tempScriptPath}"`);
-      console.log('🔍 PDF API: Input file exists:', require('fs').existsSync(filepath));
-      
+      console.log('🔍 PDF API: Input file exists:', existsSync(filepath));
+
       // Use increased maxBuffer (10MB) and timeout (180s) to handle large PDF outputs
       let stdout = '';
       let stderr = '';
       try {
-        const result = await execAsync(`python "${tempScriptPath}"`, { 
+        const result = await execAsync(`python "${tempScriptPath}"`, {
           timeout: 180_000,
           maxBuffer: 10 * 1024 * 1024 // 10MB buffer
         });
@@ -554,14 +555,14 @@ if __name__ == "__main__":
         }
         // Don't throw yet - try to parse output if available
       }
-      
+
       console.log('🔍 PDF API: Python stdout length:', stdout.length);
       console.log('🔍 PDF API: Python stdout (first 500 chars):', stdout.substring(0, 500));
       if (stderr) {
         console.log('⚠️ PDF API: Python stderr length:', stderr.length);
         console.log('⚠️ PDF API: Python stderr:', stderr);
       }
-      
+
       // Keep temporary script for later cleanup
       console.log('📁 PDF API: Temporary script will be cleaned up after import');
 
@@ -569,7 +570,7 @@ if __name__ == "__main__":
       let transactions: any[] = [];
       let transactionCount = 0;
       let metadata: any = null;
-      
+
       // Always read from JSON file first (most reliable)
       try {
         const fileContent = await readFile(jsonOutput, 'utf-8');
@@ -593,7 +594,7 @@ if __name__ == "__main__":
         }
       } catch (error) {
         console.log('⚠️ PDF API: Failed to read JSON file, trying stdout...', error);
-        
+
         // Fallback: Try parsing stdout (but be more careful)
         try {
           const trimmed = stdout.trim();
@@ -641,13 +642,13 @@ if __name__ == "__main__":
             }
             transactions = rows;
           }
-        } catch {}
+        } catch { }
       }
 
       if (!transactions.length) {
-        return NextResponse.json({ 
-          success: true, 
-          transactions: [], 
+        return NextResponse.json({
+          success: true,
+          transactions: [],
           count: 0,
           tempFiles: [filepath, csvOutput, tempScriptPath].filter(Boolean),
           debug: {
@@ -664,10 +665,10 @@ if __name__ == "__main__":
       console.log('📁 PDF API: Keeping files for import:', { filepath, csvOutput, tempScriptPath });
 
       console.log('✅ PDF API: Success! Returning', transactions.length, 'transactions');
-      
+
       // Always include metadata (even if empty) - ensure it's an object
       const finalMetadata = metadata && typeof metadata === 'object' ? metadata : {};
-      
+
       if (finalMetadata && Object.keys(finalMetadata).length > 0) {
         console.log('✅ PDF API: Metadata included:', {
           openingBalance: finalMetadata.openingBalance,
@@ -676,8 +677,8 @@ if __name__ == "__main__":
           ifsc: finalMetadata.ifsc,
           branch: finalMetadata.branch,
           accountHolderName: finalMetadata.accountHolderName,
-          statementPeriod: finalMetadata.statementStartDate && finalMetadata.statementEndDate 
-            ? `${finalMetadata.statementStartDate} to ${finalMetadata.statementEndDate}` 
+          statementPeriod: finalMetadata.statementStartDate && finalMetadata.statementEndDate
+            ? `${finalMetadata.statementStartDate} to ${finalMetadata.statementEndDate}`
             : 'N/A',
           totalCredits: finalMetadata.totalCredits,
           totalDebits: finalMetadata.totalDebits,
@@ -686,10 +687,10 @@ if __name__ == "__main__":
       } else {
         console.log('⚠️ PDF API: No metadata extracted from PDF');
       }
-      
-      return NextResponse.json({ 
-        success: true, 
-        transactions, 
+
+      return NextResponse.json({
+        success: true,
+        transactions,
         count: transactionCount || transactions.length,
         metadata: finalMetadata,  // Always include metadata (even if empty)
         tempFiles: [filepath, csvOutput, tempScriptPath].filter(Boolean),
@@ -711,26 +712,26 @@ if __name__ == "__main__":
 
     } catch (error) {
       // #region agent log
-      fetch('http://127.0.0.1:7244/ingest/6a07c0bd-f817-41ee-a7bf-a7a39cb5dabd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'parse-pdf/route.ts:631',message:'Local Python execution catch block',data:{errorMessage:error instanceof Error?error.message:'unknown',errorStack:error instanceof Error?error.stack:undefined},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+      fetch('http://127.0.0.1:7244/ingest/6a07c0bd-f817-41ee-a7bf-a7a39cb5dabd', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'parse-pdf/route.ts:631', message: 'Local Python execution catch block', data: { errorMessage: error instanceof Error ? error.message : 'unknown', errorStack: error instanceof Error ? error.stack : undefined }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'B' }) }).catch(() => { });
       // #endregion
       console.error('❌ PDF API: Local Python execution failed:', error);
-      
+
       // Strategy 3: Fallback to Node.js parser
       try {
         // #region agent log
-        fetch('http://127.0.0.1:7244/ingest/6a07c0bd-f817-41ee-a7bf-a7a39cb5dabd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'parse-pdf/route.ts:636',message:'Attempting Node.js fallback',data:{filepath},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+        fetch('http://127.0.0.1:7244/ingest/6a07c0bd-f817-41ee-a7bf-a7a39cb5dabd', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'parse-pdf/route.ts:636', message: 'Attempting Node.js fallback', data: { filepath }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'B' }) }).catch(() => { });
         // #endregion
         console.log('📄 PDF API: Attempting Node.js fallback parser...');
         const nodeResult = await parsePDFWithNode(filepath, bankHint);
-        
+
         if (nodeResult.success && nodeResult.transactions.length > 0) {
           console.log(`✅ PDF API: Node.js parser succeeded with ${nodeResult.transactions.length} transactions`);
-          
+
           // Clean up file
           try {
             await unlink(filepath);
-          } catch {}
-          
+          } catch { }
+
           return NextResponse.json({
             success: true,
             transactions: nodeResult.transactions,
@@ -749,31 +750,31 @@ if __name__ == "__main__":
         }
       } catch (nodeError) {
         // #region agent log
-        fetch('http://127.0.0.1:7244/ingest/6a07c0bd-f817-41ee-a7bf-a7a39cb5dabd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'parse-pdf/route.ts:663',message:'Node.js parser also failed',data:{errorMessage:nodeError instanceof Error?nodeError.message:'unknown'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+        fetch('http://127.0.0.1:7244/ingest/6a07c0bd-f817-41ee-a7bf-a7a39cb5dabd', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'parse-pdf/route.ts:663', message: 'Node.js parser also failed', data: { errorMessage: nodeError instanceof Error ? nodeError.message : 'unknown' }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'B' }) }).catch(() => { });
         // #endregion
         console.error('❌ PDF API: Node.js parser also failed:', nodeError);
       }
-      
+
       // Clean up files on error
       try {
         await unlink(filepath);
-      } catch {}
-      
+      } catch { }
+
       // #region agent log
-      fetch('http://127.0.0.1:7244/ingest/6a07c0bd-f817-41ee-a7bf-a7a39cb5dabd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'parse-pdf/route.ts:672',message:'All parsing methods failed',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+      fetch('http://127.0.0.1:7244/ingest/6a07c0bd-f817-41ee-a7bf-a7a39cb5dabd', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'parse-pdf/route.ts:672', message: 'All parsing methods failed', data: {}, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'B' }) }).catch(() => { });
       // #endregion
       console.error('❌ PDF API: All parsing methods failed');
-      
+
       // Extract more detailed error information
-      let errorDetails = error instanceof Error ? error.message : 'Unknown error';
+      const errorDetails = error instanceof Error ? error.message : 'Unknown error';
       let pythonError = '';
-      
+
       // Try to get Python error from stderr if available
       if (error instanceof Error && error.message.includes('stderr')) {
         pythonError = error.message;
       }
-      
-      return NextResponse.json({ 
+
+      return NextResponse.json({
         error: 'Failed to parse PDF. Please ensure it\'s a valid bank statement. All parsing methods (Python serverless, local Python, and Node.js fallback) failed.',
         details: errorDetails,
         pythonError: pythonError || undefined,
@@ -787,10 +788,10 @@ if __name__ == "__main__":
 
   } catch (error) {
     // #region agent log
-    fetch('http://127.0.0.1:7244/ingest/6a07c0bd-f817-41ee-a7bf-a7a39cb5dabd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'parse-pdf/route.ts:683',message:'Top-level catch block',data:{errorMessage:error instanceof Error?error.message:'unknown',errorStack:error instanceof Error?error.stack:undefined},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+    fetch('http://127.0.0.1:7244/ingest/6a07c0bd-f817-41ee-a7bf-a7a39cb5dabd', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'parse-pdf/route.ts:683', message: 'Top-level catch block', data: { errorMessage: error instanceof Error ? error.message : 'unknown', errorStack: error instanceof Error ? error.stack : undefined }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'B' }) }).catch(() => { });
     // #endregion
     console.error('❌ PDF API: PDF upload error:', error);
-    return NextResponse.json({ 
+    return NextResponse.json({
       error: 'Failed to process PDF',
       details: error instanceof Error ? error.message : 'Unknown error',
       debug: { stage: 'upload', error: error instanceof Error ? error.message : 'Unknown error' }

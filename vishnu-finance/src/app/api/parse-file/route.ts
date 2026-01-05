@@ -3,6 +3,7 @@ import { writeFile, unlink, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { existsSync } from 'fs';
 import { tmpdir } from 'os';
 
 const execAsync = promisify(exec);
@@ -21,11 +22,11 @@ async function tryPythonParser(fileBuffer: Buffer, fileType: string): Promise<{ 
     } else {
       baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
     }
-    
+
     const pythonFunctionUrl = `${baseUrl}/api/parser`;
-    
+
     const fileBase64 = fileBuffer.toString('base64');
-    
+
     const response = await fetch(pythonFunctionUrl, {
       method: 'POST',
       headers: {
@@ -39,7 +40,7 @@ async function tryPythonParser(fileBuffer: Buffer, fileType: string): Promise<{ 
         }
       }),
     });
-    
+
     if (response.ok) {
       const data = await response.json();
       // Python serverless functions may return {statusCode, body} format
@@ -52,7 +53,7 @@ async function tryPythonParser(fileBuffer: Buffer, fileType: string): Promise<{ 
           } else {
             return { success: false, error: parsedBody.error || 'Python parser failed' };
           }
-        } catch (e) {
+        } catch (_e) {
           return { success: false, error: data.body || 'Failed to parse Python response' };
         }
       }
@@ -70,16 +71,16 @@ async function tryPythonParser(fileBuffer: Buffer, fileType: string): Promise<{ 
     }
   } catch (error) {
     console.log('⚠️ Multi-Format API: Python function call failed, will try fallback:', error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Unknown error' 
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
     };
   }
 }
 
 export async function POST(request: NextRequest) {
   console.log('🔍 Multi-Format API: Starting request processing');
-  
+
   try {
     const formData = await request.formData();
     const file = formData.get('file') as File;
@@ -89,7 +90,7 @@ export async function POST(request: NextRequest) {
       type: file?.type,
       size: file?.size
     });
-    
+
     if (!file) {
       console.log('❌ Multi-Format API: No file provided');
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
@@ -98,18 +99,18 @@ export async function POST(request: NextRequest) {
     // Determine file type by extension (more reliable than MIME type)
     const fileName = file.name.toLowerCase();
     let fileType = null;
-    
+
     if (fileName.endsWith('.pdf')) fileType = '.pdf';
     else if (fileName.endsWith('.xls')) fileType = '.xls';
     else if (fileName.endsWith('.xlsx')) fileType = '.xlsx';
     else if (fileName.endsWith('.doc')) fileType = '.doc';
     else if (fileName.endsWith('.docx')) fileType = '.docx';
     else if (fileName.endsWith('.txt')) fileType = '.txt';
-    
+
     if (!fileType) {
       console.log('❌ Multi-Format API: Unsupported file type:', file.name);
-      return NextResponse.json({ 
-        error: 'Unsupported file type. Please upload PDF, XLS, XLSX, DOC, DOCX, or TXT files.' 
+      return NextResponse.json({
+        error: 'Unsupported file type. Please upload PDF, XLS, XLSX, DOC, DOCX, or TXT files.'
       }, { status: 400 });
     }
 
@@ -119,22 +120,22 @@ export async function POST(request: NextRequest) {
     const toolsDir = join(process.cwd(), 'tools');
     const parseFilePythonDir = join(process.cwd(), 'api', 'parse-file-python');
     const legacyToolsDir = join(process.cwd(), 'legacy', 'tools');
-    
+
     // Ensure uploads directory exists
     try {
       await mkdir(uploadsDir, { recursive: true });
     } catch {
       // Directory might already exist, ignore error
     }
-    
+
     console.log('🔍 Multi-Format API: Directories:', { uploadsDir, toolsDir });
-    
+
     // Convert File to Buffer and save
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
     const filename = `statement_${Date.now()}${fileType}`;
     const filepath = join(uploadsDir, filename);
-    
+
     console.log('🔍 Multi-Format API: Saving file to:', filepath);
     await writeFile(filepath, buffer);
     console.log('✅ Multi-Format API: File saved successfully');
@@ -146,16 +147,16 @@ export async function POST(request: NextRequest) {
       try {
         console.log('🐍 Multi-Format API: Attempting Python serverless function...');
         const pythonResult = await tryPythonParser(buffer, fileType);
-        
+
         if (pythonResult.success && pythonResult.data) {
           console.log('✅ Multi-Format API: Python parser succeeded');
           const result = pythonResult.data;
-          
+
           // Clean up file
           try {
             await unlink(filepath);
-          } catch {}
-          
+          } catch { }
+
           return NextResponse.json({
             success: result.success || true,
             transactions: result.transactions || [],
@@ -181,20 +182,20 @@ export async function POST(request: NextRequest) {
     console.log('🐍 Multi-Format API: Starting local Python execution...');
     console.log('📁 Multi-Format API: File path:', filepath);
     console.log('📁 Multi-Format API: Tools directory:', toolsDir);
-    
+
     try {
       // Check if Python is available
       try {
         const { stdout: pythonVersion } = await execAsync('python --version');
         console.log('✅ Multi-Format API: Python found:', pythonVersion.trim());
-      } catch (pythonCheckError) {
+      } catch (_pythonCheckError) {
         console.error('❌ Multi-Format API: Python not found in PATH. Please ensure Python is installed.');
         throw new Error('Python is not available. Please install Python to use the file parser.');
       }
-      
+
       // Create a temporary Python script using the multi-format parser
       const csvOutput = join(uploadsDir, `extracted_${Date.now()}.csv`);
-      
+
       const tempScript = `
 import sys
 import os
@@ -406,8 +407,8 @@ if __name__ == "__main__":
       // Execute the Python script
       console.log('🔍 Multi-Format API: Executing Python script:', tempScriptPath);
       console.log('🔍 Multi-Format API: Python command:', `python "${tempScriptPath}"`);
-      console.log('🔍 Multi-Format API: Input file exists:', require('fs').existsSync(filepath));
-      
+      console.log('🔍 Multi-Format API: Input file exists:', existsSync(filepath));
+
       let stdout = '';
       let stderr = '';
       try {
@@ -426,7 +427,7 @@ if __name__ == "__main__":
         }
         // Don't throw yet - try to parse output if available
       }
-      
+
       console.log('🔍 Multi-Format API: Python stdout length:', stdout.length);
       console.log('🔍 Multi-Format API: Python stdout (first 500 chars):', stdout.substring(0, 500));
       if (stderr) {
@@ -437,7 +438,7 @@ if __name__ == "__main__":
       } else {
         console.log('ℹ️ Multi-Format API: No stderr output from Python');
       }
-      
+
       // Keep temporary script for later cleanup
       console.log('📁 Multi-Format API: Temporary script will be cleaned up after import');
 
@@ -446,17 +447,17 @@ if __name__ == "__main__":
         console.error('❌ Multi-Format API: Python script error detected');
         console.error('❌ Multi-Format API: stderr:', stderr);
         console.error('❌ Multi-Format API: stdout (last 1000 chars):', stdout.substring(Math.max(0, stdout.length - 1000)));
-        
+
         // Check if it's a Python import error
         if (stderr.includes('ModuleNotFoundError') || stderr.includes('ImportError')) {
-          return NextResponse.json({ 
+          return NextResponse.json({
             error: `Failed to parse ${fileType.toUpperCase()} file. Python dependencies are missing.`,
             details: stderr,
             suggestion: 'Please ensure all Python dependencies are installed (pandas, openpyxl, etc.)'
           }, { status: 500 });
         }
-        
-        return NextResponse.json({ 
+
+        return NextResponse.json({
           error: `Failed to parse ${fileType.toUpperCase()} file. Please ensure it contains valid transaction data.`,
           details: stderr.substring(0, 1000) // Limit error message size
         }, { status: 500 });
@@ -478,11 +479,11 @@ if __name__ == "__main__":
         if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
           jsonText = trimmed.slice(firstBrace, lastBrace + 1);
         }
-        
+
         if (jsonText) {
           try {
             const parsed = JSON.parse(jsonText);
-            
+
             // Check if parsing failed and return error with debug info
             if (parsed.success === false) {
               parseError = parsed.error || 'Parsing failed';
@@ -500,12 +501,12 @@ if __name__ == "__main__":
                 count: 0
               }, { status: 400 });
             }
-            
+
             if (parsed.file) {
               // JSON was too large and written to file
               const fileContent = await import('fs').then(fs => fs.promises.readFile(parsed.file, 'utf-8'));
               const fileParsed = JSON.parse(fileContent);
-              
+
               // Check for errors in file content too
               if (fileParsed.success === false) {
                 parseError = fileParsed.error || 'Parsing failed';
@@ -518,7 +519,7 @@ if __name__ == "__main__":
                   count: 0
                 }, { status: 400 });
               }
-              
+
               transactions = Array.isArray(fileParsed?.transactions) ? fileParsed.transactions : [];
               transactionCount = fileParsed?.count || 0;
             } else {
@@ -539,7 +540,7 @@ if __name__ == "__main__":
           const { readFile } = await import('fs/promises');
           const fileContent = await readFile(jsonOutput, 'utf-8');
           const parsed = JSON.parse(fileContent);
-          
+
           // Check for errors in JSON file
           if (parsed.success === false) {
             parseError = parsed.error || 'Parsing failed';
@@ -556,7 +557,7 @@ if __name__ == "__main__":
               count: 0
             }, { status: 400 });
           }
-          
+
           transactions = Array.isArray(parsed?.transactions) ? parsed.transactions : [];
           transactionCount = parsed?.count || 0;
           console.log(`✅ Multi-Format API: Read ${transactions.length} transactions from JSON file`);
@@ -582,14 +583,14 @@ if __name__ == "__main__":
           // Don't return error - continue to see if we have transactions
           csvContent = null;
         }
-        
+
         // Only parse CSV if we got content
         if (csvContent) {
           // Parse CSV to return structured data
           const lines = csvContent.split('\n').filter(line => line.trim());
           if (lines.length < 2) {
-            return NextResponse.json({ 
-              error: `No transactions found in ${fileType.toUpperCase()} file. Please ensure it contains valid transaction data.` 
+            return NextResponse.json({
+              error: `No transactions found in ${fileType.toUpperCase()} file. Please ensure it contains valid transaction data.`
             }, { status: 400 });
           }
 
@@ -599,7 +600,7 @@ if __name__ == "__main__":
           for (let i = 1; i < lines.length; i++) {
             const values = lines[i].split(',');
             if (values.every(v => !v.trim())) continue;
-            
+
             const transaction: any = {};
             headers.forEach((header, index) => {
               transaction[header.trim()] = values[index]?.trim() || '';
@@ -616,16 +617,16 @@ if __name__ == "__main__":
           error: parseError || `No valid transactions found in ${fileType.toUpperCase()} file. Please check the format.`,
           tempFiles: [filepath, csvOutput, jsonOutput, tempScriptPath].filter(Boolean)
         };
-        
+
         if (debugInfo) {
           errorResponse.debug = debugInfo;
         }
-        
+
         // Also include stderr if available for more context
         if (stderr) {
           errorResponse.stderr = stderr.substring(0, 2000); // Limit size
         }
-        
+
         return NextResponse.json(errorResponse, { status: 400 });
       }
 
@@ -635,7 +636,7 @@ if __name__ == "__main__":
       console.log('📁 Multi-Format API: Keeping files for import:', { filepath, csvOutput, tempScriptPath });
 
       console.log('✅ Multi-Format API: Success! Returning', transactions.length, 'transactions');
-      
+
       return NextResponse.json({
         success: true,
         transactions,
@@ -647,41 +648,41 @@ if __name__ == "__main__":
 
     } catch (error) {
       console.error('❌ Multi-Format API: Local Python execution failed:', error);
-      
+
       // Strategy 3: For non-PDF files, we don't have a Node.js fallback yet
       // Return error with helpful message
       try {
         await unlink(filepath);
-      } catch {}
-      
+      } catch { }
+
       console.error('❌ Multi-Format API: All parsing methods failed');
-      
+
       // Extract more detailed error information
-      let errorDetails = error instanceof Error ? error.message : 'Unknown error';
+      const errorDetails = error instanceof Error ? error.message : 'Unknown error';
       let pythonError = '';
-      
+
       // Try to get Python error from stderr if available
       if (error instanceof Error && error.message.includes('stderr')) {
         pythonError = error.message;
       }
-      
-      return NextResponse.json({ 
+
+      return NextResponse.json({
         error: `Failed to parse ${fileType.toUpperCase()} file. Please ensure it contains valid transaction data. All parsing methods (Python serverless and local Python) failed.`,
         details: errorDetails,
         pythonError: pythonError || undefined,
-        suggestion: fileType === '.pdf' 
+        suggestion: fileType === '.pdf'
           ? 'For PDF files, try uploading a different bank statement format or ensure the PDF is not corrupted.'
           : fileType === '.xlsx' || fileType === '.xls'
-          ? 'For Excel files, ensure the file contains transaction data in a recognizable format (date, description, amount columns).'
-          : 'Please ensure the file format is correct and contains transaction data.'
+            ? 'For Excel files, ensure the file contains transaction data in a recognizable format (date, description, amount columns).'
+            : 'Please ensure the file format is correct and contains transaction data.'
       }, { status: 500 });
     }
 
-    } catch (error) {
-      console.error('❌ Multi-Format API: File upload error:', error);
-      return NextResponse.json({ 
-        error: 'Failed to process file',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      }, { status: 500 });
-    }
+  } catch (error) {
+    console.error('❌ Multi-Format API: File upload error:', error);
+    return NextResponse.json({
+      error: 'Failed to process file',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 });
+  }
 }

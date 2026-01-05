@@ -62,37 +62,7 @@ class HDFCBankParser(BaseBankParser):
         
         return pd.DataFrame(transactions) if transactions else pd.DataFrame()
     
-    def parse_excel(self, file_path: Path) -> pd.DataFrame:
-        """
-        Parse HDFC Excel statement.
-        
-        Args:
-            file_path: Path to Excel file
-            
-        Returns:
-            DataFrame of transactions
-        """
-        transactions = []
-        seen_transactions = set()
-        
-        try:
-            df = pd.read_excel(file_path)
-            
-            # HDFC format: Date | Narration | Chq/Ref | ValueDt | WithdrawalAmt | DepositAmt | ClosingBalance
-            for idx, row in df.iterrows():
-                transaction = self._parse_excel_row(row, 1, idx)
-                if transaction:
-                    txn_id = self.create_transaction_id(transaction)
-                    if txn_id not in seen_transactions:
-                        seen_transactions.add(txn_id)
-                        transactions.append(transaction)
-        
-        except Exception as e:
-            print(f"Error parsing HDFC Excel: {e}")
-            import traceback
-            traceback.print_exc()
-        
-        return pd.DataFrame(transactions) if transactions else pd.DataFrame()
+
     
     def _parse_text_lines(self, text: str, page_num: int) -> List[Dict]:
         """
@@ -232,79 +202,7 @@ class HDFCBankParser(BaseBankParser):
         
         return transactions
     
-    def _parse_excel_row(self, row: pd.Series, page_num: int, row_idx: int) -> Optional[Dict]:
-        """
-        Parse a single Excel row.
-        
-        Args:
-            row: DataFrame row
-            page_num: Page number
-            row_idx: Row index
-            
-        Returns:
-            Transaction dictionary or None
-        """
-        try:
-            # HDFC format: Date | Narration | Chq/Ref | ValueDt | WithdrawalAmt | DepositAmt | ClosingBalance
-            date_str = str(row.iloc[0] if len(row) > 0 else '').strip()
-            if not date_str or date_str == 'nan':
-                return None
-            
-            date_iso = self._parse_hdfc_date(date_str)
-            if not date_iso:
-                return None
-            
-            narration = str(row.iloc[1] if len(row) > 1 else '').strip()
-            ref_no = str(row.iloc[2] if len(row) > 2 else '').strip()
-            
-            # Withdrawal or deposit
-            withdrawal_str = str(row.iloc[4] if len(row) > 4 else '').strip()
-            deposit_str = str(row.iloc[5] if len(row) > 5 else '').strip()
-            balance_str = str(row.iloc[6] if len(row) > 6 else '').strip()
-            
-            withdrawal = self.parse_amount(withdrawal_str) if withdrawal_str and withdrawal_str != 'nan' else 0
-            deposit = self.parse_amount(deposit_str) if deposit_str and deposit_str != 'nan' else 0
-            balance = self.parse_amount(balance_str) if balance_str and balance_str != 'nan' else 0
-            
-            # Skip if no valid transaction
-            if withdrawal == 0 and deposit == 0:
-                return None
-            
-            # Determine transaction type
-            if withdrawal > 0:
-                transaction_type = 'expense'
-                amount = withdrawal
-            else:
-                transaction_type = 'income'
-                amount = deposit
-            
-            # Extract metadata
-            metadata = self._extract_metadata(narration)
-            store, commodity, clean_description = self.extract_store_and_commodity(narration)
-            
-            transaction = {
-                'date': date_str,
-                'date_iso': date_iso,
-                'description': clean_description or narration,
-                'raw': narration,
-                'amount': amount,
-                'type': transaction_type,
-                'debit': withdrawal,
-                'credit': deposit,
-                'balance': balance,
-                'page': f'Page {page_num}',
-                'line': str(row_idx + 1),
-                'store': store,
-                'commodity': commodity,
-                'reference': ref_no,
-                **metadata
-            }
-            
-            return self.normalize_transaction(transaction)
-        
-        except Exception as e:
-            print(f"Error parsing Excel row {row_idx}: {e}")
-            return None
+
     
     def _parse_hdfc_date(self, date_str: str) -> Optional[str]:
         """

@@ -21,7 +21,11 @@ export function useAuth() {
         setLoading(true);
         setError(null);
         console.log('🔐 AUTH HOOK - Making request to /api/auth/me...');
-        const response = await fetch('/api/auth/me');
+        const response = await fetch('/api/app', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'auth_me' }),
+        });
         console.log('🔐 AUTH HOOK - Response status:', response.status);
         
         if (response.ok) {

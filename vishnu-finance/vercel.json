@@ -3,9 +3,5 @@
   "installCommand": "npm install",
   "framework": "nextjs",
   "regions": ["iad1"],
-  "functions": {
-    "api/parser/**/*.py": {
-      "maxDuration": 180
-    }
-  }
+  "functions": {}
 }

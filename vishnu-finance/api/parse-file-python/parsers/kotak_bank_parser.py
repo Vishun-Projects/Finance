@@ -80,38 +80,7 @@ class KotakBankParser(BaseBankParser):
         
         return pd.DataFrame(transactions) if transactions else pd.DataFrame()
     
-    def parse_excel(self, file_path: Path) -> pd.DataFrame:
-        """
-        Parse Kotak Bank Excel statement.
-        
-        Args:
-            file_path: Path to Excel file
-            
-        Returns:
-            DataFrame of transactions
-        """
-        transactions = []
-        seen_transactions = set()
-        
-        try:
-            # Read Excel file
-            df = pd.read_excel(file_path)
-            
-            # Kotak format: Date | Narration | Chq/Ref No | Withdrawal(Dr)/Deposit(Cr) | Balance
-            for idx, row in df.iterrows():
-                transaction = self._parse_excel_row(row, idx)
-                if transaction:
-                    txn_id = self.create_transaction_id(transaction)
-                    if txn_id not in seen_transactions:
-                        seen_transactions.add(txn_id)
-                        transactions.append(transaction)
-        
-        except Exception as e:
-            print(f"Error parsing Kotak Bank Excel: {e}")
-            import traceback
-            traceback.print_exc()
-        
-        return pd.DataFrame(transactions) if transactions else pd.DataFrame()
+
     
     def _parse_table_row(self, row: List, page: int, line: int) -> Optional[Dict]:
         """
@@ -267,106 +236,7 @@ class KotakBankParser(BaseBankParser):
             print(f"Error parsing table row: {e}")
             return None
     
-    def _parse_excel_row(self, row: pd.Series, idx: int) -> Optional[Dict]:
-        """Parse an Excel row into a transaction dictionary."""
-        try:
-            # Get values by position or column name
-            if len(row) >= 5:
-                date_val = row.iloc[0] if pd.notna(row.iloc[0]) else None
-                narration = str(row.iloc[1]) if pd.notna(row.iloc[1]) else None
-                ref_no = str(row.iloc[2]) if pd.notna(row.iloc[2]) else None
-                amount_with_type = str(row.iloc[3]) if pd.notna(row.iloc[3]) else None
-                balance_with_type = str(row.iloc[4]) if pd.notna(row.iloc[4]) else None
-            else:
-                # Try by column names
-                date_val = row.get('Date') or row.get('date') or row.get('DATE')
-                narration = str(row.get('Narration') or row.get('narration') or row.get('NARRATION') or '')
-                ref_no = str(row.get('Chq/Ref No') or row.get('Ref No') or row.get('Reference') or '')
-                
-                # Look for amount column (may have different names)
-                amount_with_type = None
-                for col in row.index:
-                    col_lower = str(col).lower()
-                    if 'withdrawal' in col_lower or 'deposit' in col_lower or 'dr' in col_lower or 'cr' in col_lower:
-                        amount_with_type = str(row[col])
-                        break
-                
-                balance_with_type = None
-                for col in row.index:
-                    col_lower = str(col).lower()
-                    if 'balance' in col_lower or 'bal' in col_lower:
-                        balance_with_type = str(row[col])
-                        break
-            
-            if not date_val:
-                return None
-            
-            date_iso = self._parse_kotak_date(date_val)
-            if not date_iso:
-                return None
-            
-            # Parse amount with Dr/Cr indicator
-            debit = 0.0
-            credit = 0.0
-            
-            if amount_with_type:
-                amount_match = re.search(r'([0-9,]+(?:\.[0-9]{2})?)\s*\((Dr|Cr)\)', str(amount_with_type), re.IGNORECASE)
-                if amount_match:
-                    amount_str = amount_match.group(1).replace(',', '')
-                    amount_type = amount_match.group(2).upper()
-                    amount_value = float(amount_str)
-                    
-                    if amount_type == 'DR':
-                        debit = amount_value
-                    elif amount_type == 'CR':
-                        credit = amount_value
-                else:
-                    # Fallback: try to parse as regular amount
-                    amount_value = self.parse_amount(amount_with_type)
-                    if narration and ('debit' in str(narration).lower() or 'withdrawal' in str(narration).lower()):
-                        debit = amount_value
-                    else:
-                        credit = amount_value
-            
-            if debit == 0 and credit == 0:
-                return None
-            
-            # Parse balance
-            balance = None
-            if balance_with_type:
-                balance_match = re.search(r'([0-9,]+(?:\.[0-9]{2})?)\s*(?:\((?:Dr|Cr)\))?', str(balance_with_type), re.IGNORECASE)
-                if balance_match:
-                    balance_str = balance_match.group(1).replace(',', '')
-                    balance = float(balance_str)
-                else:
-                    balance = self.parse_amount(balance_with_type)
-            
-            metadata = self._extract_metadata(narration if narration else '')
-            store, commodity, clean_desc = self.extract_store_and_commodity(narration if narration else '')
-            
-            transaction = {
-                'date': str(date_val),
-                'date_iso': date_iso,
-                'description': clean_desc or narration,
-                'raw': narration,
-                'amount': debit if debit > 0 else credit,
-                'type': 'expense' if debit > 0 else 'income',
-                'debit': debit,
-                'credit': credit,
-                'balance': balance,
-                'page': 'Excel',
-                'line': str(idx + 1),
-                'store': store,
-                'commodity': commodity,
-                'reference': ref_no,
-                **metadata
-            }
-            
-            return self.normalize_transaction(transaction)
-        
-        except Exception as e:
-            print(f"Error parsing Excel row: {e}")
-            return None
+
     
     def _parse_text_lines(self, text: str) -> List[Dict]:
         """Parse text lines as fallback when tables not detected."""

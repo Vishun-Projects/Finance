@@ -62,7 +62,7 @@ async function run() {
 				validateBalance: true,
 				categorizeInBackground: true,
 			};
-			const ir = await fetch(`${baseUrl}/api/import`, {
+			const ir = await fetch(`${baseUrl}/api/import-bank-statement`, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify(importPayload),

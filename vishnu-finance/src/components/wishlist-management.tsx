@@ -67,7 +67,11 @@ export default function WishlistManagement() {
     if (!user) return;
     
     try {
-      const response = await fetch(`/api/wishlist?userId=${user.id}`);
+      const response = await fetch('/api/app', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'wishlist_list', userId: user.id }),
+      });
       const raw = await response.json();
 
       if (!response.ok) {
@@ -77,10 +81,10 @@ export default function WishlistManagement() {
         return;
       }
 
-      const items = Array.isArray(raw)
-        ? raw
-        : Array.isArray(raw?.data)
-          ? raw.data
+      const items = Array.isArray(raw?.data)
+        ? raw.data
+        : Array.isArray(raw)
+          ? raw
           : [];
 
       if (!Array.isArray(items)) {
@@ -116,20 +120,19 @@ export default function WishlistManagement() {
     if (!user) return;
     
     try {
-      const url = editingItem ? '/api/wishlist' : '/api/wishlist';
-      const method = editingItem ? 'PUT' : 'POST';
-      
+      const action = editingItem ? 'wishlist_update' : 'wishlist_create';
       const payload = {
+        action,
         ...(editingItem && { id: editingItem.id }),
         ...formData,
         userId: user.id,
-        estimatedCost: parseFloat(formData.estimatedCost)
+        estimatedCost: parseFloat(formData.estimatedCost),
       };
 
-      const response = await fetch(url, {
-        method,
+      const response = await fetch('/api/app', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
       });
 
       if (response.ok) {
@@ -164,8 +167,10 @@ export default function WishlistManagement() {
     if (!confirm('Are you sure you want to delete this item?')) return;
     
     try {
-      const response = await fetch(`/api/wishlist?id=${id}`, {
-        method: 'DELETE',
+      const response = await fetch('/api/app', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'wishlist_delete', id }),
       });
 
       if (response.ok) {
@@ -181,14 +186,15 @@ export default function WishlistManagement() {
   const handleToggleComplete = async (item: WishlistItem) => {
     if (!user) return;
     try {
-      const response = await fetch('/api/wishlist', {
-        method: 'PATCH',
+      const response = await fetch('/api/app', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          action: 'wishlist_update',
           id: item.id,
           isCompleted: !item.isCompleted,
-          completedDate: !item.isCompleted ? new Date().toISOString() : null
-        })
+          completedDate: !item.isCompleted ? new Date().toISOString() : null,
+        }),
       });
 
       if (response.ok) {

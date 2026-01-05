@@ -5,7 +5,7 @@ const config: CapacitorConfig = {
   appName: 'Vishnu Finance',
   webDir: 'out',
   server: {
-    url: 'https://ed4ac23e5fcfe0.lhr.life',
+    url: 'https://vishun-finance.vercel.app/',
     cleartext: false,
   },
 };

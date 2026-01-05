@@ -91,7 +91,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
   const [deletingTransaction, setDeletingTransaction] = useState<Transaction | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  
+
   // Selection state (always available, no separate mode)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showBulkCategorize, setShowBulkCategorize] = useState(false);
@@ -102,7 +102,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
   const [importDebug, setImportDebug] = useState<any>(null);
   const [showDeleted, setShowDeleted] = useState(false);
   const [showSelectionMode, setShowSelectionMode] = useState(false); // Toggle checkbox visibility
-  
+
   // PDF Import state
   const [showFileDialog, setShowFileDialog] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -258,8 +258,8 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
   // Determine page size based on date range
   const getPageSize = useCallback(() => {
     // For "all time" or large date ranges, use larger page size
-    if (quickRange === 'all' || (startDate && endDate && 
-        new Date(endDate).getTime() - new Date(startDate).getTime() > 365 * 24 * 60 * 60 * 1000)) {
+    if (quickRange === 'all' || (startDate && endDate &&
+      new Date(endDate).getTime() - new Date(startDate).getTime() > 365 * 24 * 60 * 60 * 1000)) {
       return '1000'; // Large page size for all time queries
     }
     return '100'; // Default page size
@@ -273,35 +273,25 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
       setIsLoading(true);
     }
     try {
-      const params = new URLSearchParams();
-      if (financialCategory !== 'ALL') {
-        params.set('type', financialCategory);
-      }
-      if (searchTerm) {
-        params.set('search', searchTerm);
-      }
-      if (startDate) {
-        params.set('startDate', startDate);
-      }
-      if (endDate) {
-        params.set('endDate', endDate);
-      }
-      if (amountPreset && amountPreset !== 'all') {
-        params.set('amountPreset', amountPreset);
-      }
-      if (selectedCategoryId) {
-        params.set('categoryId', selectedCategoryId);
-      }
-      params.set('sortField', 'transactionDate');
-      params.set('sortDirection', 'desc');
-      params.set('page', pageParam.toString());
-      params.set('pageSize', getPageSize());
-      params.set('includeTotals', 'true'); // Always fetch totals
-      if (showDeleted) {
-        params.set('includeDeleted', 'true');
-      }
-
-      const response = await fetch(`/api/transactions?${params.toString()}`);
+      const response = await fetch('/api/app', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'transactions_list',
+          page: pageParam,
+          pageSize: getPageSize(),
+          includeTotals: true,
+          type: financialCategory !== 'ALL' ? financialCategory : undefined,
+          categoryId: selectedCategoryId || undefined,
+          startDate: startDate || undefined,
+          endDate: endDate || undefined,
+          search: searchTerm || undefined,
+          includeDeleted: showDeleted,
+          sortField: 'transactionDate',
+          sortDirection: 'desc',
+          amountPreset: amountPreset !== 'all' ? amountPreset : undefined,
+        }),
+      });
       if (!response.ok) throw new Error('Failed to fetch transactions');
 
       const data = await response.json();
@@ -326,7 +316,11 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
 
     try {
       // Fetch all categories - show ALL categories, not just used ones
-      const response = await fetch('/api/categories');
+      const response = await fetch('/api/app', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'categories_list' }),
+      });
       if (response.ok) {
         const allCategories = await response.json() || [];
         setCategories(allCategories);
@@ -366,10 +360,20 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
   }, [searchTerm]);
 
   // Handle search with debounce
+  const debouncedSearch = useMemo(() => {
+    let timeoutId: NodeJS.Timeout;
+    return (value: string) => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        updateURLParams({ search: value || null, page: '1' });
+      }, 500);
+    };
+  }, [updateURLParams]);
+
   const handleSearch = useCallback((value: string) => {
     setLocalSearch(value);
-    updateURLParams({ search: value || null, page: '1' }); // Reset to page 1 on search
-  }, [updateURLParams]);
+    debouncedSearch(value);
+  }, [debouncedSearch]);
 
   // Calculate totals - use API totals if available, otherwise calculate from visible transactions
   const totals = useMemo(() => {
@@ -479,13 +483,16 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
   const handleSave = useCallback(async (data: TransactionFormData) => {
     try {
       const transactionId = editingTransaction?.id;
-      const url = transactionId ? `/api/transactions/${transactionId}` : '/api/transactions';
-      const method = transactionId ? 'PUT' : 'POST';
+      const action = transactionId ? 'transactions_update' : 'transactions_create';
 
-      const response = await fetch(url, {
-        method,
+      const response = await fetch('/api/app', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          action,
+          ...(transactionId ? { id: transactionId } : {}),
+          ...data,
+        }),
       });
 
       if (!response.ok) throw new Error('Failed to save transaction');
@@ -506,8 +513,13 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
 
     setIsDeleting(true);
     try {
-      const response = await fetch(`/api/transactions/${deletingTransaction.id}`, {
-        method: 'DELETE',
+      const response = await fetch('/api/app', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'transactions_delete_single',
+          id: deletingTransaction.id,
+        }),
       });
 
       if (!response.ok) throw new Error('Failed to delete transaction');
@@ -586,10 +598,13 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
 
     setIsDeleting(true);
     try {
-      const response = await fetch('/api/transactions/delete', {
-        method: 'DELETE',
+      const response = await fetch('/api/app', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ transactionIds: Array.from(selectedIds) }),
+        body: JSON.stringify({
+          action: 'transactions_delete_bulk',
+          transactionIds: Array.from(selectedIds),
+        }),
       });
 
       if (!response.ok) throw new Error('Failed to delete transactions');
@@ -619,10 +634,13 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
 
     setIsDeleting(true);
     try {
-      const response = await fetch('/api/transactions/restore', {
+      const response = await fetch('/api/app', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ transactionIds: deletedSelected }),
+        body: JSON.stringify({
+          action: 'transactions_restore',
+          transactionIds: deletedSelected,
+        }),
       });
 
       if (!response.ok) throw new Error('Failed to restore transactions');
@@ -649,7 +667,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
     setIsBulkUpdating(true);
     try {
       const selectedTransactions = transactions.filter(t => selectedIds.has(t.id) && !t.categoryId);
-      
+
       if (selectedTransactions.length === 0) {
         showError('Info', 'All selected transactions are already categorized');
         setIsBulkUpdating(false);
@@ -680,7 +698,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
             }
           }
         }
-        
+
         return {
           description: t.description || '',
           store: t.store || undefined,
@@ -696,10 +714,11 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
       });
 
       // Call categorization API endpoint
-      const response = await fetch('/api/transactions/categorize', {
+      const response = await fetch('/api/app', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          action: 'transactions_categorize',
           userId: user?.id,
           transactions: transactionsToCategorize,
         }),
@@ -711,7 +730,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
       }
 
       const categorizationResults = await response.json();
-      
+
       if (!Array.isArray(categorizationResults) || categorizationResults.length !== selectedTransactions.length) {
         throw new Error('Invalid categorization response');
       }
@@ -738,10 +757,11 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
       }
 
       // Use batch update endpoint to avoid 429 rate limit errors
-      const batchResponse = await fetch('/api/transactions/batch-update', {
-        method: 'PUT',
+      const batchResponse = await fetch('/api/app', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          action: 'transactions_batch_update',
           userId: user?.id,
           updates,
         }),
@@ -791,11 +811,15 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
 
       // Update transactions one by one (or create bulk endpoint)
       const results = await Promise.allSettled(
-        updates.map(update => 
-          fetch(`/api/transactions/${update.id}`, {
-            method: 'PUT',
+        updates.map(update =>
+          fetch('/api/app', {
+            method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ categoryId: update.categoryId }),
+            body: JSON.stringify({
+              action: 'transactions_update',
+              id: update.id,
+              categoryId: update.categoryId,
+            }),
           })
         )
       );
@@ -966,17 +990,37 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
     if (!previewMonthOnly) {
       return parsedTransactions;
     }
-    
+
     const now = new Date();
     const start = new Date(now.getFullYear(), now.getMonth(), 1);
     const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
-    
+
     return parsedTransactions.filter((t: BankTransaction) => {
       const dStr = (t.date_iso || t.date || '').toString().slice(0, 10);
       const d = dStr ? new Date(dStr) : null;
       return d && d >= start && d <= end;
     });
   }, [parsedTransactions, previewMonthOnly]);
+
+  // Calculate actual totals from parsed transactions
+  const actualTotals = useMemo(() => {
+    let totalCredits = 0;
+    let totalDebits = 0;
+
+    parsedTransactions.forEach((t: BankTransaction) => {
+      const creditAmount = typeof t.credit === 'number' ? t.credit : parseFloat(String(t.credit || '0'));
+      const debitAmount = typeof t.debit === 'number' ? t.debit : parseFloat(String(t.debit || '0'));
+
+      if (creditAmount > 0) {
+        totalCredits += creditAmount;
+      }
+      if (debitAmount > 0) {
+        totalDebits += debitAmount;
+      }
+    });
+
+    return { totalCredits, totalDebits };
+  }, [parsedTransactions]);
 
   const totalPages = useMemo(() => Math.max(1, Math.ceil(filteredParsed.length / previewPageSize)), [filteredParsed.length, previewPageSize]);
   const visibleParsed = useMemo(() => {
@@ -988,21 +1032,13 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
   const handleMultiFormatFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const supportedTypes = [
-        'application/pdf',
-        'application/vnd.ms-excel',
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'application/msword',
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'text/plain'
-      ];
-      
-      const supportedExtensions = ['.pdf', '.xls', '.xlsx', '.doc', '.docx', '.txt'];
+      const supportedTypes = ['application/pdf'];
+      const supportedExtensions = ['.pdf'];
       const hasValidType = supportedTypes.includes(file.type);
       const hasValidExtension = supportedExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
-      
+
       if (!hasValidType && !hasValidExtension) {
-        setFileError('Please select a valid file (PDF, XLS, XLSX, DOC, DOCX, or TXT)');
+        setFileError('Please select a valid PDF file');
         return;
       }
       setSelectedFile(file);
@@ -1034,30 +1070,22 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);
-    
+
     const files = e.dataTransfer.files;
     if (files && files.length > 0) {
       const file = files[0];
-      const supportedTypes = [
-        'application/pdf',
-        'application/vnd.ms-excel',
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'application/msword',
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'text/plain'
-      ];
-      
-      const supportedExtensions = ['.pdf', '.xls', '.xlsx', '.doc', '.docx', '.txt'];
+      const supportedTypes = ['application/pdf'];
+      const supportedExtensions = ['.pdf'];
       const hasValidType = supportedTypes.includes(file.type);
       const hasValidExtension = supportedExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
-      
+
       if (hasValidType || hasValidExtension) {
         setSelectedFile(file);
         setFileError(null);
         // Auto-parse the file after drop
         setTimeout(() => handleParseFile(file), 100);
       } else {
-        setFileError('Please drop a valid file (PDF, XLS, XLSX, DOC, DOCX, or TXT)');
+        setFileError('Please drop a valid PDF file');
       }
     }
   };
@@ -1079,53 +1107,32 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
         setParseProgress((p) => (p < 90 ? Math.min(90, p + 5) : p));
       }, 400);
       const lowerName = file.name.toLowerCase();
-      const isPdf = file.type === 'application/pdf' || lowerName.endsWith('.pdf');
 
-      if (isPdf) {
-        const fd = new FormData();
-        fd.append('pdf', file);
-        // Simple bank auto-detect from filename
-        const bank = ['sbi', 'hdfc', 'icici', 'axis', 'bob', 'kotak', 'yes'].find(b => lowerName.includes(b)) || '';
-        const bankToSend = (selectedBank || bank);
-        if (bankToSend) fd.append('bank', bankToSend);
+      const fd = new FormData();
+      fd.append('pdf', file);
+      // Simple bank auto-detect from filename
+      const bank = ['sbi', 'hdfc', 'icici', 'axis', 'bob', 'kotak', 'yes'].find(b => lowerName.includes(b)) || '';
+      const bankToSend = (selectedBank || bank);
+      if (bankToSend) fd.append('bank', bankToSend);
 
-        const res = await fetch('/api/parse-pdf', { method: 'POST', body: fd });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err.error || 'Failed to parse PDF');
-        }
-        const data = await res.json();
-        if (data?.debug) setParseDebug(data.debug);
-        
-        const transactionsToSet = data.transactions || [];
-        setParsedTransactions(transactionsToSet);
-        setStatementMetadata(data.metadata || null);
-        setTempFiles(data.tempFiles || []);
-        setShowCsvPreview(true);
-        setShowFileDialog(false);
-        
-        success('PDF Parsed', `Extracted ${data.count || transactionsToSet.length} transactions`);
-        setParseProgress(100);
-        clearInterval(parseTimer);
-        return;
+      const res = await fetch('/api/parse-pdf', { method: 'POST', body: fd });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to parse PDF');
       }
-
-      // Fallback to multi-format parser for non-PDF
-      const formData = new FormData();
-      formData.append('file', file);
-      const response = await fetch('/api/parse-file', { method: 'POST', body: formData });
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `Failed to parse file (Status: ${response.status})`);
-      }
-      const data = await response.json();
+      const data = await res.json();
       if (data?.debug) setParseDebug(data.debug);
-      setParsedTransactions(data.transactions || []);
+
+      const transactionsToSet = data.transactions || [];
+      setParsedTransactions(transactionsToSet);
+      setStatementMetadata(data.metadata || null);
       setTempFiles(data.tempFiles || []);
       setShowCsvPreview(true);
       setShowFileDialog(false);
-      success('File Parsed', `Extracted ${data.count || (data.transactions || []).length} transactions`);
+
+      success('PDF Parsed', `Extracted ${data.count || transactionsToSet.length} transactions`);
       setParseProgress(100);
+      clearInterval(parseTimer);
     } catch (error) {
       console.error('Error parsing file:', error);
       setFileError(error instanceof Error ? error.message : 'Failed to parse file');
@@ -1140,7 +1147,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
   const pollCategorizationProgress = async (transactionIds: string[], userId: string) => {
     const maxAttempts = 60; // Poll for up to 5 minutes (5 second intervals)
     let attempts = 0;
-    
+
     // Set initial progress state
     setCategorizationProgress({
       total: transactionIds.length,
@@ -1148,19 +1155,25 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
       progress: 0,
       isActive: true,
     });
-    
+
     const poll = async () => {
       try {
-        const response = await fetch(
-          `/api/transactions/categorize-background?userId=${userId}&transactionIds=${transactionIds.join(',')}`
-        );
-        
+        const response = await fetch('/api/app', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'transactions_categorize_background_status',
+            userId,
+            transactionIds,
+          }),
+        });
+
         if (response.ok) {
           const status = await response.json();
           const progress = status.progress || 0;
           const categorized = status.categorized || 0;
           const total = status.total || transactionIds.length;
-          
+
           // Update progress state
           setCategorizationProgress({
             total,
@@ -1168,7 +1181,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
             progress,
             isActive: true,
           });
-          
+
           if (progress >= 100 || status.remaining === 0) {
             // Categorization complete
             setCategorizationProgress({
@@ -1184,7 +1197,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
             setTimeout(() => setCategorizationProgress(null), 3000);
             return;
           }
-          
+
           // Continue polling if not complete
           if (attempts < maxAttempts) {
             attempts++;
@@ -1206,7 +1219,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
         // But keep progress visible
       }
     };
-    
+
     // Start polling after 2 seconds
     setTimeout(poll, 2000);
   };
@@ -1227,16 +1240,16 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
             const debitAmount = typeof t.debit === 'number' ? t.debit : parseFloat(String(t.debit || '0'));
             const creditAmount = typeof t.credit === 'number' ? t.credit : parseFloat(String(t.credit || '0'));
             const description = String(t.description || t.narration || '').trim();
-            
+
             // Validate that we have either debit or credit, and a description
             if ((debitAmount === 0 && creditAmount === 0) || !description) {
               return null;
             }
-            
+
             // Use date_iso if available (preferred), otherwise fall back to date
             let dateStr = '';
             let dateIsoStr = '';
-            
+
             if (t.date_iso) {
               dateIsoStr = String(t.date_iso).slice(0, 10);
               dateStr = dateIsoStr;
@@ -1267,21 +1280,21 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                         dateIsoStr = parsedDate.toISOString().slice(0, 10);
                         dateStr = dateIsoStr;
                       }
-                    } catch {}
+                    } catch { }
                   }
                 }
               }
             }
-            
+
             // Validate date format is correct (YYYY-MM-DD)
             const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
             const isValidDate = dateStr && dateRegex.test(dateStr);
-            
+
             if (!isValidDate) {
               console.warn('⚠️ Invalid date for transaction:', { date: t.date, date_iso: t.date_iso, dateStr });
               return null;
             }
-            
+
             // Return in format expected by import-bank-statement API
             return {
               debit: debitAmount,
@@ -1323,7 +1336,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
       const importTimer = setInterval(() => {
         setImportProgress((p) => (p < 90 ? Math.min(90, p + 4) : p));
       }, 300);
-      
+
       // Use bank statement import API which handles bank-specific fields
       // Note: type is optional, API will infer from credit/debit amounts
       const primaryTempFile = tempFiles[0];
@@ -1336,25 +1349,25 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
 
       // Use background categorization for large imports (>100 transactions) for better performance
       const useBackgroundCategorization = normalized.length > 100;
-      
-      const importPayload: any = { 
-        userId: user.id, 
+
+      const importPayload: any = {
+        userId: user.id,
         records: normalized,
         useAICategorization: true, // Enable AI categorization
         categorizeInBackground: useBackgroundCategorization, // Use background for large imports
         validateBalance: true, // Enable balance validation
         ...(documentMeta ? { document: documentMeta } : {}),
       };
-      
+
       // Add metadata if available
       if (statementMetadata) {
         importPayload.metadata = statementMetadata;
       }
-      
+
       // Update progress message
       setImportProgress(10);
       console.log('📤 Sending import request with AI categorization and balance validation...');
-      
+
       const response = await fetch('/api/import-bank-statement', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1369,13 +1382,13 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
       const incomeCount = result.incomeInserted || 0;
       const expenseCount = result.expenseInserted || 0;
       const totalInserted = result.inserted || (incomeCount + expenseCount);
-      
+
       let message = `Inserted ${totalInserted} records (${incomeCount} income, ${expenseCount} expenses), ${result.duplicates || 0} duplicates`;
-      
+
       // Handle background categorization
       if (result.backgroundCategorization?.started) {
         message += `. 🚀 Background categorization started for ${result.backgroundCategorization.total} transactions`;
-        
+
         // Start polling for categorization progress
         if (result.backgroundCategorization.transactionIds?.length > 0) {
           pollCategorizationProgress(result.backgroundCategorization.transactionIds, user.id);
@@ -1384,7 +1397,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
         // Show immediate categorization results
         message += `. ${result.categorizedCount} transactions auto-categorized`;
       }
-      
+
       // Show balance validation results
       if (result.balanceValidationResult) {
         const validation = result.balanceValidationResult;
@@ -1399,14 +1412,14 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
           // No discrepancy calculated or validation passed
           message += `. ✅ Balance validated`;
         }
-        
+
         if (!validation.accountNumberValid) {
           message += `. ⚠️ Account number not extracted`;
         }
       } else if (result.balanceValidation?.warning) {
         message += `. Note: ${result.balanceValidation.warning}`;
       }
-      
+
       // Display warnings
       if (result.warnings && result.warnings.length > 0) {
         const warningMessages = result.warnings.slice(0, 5); // Show first 5 warnings
@@ -1417,25 +1430,25 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
           console.warn(`  ... and ${result.warnings.length - 5} more warnings`);
         }
       }
-      
+
       // Display errors
       if (result.errors && result.errors.length > 0) {
         result.errors.forEach((error: string) => {
           showError('Import Error', error);
         });
       }
-      
+
       // Show detailed balance validation summary if available
       if (result.balanceValidationResult?.summary) {
         console.log('Balance Validation Summary:', result.balanceValidationResult.summary);
       }
-      
+
       success('Imported', message);
       setImportProgress(100);
       clearInterval(importTimer);
       // Refetch transactions
       await fetchTransactions();
-      
+
       // Clean up temporary files after successful import
       if (tempFiles.length > 0) {
         const filesToCleanup = documentMeta
@@ -1496,7 +1509,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
             </>
           ) : (
             <pre className="text-xs overflow-auto max-h-64 bg-muted/40 p-2 rounded">
-{JSON.stringify({ message: 'No parse data yet. Select a PDF and click Parse.' }, null, 2)}
+              {JSON.stringify({ message: 'No parse data yet. Select a PDF and click Parse.' }, null, 2)}
             </pre>
           )}
         </div>
@@ -1511,7 +1524,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
             </>
           ) : (
             <pre className="text-xs overflow-auto max-h-64 bg-muted/40 p-2 rounded">
-{JSON.stringify({ message: 'No import yet. After parsing, click Import to see details.' }, null, 2)}
+              {JSON.stringify({ message: 'No import yet. After parsing, click Import to see details.' }, null, 2)}
             </pre>
           )}
         </div>
@@ -1532,7 +1545,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                   </span>
                 </div>
                 <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
-                  <div 
+                  <div
                     className="h-full bg-primary transition-all duration-500 rounded-full"
                     style={{ width: `${categorizationProgress.progress}%` }}
                   />
@@ -1603,7 +1616,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                 </span>
               </div>
               <div className="w-32 md:w-48 h-2 bg-muted rounded-full overflow-hidden">
-                <div 
+                <div
                   className="h-full bg-primary transition-all duration-500 rounded-full"
                   style={{ width: `${categorizationProgress.progress}%` }}
                 />
@@ -1813,9 +1826,8 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
       {showSelectionMode && (
         <div
           ref={selectionToolbarRef}
-          className={`sticky top-16 md:top-32 z-20 border-b px-4 py-2 transition-shadow ${
-            selectionPulse ? 'bg-primary/10 shadow-[0_0_0_3px_rgba(59,130,246,0.25)]' : 'bg-primary/5'
-          }`}
+          className={`sticky top-16 md:top-32 z-20 border-b px-4 py-2 transition-shadow ${selectionPulse ? 'bg-primary/10 shadow-[0_0_0_3px_rgba(59,130,246,0.25)]' : 'bg-primary/5'
+            }`}
         >
           <div className="container mx-auto flex items-center justify-between gap-4">
             <div className="flex items-center gap-2">
@@ -1904,11 +1916,10 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                   key={option.value}
                   type="button"
                   onClick={() => updateURLParams({ type: option.value, page: '1' })} // Reset to page 1
-                  className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 ${
-                    isActive
-                      ? 'bg-primary text-primary-foreground shadow-sm'
-                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                  }`}
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 ${isActive
+                    ? 'bg-primary text-primary-foreground shadow-sm'
+                    : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                    }`}
                   aria-pressed={isActive}
                 >
                   {option.label}
@@ -1922,9 +1933,8 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
       {/* Filters - Desktop Only */}
       <div
         ref={filterBarRef}
-        className={`hidden md:block sticky ${showSelectionMode ? 'top-40' : 'top-32'} z-20 bg-background/95 backdrop-blur border-b transition-shadow ${
-          filterPulse ? 'ring-2 ring-primary/40 shadow-lg' : ''
-        }`}
+        className={`hidden md:block sticky ${showSelectionMode ? 'top-40' : 'top-32'} z-20 bg-background/95 backdrop-blur border-b transition-shadow ${filterPulse ? 'ring-2 ring-primary/40 shadow-lg' : ''
+          }`}
       >
         <div className="container mx-auto px-4 py-4">
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1.6fr),minmax(0,2fr),minmax(0,1.6fr)]">
@@ -2000,9 +2010,8 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                         key={option.value}
                         type="button"
                         onClick={() => updateURLParams({ type: option.value, page: '1' })}
-                        className={`rounded-full px-3 py-1.5 text-sm font-medium transition-all ${
-                          isActive ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/30' : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                        }`}
+                        className={`rounded-full px-3 py-1.5 text-sm font-medium transition-all ${isActive ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/30' : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                          }`}
                         aria-pressed={isActive}
                       >
                         {option.label}
@@ -2021,9 +2030,8 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                         key={option.value}
                         type="button"
                         onClick={() => updateURLParams({ amountPreset: option.value === 'all' ? null : option.value, page: '1' })}
-                        className={`rounded-full px-3 py-1.5 text-sm font-medium transition-all ${
-                          isActive ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/30' : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                        }`}
+                        className={`rounded-full px-3 py-1.5 text-sm font-medium transition-all ${isActive ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/30' : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                          }`}
                         aria-pressed={isActive}
                       >
                         {option.label}
@@ -2091,25 +2099,25 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
             </div>
           )}
         </div>
-        </div>
+      </div>
 
       {/* Main Content */}
       <div className="container mx-auto px-4 py-4 md:py-6">
         {/* Summary Cards - Compact, always 2 columns */}
         <div className="grid grid-cols-2 gap-2 md:gap-3 mb-3 md:mb-4 md:hidden">
-            <div className="bg-card rounded-lg border p-2.5 md:p-3">
-              <div className="text-[10px] sm:text-xs text-muted-foreground mb-0.5">Total Income</div>
-              <div className="text-base sm:text-lg md:text-xl font-bold text-green-600 dark:text-green-400 truncate">
-                {formatCurrency(totals.income)}
-              </div>
-            </div>
-            <div className="bg-card rounded-lg border p-2.5 md:p-3">
-              <div className="text-[10px] sm:text-xs text-muted-foreground mb-0.5">Total Expense</div>
-              <div className="text-base sm:text-lg md:text-xl font-bold text-red-600 dark:text-red-400 truncate">
-                {formatCurrency(totals.expense)}
-              </div>
+          <div className="bg-card rounded-lg border p-2.5 md:p-3">
+            <div className="text-[10px] sm:text-xs text-muted-foreground mb-0.5">Total Income</div>
+            <div className="text-base sm:text-lg md:text-xl font-bold text-green-600 dark:text-green-400 truncate">
+              {formatCurrency(totals.income)}
             </div>
           </div>
+          <div className="bg-card rounded-lg border p-2.5 md:p-3">
+            <div className="text-[10px] sm:text-xs text-muted-foreground mb-0.5">Total Expense</div>
+            <div className="text-base sm:text-lg md:text-xl font-bold text-red-600 dark:text-red-400 truncate">
+              {formatCurrency(totals.expense)}
+            </div>
+          </div>
+        </div>
 
         {/* Transactions List */}
         {isLoading ? (
@@ -2128,7 +2136,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
             </div>
             <p className="text-muted-foreground mb-2 font-medium">No transactions found</p>
             <p className="text-sm text-muted-foreground mb-6">
-              {searchTerm || financialCategory !== 'ALL' 
+              {searchTerm || financialCategory !== 'ALL'
                 ? 'Try adjusting your filters'
                 : 'Get started by adding your first transaction'}
             </p>
@@ -2149,9 +2157,8 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                 {showSelectionMode && (
                   <button
                     onClick={() => handleSelectOne(transaction.id)}
-                    className={`absolute left-2 top-2 z-10 p-1.5 rounded-md bg-background/90 backdrop-blur shadow-sm border ${
-                      selectedIds.has(transaction.id) ? 'text-primary border-primary' : 'text-muted-foreground border-border'
-                    }`}
+                    className={`absolute left-2 top-2 z-10 p-1.5 rounded-md bg-background/90 backdrop-blur shadow-sm border ${selectedIds.has(transaction.id) ? 'text-primary border-primary' : 'text-muted-foreground border-border'
+                      }`}
                   >
                     {selectedIds.has(transaction.id) ? (
                       <CheckSquare className="w-5 h-5" />
@@ -2244,210 +2251,208 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
 
       {/* Filter Sheet - Mobile */}
       <FilterSheet open={isFilterOpen} onClose={() => setIsFilterOpen(false)}>
-          <div className="space-y-5">
-            <div className="flex items-center justify-between pb-3 border-b">
-              <h2 className="text-lg font-semibold">Filters</h2>
-              <button
-                onClick={() => setIsFilterOpen(false)}
-                className="p-1 rounded-md hover:bg-muted"
-                aria-label="Close"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+        <div className="space-y-5">
+          <div className="flex items-center justify-between pb-3 border-b">
+            <h2 className="text-lg font-semibold">Filters</h2>
+            <button
+              onClick={() => setIsFilterOpen(false)}
+              className="p-1 rounded-md hover:bg-muted"
+              aria-label="Close"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
 
-            {/* Search */}
-            <div>
-              <label className="block text-sm font-medium mb-2">Search</label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <input
-                  type="text"
-                  value={localSearch}
-                  onChange={(e) => setLocalSearch(e.target.value)}
-                  placeholder="Search transactions..."
-                  className="w-full pl-10 pr-4 py-2.5 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary"
-                />
-              </div>
+          {/* Search */}
+          <div>
+            <label className="block text-sm font-medium mb-2">Search</label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <input
+                type="text"
+                value={localSearch}
+                onChange={(e) => setLocalSearch(e.target.value)}
+                placeholder="Search transactions..."
+                className="w-full pl-10 pr-4 py-2.5 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+              />
             </div>
+          </div>
 
-            {/* Type */}
-            <div>
-              <label className="block text-sm font-medium mb-2">Transaction Type</label>
-              <div className="grid grid-cols-2 gap-2">
-                {typeOptions.map((option) => {
-                  const isActive = financialCategory === option.value || (option.value === 'ALL' && financialCategory === 'ALL');
-                  return (
-                    <button
-                      key={option.value}
-                      type="button"
+          {/* Type */}
+          <div>
+            <label className="block text-sm font-medium mb-2">Transaction Type</label>
+            <div className="grid grid-cols-2 gap-2">
+              {typeOptions.map((option) => {
+                const isActive = financialCategory === option.value || (option.value === 'ALL' && financialCategory === 'ALL');
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
                     onClick={() => {
                       updateURLParams({ type: option.value, page: '1' }); // Reset to page 1
                     }}
-                      className={`px-4 py-2.5 rounded-md text-sm font-medium transition-all ${
-                        isActive
-                          ? 'bg-primary text-primary-foreground'
-                          : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                    className={`px-4 py-2.5 rounded-md text-sm font-medium transition-all ${isActive
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
                       }`}
-                    >
-                      {option.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Amount Filter */}
-            <div>
-              <label className="block text-sm font-medium mb-2">Amount Range</label>
-              <div className="flex flex-wrap gap-2">
-                {amountOptions.map((option) => {
-                  const isActive = amountPreset === option.value;
-                  return (
-                    <button
-                      key={option.value}
-                      type="button"
-                      onClick={() => {
-                        updateURLParams({ amountPreset: option.value === 'all' ? null : option.value, page: '1' });
-                      }}
-                      className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
-                        isActive
-                          ? 'bg-primary text-primary-foreground border-primary'
-                          : 'bg-muted text-muted-foreground border-border hover:bg-muted/80'
-                      } border`}
-                      aria-pressed={isActive}
-                    >
-                      {option.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Quick Range */}
-            <div>
-              <label className="block text-sm font-medium mb-2">Quick Date Range</label>
-              <QuickRangeChips value={quickRange} onChange={applyQuickRange} />
-            </div>
-
-            {/* Single Calendar Date Range Picker - Mobile */}
-            <div>
-              <label className="block text-sm font-medium mb-2">Custom Date Range</label>
-              <Popover open={dateRangePickerOpen} onOpenChange={setDateRangePickerOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start text-left font-normal"
                   >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {localStartDate && localEndDate ? (
-                      <>
-                        {format(new Date(localStartDate), 'dd MMM yyyy')} - {format(new Date(localEndDate), 'dd MMM yyyy')}
-                      </>
-                    ) : (
-                      <span>Pick a date range</span>
-                    )}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    initialFocus
-                    mode="range"
-                    defaultMonth={localStartDate ? new Date(localStartDate) : new Date()}
-                    selected={{
-                      from: localStartDate ? new Date(localStartDate) : undefined,
-                      to: localEndDate ? new Date(localEndDate) : undefined,
-                    }}
-                    onSelect={(range: DateRange | undefined) => {
-                      if (range?.from && range?.to) {
-                        setLocalStartDate(range.from.toISOString().split('T')[0]);
-                        setLocalEndDate(range.to.toISOString().split('T')[0]);
-                        setDateRangePickerOpen(false);
-                      } else if (range?.from) {
-                        setLocalStartDate(range.from.toISOString().split('T')[0]);
-                      }
-                    }}
-                    numberOfMonths={1}
-                  />
-                </PopoverContent>
-              </Popover>
+                    {option.label}
+                  </button>
+                );
+              })}
             </div>
+          </div>
 
-            {/* Category Filter */}
-            <div>
-              <label className="block text-sm font-medium mb-2">Category</label>
-              <Select value={selectedCategoryId || 'all'} onValueChange={(value) => {
-                if (value === 'uncategorized') {
-                  setSelectedCategoryId('uncategorized');
-                  updateURLParams({ categoryId: 'uncategorized', page: '1' });
-                } else {
-                  setSelectedCategoryId(value === 'all' ? '' : value);
-                  updateURLParams({ categoryId: value === 'all' ? null : value, page: '1' });
-                }
-              }}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All Categories" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Categories</SelectItem>
-                  <SelectItem value="uncategorized">Uncategorized</SelectItem>
-                  {categories
-                    .filter(c => !financialCategory || financialCategory === 'ALL' || c.type === financialCategory)
-                    .map(category => (
-                      <SelectItem key={category.id} value={category.id}>
-                        <div className="flex items-center gap-2">
-                          {category.color && (
-                            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: category.color }} />
-                          )}
-                          <span>{category.name}</span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
+          {/* Amount Filter */}
+          <div>
+            <label className="block text-sm font-medium mb-2">Amount Range</label>
+            <div className="flex flex-wrap gap-2">
+              {amountOptions.map((option) => {
+                const isActive = amountPreset === option.value;
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => {
+                      updateURLParams({ amountPreset: option.value === 'all' ? null : option.value, page: '1' });
+                    }}
+                    className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${isActive
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'bg-muted text-muted-foreground border-border hover:bg-muted/80'
+                      } border`}
+                    aria-pressed={isActive}
+                  >
+                    {option.label}
+                  </button>
+                );
+              })}
             </div>
+          </div>
 
-            {/* Apply Button */}
-            <div className="pt-2 space-y-2">
+          {/* Quick Range */}
+          <div>
+            <label className="block text-sm font-medium mb-2">Quick Date Range</label>
+            <QuickRangeChips value={quickRange} onChange={applyQuickRange} />
+          </div>
+
+          {/* Single Calendar Date Range Picker - Mobile */}
+          <div>
+            <label className="block text-sm font-medium mb-2">Custom Date Range</label>
+            <Popover open={dateRangePickerOpen} onOpenChange={setDateRangePickerOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start text-left font-normal"
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {localStartDate && localEndDate ? (
+                    <>
+                      {format(new Date(localStartDate), 'dd MMM yyyy')} - {format(new Date(localEndDate), 'dd MMM yyyy')}
+                    </>
+                  ) : (
+                    <span>Pick a date range</span>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  initialFocus
+                  mode="range"
+                  defaultMonth={localStartDate ? new Date(localStartDate) : new Date()}
+                  selected={{
+                    from: localStartDate ? new Date(localStartDate) : undefined,
+                    to: localEndDate ? new Date(localEndDate) : undefined,
+                  }}
+                  onSelect={(range: DateRange | undefined) => {
+                    if (range?.from && range?.to) {
+                      setLocalStartDate(range.from.toISOString().split('T')[0]);
+                      setLocalEndDate(range.to.toISOString().split('T')[0]);
+                      setDateRangePickerOpen(false);
+                    } else if (range?.from) {
+                      setLocalStartDate(range.from.toISOString().split('T')[0]);
+                    }
+                  }}
+                  numberOfMonths={1}
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          {/* Category Filter */}
+          <div>
+            <label className="block text-sm font-medium mb-2">Category</label>
+            <Select value={selectedCategoryId || 'all'} onValueChange={(value) => {
+              if (value === 'uncategorized') {
+                setSelectedCategoryId('uncategorized');
+                updateURLParams({ categoryId: 'uncategorized', page: '1' });
+              } else {
+                setSelectedCategoryId(value === 'all' ? '' : value);
+                updateURLParams({ categoryId: value === 'all' ? null : value, page: '1' });
+              }
+            }}>
+              <SelectTrigger>
+                <SelectValue placeholder="All Categories" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Categories</SelectItem>
+                <SelectItem value="uncategorized">Uncategorized</SelectItem>
+                {categories
+                  .filter(c => !financialCategory || financialCategory === 'ALL' || c.type === financialCategory)
+                  .map(category => (
+                    <SelectItem key={category.id} value={category.id}>
+                      <div className="flex items-center gap-2">
+                        {category.color && (
+                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: category.color }} />
+                        )}
+                        <span>{category.name}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Apply Button */}
+          <div className="pt-2 space-y-2">
+            <Button
+              className="w-full"
+              onClick={() => {
+                handleSearch(localSearch);
+                updateURLParams({
+                  startDate: localStartDate,
+                  endDate: localEndDate,
+                  categoryId: selectedCategoryId || null
+                });
+                setIsFilterOpen(false);
+              }}
+            >
+              Apply Filters
+            </Button>
+            {(localSearch || financialCategory !== 'ALL' || quickRange !== 'month' || amountPreset !== 'all' || selectedCategoryId) && (
               <Button
+                variant="outline"
                 className="w-full"
                 onClick={() => {
-                  handleSearch(localSearch);
-                  updateURLParams({ 
-                    startDate: localStartDate, 
-                    endDate: localEndDate,
-                    categoryId: selectedCategoryId || null
+                  setLocalSearch('');
+                  updateURLParams({
+                    search: null,
+                    type: 'ALL',
+                    range: 'month',
+                    startDate: null,
+                    endDate: null,
+                    amountPreset: null,
+                    categoryId: null
                   });
+                  setSelectedCategoryId('');
                   setIsFilterOpen(false);
                 }}
               >
-                Apply Filters
+                Clear All Filters
               </Button>
-              {(localSearch || financialCategory !== 'ALL' || quickRange !== 'month' || amountPreset !== 'all' || selectedCategoryId) && (
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => {
-                    setLocalSearch('');
-                    updateURLParams({ 
-                      search: null, 
-                      type: 'ALL',
-                      range: 'month',
-                      startDate: null,
-                      endDate: null,
-                      amountPreset: null,
-                      categoryId: null
-                    });
-                    setSelectedCategoryId('');
-                    setIsFilterOpen(false);
-                  }}
-                >
-                  Clear All Filters
-                </Button>
-              )}
-            </div>
+            )}
           </div>
-        </FilterSheet>
+        </div>
+      </FilterSheet>
 
       {/* Bulk Categorize Modal */}
       {showBulkCategorize && (
@@ -2498,11 +2503,10 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                                 e.stopPropagation();
                                 setBulkCategoryId(category.id);
                               }}
-                              className={`p-3 rounded-lg border text-left transition-all cursor-pointer ${
-                                bulkCategoryId === category.id
-                                  ? 'border-primary bg-primary/10 ring-2 ring-primary'
-                                  : 'border-border hover:bg-muted hover:border-primary/50'
-                              }`}
+                              className={`p-3 rounded-lg border text-left transition-all cursor-pointer ${bulkCategoryId === category.id
+                                ? 'border-primary bg-primary/10 ring-2 ring-primary'
+                                : 'border-border hover:bg-muted hover:border-primary/50'
+                                }`}
                             >
                               <div className="flex items-center justify-between gap-2">
                                 <div className="flex items-center gap-2 flex-1">
@@ -2518,29 +2522,29 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                                   <Check className="w-4 h-4 text-primary flex-shrink-0" />
                                 )}
                               </div>
-                          {/* Common subcategories for income */}
-                          {category.name === 'Salary' && (
-                            <div className="mt-2 text-xs text-muted-foreground">
-                              Regular, Bonus, Commission
-                            </div>
-                          )}
-                          {category.name === 'Freelance' && (
-                            <div className="mt-2 text-xs text-muted-foreground">
-                              Projects, Consulting, Services
-                            </div>
-                          )}
-                          {category.name === 'Investment' && (
-                            <div className="mt-2 text-xs text-muted-foreground">
-                              Dividends, Returns, Interest
-                            </div>
-                          )}
-                          {category.name === 'Business' && (
-                            <div className="mt-2 text-xs text-muted-foreground">
-                              Revenue, Profit, Sales
-                            </div>
-                          )}
-                        </button>
-                      ))}
+                              {/* Common subcategories for income */}
+                              {category.name === 'Salary' && (
+                                <div className="mt-2 text-xs text-muted-foreground">
+                                  Regular, Bonus, Commission
+                                </div>
+                              )}
+                              {category.name === 'Freelance' && (
+                                <div className="mt-2 text-xs text-muted-foreground">
+                                  Projects, Consulting, Services
+                                </div>
+                              )}
+                              {category.name === 'Investment' && (
+                                <div className="mt-2 text-xs text-muted-foreground">
+                                  Dividends, Returns, Interest
+                                </div>
+                              )}
+                              {category.name === 'Business' && (
+                                <div className="mt-2 text-xs text-muted-foreground">
+                                  Revenue, Profit, Sales
+                                </div>
+                              )}
+                            </button>
+                          ))}
                       </div>
                     </div>
                   )}
@@ -2564,11 +2568,10 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                                 e.stopPropagation();
                                 setBulkCategoryId(category.id);
                               }}
-                              className={`p-3 rounded-lg border text-left transition-all cursor-pointer ${
-                                bulkCategoryId === category.id
-                                  ? 'border-primary bg-primary/10 ring-2 ring-primary'
-                                  : 'border-border hover:bg-muted hover:border-primary/50'
-                              }`}
+                              className={`p-3 rounded-lg border text-left transition-all cursor-pointer ${bulkCategoryId === category.id
+                                ? 'border-primary bg-primary/10 ring-2 ring-primary'
+                                : 'border-border hover:bg-muted hover:border-primary/50'
+                                }`}
                             >
                               <div className="flex items-center justify-between gap-2">
                                 <div className="flex items-center gap-2 flex-1">
@@ -2584,65 +2587,65 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                                   <Check className="w-4 h-4 text-primary flex-shrink-0" />
                                 )}
                               </div>
-                          {/* Common subcategories for expenses */}
-                          {category.name === 'Food' && (
-                            <div className="mt-2 text-xs text-muted-foreground">
-                              Groceries, Restaurants, Snacks, Beverages
-                            </div>
-                          )}
-                          {category.name === 'Transportation' && (
-                            <div className="mt-2 text-xs text-muted-foreground">
-                              Fuel, Taxi, Public Transport, Parking
-                            </div>
-                          )}
-                          {category.name === 'Housing' && (
-                            <div className="mt-2 text-xs text-muted-foreground">
-                              Rent, Mortgage, Maintenance, Repairs
-                            </div>
-                          )}
-                          {category.name === 'Entertainment' && (
-                            <div className="mt-2 text-xs text-muted-foreground">
-                              Movies, Games, Events, Subscriptions
-                            </div>
-                          )}
-                          {category.name === 'Healthcare' && (
-                            <div className="mt-2 text-xs text-muted-foreground">
-                              Doctor, Medicine, Insurance, Tests
-                            </div>
-                          )}
-                          {category.name === 'Shopping' && (
-                            <div className="mt-2 text-xs text-muted-foreground">
-                              Clothes, Electronics, Gifts, Online
-                            </div>
-                          )}
-                          {category.name === 'Education' && (
-                            <div className="mt-2 text-xs text-muted-foreground">
-                              Tuition, Books, Courses, Supplies
-                            </div>
-                          )}
-                          {category.name === 'Utilities' && (
-                            <div className="mt-2 text-xs text-muted-foreground">
-                              Electricity, Water, Internet, Phone
-                            </div>
-                          )}
-                          {category.name === 'Insurance' && (
-                            <div className="mt-2 text-xs text-muted-foreground">
-                              Health, Life, Vehicle, Property
-                            </div>
-                          )}
-                        </button>
-                      ))}
+                              {/* Common subcategories for expenses */}
+                              {category.name === 'Food' && (
+                                <div className="mt-2 text-xs text-muted-foreground">
+                                  Groceries, Restaurants, Snacks, Beverages
+                                </div>
+                              )}
+                              {category.name === 'Transportation' && (
+                                <div className="mt-2 text-xs text-muted-foreground">
+                                  Fuel, Taxi, Public Transport, Parking
+                                </div>
+                              )}
+                              {category.name === 'Housing' && (
+                                <div className="mt-2 text-xs text-muted-foreground">
+                                  Rent, Mortgage, Maintenance, Repairs
+                                </div>
+                              )}
+                              {category.name === 'Entertainment' && (
+                                <div className="mt-2 text-xs text-muted-foreground">
+                                  Movies, Games, Events, Subscriptions
+                                </div>
+                              )}
+                              {category.name === 'Healthcare' && (
+                                <div className="mt-2 text-xs text-muted-foreground">
+                                  Doctor, Medicine, Insurance, Tests
+                                </div>
+                              )}
+                              {category.name === 'Shopping' && (
+                                <div className="mt-2 text-xs text-muted-foreground">
+                                  Clothes, Electronics, Gifts, Online
+                                </div>
+                              )}
+                              {category.name === 'Education' && (
+                                <div className="mt-2 text-xs text-muted-foreground">
+                                  Tuition, Books, Courses, Supplies
+                                </div>
+                              )}
+                              {category.name === 'Utilities' && (
+                                <div className="mt-2 text-xs text-muted-foreground">
+                                  Electricity, Water, Internet, Phone
+                                </div>
+                              )}
+                              {category.name === 'Insurance' && (
+                                <div className="mt-2 text-xs text-muted-foreground">
+                                  Health, Life, Vehicle, Property
+                                </div>
+                              )}
+                            </button>
+                          ))}
                       </div>
                     </div>
                   )}
 
                   {/* Show message if no categories match selected transaction types */}
-                  {categories.filter(c => c.type === 'INCOME').length === 0 && 
-                   categories.filter(c => c.type === 'EXPENSE').length === 0 && (
-                    <div className="text-center py-4 text-sm text-muted-foreground">
-                      No categories available. Please create categories in Settings.
-                    </div>
-                  )}
+                  {categories.filter(c => c.type === 'INCOME').length === 0 &&
+                    categories.filter(c => c.type === 'EXPENSE').length === 0 && (
+                      <div className="text-center py-4 text-sm text-muted-foreground">
+                        No categories available. Please create categories in Settings.
+                      </div>
+                    )}
                 </div>
               )}
             </div>
@@ -2741,9 +2744,6 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                     <h4 className="font-semibold text-foreground mb-2">Supported File Formats:</h4>
                     <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
                       <li><strong>PDF:</strong> Bank statements, transaction reports</li>
-                      <li><strong>XLS/XLSX:</strong> Excel spreadsheets with transaction data</li>
-                      <li><strong>DOC/DOCX:</strong> Word documents with financial data</li>
-                      <li><strong>TXT:</strong> Text files with transaction information</li>
                     </ul>
                     <p className="text-xs text-muted-foreground mt-2">
                       Duplicates will be automatically skipped during import
@@ -2757,16 +2757,15 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                 <label className="block text-sm font-semibold text-foreground mb-3">
                   Select File
                 </label>
-                <div 
+                <div
                   onDragEnter={handleDragEnter}
                   onDragOver={handleDragOver}
                   onDragLeave={handleDragLeave}
                   onDrop={handleDrop}
-                  className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-                    isDragging 
-                      ? 'border-primary bg-primary/10' 
-                      : 'border-border hover:border-primary/50'
-                  }`}
+                  className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${isDragging
+                    ? 'border-primary bg-primary/10'
+                    : 'border-border hover:border-primary/50'
+                    }`}
                 >
                   <Upload className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
                   <p className="text-sm text-muted-foreground mb-2">
@@ -2774,7 +2773,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                   </p>
                   <input
                     type="file"
-                    accept=".pdf,.xls,.xlsx,.doc,.docx,.txt"
+                    accept=".pdf,application/pdf"
                     onChange={handleMultiFormatFileSelect}
                     className="hidden"
                     id="file-upload-transactions"
@@ -2793,13 +2792,13 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                   <div className="rounded-lg border p-3">
                     <div className="text-sm font-medium mb-1">Parse Debug</div>
                     <pre className="text-xs overflow-auto max-h-64 bg-muted/40 p-2 rounded">
-{JSON.stringify(parseDebug ?? { message: 'No parse data yet. Select a PDF and click Parse.' }, null, 2)}
+                      {JSON.stringify(parseDebug ?? { message: 'No parse data yet. Select a PDF and click Parse.' }, null, 2)}
                     </pre>
                   </div>
                   <div className="rounded-lg border p-3">
                     <div className="text-sm font-medium mb-1">Import Debug</div>
                     <pre className="text-xs overflow-auto max-h-64 bg-muted/40 p-2 rounded">
-{JSON.stringify(importDebug ?? { message: 'No import yet. After parsing, click Import to see details.' }, null, 2)}
+                      {JSON.stringify(importDebug ?? { message: 'No import yet. After parsing, click Import to see details.' }, null, 2)}
                     </pre>
                   </div>
                 </div>
@@ -2861,7 +2860,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                   </button>
                 </div>
               </div>
-              
+
               {/* Parse Progress */}
               {isParsingFile && parseProgress > 0 && (
                 <div className="space-y-2">
@@ -2905,7 +2904,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                   <div>
                     <p className="font-semibold text-foreground">Found {filteredParsed.length} transactions</p>
                     <p className="text-sm text-muted-foreground">
-                      Credits will be added as Income, Debits as Expenses. 
+                      Credits will be added as Income, Debits as Expenses.
                       Zero amounts will be skipped. Duplicates will be automatically skipped.
                       Store and product information will be preserved.
                     </p>
@@ -2920,6 +2919,127 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                   </div>
                 )}
               </div>
+
+              {/* Credits & Debits Summary - Parser vs Actual */}
+              {parsedTransactions.length > 0 && (
+                <div className="bg-gradient-to-br from-green-50 to-blue-50 dark:from-green-950/20 dark:to-blue-950/20 rounded-lg p-4 border border-green-200 dark:border-green-800">
+                  <div className="flex items-center space-x-3 mb-4">
+                    <Sparkles className="w-5 h-5 text-primary flex-shrink-0" />
+                    <h4 className="text-lg font-semibold text-foreground">Credits & Debits Summary</h4>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Parser Found (from PDF metadata) */}
+                    <div className="bg-background rounded-lg p-4 border border-border">
+                      <div className="flex items-center space-x-2 mb-3">
+                        <FileText className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                        <h5 className="text-sm font-semibold text-foreground">Parser Found (from PDF)</h5>
+                      </div>
+                      <div className="space-y-2">
+                        {statementMetadata?.totalCredits !== undefined ? (
+                          <div>
+                            <p className="text-xs font-medium text-muted-foreground mb-1">Total Credits</p>
+                            <p className="text-base font-bold text-green-600 dark:text-green-400">
+                              ₹{Number(statementMetadata.totalCredits).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </p>
+                          </div>
+                        ) : (
+                          <div>
+                            <p className="text-xs font-medium text-muted-foreground mb-1">Total Credits</p>
+                            <p className="text-sm text-muted-foreground">Not available in PDF</p>
+                          </div>
+                        )}
+                        {statementMetadata?.totalDebits !== undefined ? (
+                          <div>
+                            <p className="text-xs font-medium text-muted-foreground mb-1">Total Debits</p>
+                            <p className="text-base font-bold text-red-600 dark:text-red-400">
+                              ₹{Number(statementMetadata.totalDebits).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </p>
+                          </div>
+                        ) : (
+                          <div>
+                            <p className="text-xs font-medium text-muted-foreground mb-1">Total Debits</p>
+                            <p className="text-sm text-muted-foreground">Not available in PDF</p>
+                          </div>
+                        )}
+                        {statementMetadata?.transactionCount !== undefined && (
+                          <div className="mt-2 pt-2 border-t border-border">
+                            <p className="text-xs font-medium text-muted-foreground mb-1">Transaction Count</p>
+                            <p className="text-sm font-semibold text-foreground">
+                              {statementMetadata.transactionCount}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Actual Parsed (calculated from transactions) */}
+                    <div className="bg-background rounded-lg p-4 border border-border">
+                      <div className="flex items-center space-x-2 mb-3">
+                        <Check className="w-4 h-4 text-success" />
+                        <h5 className="text-sm font-semibold text-foreground">Actual Parsed (from transactions)</h5>
+                      </div>
+                      <div className="space-y-2">
+                        <div>
+                          <p className="text-xs font-medium text-muted-foreground mb-1">Total Credits</p>
+                          <p className="text-base font-bold text-green-600 dark:text-green-400">
+                            ₹{actualTotals.totalCredits.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium text-muted-foreground mb-1">Total Debits</p>
+                          <p className="text-base font-bold text-red-600 dark:text-red-400">
+                            ₹{actualTotals.totalDebits.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </p>
+                        </div>
+                        <div className="mt-2 pt-2 border-t border-border">
+                          <p className="text-xs font-medium text-muted-foreground mb-1">Transaction Count</p>
+                          <p className="text-sm font-semibold text-foreground">
+                            {parsedTransactions.length}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Difference/Comparison */}
+                  {(statementMetadata?.totalCredits !== undefined || statementMetadata?.totalDebits !== undefined) && (
+                    <div className="mt-4 pt-4 border-t border-border">
+                      <h5 className="text-sm font-semibold text-foreground mb-3">Comparison</h5>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {statementMetadata?.totalCredits !== undefined && (
+                          <div className="bg-muted/50 rounded p-3">
+                            <p className="text-xs font-medium text-muted-foreground mb-1">Credit Difference</p>
+                            <p className={`text-sm font-semibold ${Math.abs(actualTotals.totalCredits - Number(statementMetadata.totalCredits)) < 0.01
+                              ? 'text-success'
+                              : 'text-yellow-600 dark:text-yellow-400'
+                              }`}>
+                              {Math.abs(actualTotals.totalCredits - Number(statementMetadata.totalCredits)) < 0.01
+                                ? '✓ Matches'
+                                : `₹${Math.abs(actualTotals.totalCredits - Number(statementMetadata.totalCredits)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${actualTotals.totalCredits > Number(statementMetadata.totalCredits) ? 'more' : 'less'}`
+                              }
+                            </p>
+                          </div>
+                        )}
+                        {statementMetadata?.totalDebits !== undefined && (
+                          <div className="bg-muted/50 rounded p-3">
+                            <p className="text-xs font-medium text-muted-foreground mb-1">Debit Difference</p>
+                            <p className={`text-sm font-semibold ${Math.abs(actualTotals.totalDebits - Number(statementMetadata.totalDebits)) < 0.01
+                              ? 'text-success'
+                              : 'text-yellow-600 dark:text-yellow-400'
+                              }`}>
+                              {Math.abs(actualTotals.totalDebits - Number(statementMetadata.totalDebits)) < 0.01
+                                ? '✓ Matches'
+                                : `₹${Math.abs(actualTotals.totalDebits - Number(statementMetadata.totalDebits)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${actualTotals.totalDebits > Number(statementMetadata.totalDebits) ? 'more' : 'less'}`
+                              }
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Account Details from PDF */}
               {statementMetadata && (
@@ -2981,10 +3101,10 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                       <div>
                         <p className="text-xs font-medium text-muted-foreground mb-1">Statement Period (Start)</p>
                         <p className="text-sm text-foreground bg-background px-2 py-1 rounded border">
-                          {new Date(statementMetadata.statementStartDate).toLocaleDateString('en-IN', { 
-                            year: 'numeric', 
-                            month: 'long', 
-                            day: 'numeric' 
+                          {new Date(statementMetadata.statementStartDate).toLocaleDateString('en-IN', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
                           })}
                         </p>
                       </div>
@@ -2993,10 +3113,10 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                       <div>
                         <p className="text-xs font-medium text-muted-foreground mb-1">Statement Period (End)</p>
                         <p className="text-sm text-foreground bg-background px-2 py-1 rounded border">
-                          {new Date(statementMetadata.statementEndDate).toLocaleDateString('en-IN', { 
-                            year: 'numeric', 
-                            month: 'long', 
-                            day: 'numeric' 
+                          {new Date(statementMetadata.statementEndDate).toLocaleDateString('en-IN', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
                           })}
                         </p>
                       </div>
@@ -3078,12 +3198,12 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                     {/* Preview filters */}
                     <div className="flex items-center justify-between mb-3">
                       <label className="inline-flex items-center gap-2 text-sm">
-                        <input type="checkbox" checked={previewMonthOnly} onChange={(e)=>{ setPreviewMonthOnly(e.target.checked); setPreviewPage(1); }} />
+                        <input type="checkbox" checked={previewMonthOnly} onChange={(e) => { setPreviewMonthOnly(e.target.checked); setPreviewPage(1); }} />
                         Current month only
                       </label>
                       <div className="flex items-center gap-2 text-xs">
                         <span>Rows per page</span>
-                        <select value={previewPageSize} onChange={(e)=>{ setPreviewPageSize(parseInt(e.target.value||'200')); setPreviewPage(1); }} className="border rounded px-1 py-0.5 bg-background text-foreground">
+                        <select value={previewPageSize} onChange={(e) => { setPreviewPageSize(parseInt(e.target.value || '200')); setPreviewPage(1); }} className="border rounded px-1 py-0.5 bg-background text-foreground">
                           <option value={100}>100</option>
                           <option value={200}>200</option>
                           <option value={500}>500</option>
@@ -3110,7 +3230,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                             const isIncome = creditAmount > 0;
                             const storeOrPerson = transaction.store || transaction.personName || '';
                             const commodity = transaction.commodity || '';
-                            
+
                             return (
                               <tr key={index} className="hover:bg-muted/50">
                                 <td className="px-3 py-2 text-xs text-foreground">
@@ -3123,11 +3243,10 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                                   {commodity || '-'}
                                 </td>
                                 <td className="px-3 py-2">
-                                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                                    isIncome 
-                                      ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' 
-                                      : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                                  }`}>
+                                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${isIncome
+                                    ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                    : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                                    }`}>
                                     {isIncome ? 'Credit' : 'Debit'}
                                   </span>
                                 </td>
@@ -3188,14 +3307,14 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                         })
                       )}
                     </div>
-                    
+
                     {/* Pagination */}
                     {totalPages > 1 && (
                       <div className="flex items-center justify-between mt-3 text-sm">
                         <span className="text-muted-foreground">Page {previewPage} of {totalPages}</span>
                         <div className="flex items-center gap-2">
-                          <button className="px-2 py-1 border rounded disabled:opacity-50 bg-background text-foreground hover:bg-muted" onClick={()=> setPreviewPage(p => Math.max(1, p-1))} disabled={previewPage===1}>Prev</button>
-                          <button className="px-2 py-1 border rounded disabled:opacity-50 bg-background text-foreground hover:bg-muted" onClick={()=> setPreviewPage(p => Math.min(totalPages, p+1))} disabled={previewPage===totalPages}>Next</button>
+                          <button className="px-2 py-1 border rounded disabled:opacity-50 bg-background text-foreground hover:bg-muted" onClick={() => setPreviewPage(p => Math.max(1, p - 1))} disabled={previewPage === 1}>Prev</button>
+                          <button className="px-2 py-1 border rounded disabled:opacity-50 bg-background text-foreground hover:bg-muted" onClick={() => setPreviewPage(p => Math.min(totalPages, p + 1))} disabled={previewPage === totalPages}>Next</button>
                         </div>
                       </div>
                     )}

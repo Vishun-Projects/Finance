@@ -60,7 +60,7 @@ class StatementMetadataExtractor:
                                 return float(first_opening['balance'])
                 
                 # Method 2b: Calculate from first transaction if available
-                if transactions_df is not None and not transactions_df.empty:
+                if transactions_df is not None and isinstance(transactions_df, pd.DataFrame) and not transactions_df.empty:
                     calculated = StatementMetadataExtractor._calculate_from_first_transaction(transactions_df)
                     if calculated is not None:
                         return calculated
@@ -133,7 +133,7 @@ class StatementMetadataExtractor:
         For debit: opening = balance + debit
         For credit: opening = balance - credit
         """
-        if transactions_df.empty:
+        if transactions_df is None or not isinstance(transactions_df, pd.DataFrame) or transactions_df.empty:
             return None
         
         try:
@@ -455,7 +455,7 @@ class StatementMetadataExtractor:
         Formula: openingBalance + totalCredits - totalDebits = closingBalance
         If opening balance not provided, use last transaction balance
         """
-        if transactions_df.empty:
+        if transactions_df is None or not isinstance(transactions_df, pd.DataFrame) or transactions_df.empty:
             return None
         
         try:

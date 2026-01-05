@@ -115,8 +115,8 @@ class BaseBankParser(ABC):
         pass
     
     @abstractmethod
-    def parse_excel(self, file_path) -> pd.DataFrame:
-        """Parse Excel file and return DataFrame of transactions."""
+    def parse_pdf(self, pdf_path) -> pd.DataFrame:
+        """Parse PDF file and return DataFrame of transactions."""
         pass
     
     def parse_with_ai_fallback(

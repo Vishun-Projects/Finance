@@ -1,58 +1,31 @@
 """
-Unified Bank Statement Parser
-==============================
-Main entry point for bank statement parsing with auto-detection and deduplication.
+Unified Bank Statement Parser (Legacy)
+=======================================
+This file is kept for backward compatibility.
+New code should use services/parser_service.py instead.
 """
 
 import sys
 import os
-import pandas as pd
 from pathlib import Path
 from typing import Optional
+import pandas as pd
 
-# Add parsers directory to path for local imports
-parsers_dir = os.path.join(os.path.dirname(__file__), 'parsers')
-if parsers_dir not in sys.path:
-    sys.path.insert(0, parsers_dir)
-
-# Try importing from parsers subdirectory first, then fallback to direct import
+# Import from new service structure
 try:
-    from parsers.bank_detector import BankDetector
-    from parsers.sbi_parser import SBIParser
-    from parsers.indian_bank_parser import IndianBankParser
-    from parsers.kotak_bank_parser import KotakBankParser
-    from parsers.kotak_bank_parser_v2 import KotakBankParserV2
-    from parsers.hdfc_bank_parser import HDFCBankParser
-    from parsers.sbm_parser import SBMParser
-    from parsers.multi_bank_parser import MultiBankParser
-    from parsers.base_parser import BaseBankParser
+    from services.parser_service import ParserService, parse_bank_statement as _parse_bank_statement_new, parse_bank_statement_with_metadata as _parse_bank_statement_with_metadata_new
 except ImportError:
     try:
-        # Fallback to direct imports from parsers directory
-        from bank_detector import BankDetector
-        from sbi_parser import SBIParser
-        from indian_bank_parser import IndianBankParser
-        from kotak_bank_parser import KotakBankParser
-        from kotak_bank_parser_v2 import KotakBankParserV2
-        from hdfc_bank_parser import HDFCBankParser
-        from sbm_parser import SBMParser
-        from multi_bank_parser import MultiBankParser
-        from base_parser import BaseBankParser
-    except ImportError as e:
-        # If all imports fail, set to None and handle gracefully
-        print(f"Warning: Failed to import parsers: {e}", file=sys.stderr)
-        BankDetector = None
-        SBIParser = None
-        IndianBankParser = None
-        KotakBankParser = None
-        KotakBankParserV2 = None
-        HDFCBankParser = None
-        SBMParser = None
-        MultiBankParser = None
-        BaseBankParser = None
+        # Try relative import
+        sys.path.insert(0, os.path.dirname(__file__))
+        from services.parser_service import ParserService, parse_bank_statement as _parse_bank_statement_new, parse_bank_statement_with_metadata as _parse_bank_statement_with_metadata_new
+    except ImportError:
+        # Fallback: define here (will be replaced by service)
+        _parse_bank_statement_new = None
+        _parse_bank_statement_with_metadata_new = None
 
 
-def parse_bank_statement(file_path: Path, bank_code: Optional[str] = None) -> tuple[pd.DataFrame, Optional[dict]]:
+def parse_bank_statement(file_path: Path, bank_code: Optional[str] = None) -> pd.DataFrame:
     """
     Parse bank statement with auto-detection.
     
@@ -61,8 +34,104 @@ def parse_bank_statement(file_path: Path, bank_code: Optional[str] = None) -> tu
         bank_code: Optional bank code override (SBIN, IDIB, KKBK, etc.)
         
     Returns:
-        DataFrame with transactions and metadata
+        DataFrame with transactions (metadata not included)
     """
+    print(f"DEBUG: parse_bank_statement called for {file_path}")
+    # Import helper for safe extraction
+    try:
+        from utils.type_helpers import safe_get_dataframe
+    except ImportError:
+        # Fallback if utils not found (e.g. running directly)
+        sys.path.insert(0, os.path.dirname(__file__))
+        from utils.type_helpers import safe_get_dataframe
+
+    if _parse_bank_statement_new:
+        print("DEBUG: Using new parser service")
+        result = _parse_bank_statement_new(file_path, bank_code)
+        print(f"DEBUG: New parser service returned type: {type(result)}")
+        return safe_get_dataframe(result)
+    
+    print("DEBUG: Using legacy parser implementation")
+    # Fallback to old implementation if service not available
+    result = _legacy_parse_bank_statement(file_path, bank_code)
+    print(f"DEBUG: Legacy parser returned type: {type(result)}")
+    return safe_get_dataframe(result)
+
+
+def parse_bank_statement_with_metadata(file_path: Path, bank_code: Optional[str] = None) -> tuple[pd.DataFrame, Optional[dict]]:
+    """
+    Parse bank statement with metadata extraction.
+    
+    Args:
+        file_path: Path to PDF or Excel file
+        bank_code: Optional bank code override
+        
+    Returns:
+        Tuple of (DataFrame with transactions, metadata dictionary)
+    """
+    if _parse_bank_statement_with_metadata_new:
+        return _parse_bank_statement_with_metadata_new(file_path, bank_code)
+    # Fallback to old implementation if service not available
+    return _legacy_parse_bank_statement_with_metadata(file_path, bank_code)
+
+
+def _legacy_parse_bank_statement(file_path: Path, bank_code: Optional[str] = None) -> pd.DataFrame:
+    """Legacy implementation - kept for fallback."""
+    # Import helper for safe extraction
+    try:
+        from utils.type_helpers import safe_get_dataframe
+    except ImportError:
+        sys.path.insert(0, os.path.dirname(__file__))
+        from utils.type_helpers import safe_get_dataframe
+        
+    result = _legacy_parse_bank_statement_with_metadata(file_path, bank_code)
+    return safe_get_dataframe(result)
+
+
+def _legacy_parse_bank_statement_with_metadata(file_path: Path, bank_code: Optional[str] = None) -> tuple[pd.DataFrame, Optional[dict]]:
+    """Legacy implementation - kept for fallback."""
+    # Import legacy dependencies
+    import sys
+    import os
+    import pandas as pd
+    
+    parsers_dir = os.path.join(os.path.dirname(__file__), 'parsers')
+    if parsers_dir not in sys.path:
+        sys.path.insert(0, parsers_dir)
+    
+    try:
+        from parsers.bank_detector import BankDetector
+        from parsers.sbi_parser import SBIParser
+        from parsers.indian_bank_parser import IndianBankParser
+        from parsers.kotak_bank_parser import KotakBankParser
+        from parsers.kotak_bank_parser_v2 import KotakBankParserV2
+        from parsers.hdfc_bank_parser import HDFCBankParser
+        from parsers.sbm_parser import SBMParser
+        from parsers.multi_bank_parser import MultiBankParser
+        from parsers.base_parser import BaseBankParser
+    except ImportError:
+        try:
+            from bank_detector import BankDetector
+            from sbi_parser import SBIParser
+            from indian_bank_parser import IndianBankParser
+            from kotak_bank_parser import KotakBankParser
+            from kotak_bank_parser_v2 import KotakBankParserV2
+            from hdfc_bank_parser import HDFCBankParser
+            from sbm_parser import SBMParser
+            from multi_bank_parser import MultiBankParser
+            from base_parser import BaseBankParser
+        except ImportError as e:
+            print(f"Warning: Failed to import parsers: {e}", file=sys.stderr)
+            BankDetector = None
+            SBIParser = None
+            IndianBankParser = None
+            KotakBankParser = None
+            KotakBankParserV2 = None
+            HDFCBankParser = None
+            SBMParser = None
+            MultiBankParser = None
+            BaseBankParser = None
+    
     file_path = Path(file_path)
     
     if not file_path.exists():
@@ -117,15 +186,28 @@ def parse_bank_statement(file_path: Path, bank_code: Optional[str] = None) -> tu
         raise ImportError("No parser available - all parser imports failed")
     
     # Parse based on file type
+    # Parse based on file type
     if file_path.suffix.lower() == '.pdf':
-        df = parser.parse_pdf(file_path)
-    elif file_path.suffix.lower() in ['.xls', '.xlsx']:
-        df = parser.parse_excel(file_path)
+        result = parser.parse_pdf(file_path)
     else:
-        raise ValueError(f"Unsupported file format: {file_path.suffix}")
+        raise ValueError(f"Unsupported file format: {file_path.suffix}. Only PDF files are supported.")
+    
+    # Handle case where parser returns tuple (df, metadata) instead of just df
+    if isinstance(result, tuple) and len(result) >= 1:
+        df = result[0]
+    elif isinstance(result, pd.DataFrame):
+        df = result
+    else:
+        # If result is not a DataFrame or tuple, create empty DataFrame
+        df = pd.DataFrame()
+    
+    # Ensure df is a DataFrame
+    if not isinstance(df, pd.DataFrame):
+        print(f"Warning: df is not a DataFrame (type: {type(df)}), creating empty DataFrame", file=sys.stderr)
+        df = pd.DataFrame()
     
     # Additional deduplication at DataFrame level
-    if not df.empty:
+    if isinstance(df, pd.DataFrame) and not df.empty:
         df = deduplicate_transactions(df)
     
     # Extract statement metadata (MANDATORY - always attempt extraction)
@@ -134,7 +216,7 @@ def parse_bank_statement(file_path: Path, bank_code: Optional[str] = None) -> tu
         if file_path.suffix.lower() == '.pdf':
             # Try to extract metadata from parser first
             try:
-                metadata = parser.extract_statement_metadata(file_path, df if not df.empty else None)
+                metadata = parser.extract_statement_metadata(file_path, df if isinstance(df, pd.DataFrame) and not df.empty else None)
             except Exception as parser_meta_err:
                 print(f"Parser metadata extraction failed: {parser_meta_err}", file=sys.stderr)
                 metadata = None
@@ -143,7 +225,7 @@ def parse_bank_statement(file_path: Path, bank_code: Optional[str] = None) -> tu
             if not metadata or (isinstance(metadata, dict) and not any(metadata.values())):
                 try:
                     from parsers.statement_metadata import StatementMetadataExtractor
-                    metadata = StatementMetadataExtractor.extract_all_metadata(file_path, bank_code, df if not df.empty else None)
+                    metadata = StatementMetadataExtractor.extract_all_metadata(file_path, bank_code, df if isinstance(df, pd.DataFrame) and not df.empty else None)
                     print(f"Direct metadata extraction: openingBalance={metadata.get('openingBalance')}, accountNumber={metadata.get('accountNumber')}", file=sys.stderr)
                 except Exception as direct_meta_err:
                     print(f"Direct metadata extraction failed: {direct_meta_err}", file=sys.stderr)
@@ -174,7 +256,7 @@ def parse_bank_statement(file_path: Path, bank_code: Optional[str] = None) -> tu
         metadata = {}
     
     # Post-parse validation (after metadata extraction)
-    if not df.empty:
+    if isinstance(df, pd.DataFrame) and not df.empty:
         try:
             from parsers.data_validator import DataValidator
             validation_result = DataValidator.validate_transactions(df, bank_code, metadata)
@@ -195,6 +277,13 @@ def parse_bank_statement(file_path: Path, bank_code: Optional[str] = None) -> tu
     return df, metadata
 
 
+# Backward compatibility: keep old function signature as alias
+# This will be removed in future versions
+def _parse_bank_statement_legacy(file_path: Path, bank_code: Optional[str] = None) -> tuple[pd.DataFrame, Optional[dict]]:
+    """Legacy function - use parse_bank_statement_with_metadata instead."""
+    return parse_bank_statement_with_metadata(file_path, bank_code)
+
+
 def deduplicate_transactions(df: pd.DataFrame) -> pd.DataFrame:
     """
     Remove duplicate transactions from DataFrame.
@@ -205,8 +294,8 @@ def deduplicate_transactions(df: pd.DataFrame) -> pd.DataFrame:
     Returns:
         DataFrame without duplicates
     """
-    if df.empty:
-        return df
+    if not isinstance(df, pd.DataFrame) or df.empty:
+        return df if isinstance(df, pd.DataFrame) else pd.DataFrame()
     
     # Sort by date
     if 'date_iso' in df.columns:
@@ -237,7 +326,12 @@ def deduplicate_transactions(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def get_parser_for_bank(bank_code: str) -> BaseBankParser:
+from typing import Optional, Any
+import pandas as pd
+
+# ... (existing code) ...
+
+def get_parser_for_bank(bank_code: str) -> Any:
     """
     Get appropriate parser for bank code.
     
@@ -247,6 +341,26 @@ def get_parser_for_bank(bank_code: str) -> BaseBankParser:
     Returns:
         Parser instance
     """
+    # Import parsers locally to avoid circular imports
+    try:
+        from parsers.sbi_parser import SBIParser
+        from parsers.indian_bank_parser import IndianBankParser
+        from parsers.kotak_bank_parser import KotakBankParser
+        from parsers.kotak_bank_parser_v2 import KotakBankParserV2
+        from parsers.hdfc_bank_parser import HDFCBankParser
+        from parsers.sbm_parser import SBMParser
+        from parsers.multi_bank_parser import MultiBankParser
+    except ImportError:
+        # Fallback for direct execution
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'parsers'))
+        from sbi_parser import SBIParser
+        from indian_bank_parser import IndianBankParser
+        from kotak_bank_parser import KotakBankParser
+        from kotak_bank_parser_v2 import KotakBankParserV2
+        from hdfc_bank_parser import HDFCBankParser
+        from sbm_parser import SBMParser
+        from multi_bank_parser import MultiBankParser
+
     if bank_code == 'SBIN':
         return SBIParser()
     elif bank_code == 'IDIB':
@@ -275,9 +389,9 @@ def main():
     bank_code = sys.argv[2] if len(sys.argv) > 2 else None
     
     try:
-        df, metadata = parse_bank_statement(file_path, bank_code)
+        df, metadata = parse_bank_statement_with_metadata(file_path, bank_code)
         
-        if df.empty:
+        if not isinstance(df, pd.DataFrame) or df.empty:
             print("No transactions found")
         else:
             print(f"\n[SUCCESS] Successfully extracted {len(df)} transactions")

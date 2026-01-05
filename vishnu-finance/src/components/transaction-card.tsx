@@ -133,13 +133,13 @@ export default function TransactionCard({
                 </span>
 
                 {/* Description THIRD (if different from name) */}
-                {transaction.description && 
-                 transaction.description !== transaction.personName && 
-                 transaction.description !== transaction.store && (
-                  <span className="text-[11px] text-muted-foreground truncate max-w-[200px]">
-                    {transaction.description}
-                  </span>
-                )}
+                {transaction.description &&
+                  transaction.description !== transaction.personName &&
+                  transaction.description !== transaction.store && (
+                    <span className="text-[11px] text-muted-foreground truncate max-w-[200px]">
+                      {transaction.description}
+                    </span>
+                  )}
 
                 {/* Date */}
                 <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
@@ -151,10 +151,10 @@ export default function TransactionCard({
           </div>
 
           {/* Amount + quick controls */}
-          <div className="flex flex-col items-end gap-2">
+          <div className="flex flex-col items-end gap-2 flex-shrink-0">
             <div
               className={cn(
-                "text-base font-semibold sm:text-lg",
+                "text-base font-semibold sm:text-lg whitespace-nowrap",
                 isCredit
                   ? "text-emerald-600 dark:text-emerald-400"
                   : "text-rose-600 dark:text-rose-400",

@@ -1,7 +1,7 @@
 """
 Bank Type Detector
 ==================
-Detects bank type from PDF/Excel bank statement content.
+Detects bank type from PDF bank statement content.
 """
 
 import re
@@ -63,6 +63,97 @@ class BankDetector:
             'table_patterns': [r'sr\s+no\s+date\s+particulars\s+cheque/reference\s+no', r'cheque/reference\s+no\s+debit\s+credit\s+balance\s+channel'],
             'ifsc_patterns': [r'MAHB[0-9]+'],
             'email_patterns': [r'mahabank\.co\.in']
+        },
+        'ICIC': {
+            'codes': ['ICIC', 'ICICI'],
+            'name_patterns': [r'icici\s+bank'],
+            'upi_patterns': [r'/ICIC/', r'ICIC/[A-Z0-9@]+', r'ICICI[A-Z0-9]+'],
+            'ifsc_patterns': [r'ICIC[0-9]+'],
+            'email_patterns': [r'icicibank\.com']
+        },
+        'PUNB': {
+            'codes': ['PUNB', 'PNB'],
+            'name_patterns': [r'punjab\s+national\s+bank', r'pnb\s+bank'],
+            'upi_patterns': [r'/PUNB/', r'PUNB/[A-Z0-9@]+'],
+            'ifsc_patterns': [r'PUNB[0-9]+'],
+            'email_patterns': [r'pnb\.co\.in']
+        },
+        'BARB': {
+            'codes': ['BARB', 'BOB'],
+            'name_patterns': [r'bank\s+of\s+baroda', r'bob\s+bank'],
+            'upi_patterns': [r'/BARB/', r'BARB/[A-Z0-9@]+'],
+            'ifsc_patterns': [r'BARB[0-9]+'],
+            'email_patterns': [r'bankofbaroda\.in']
+        },
+        'CNRB': {
+            'codes': ['CNRB', 'CANARA'],
+            'name_patterns': [r'canara\s+bank'],
+            'upi_patterns': [r'/CNRB/', r'CNRB/[A-Z0-9@]+'],
+            'ifsc_patterns': [r'CNRB[0-9]+'],
+            'email_patterns': [r'canarabank\.com']
+        },
+        'UBIN': {
+            'codes': ['UBIN', 'UNION'],
+            'name_patterns': [r'union\s+bank\s+of\s+india'],
+            'upi_patterns': [r'/UBIN/', r'UBIN/[A-Z0-9@]+'],
+            'ifsc_patterns': [r'UBIN[0-9]+'],
+            'email_patterns': [r'unionbankofindia\.co\.in']
+        },
+        'IOBA': {
+            'codes': ['IOBA', 'IOB'],
+            'name_patterns': [r'indian\s+overseas\s+bank'],
+            'upi_patterns': [r'/IOBA/', r'IOBA/[A-Z0-9@]+'],
+            'ifsc_patterns': [r'IOBA[0-9]+'],
+            'email_patterns': [r'iob\.in']
+        },
+        'BKID': {
+            'codes': ['BKID', 'BOI'],
+            'name_patterns': [r'bank\s+of\s+india'],
+            'upi_patterns': [r'/BKID/', r'BKID/[A-Z0-9@]+'],
+            'ifsc_patterns': [r'BKID[0-9]+'],
+            'email_patterns': [r'bankofindia\.co\.in']
+        },
+        'CBIN': {
+            'codes': ['CBIN', 'CBI'],
+            'name_patterns': [r'central\s+bank\s+of\s+india'],
+            'upi_patterns': [r'/CBIN/', r'CBIN/[A-Z0-9@]+'],
+            'ifsc_patterns': [r'CBIN[0-9]+'],
+            'email_patterns': [r'centralbank\.co\.in']
+        },
+        'IDFB': {
+            'codes': ['IDFB', 'IDFC'],
+            'name_patterns': [r'idfc\s+first\s+bank'],
+            'upi_patterns': [r'/IDFB/', r'IDFB/[A-Z0-9@]+'],
+            'ifsc_patterns': [r'IDFB[0-9]+'],
+            'email_patterns': [r'idfcfirstbank\.com']
+        },
+        'FDRL': {
+            'codes': ['FDRL', 'FEDERAL'],
+            'name_patterns': [r'federal\s+bank'],
+            'upi_patterns': [r'/FDRL/', r'FDRL/[A-Z0-9@]+'],
+            'ifsc_patterns': [r'FDRL[0-9]+'],
+            'email_patterns': [r'federalbank\.co\.in']
+        },
+        'RATN': {
+            'codes': ['RATN', 'RBL'],
+            'name_patterns': [r'rbl\s+bank'],
+            'upi_patterns': [r'/RATN/', r'RATN/[A-Z0-9@]+'],
+            'ifsc_patterns': [r'RATN[0-9]+'],
+            'email_patterns': [r'rblbank\.com']
+        },
+        'SIBL': {
+            'codes': ['SIBL', 'SOUTH INDIAN'],
+            'name_patterns': [r'south\s+indian\s+bank'],
+            'upi_patterns': [r'/SIBL/', r'SIBL/[A-Z0-9@]+'],
+            'ifsc_patterns': [r'SIBL[0-9]+'],
+            'email_patterns': [r'southindianbank\.com']
+        },
+        'KVBL': {
+            'codes': ['KVBL', 'KARUR VYSYA'],
+            'name_patterns': [r'karur\s+vysya\s+bank'],
+            'upi_patterns': [r'/KVBL/', r'KVBL/[A-Z0-9@]+'],
+            'ifsc_patterns': [r'KVBL[0-9]+'],
+            'email_patterns': [r'kvb\.co\.in']
         }
     }
     
@@ -165,40 +256,9 @@ class BankDetector:
         return 'V1'
     
     @staticmethod
-    def detect_from_excel(file_path: Path) -> Optional[str]:
-        """
-        Detect bank type from Excel content.
-        
-        Args:
-            file_path: Path to Excel file
-            
-        Returns:
-            Bank code (SBIN, IDIB, etc.) or None
-        """
-        try:
-            # Read first few rows
-            df = pd.read_excel(file_path, nrows=50)
-            
-            sample_text = ""
-            # Convert all columns to text and combine
-            for col in df.columns:
-                sample_text += str(col) + " "
-            
-            # Sample from first few rows
-            for _, row in df.head(10).iterrows():
-                for val in row.values:
-                    if pd.notna(val):
-                        sample_text += str(val) + " "
-            
-            return BankDetector._analyze_text(sample_text)
-        except Exception as e:
-            print(f"Error detecting bank from Excel: {e}")
-            return None
-    
-    @staticmethod
     def detect_from_file(file_path: Path) -> Optional[str]:
         """
-        Detect bank type from file (PDF or Excel).
+        Detect bank type from file (PDF only).
         
         Args:
             file_path: Path to file
@@ -213,8 +273,6 @@ class BankDetector:
         
         if file_path.suffix.lower() == '.pdf':
             return BankDetector.detect_from_pdf(file_path)
-        elif file_path.suffix.lower() in ['.xls', '.xlsx']:
-            return BankDetector.detect_from_excel(file_path)
         else:
             return None
     
@@ -290,7 +348,7 @@ def detect_bank_type(file_path: Path) -> Optional[str]:
     Detect bank type from file path.
     
     Args:
-        file_path: Path to PDF or Excel file
+        file_path: Path to PDF file
         
     Returns:
         Bank code or None

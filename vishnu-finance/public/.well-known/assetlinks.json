@@ -1,0 +1,14 @@
+[
+    {
+        "relation": [
+            "delegate_permission/common.handle_all_urls"
+        ],
+        "target": {
+            "namespace": "android_app",
+            "package_name": "com.vishnu.finance",
+            "sha256_cert_fingerprints": [
+                "93:17:42:1A:AC:73:EF:C6:95:BC:19:02:59:E6:8E:CD:72:3D:41:25:BD:B8:C9:1F:C5:63:10:5B:5D:C3:F1:6E"
+            ]
+        }
+    }
+]

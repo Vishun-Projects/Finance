@@ -76,37 +76,7 @@ class IndianBankParser(BaseBankParser):
         
         return pd.DataFrame(transactions) if transactions else pd.DataFrame()
     
-    def parse_excel(self, file_path: Path) -> pd.DataFrame:
-        """
-        Parse Indian Bank Excel statement.
-        
-        Args:
-            file_path: Path to Excel file
-            
-        Returns:
-            DataFrame of transactions
-        """
-        transactions = []
-        seen_transactions = set()
-        
-        try:
-            df = pd.read_excel(file_path)
-            
-            # Indian Bank format: Date | Details | Ref No./Cheque No | Debit | Credit | Balance
-            for idx, row in df.iterrows():
-                transaction = self._parse_excel_row(row, idx)
-                if transaction:
-                    txn_id = self.create_transaction_id(transaction)
-                    if txn_id not in seen_transactions:
-                        seen_transactions.add(txn_id)
-                        transactions.append(transaction)
-        
-        except Exception as e:
-            print(f"Error parsing Indian Bank Excel: {e}")
-            import traceback
-            traceback.print_exc()
-        
-        return pd.DataFrame(transactions) if transactions else pd.DataFrame()
+
     
     def _parse_table_row(self, row: List, page: int, line: int) -> Optional[Dict]:
         """Parse a table row into a transaction dictionary."""
@@ -169,63 +139,7 @@ class IndianBankParser(BaseBankParser):
             print(f"Error parsing table row: {e}")
             return None
     
-    def _parse_excel_row(self, row: pd.Series, idx: int) -> Optional[Dict]:
-        """Parse an Excel row into a transaction dictionary."""
-        try:
-            if len(row) >= 6:
-                date_val = row.iloc[0] if pd.notna(row.iloc[0]) else None
-                details = str(row.iloc[1]) if pd.notna(row.iloc[1]) else None
-                ref_no = str(row.iloc[2]) if pd.notna(row.iloc[2]) else None
-                debit_val = row.iloc[3] if pd.notna(row.iloc[3]) else None
-                credit_val = row.iloc[4] if pd.notna(row.iloc[4]) else None
-                balance_val = row.iloc[5] if pd.notna(row.iloc[5]) else None
-            else:
-                date_val = row.get('Date') or row.get('date')
-                details = str(row.get('Details') or row.get('details', ''))
-                debit_val = row.get('Debit') or row.get('debit')
-                credit_val = row.get('Credit') or row.get('credit')
-                balance_val = row.get('Balance') or row.get('balance')
-                ref_no = None
-            
-            if not date_val:
-                return None
-            
-            date_iso = self.parse_date(date_val)
-            if not date_iso:
-                return None
-            
-            debit = self.parse_amount(debit_val) if debit_val else 0
-            credit = self.parse_amount(credit_val) if credit_val else 0
-            balance = self.parse_amount(balance_val) if balance_val else None
-            
-            if debit == 0 and credit == 0:
-                return None
-            
-            metadata = self._extract_metadata(details) if details else {}
-            store, commodity, clean_desc = self.extract_store_and_commodity(details) if details else (None, None, None)
-            
-            transaction = {
-                'date': str(date_val),
-                'date_iso': date_iso,
-                'description': clean_desc or details,
-                'raw': details,
-                'amount': debit if debit > 0 else credit,
-                'type': 'expense' if debit > 0 else 'income',
-                'debit': debit,
-                'credit': credit,
-                'balance': balance,
-                'page': 'Excel',
-                'line': str(idx + 1),
-                'store': store,
-                'commodity': commodity,
-                **metadata
-            }
-            
-            return self.normalize_transaction(transaction)
-        
-        except Exception as e:
-            print(f"Error parsing Excel row: {e}")
-            return None
+
     
     def _parse_text_lines(self, text: str) -> List[Dict]:
         """Parse text lines as fallback when tables not detected."""

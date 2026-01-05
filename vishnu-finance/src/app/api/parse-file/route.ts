@@ -42,10 +42,31 @@ async function tryPythonParser(fileBuffer: Buffer, fileType: string): Promise<{ 
     
     if (response.ok) {
       const data = await response.json();
+      // Python serverless functions may return {statusCode, body} format
+      // or direct JSON response
+      if (data.statusCode && data.body) {
+        try {
+          const parsedBody = typeof data.body === 'string' ? JSON.parse(data.body) : data.body;
+          if (data.statusCode === 200) {
+            return { success: true, data: parsedBody };
+          } else {
+            return { success: false, error: parsedBody.error || 'Python parser failed' };
+          }
+        } catch (e) {
+          return { success: false, error: data.body || 'Failed to parse Python response' };
+        }
+      }
       return { success: true, data };
     } else {
       const errorText = await response.text();
-      return { success: false, error: errorText };
+      let errorMessage = errorText;
+      try {
+        const errorJson = JSON.parse(errorText);
+        errorMessage = errorJson.error || errorJson.message || errorText;
+      } catch {
+        // Not JSON, use as-is
+      }
+      return { success: false, error: errorMessage };
     }
   } catch (error) {
     console.log('⚠️ Multi-Format API: Python function call failed, will try fallback:', error);
@@ -62,7 +83,6 @@ export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
     const file = formData.get('file') as File;
-    
     console.log('🔍 Multi-Format API: Form data received');
     console.log('🔍 Multi-Format API: File details:', {
       name: file?.name,
@@ -97,6 +117,8 @@ export async function POST(request: NextRequest) {
     // /tmp is the only writable directory in serverless functions
     const uploadsDir = join(tmpdir(), 'multi-format-uploads');
     const toolsDir = join(process.cwd(), 'tools');
+    const parseFilePythonDir = join(process.cwd(), 'api', 'parse-file-python');
+    const legacyToolsDir = join(process.cwd(), 'legacy', 'tools');
     
     // Ensure uploads directory exists
     try {
@@ -118,45 +140,70 @@ export async function POST(request: NextRequest) {
     console.log('✅ Multi-Format API: File saved successfully');
 
     // Strategy 1: Try Python serverless function first (production)
-    try {
-      console.log('🐍 Multi-Format API: Attempting Python serverless function...');
-      const pythonResult = await tryPythonParser(buffer, fileType);
-      
-      if (pythonResult.success && pythonResult.data) {
-        console.log('✅ Multi-Format API: Python parser succeeded');
-        const result = pythonResult.data;
+    // Skip in local development if VERCEL_URL is not set
+    const isProduction = !!process.env.VERCEL_URL || !!process.env.VERCEL;
+    if (isProduction) {
+      try {
+        console.log('🐍 Multi-Format API: Attempting Python serverless function...');
+        const pythonResult = await tryPythonParser(buffer, fileType);
         
-        // Clean up file
-        try {
-          await unlink(filepath);
-        } catch {}
-        
-        return NextResponse.json({
-          success: result.success || true,
-          transactions: result.transactions || [],
-          count: result.count || 0,
-          fileType: result.fileType || fileType.toUpperCase().replace('.', ''),
-          message: result.message || `Successfully parsed ${result.count || 0} transactions from ${fileType.toUpperCase()} file`,
-        });
-      } else {
-        console.log('⚠️ Multi-Format API: Python parser failed, trying local Python execution...');
+        if (pythonResult.success && pythonResult.data) {
+          console.log('✅ Multi-Format API: Python parser succeeded');
+          const result = pythonResult.data;
+          
+          // Clean up file
+          try {
+            await unlink(filepath);
+          } catch {}
+          
+          return NextResponse.json({
+            success: result.success || true,
+            transactions: result.transactions || [],
+            count: result.count || 0,
+            fileType: result.fileType || fileType.toUpperCase().replace('.', ''),
+            message: result.message || `Successfully parsed ${result.count || 0} transactions from ${fileType.toUpperCase()} file`,
+          });
+        } else {
+          console.log('⚠️ Multi-Format API: Python serverless parser failed:', pythonResult.error);
+          console.log('⚠️ Multi-Format API: Trying local Python execution...');
+        }
+      } catch (error) {
+        console.log('⚠️ Multi-Format API: Python serverless function error, trying fallback:', error);
+        if (error instanceof Error) {
+          console.error('Error details:', error.message, error.stack);
+        }
       }
-    } catch (error) {
-      console.log('⚠️ Multi-Format API: Python function error, trying fallback:', error);
+    } else {
+      console.log('ℹ️ Multi-Format API: Local development mode - skipping Python serverless function');
     }
 
     // Strategy 2: Try local Python execution (development/local)
+    console.log('🐍 Multi-Format API: Starting local Python execution...');
+    console.log('📁 Multi-Format API: File path:', filepath);
+    console.log('📁 Multi-Format API: Tools directory:', toolsDir);
+    
     try {
+      // Check if Python is available
+      try {
+        const { stdout: pythonVersion } = await execAsync('python --version');
+        console.log('✅ Multi-Format API: Python found:', pythonVersion.trim());
+      } catch (pythonCheckError) {
+        console.error('❌ Multi-Format API: Python not found in PATH. Please ensure Python is installed.');
+        throw new Error('Python is not available. Please install Python to use the file parser.');
+      }
+      
       // Create a temporary Python script using the multi-format parser
       const csvOutput = join(uploadsDir, `extracted_${Date.now()}.csv`);
       
       const tempScript = `
 import sys
 import os
+import traceback
+# Add multiple paths to find multi_format_parser
+sys.path.insert(0, r'${parseFilePythonDir.replace(/\\/g, '\\\\')}')
+sys.path.insert(0, r'${legacyToolsDir.replace(/\\/g, '\\\\')}')
 sys.path.append(r'${toolsDir.replace(/\\/g, '\\\\')}')
 
-# Import the multi-format parser
-from multi_format_parser import parse_file
 from pathlib import Path
 import pandas as pd
 import json
@@ -166,18 +213,111 @@ def main():
     csv_path = Path(r"${csvOutput.replace(/\\/g, '\\\\')}")
     
     if not file_path.exists():
-        raise FileNotFoundError(f"File not found: {file_path}")
-
-    print(f"Parsing {file_path.suffix.upper()} file: {file_path.name}")
-
-    df = parse_file(file_path)
-    
-    if df.empty:
-        print("No transactions found")
-        result = {"success": True, "transactions": [], "count": 0}
-        with open(csv_path.parent / f"{csv_path.stem}.json", 'w') as f:
-            json.dump(result, f)
+        error_msg = f"File not found: {file_path}"
+        print(error_msg, file=sys.stderr)
+        result = {"success": False, "error": error_msg, "transactions": [], "count": 0, "debug": {"file_path": str(file_path), "exists": False}}
         print(json.dumps(result))
+        return
+
+    print(f"Parsing {file_path.suffix.upper()} file: {file_path.name}", file=sys.stderr)
+    
+    # For Excel files, first show what's actually in the file (read more rows for metadata)
+    if file_path.suffix.lower() in ['.xls', '.xlsx']:
+        try:
+            print("\\n=== EXCEL FILE DEBUG INFO ===", file=sys.stderr)
+            df_raw = pd.read_excel(file_path, engine='openpyxl', nrows=50, header=None)
+            print(f"Excel file shape: {df_raw.shape}", file=sys.stderr)
+            print(f"\\nFirst 20 rows (showing metadata):", file=sys.stderr)
+            for idx in range(min(20, len(df_raw))):
+                row_values = [str(v) if pd.notna(v) else 'NaN' for v in df_raw.iloc[idx].values[:10]]
+                print(f"Row {idx}: {' | '.join(row_values)}", file=sys.stderr)
+            print("\\n=== END DEBUG INFO ===\\n", file=sys.stderr)
+        except Exception as debug_err:
+            print(f"Could not read Excel for debugging: {debug_err}", file=sys.stderr)
+            import traceback
+            traceback.print_exc(file=sys.stderr)
+
+    # Import the multi-format parser
+    try:
+        from multi_format_parser import parse_file
+    except ImportError as e:
+        error_msg = f"Import error: {e}"
+        print(error_msg, file=sys.stderr)
+        print(f"Python path: {sys.path}", file=sys.stderr)
+        traceback.print_exc(file=sys.stderr)
+        result = {"success": False, "error": error_msg, "transactions": [], "count": 0, "debug": {"python_path": sys.path}}
+        print(json.dumps(result))
+        return
+
+    # Parse the file with proper error handling
+    df = None
+    parse_error = None
+    try:
+        result_obj = parse_file(file_path)
+        # Handle both DataFrame and tuple returns
+        if isinstance(result_obj, tuple):
+            df = result_obj[0]
+            if not isinstance(df, pd.DataFrame):
+                df = pd.DataFrame()
+        elif isinstance(result_obj, pd.DataFrame):
+            df = result_obj
+        else:
+            df = pd.DataFrame()
+            parse_error = f"Unexpected return type from parse_file: {type(result_obj)}"
+    except Exception as e:
+        parse_error = str(e)
+        print(f"\\n❌ PARSING ERROR: {parse_error}", file=sys.stderr)
+        traceback.print_exc(file=sys.stderr)
+        df = pd.DataFrame()
+    
+    # If parsing failed, return error with debug info
+    if parse_error or (df is not None and isinstance(df, pd.DataFrame) and df.empty):
+        error_details = {
+            "error": parse_error or "No transactions found in file",
+            "file_name": file_path.name,
+            "file_type": file_path.suffix,
+            "file_size": file_path.stat().st_size if file_path.exists() else 0
+        }
+        
+        # Add Excel debug info if available
+        if file_path.suffix.lower() in ['.xls', '.xlsx']:
+            try:
+                df_debug = pd.read_excel(file_path, engine='openpyxl', nrows=50)
+                # Convert NaN to None for JSON serialization
+                df_debug_clean = df_debug.replace({pd.NA: None, pd.NaT: None})
+                df_debug_clean = df_debug_clean.where(pd.notnull(df_debug_clean), None)
+                
+                first_row_dict = None
+                if len(df_debug_clean) > 0:
+                    first_row = df_debug_clean.iloc[0]
+                    first_row_dict = {str(k): (None if pd.isna(v) else str(v)) for k, v in first_row.items()}
+                
+                sample_data = []
+                if len(df_debug_clean) > 0:
+                    for idx, row in df_debug_clean.head(5).iterrows():
+                        row_dict = {str(k): (None if pd.isna(v) else str(v)) for k, v in row.items()}
+                        sample_data.append(row_dict)
+                
+                error_details["excel_debug"] = {
+                    "shape": list(df_debug.shape),
+                    "columns": [str(c) for c in df_debug.columns],
+                    "first_row": first_row_dict,
+                    "sample_data": sample_data
+                }
+            except Exception as e:
+                error_details["excel_debug_error"] = str(e)
+        
+        result = {
+            "success": False,
+            "error": error_details["error"],
+            "transactions": [],
+            "count": 0,
+            "debug": error_details
+        }
+        json_path = csv_path.parent / f"{csv_path.stem}.json"
+        with open(json_path, 'w') as f:
+            json.dump(result, f, indent=2, default=str)  # Handle NaN values
+        print(json.dumps(result, indent=2, default=str))  # Handle NaN values
         return
     
     # Ensure date_iso is properly formatted (YYYY-MM-DD)
@@ -224,7 +364,17 @@ def main():
     # Also save to JSON for better error handling
     json_path = csv_path.parent / f"{csv_path.stem}.json"
     try:
-        json_records = df.to_dict(orient='records')
+        # Replace NaN with None for JSON serialization
+        df_clean = df.replace({pd.NA: None, pd.NaT: None})
+        df_clean = df_clean.where(pd.notnull(df_clean), None)
+        
+        json_records = df_clean.to_dict(orient='records')
+        # Clean up any remaining NaN values
+        for record in json_records:
+            for key, value in record.items():
+                if pd.isna(value) if hasattr(pd, 'isna') else (value != value):  # Check for NaN
+                    record[key] = None
+        
         result = {
             "success": True,
             "transactions": json_records,
@@ -241,6 +391,8 @@ def main():
             print(json.dumps({"success": True, "transactions": [], "count": len(df), "file": str(json_path)}, default=str))
     except Exception as e:
         print(f"Warning: Could not save JSON: {e}", file=sys.stderr)
+        import traceback
+        traceback.print_exc(file=sys.stderr)
         print(f"SUCCESS: Extracted {len(df)} transactions.")
         print(f"CSV saved to: {csv_path}")
 
@@ -254,22 +406,59 @@ if __name__ == "__main__":
       // Execute the Python script
       console.log('🔍 Multi-Format API: Executing Python script:', tempScriptPath);
       console.log('🔍 Multi-Format API: Python command:', `python "${tempScriptPath}"`);
+      console.log('🔍 Multi-Format API: Input file exists:', require('fs').existsSync(filepath));
       
-      const { stdout, stderr } = await execAsync(`python "${tempScriptPath}"`);
+      let stdout = '';
+      let stderr = '';
+      try {
+        const result = await execAsync(`python "${tempScriptPath}"`, {
+          timeout: 180_000,
+          maxBuffer: 10 * 1024 * 1024 // 10MB buffer
+        });
+        stdout = result.stdout || '';
+        stderr = result.stderr || '';
+      } catch (execError: any) {
+        stdout = execError.stdout || '';
+        stderr = execError.stderr || '';
+        console.error('❌ Multi-Format API: Python execution error:', execError.message);
+        if (execError.code) {
+          console.error('❌ Multi-Format API: Exit code:', execError.code);
+        }
+        // Don't throw yet - try to parse output if available
+      }
       
-      console.log('🔍 Multi-Format API: Python stdout:', stdout);
+      console.log('🔍 Multi-Format API: Python stdout length:', stdout.length);
+      console.log('🔍 Multi-Format API: Python stdout (first 500 chars):', stdout.substring(0, 500));
       if (stderr) {
-        console.log('⚠️ Multi-Format API: Python stderr:', stderr);
+        console.log('⚠️ Multi-Format API: Python stderr length:', stderr.length);
+        console.log('⚠️ Multi-Format API: Python stderr (full):', stderr);
+        // Also log stderr to help debug
+        console.error('⚠️ Multi-Format API: Python stderr content:', stderr);
+      } else {
+        console.log('ℹ️ Multi-Format API: No stderr output from Python');
       }
       
       // Keep temporary script for later cleanup
       console.log('📁 Multi-Format API: Temporary script will be cleaned up after import');
 
-      if (stderr && !stdout.includes('SUCCESS') && !stdout.includes('transactions')) {
-        console.error('❌ Multi-Format API: Python script error:', stderr);
+      // Check if Python script failed completely
+      if (stderr && !stdout.includes('SUCCESS') && !stdout.includes('transactions') && !stdout.includes('"success"')) {
+        console.error('❌ Multi-Format API: Python script error detected');
+        console.error('❌ Multi-Format API: stderr:', stderr);
+        console.error('❌ Multi-Format API: stdout (last 1000 chars):', stdout.substring(Math.max(0, stdout.length - 1000)));
+        
+        // Check if it's a Python import error
+        if (stderr.includes('ModuleNotFoundError') || stderr.includes('ImportError')) {
+          return NextResponse.json({ 
+            error: `Failed to parse ${fileType.toUpperCase()} file. Python dependencies are missing.`,
+            details: stderr,
+            suggestion: 'Please ensure all Python dependencies are installed (pandas, openpyxl, etc.)'
+          }, { status: 500 });
+        }
+        
         return NextResponse.json({ 
           error: `Failed to parse ${fileType.toUpperCase()} file. Please ensure it contains valid transaction data.`,
-          details: stderr 
+          details: stderr.substring(0, 1000) // Limit error message size
         }, { status: 500 });
       }
 
@@ -277,6 +466,8 @@ if __name__ == "__main__":
       const jsonOutput = csvOutput.replace('.csv', '.json');
       let transactions: any[] = [];
       let transactionCount = 0;
+      let debugInfo: any = null;
+      let parseError: string | null = null;
 
       try {
         // Try parsing JSON from stdout
@@ -291,10 +482,43 @@ if __name__ == "__main__":
         if (jsonText) {
           try {
             const parsed = JSON.parse(jsonText);
+            
+            // Check if parsing failed and return error with debug info
+            if (parsed.success === false) {
+              parseError = parsed.error || 'Parsing failed';
+              debugInfo = parsed.debug || null;
+              console.error('❌ Multi-Format API: Parsing failed:', parseError);
+              if (debugInfo) {
+                console.error('❌ Multi-Format API: Debug info:', JSON.stringify(debugInfo, null, 2));
+              }
+              // Return error immediately with debug info
+              return NextResponse.json({
+                success: false,
+                error: parseError,
+                debug: debugInfo,
+                transactions: [],
+                count: 0
+              }, { status: 400 });
+            }
+            
             if (parsed.file) {
               // JSON was too large and written to file
               const fileContent = await import('fs').then(fs => fs.promises.readFile(parsed.file, 'utf-8'));
               const fileParsed = JSON.parse(fileContent);
+              
+              // Check for errors in file content too
+              if (fileParsed.success === false) {
+                parseError = fileParsed.error || 'Parsing failed';
+                debugInfo = fileParsed.debug || null;
+                return NextResponse.json({
+                  success: false,
+                  error: parseError,
+                  debug: debugInfo,
+                  transactions: [],
+                  count: 0
+                }, { status: 400 });
+              }
+              
               transactions = Array.isArray(fileParsed?.transactions) ? fileParsed.transactions : [];
               transactionCount = fileParsed?.count || 0;
             } else {
@@ -310,11 +534,29 @@ if __name__ == "__main__":
       }
 
       // If no transactions from JSON stdout, try reading JSON file
-      if (transactions.length === 0) {
+      if (transactions.length === 0 && !parseError) {
         try {
           const { readFile } = await import('fs/promises');
           const fileContent = await readFile(jsonOutput, 'utf-8');
           const parsed = JSON.parse(fileContent);
+          
+          // Check for errors in JSON file
+          if (parsed.success === false) {
+            parseError = parsed.error || 'Parsing failed';
+            debugInfo = parsed.debug || null;
+            console.error('❌ Multi-Format API: Parsing failed (from JSON file):', parseError);
+            if (debugInfo) {
+              console.error('❌ Multi-Format API: Debug info:', JSON.stringify(debugInfo, null, 2));
+            }
+            return NextResponse.json({
+              success: false,
+              error: parseError,
+              debug: debugInfo,
+              transactions: [],
+              count: 0
+            }, { status: 400 });
+          }
+          
           transactions = Array.isArray(parsed?.transactions) ? parsed.transactions : [];
           transactionCount = parsed?.count || 0;
           console.log(`✅ Multi-Format API: Read ${transactions.length} transactions from JSON file`);
@@ -327,43 +569,64 @@ if __name__ == "__main__":
       if (transactions.length === 0) {
         let csvContent;
         try {
-          csvContent = await import('fs').then(fs => fs.promises.readFile(csvOutput, 'utf-8'));
+          const fs = await import('fs');
+          // Check if CSV file exists before trying to read
+          if (fs.existsSync(csvOutput)) {
+            csvContent = await fs.promises.readFile(csvOutput, 'utf-8');
+          } else {
+            console.log('⚠️ Multi-Format API: CSV file does not exist, skipping CSV fallback');
+            csvContent = null;
+          }
         } catch (error) {
           console.error('Error reading CSV file:', error);
-          return NextResponse.json({ 
-            error: 'Failed to read parsed data. Please try again.',
-            details: error instanceof Error ? error.message : 'Unknown error'
-          }, { status: 500 });
+          // Don't return error - continue to see if we have transactions
+          csvContent = null;
         }
         
-        // Parse CSV to return structured data
-        const lines = csvContent.split('\n').filter(line => line.trim());
-        if (lines.length < 2) {
-          return NextResponse.json({ 
-            error: `No transactions found in ${fileType.toUpperCase()} file. Please ensure it contains valid transaction data.` 
-          }, { status: 400 });
-        }
+        // Only parse CSV if we got content
+        if (csvContent) {
+          // Parse CSV to return structured data
+          const lines = csvContent.split('\n').filter(line => line.trim());
+          if (lines.length < 2) {
+            return NextResponse.json({ 
+              error: `No transactions found in ${fileType.toUpperCase()} file. Please ensure it contains valid transaction data.` 
+            }, { status: 400 });
+          }
 
-        const headers = lines[0].split(',');
-        transactions = [];
+          const headers = lines[0].split(',');
+          transactions = [];
 
-        for (let i = 1; i < lines.length; i++) {
-          const values = lines[i].split(',');
-          if (values.every(v => !v.trim())) continue;
-          
-          const transaction: any = {};
-          headers.forEach((header, index) => {
-            transaction[header.trim()] = values[index]?.trim() || '';
-          });
-          transactions.push(transaction);
+          for (let i = 1; i < lines.length; i++) {
+            const values = lines[i].split(',');
+            if (values.every(v => !v.trim())) continue;
+            
+            const transaction: any = {};
+            headers.forEach((header, index) => {
+              transaction[header.trim()] = values[index]?.trim() || '';
+            });
+            transactions.push(transaction);
+          }
         }
       }
 
       if (transactions.length === 0) {
-        return NextResponse.json({ 
-          error: `No valid transactions found in ${fileType.toUpperCase()} file. Please check the format.`,
+        // If we have debug info, include it in the error
+        const errorResponse: any = {
+          success: false,
+          error: parseError || `No valid transactions found in ${fileType.toUpperCase()} file. Please check the format.`,
           tempFiles: [filepath, csvOutput, jsonOutput, tempScriptPath].filter(Boolean)
-        }, { status: 400 });
+        };
+        
+        if (debugInfo) {
+          errorResponse.debug = debugInfo;
+        }
+        
+        // Also include stderr if available for more context
+        if (stderr) {
+          errorResponse.stderr = stderr.substring(0, 2000); // Limit size
+        }
+        
+        return NextResponse.json(errorResponse, { status: 400 });
       }
 
       transactionCount = transactionCount || transactions.length;
@@ -392,20 +655,33 @@ if __name__ == "__main__":
       } catch {}
       
       console.error('❌ Multi-Format API: All parsing methods failed');
+      
+      // Extract more detailed error information
+      let errorDetails = error instanceof Error ? error.message : 'Unknown error';
+      let pythonError = '';
+      
+      // Try to get Python error from stderr if available
+      if (error instanceof Error && error.message.includes('stderr')) {
+        pythonError = error.message;
+      }
+      
       return NextResponse.json({ 
         error: `Failed to parse ${fileType.toUpperCase()} file. Please ensure it contains valid transaction data. All parsing methods (Python serverless and local Python) failed.`,
-        details: error instanceof Error ? error.message : 'Unknown error',
+        details: errorDetails,
+        pythonError: pythonError || undefined,
         suggestion: fileType === '.pdf' 
-          ? 'For PDF files, try uploading a different bank statement format.'
+          ? 'For PDF files, try uploading a different bank statement format or ensure the PDF is not corrupted.'
+          : fileType === '.xlsx' || fileType === '.xls'
+          ? 'For Excel files, ensure the file contains transaction data in a recognizable format (date, description, amount columns).'
           : 'Please ensure the file format is correct and contains transaction data.'
       }, { status: 500 });
     }
 
-  } catch (error) {
-    console.error('❌ Multi-Format API: File upload error:', error);
-    return NextResponse.json({ 
-      error: 'Failed to process file',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 });
-  }
+    } catch (error) {
+      console.error('❌ Multi-Format API: File upload error:', error);
+      return NextResponse.json({ 
+        error: 'Failed to process file',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      }, { status: 500 });
+    }
 }

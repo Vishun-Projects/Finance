@@ -35,7 +35,7 @@ class DataValidator:
             'stats': {}
         }
         
-        if df.empty:
+        if df is None or not isinstance(df, pd.DataFrame) or df.empty:
             result['errors'].append("DataFrame is empty - no transactions extracted")
             result['valid'] = False
             return result

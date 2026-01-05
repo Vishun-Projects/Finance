@@ -111,38 +111,7 @@ class SBMParser(BaseBankParser):
         
         return pd.DataFrame(transactions) if transactions else pd.DataFrame()
     
-    def parse_excel(self, file_path: Path) -> pd.DataFrame:
-        """
-        Parse SBM Excel statement.
-        
-        Args:
-            file_path: Path to Excel file
-            
-        Returns:
-            DataFrame of transactions
-        """
-        transactions = []
-        seen_transactions = set()
-        
-        try:
-            # Read Excel file
-            df = pd.read_excel(file_path)
-            
-            # SBM format: Sr No | Date | Particulars | Cheque/Reference No | Debit | Credit | Balance | Channel
-            for idx, row in df.iterrows():
-                transaction = self._parse_excel_row(row, idx)
-                if transaction:
-                    txn_id = self.create_transaction_id(transaction)
-                    if txn_id not in seen_transactions:
-                        seen_transactions.add(txn_id)
-                        transactions.append(transaction)
-        
-        except Exception as e:
-            print(f"Error parsing SBM Excel: {e}")
-            import traceback
-            traceback.print_exc()
-        
-        return pd.DataFrame(transactions) if transactions else pd.DataFrame()
+
     
     def _parse_table_row(self, row: List, page: int, line: int, previous_date_iso: Optional[str] = None) -> Optional[Dict]:
         """Parse a table row into a transaction dictionary."""
@@ -227,77 +196,7 @@ class SBMParser(BaseBankParser):
             print(f"Error parsing table row: {e}")
             return None
     
-    def _parse_excel_row(self, row: pd.Series, idx: int) -> Optional[Dict]:
-        """Parse an Excel row into a transaction dictionary."""
-        try:
-            # Get values by position or column name
-            if len(row) >= 6:
-                sr_no = str(row.iloc[0]) if pd.notna(row.iloc[0]) else None
-                date_val = row.iloc[1] if pd.notna(row.iloc[1]) else None
-                particulars = str(row.iloc[2]) if pd.notna(row.iloc[2]) else None
-                ref_no = str(row.iloc[3]) if pd.notna(row.iloc[3]) else None
-                debit_val = row.iloc[4] if pd.notna(row.iloc[4]) else None
-                credit_val = row.iloc[5] if pd.notna(row.iloc[5]) else None
-                balance_val = row.iloc[6] if pd.notna(row.iloc[6]) else None
-                channel = str(row.iloc[7]) if len(row) > 7 and pd.notna(row.iloc[7]) else None
-            else:
-                # Try by column names
-                sr_no = row.get('Sr No') or row.get('sr no')
-                date_val = row.get('Date') or row.get('date')
-                particulars = str(row.get('Particulars') or row.get('particulars', ''))
-                ref_no = str(row.get('Cheque/Reference No') or row.get('cheque/reference no', ''))
-                debit_val = row.get('Debit') or row.get('debit')
-                credit_val = row.get('Credit') or row.get('credit')
-                balance_val = row.get('Balance') or row.get('balance')
-                channel = row.get('Channel') or row.get('channel')
-            
-            if not date_val:
-                return None
-            
-            # Skip header rows
-            try:
-                int(sr_no) if sr_no else None
-            except (ValueError, TypeError):
-                return None
-            
-            date_iso = self.parse_date(str(date_val))
-            if not date_iso:
-                return None
-            
-            debit = self.parse_amount(debit_val) if debit_val and str(debit_val) != '-' else 0
-            credit = self.parse_amount(credit_val) if credit_val and str(credit_val) != '-' else 0
-            balance = self.parse_amount(balance_val) if balance_val else None
-            
-            if debit == 0 and credit == 0:
-                return None
-            
-            metadata = self._extract_metadata(particulars, ref_no, channel) if particulars else {}
-            store, commodity, clean_desc = self.extract_store_and_commodity(particulars) if particulars else (None, None, None)
-            
-            transaction = {
-                'date': str(date_val),
-                'date_iso': date_iso,
-                'description': clean_desc or particulars,
-                'raw': particulars or '',
-                'amount': debit if debit > 0 else credit,
-                'type': 'expense' if debit > 0 else 'income',
-                'debit': debit,
-                'credit': credit,
-                'balance': balance,
-                'page': 'Excel',
-                'line': str(idx + 1),
-                'store': store,
-                'commodity': commodity,
-                'reference': ref_no,
-                'channel': channel,
-                **metadata
-            }
-            
-            return self.normalize_transaction(transaction)
-        
-        except Exception as e:
-            print(f"Error parsing Excel row: {e}")
-            return None
+
     
     def _parse_text_lines(self, text: str, page_num: int) -> List[Dict]:
         """Parse text lines as fallback when tables not detected."""

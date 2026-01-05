@@ -1209,12 +1209,13 @@ export async function POST(request: NextRequest) {
           
           console.log(`🚀 Starting background categorization for ${insertedTransactionIds.length} transactions via ${baseUrl}...`);
           
-          fetch(`${baseUrl}/api/transactions/categorize-background`, {
+          fetch(`${baseUrl}/api/transactions/categorize`, {
             method: 'POST',
             headers,
             body: JSON.stringify({
               userId,
               transactionIds: insertedTransactionIds,
+              background: true,
               batchSize: 100,
             }),
           })

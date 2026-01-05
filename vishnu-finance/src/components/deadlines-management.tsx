@@ -89,7 +89,11 @@ export default function DeadlinesManagement() {
       setIsFetching(true);
       setError(null);
       
-      const response = await fetch(`/api/deadlines?userId=${user.id}`);
+      const response = await fetch('/api/app', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'deadlines_list', userId: user.id }),
+      });
       if (response.ok) {
         const data = await response.json();
         // API returns { data: deadlines[], pagination: {...} }
@@ -128,15 +132,14 @@ export default function DeadlinesManagement() {
     setError(null);
 
     try {
-      const response = await fetch('/api/deadlines', {
+      const response = await fetch('/api/app', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          action: 'deadlines_create',
           ...formData,
           amount: formData.amount ? parseFloat(formData.amount) : null,
-          userId: user.id
+          userId: user.id,
         }),
       });
 
@@ -173,8 +176,10 @@ export default function DeadlinesManagement() {
     if (!confirm('Are you sure you want to delete this deadline?')) return;
 
     try {
-      const response = await fetch(`/api/deadlines?id=${id}`, {
-        method: 'DELETE',
+      const response = await fetch('/api/app', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'deadlines_delete', id }),
       });
 
       if (response.ok) {
@@ -191,12 +196,14 @@ export default function DeadlinesManagement() {
   const handleToggleComplete = async (id: string, isCompleted: boolean) => {
     if (!user) return;
     try {
-      const response = await fetch(`/api/deadlines?id=${id}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ isCompleted: !isCompleted }),
+      const response = await fetch('/api/app', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'deadlines_update',
+          id,
+          isCompleted: !isCompleted,
+        }),
       });
 
       if (response.ok) {

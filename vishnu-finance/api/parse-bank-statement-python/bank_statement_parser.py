@@ -118,14 +118,26 @@ def parse_bank_statement(file_path: Path, bank_code: Optional[str] = None) -> tu
     
     # Parse based on file type
     if file_path.suffix.lower() == '.pdf':
-        df = parser.parse_pdf(file_path)
+        result = parser.parse_pdf(file_path)
     elif file_path.suffix.lower() in ['.xls', '.xlsx']:
-        df = parser.parse_excel(file_path)
+        result = parser.parse_excel(file_path)
     else:
         raise ValueError(f"Unsupported file format: {file_path.suffix}")
     
+    # Handle case where parser returns tuple (df, metadata) instead of just df
+    if isinstance(result, tuple) and len(result) >= 1:
+        df = result[0]
+    elif isinstance(result, pd.DataFrame):
+        df = result
+    else:
+        df = pd.DataFrame()
+    
+    # Ensure df is a DataFrame
+    if not isinstance(df, pd.DataFrame):
+        df = pd.DataFrame()
+    
     # Additional deduplication at DataFrame level
-    if not df.empty:
+    if isinstance(df, pd.DataFrame) and not df.empty:
         df = deduplicate_transactions(df)
     
     # Extract statement metadata (MANDATORY - always attempt extraction)

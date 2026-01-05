@@ -54,8 +54,12 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
       setLoading(true);
       setError(null);
       
-      const response = await fetch('/api/auth/me');
-      console.log('🔐 AUTH CONTEXT - /api/auth/me response status:', response.status);
+      const response = await fetch('/api/app', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'auth_me' }),
+      });
+      console.log('🔐 AUTH CONTEXT - /api/app auth_me response status:', response.status);
       
       if (response.ok) {
         const data = await response.json();
@@ -96,10 +100,10 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
       setLoading(true);
       setError(null);
       
-      const response = await fetch('/api/auth/login', {
+      const response = await fetch('/api/app', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ action: 'auth_login', email, password }),
       });
       
       console.log('🔐 AUTH CONTEXT - Login response status:', response.status);
@@ -129,7 +133,11 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
 
   const logout = useCallback(async (): Promise<void> => {
     try {
-      await fetch('/api/auth/logout', { method: 'POST' });
+      await fetch('/api/app', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'auth_logout' }),
+      });
       setUser(null);
       // Reset theme to light on logout
       document.documentElement.classList.remove('dark', 'high-contrast');

@@ -46,6 +46,7 @@ import Link from 'next/link';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { formatFileSize, validateDeleteMode } from '@/lib/document-utils';
 import ProfileSettingsSection from '@/components/settings/profile-section';
+import RazorpayTest from '@/components/settings/RazorpayTest';
 import type { UserDocumentSummary } from '@/types/documents';
 import type { UserPreferencesPayload } from '@/types/settings';
 
@@ -406,7 +407,11 @@ function CategoryManagement() {
   const fetchCategories = async () => {
     setLoading(true);
     try {
-      const response = await fetch('/api/categories');
+      const response = await fetch('/api/app', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'categories_list' }),
+      });
       if (response.ok) {
         const data = (await response.json()) as UserCategory[];
         setCategories(data || []);
@@ -426,13 +431,14 @@ function CategoryManagement() {
 
     setLoading(true);
     try {
-      const url = editingCategory ? `/api/categories/${editingCategory.id}` : '/api/categories';
-      const method = editingCategory ? 'PUT' : 'POST';
-      
-      const response = await fetch(url, {
-        method,
+      const response = await fetch('/api/app', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(
+          editingCategory
+            ? { action: 'categories_update', id: editingCategory.id, ...formData }
+            : { action: 'categories_create', ...formData }
+        ),
       });
 
       if (response.ok) {
@@ -464,8 +470,10 @@ function CategoryManagement() {
 
     setLoading(true);
     try {
-      const response = await fetch(`/api/categories/${category.id}`, {
-        method: 'DELETE',
+      const response = await fetch('/api/app', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'categories_delete', id: category.id }),
       });
 
       if (response.ok) {
@@ -857,6 +865,21 @@ export default function SettingsPageClient({ initialDocuments, initialPreference
                 </p>
               </div>
               <ProfileSettingsSection />
+
+              {/* Razorpay Test Section */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2">
+                    <span>Payments – Razorpay Test</span>
+                  </CardTitle>
+                  <CardDescription>
+                    Run a ₹1.00 test payment via Razorpay Checkout to verify integration.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <RazorpayTest />
+                </CardContent>
+              </Card>
             </div>
           </TabsContent>
 

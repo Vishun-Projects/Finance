@@ -67,7 +67,11 @@ export default function GoalsManagement() {
       setIsFetching(true);
       setError(null);
       
-      const response = await fetch(`/api/goals?userId=${user.id}`);
+      const response = await fetch('/api/app', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'goals_list', userId: user.id }),
+      });
       if (response.ok) {
         const data = await response.json();
         setGoals(data);
@@ -104,16 +108,15 @@ export default function GoalsManagement() {
     setError(null);
 
     try {
-      const response = await fetch('/api/goals', {
+      const response = await fetch('/api/app', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          action: 'goals_create',
           ...formData,
           targetAmount: parseFloat(formData.targetAmount),
           currentAmount: parseFloat(formData.currentAmount) || 0,
-          userId: user.id
+          userId: user.id,
         }),
       });
 
@@ -146,8 +149,10 @@ export default function GoalsManagement() {
     if (!confirm('Are you sure you want to delete this goal?')) return;
 
     try {
-      const response = await fetch(`/api/goals?id=${id}`, {
-        method: 'DELETE',
+      const response = await fetch('/api/app', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'goals_delete', id }),
       });
 
       if (response.ok) {

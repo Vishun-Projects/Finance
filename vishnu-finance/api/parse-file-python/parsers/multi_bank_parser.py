@@ -88,37 +88,7 @@ class MultiBankParser(BaseBankParser):
         
         return pd.DataFrame(transactions) if transactions else pd.DataFrame()
     
-    def parse_excel(self, file_path: Path) -> pd.DataFrame:
-        """
-        Parse bank Excel statement.
-        
-        Args:
-            file_path: Path to Excel file
-            
-        Returns:
-            DataFrame of transactions
-        """
-        transactions = []
-        seen_transactions = set()
-        
-        try:
-            df = pd.read_excel(file_path)
-            
-            # Generic format detection
-            for idx, row in df.iterrows():
-                transaction = self._parse_excel_row(row, idx)
-                if transaction:
-                    txn_id = self.create_transaction_id(transaction)
-                    if txn_id not in seen_transactions:
-                        seen_transactions.add(txn_id)
-                        transactions.append(transaction)
-        
-        except Exception as e:
-            print(f"Error parsing Excel: {e}")
-            import traceback
-            traceback.print_exc()
-        
-        return pd.DataFrame(transactions) if transactions else pd.DataFrame()
+
     
     def _parse_table_row(self, row: List, page: int, line: int) -> Optional[Dict]:
         """
@@ -291,96 +261,7 @@ class MultiBankParser(BaseBankParser):
             print(f"Error parsing table row: {e}")
             return None
     
-    def _parse_excel_row(self, row: pd.Series, idx: int) -> Optional[Dict]:
-        """Parse an Excel row into a transaction dictionary."""
-        try:
-            # Try to find date column
-            date_val = None
-            for col_name in row.index:
-                if 'date' in str(col_name).lower():
-                    date_val = row[col_name]
-                    break
-            
-            if not date_val and len(row) > 0:
-                date_val = row.iloc[0]
-            
-            if not date_val:
-                return None
-            
-            date_iso = self.parse_date(date_val)
-            if not date_iso:
-                return None
-            
-            # Try to find description
-            details = None
-            for col_name in row.index:
-                col_lower = str(col_name).lower()
-                if any(keyword in col_lower for keyword in ['detail', 'desc', 'particular', 'narration']):
-                    details = str(row[col_name])
-                    break
-            
-            if not details and len(row) > 1:
-                details = str(row.iloc[1])
-            
-            # Try to find debit/credit
-            debit_val = None
-            credit_val = None
-            balance_val = None
-            
-            for col_name in row.index:
-                col_lower = str(col_name).lower()
-                if 'debit' in col_lower or 'dr' in col_lower:
-                    debit_val = row[col_name]
-                elif 'credit' in col_lower or 'cr' in col_lower:
-                    credit_val = row[col_name]
-                elif 'bal' in col_lower:
-                    balance_val = row[col_name]
-            
-            # If not found by name, try to parse amounts
-            if not debit_val or not credit_val:
-                for idx, val in enumerate(row[2:], start=2):
-                    val_str = str(val).strip().replace(',', '')
-                    if re.match(r'\d+\.\d{2}', val_str):
-                        if not debit_val:
-                            debit_val = val
-                        elif not credit_val:
-                            credit_val = val
-                        else:
-                            balance_val = val
-                            break
-            
-            debit = self.parse_amount(debit_val) if debit_val else 0
-            credit = self.parse_amount(credit_val) if credit_val else 0
-            balance = self.parse_amount(balance_val) if balance_val else None
-            
-            if debit == 0 and credit == 0:
-                return None
-            
-            metadata = self._extract_metadata(details) if details else {}
-            store, commodity, clean_desc = self.extract_store_and_commodity(details) if details else (None, None, None)
-            
-            transaction = {
-                'date': str(date_val),
-                'date_iso': date_iso,
-                'description': clean_desc or details,
-                'raw': details,
-                'amount': debit if debit > 0 else credit,
-                'type': 'expense' if debit > 0 else 'income',
-                'debit': debit,
-                'credit': credit,
-                'balance': balance,
-                'page': 'Excel',
-                'line': str(idx + 1),
-                'store': store,
-                'commodity': commodity,
-                **metadata
-            }
-            
-            return self.normalize_transaction(transaction)
-        
-        except Exception as e:
-            print(f"Error parsing Excel row: {e}")
-            return None
+
     
     def _parse_text_lines(self, text: str) -> List[Dict]:
         """Parse text lines as fallback when tables not detected."""

@@ -12,7 +12,7 @@ interface MobileHeaderProps {
 
 export default function MobileHeader({ title, subtitle, right, className }: MobileHeaderProps) {
   return (
-    <div className={cn('sticky top-0 z-30 md:hidden bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-3 py-3 safe-top', className)}>
+    <div className={cn('sticky top-[calc(4rem+env(safe-area-inset-top))] z-30 md:hidden bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-3 py-3', className)}>
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-semibold leading-6">{title}</h2>

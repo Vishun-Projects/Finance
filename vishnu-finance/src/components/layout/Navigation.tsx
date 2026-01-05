@@ -44,7 +44,7 @@ export default function Navigation() {
   const activeByHref = useMemo(() => {
     // Check for exact match or if pathname starts with the href
     return new Set(
-      desktopNavItems.filter(item => 
+      desktopNavItems.filter(item =>
         pathname === item.href || pathname.startsWith(item.href + '/')
       ).map(item => item.href)
     );
@@ -67,8 +67,8 @@ export default function Navigation() {
   return (
     <>
       {/* Top Navigation Bar */}
-      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border bg-card/95 backdrop-blur-sm shadow-sm">
-        <div className="mx-auto flex w-full max-w-screen-2xl items-center justify-between px-3 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-14">
+      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border bg-card/95 backdrop-blur-sm shadow-sm safe-top">
+        <div className="mx-auto flex w-full max-w-screen-2xl items-center justify-between px-3 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-14 min-h-[4rem] h-auto pt-[env(safe-area-inset-top)]">
           <div className="flex h-16 w-full items-center justify-between lg:h-16 xl:h-[68px]">
             {/* Logo and Brand */}
             <div className="flex items-center flex-shrink-0">
@@ -96,11 +96,10 @@ export default function Navigation() {
                     key={item.href}
                     href={item.href}
                     aria-current={isActive ? 'page' : undefined}
-                    className={`relative inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                      isActive
-                        ? 'bg-primary text-primary-foreground shadow-sm'
-                        : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
-                    }`}
+                    className={`relative inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${isActive
+                      ? 'bg-primary text-primary-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                      }`}
                     title={item.tooltip || item.label}
                   >
                     <Icon className="w-4 h-4 flex-shrink-0" />
@@ -123,7 +122,7 @@ export default function Navigation() {
               >
                 <span>Sign Out</span>
               </button>
-              
+
               <div className="relative user-menu-container">
                 <button
                   onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
@@ -203,11 +202,10 @@ export default function Navigation() {
                 key={item.href}
                 href={item.href}
                 aria-current={isActive ? 'page' : undefined}
-                className={`flex flex-col items-center justify-center gap-1 flex-1 h-full rounded-lg transition-colors ${
-                  isActive
-                    ? 'text-foreground bg-muted'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-accent'
-                }`}
+                className={`flex flex-col items-center justify-center gap-1 flex-1 h-full rounded-lg transition-colors ${isActive
+                  ? 'text-foreground bg-muted'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                  }`}
                 aria-label={item.label}
               >
                 <Icon className={`w-5 h-5 ${isActive ? 'scale-110' : ''} transition-transform`} />

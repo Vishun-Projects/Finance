@@ -44,39 +44,8 @@ export interface InternetSearchResult {
  * Returns empty string if extraction fails (allows fallback to other methods)
  */
 export async function extractTextFromPDF(filePath: string): Promise<string> {
-  // First check if @napi-rs/canvas is available
-  let canvasAvailable = false;
-  try {
-    require.resolve('@napi-rs/canvas');
-    canvasAvailable = true;
-  } catch {
-    // Canvas not available, skip pdf-parse
-    return '';
-  }
-
-  // If canvas is available, try pdf-parse
-  if (canvasAvailable) {
-    try {
-      const dataBuffer = await readFile(filePath);
-      // Use require for server-side code to avoid ESM import issues
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const pdfParse = require('pdf-parse');
-      const data = await pdfParse(dataBuffer);
-      return data.text || '';
-    } catch (error) {
-      // Silently fail - will fallback to Python parser or Gemini Vision API
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      if (errorMessage.includes('DOMMatrix') || 
-          errorMessage.includes('@napi-rs/canvas') ||
-          errorMessage.includes('Cannot find module')) {
-        // Known issue with canvas dependency, skip silently
-        return '';
-      }
-      // For other errors, also return empty to allow fallback
-      return '';
-    }
-  }
-
+  // PDF text extraction temporarily disabled due to build issues with @napi-rs/canvas in Next.js 16
+  // Main bank statement parsing uses Python and is unaffected.
   return '';
 }
 
@@ -133,7 +102,7 @@ Only include documents with relevance score > 0.3.`;
     const result = await retryWithBackoff(async () => {
       return await model.generateContent(prompt);
     }, 3, 1000);
-    
+
     const response = result.response;
     const text = response.text();
 
@@ -162,12 +131,12 @@ Only include documents with relevance score > 0.3.`;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     console.error('Error searching documents with Gemini:', errorMessage);
-    
+
     // If it's a 503 or overloaded error after retries, fallback to keyword search
     if (errorMessage.includes('503') || errorMessage.includes('overloaded')) {
       console.log('Falling back to keyword-based search due to API overload');
     }
-    
+
     // Fallback to simple keyword search
     return simpleKeywordSearch(query, documents);
   }
@@ -228,35 +197,35 @@ export async function retryWithBackoff<T>(
   initialDelay: number = 1000
 ): Promise<T> {
   let lastError: Error | null = null;
-  
+
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       return await fn();
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
-      
+
       // Check error message and any nested error properties
       const errorMessage = lastError.message || '';
       const errorObj = error as any;
       const status = errorObj?.status || errorObj?.statusCode || errorObj?.response?.status;
-      
+
       // Check if it's a quota exceeded error (don't retry)
-      const isQuotaExceeded = 
+      const isQuotaExceeded =
         errorMessage.includes('quota exceeded') ||
         errorMessage.includes('Quota exceeded') ||
         errorMessage.includes('exceeded your current quota') ||
         errorMessage.includes('quotaValue') ||
         (status === 429 && errorMessage.includes('quota'));
-      
+
       if (isQuotaExceeded) {
         // Set global flag to skip all future AI calls
         globalGeminiQuotaExceeded = true;
         console.error('🚫 Gemini API quota exceeded. Disabling AI features for this session.');
         throw lastError;
       }
-      
+
       // Check if it's a retryable error (503, 429, or network errors)
-      const isRetryable = 
+      const isRetryable =
         status === 503 ||
         (status === 429 && !isQuotaExceeded) ||
         errorMessage.includes('503') ||
@@ -267,22 +236,22 @@ export async function retryWithBackoff<T>(
         errorMessage.includes('ECONNRESET') ||
         errorMessage.includes('ETIMEDOUT') ||
         errorMessage.includes('The model is overloaded');
-      
+
       if (!isRetryable || attempt === maxRetries - 1) {
         throw lastError;
       }
-      
+
       // Exponential backoff: wait longer with each retry
       // Add jitter to avoid thundering herd
       const baseDelay = initialDelay * Math.pow(2, attempt);
       const jitter = Math.random() * 0.3 * baseDelay; // Add up to 30% jitter
       const delay = Math.floor(baseDelay + jitter);
-      
+
       console.log(`Retry attempt ${attempt + 1}/${maxRetries} after ${delay}ms delay (error: ${errorMessage.substring(0, 100)})`);
       await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
-  
+
   throw lastError || new Error('Unknown error');
 }
 
@@ -299,13 +268,13 @@ export async function generateResponse(
 ): Promise<{ response: string; sources: Array<{ type: 'document' | 'internet'; id?: string; title?: string; url?: string }> }> {
   // Try models in order of preference with fallback
   const models = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro'];
-  
+
   let lastError: Error | null = null;
-  
+
   for (const modelName of models) {
     try {
       return await retryWithBackoff(async () => {
-        const model = genAI.getGenerativeModel({ 
+        const model = genAI.getGenerativeModel({
           model: modelName,
           generationConfig: {
             temperature: 0.7,
@@ -471,7 +440,7 @@ Always prioritize information from provided documents and the user's actual tran
 
         // Extract sources from response
         const sources: Array<{ type: 'document' | 'internet'; id?: string; title?: string; url?: string }> = [];
-        
+
         if (context.relevantDocuments) {
           context.relevantDocuments.forEach((doc) => {
             if (text.toLowerCase().includes(doc.title.toLowerCase())) {
@@ -489,19 +458,19 @@ Always prioritize information from provided documents and the user's actual tran
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
       console.log(`Model ${modelName} failed, trying next model...`, lastError.message);
-      
+
       // If it's not a model availability error, don't try other models
-      if (!lastError.message.includes('not found') && 
-          !lastError.message.includes('503') && 
-          !lastError.message.includes('overloaded')) {
+      if (!lastError.message.includes('not found') &&
+        !lastError.message.includes('503') &&
+        !lastError.message.includes('overloaded')) {
         throw lastError;
       }
-      
+
       // Continue to next model
       continue;
     }
   }
-  
+
   // If all models failed
   console.error('Error generating response with Gemini (all models failed):', lastError);
   if (lastError instanceof Error) {
@@ -552,7 +521,7 @@ Focus on official sources like:
     const result = await retryWithBackoff(async () => {
       return await model.generateContent(prompt);
     }, 3, 1000);
-    
+
     const response = result.response;
     const text = response.text();
 
@@ -577,7 +546,7 @@ Focus on official sources like:
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     console.error('Error searching internet:', errorMessage);
-    
+
     // If API is overloaded, return fallback sources instead of empty array
     if (errorMessage.includes('503') || errorMessage.includes('overloaded')) {
       console.log('API overloaded, returning fallback internet sources');
@@ -599,7 +568,7 @@ Focus on official sources like:
         },
       ];
     }
-    
+
     return [];
   }
 }

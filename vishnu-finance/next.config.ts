@@ -4,18 +4,16 @@ const outputMode = process.env.NEXT_OUTPUT_MODE === 'export' ? 'export' : undefi
 
 const nextConfig: NextConfig = {
   ...(outputMode ? { output: outputMode } : {}),
-  eslint: {
-    ignoreDuringBuilds: false,
-  },
+  ...(outputMode ? { output: outputMode } : {}),
   typescript: {
     ignoreBuildErrors: false,
   },
-  
+
   // Performance optimizations
   experimental: {
     // Enable modern React features and tree-shaking optimizations
     optimizePackageImports: [
-      'lucide-react', 
+      'lucide-react',
       '@radix-ui/react-alert-dialog',
       '@radix-ui/react-dialog',
       '@radix-ui/react-dropdown-menu',
@@ -24,7 +22,7 @@ const nextConfig: NextConfig = {
     // Enable faster Fast Refresh in development
     optimizeCss: true,
   },
-  
+
   // Image optimization
   images: {
     formats: ['image/webp', 'image/avif'],
@@ -45,7 +43,7 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  
+
   // Compiler optimizations
   compiler: {
     // Remove console.log in production
@@ -53,7 +51,7 @@ const nextConfig: NextConfig = {
       exclude: ['error', 'warn'],
     } : false,
   },
-  
+
   // Webpack optimizations
   webpack: (config, { dev, isServer }) => {
     // Use webpack's IgnorePlugin to ignore .node binary files
@@ -64,32 +62,25 @@ const nextConfig: NextConfig = {
         resourceRegExp: /\.node$/,
       })
     );
-    
+
     // Mark native modules as external for server builds
     if (isServer) {
       const originalExternals = config.externals;
-      
+
       // Create a function to handle externals
       const externalHandler = ({ request }: { request?: string }, callback: (err?: Error | null, result?: string) => void) => {
         // Exclude @napi-rs/canvas and its native dependencies
-        if (
-          request === '@napi-rs/canvas' ||
-          request?.startsWith('@napi-rs/canvas/') ||
-          request?.includes('@napi-rs/canvas-win32-x64-msvc') ||
-          request?.includes('skia.win32-x64-msvc.node') ||
-          request === 'pdf-parse'
-        ) {
-          return callback(null, `commonjs ${request}`);
-        }
-        
+        // Exclude @napi-rs/canvas logic removed
+
+
         // Call original externals handler if it exists
         if (typeof originalExternals === 'function') {
           return originalExternals({ request }, callback);
         }
-        
+
         callback();
       };
-      
+
       // Set externals based on current type
       if (Array.isArray(originalExternals)) {
         config.externals = [...originalExternals, externalHandler];
@@ -99,7 +90,7 @@ const nextConfig: NextConfig = {
         config.externals = [originalExternals, externalHandler].filter(Boolean);
       }
     }
-    
+
     if (!dev && !isServer) {
       // Production optimizations
       config.optimization = {
@@ -140,20 +131,20 @@ const nextConfig: NextConfig = {
         },
       };
     }
-    
+
     return config;
   },
-  
+
   // Enable compression
   compress: true,
-  
+
   // Cache optimization
   generateEtags: true,
-  
+
   // Enable React Strict Mode - helps catch bugs in development
   // This is critical for production performance
   reactStrictMode: true,
-  
+
   // Turbopack configuration (Next.js 15)
   turbopack: {
     rules: {
@@ -163,7 +154,7 @@ const nextConfig: NextConfig = {
       },
     },
   },
-  
+
   // Power saving for mobile devices
   poweredByHeader: false,
 };

@@ -68,7 +68,7 @@ export default function Navigation() {
     <>
       {/* Top Navigation Bar */}
       <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border bg-card/95 backdrop-blur-sm shadow-sm safe-top">
-        <div className="mx-auto flex w-full max-w-screen-2xl items-center justify-between px-3 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-14 min-h-[4rem] h-auto pt-[env(safe-area-inset-top)]">
+        <div className="mx-auto flex w-full max-w-screen-2xl items-center justify-between px-3 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-14 min-h-[4rem] h-auto">
           <div className="flex h-16 w-full items-center justify-between lg:h-16 xl:h-[68px]">
             {/* Logo and Brand */}
             <div className="flex items-center flex-shrink-0">
@@ -202,7 +202,7 @@ export default function Navigation() {
                 key={item.href}
                 href={item.href}
                 aria-current={isActive ? 'page' : undefined}
-                className={`flex flex-col items-center justify-center gap-1 flex-1 h-full rounded-lg transition-colors ${isActive
+                className={`flex flex-col items-center justify-center gap-1 flex-1 h-full rounded-lg transition-all duration-200 active:scale-95 active:bg-accent/50 ${isActive
                   ? 'text-foreground bg-muted'
                   : 'text-muted-foreground hover:text-foreground hover:bg-accent'
                   }`}

@@ -9,9 +9,11 @@
 .safe-top {
   padding-top: env(safe-area-inset-top);
 }
+
 .safe-bottom {
   padding-bottom: env(safe-area-inset-bottom);
 }
+
 .safe-padding {
   padding-top: env(safe-area-inset-top);
   padding-bottom: env(safe-area-inset-bottom);
@@ -41,7 +43,7 @@
   --input: 0 0% 100%;
   --ring: 0 0% 8%;
   --radius: 0.5rem;
-  
+
   /* Semantic Colors - Following UX/UI best practices */
   --success: 142 76% 36%;
   --success-foreground: 0 0% 100%;
@@ -74,7 +76,7 @@
   --border: 0 0% 20%;
   --input: 0 0% 16%;
   --ring: 0 0% 98%;
-  
+
   /* Semantic Colors - Dark Mode */
   --success: 142 76% 36%;
   --success-foreground: 0 0% 100%;
@@ -98,7 +100,7 @@ html.dark body {
 }
 
 /* Ensure body also gets dark background when html has dark class */
-html.dark > body {
+html.dark>body {
   background-color: hsl(var(--background)) !important;
   color: hsl(var(--foreground)) !important;
 }
@@ -116,7 +118,7 @@ html.dark > body {
 /* Force html and body background in dark mode - multiple selectors for maximum compatibility */
 html.dark,
 html.dark body,
-html.dark > body,
+html.dark>body,
 body.dark {
   background-color: hsl(var(--background)) !important;
   background: hsl(var(--background)) !important;
@@ -128,7 +130,7 @@ html.dark {
 }
 
 html.dark body,
-html.dark > body {
+html.dark>body {
   background-color: hsl(var(--background)) !important;
   background: hsl(var(--background)) !important;
 }
@@ -522,6 +524,7 @@ html.high-contrast .badge {
     opacity: 0;
     transform: scale(0.95) translateY(-10px);
   }
+
   to {
     opacity: 1;
     transform: scale(1) translateY(0);
@@ -679,11 +682,11 @@ body {
 }
 
 /* Enhanced Spacing */
-.space-y-8 > * + * {
+.space-y-8>*+* {
   margin-top: 2rem;
 }
 
-.space-y-6 > * + * {
+.space-y-6>*+* {
   margin-top: 1.5rem;
 }
 
@@ -716,6 +719,11 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+}
+
+.minimal-button-primary:active {
+  transform: scale(0.96);
+  background-color: hsl(var(--primary) / 0.8);
 }
 
 .minimal-button-primary:hover {
@@ -957,9 +965,12 @@ body {
 }
 
 @keyframes pulse {
-  0%, 100% {
+
+  0%,
+  100% {
     opacity: 1;
   }
+
   50% {
     opacity: 0.5;
   }
@@ -970,7 +981,7 @@ body {
   .container-padding {
     padding: 1.5rem 1rem;
   }
-  
+
   .card-spacing {
     padding: 1rem;
   }
@@ -1004,8 +1015,15 @@ body {
 
 /* Animation Enhancements */
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .fade-in {
@@ -1013,8 +1031,15 @@ body {
 }
 
 @keyframes slideIn {
-  from { transform: translateX(-20px); opacity: 0; }
-  to { transform: translateX(0); opacity: 1; }
+  from {
+    transform: translateX(-20px);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
 }
 
 .slide-in {
@@ -1082,6 +1107,7 @@ body {
 .safe-top {
   padding-top: env(safe-area-inset-top);
 }
+
 .safe-bottom {
   padding-bottom: env(safe-area-inset-bottom);
 }
@@ -1106,11 +1132,13 @@ body {
   border-top: 1px solid hsl(var(--border));
   padding-bottom: env(safe-area-inset-bottom);
 }
+
 .bottom-action-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.5rem;
 }
+
 .bottom-action-btn {
   min-height: 44px;
   min-width: 44px;
@@ -1167,6 +1195,7 @@ body {
     --chart-5: 27 87% 67%;
     --radius: 0.5rem;
   }
+
   .dark {
     --background: 0 0% 3.9%;
     --foreground: 0 0% 98%;
@@ -1201,9 +1230,11 @@ body {
   * {
     border-color: hsl(var(--border));
   }
+
   body {
     background-color: hsl(var(--background));
     color: hsl(var(--foreground));
   }
 }
+
 /* stylelint-enable at-rule-no-unknown */

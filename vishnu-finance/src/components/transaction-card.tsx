@@ -85,7 +85,7 @@ export default function TransactionCard({
   return (
     <motion.div
       className={cn(
-        "w-full cursor-pointer overflow-hidden rounded-2xl border bg-card shadow-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+        "w-full cursor-pointer overflow-hidden rounded-2xl border bg-card shadow-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 active:scale-[0.98] active:bg-accent/50",
         isCredit ? "border-l-4 border-l-emerald-500" : "border-l-4 border-l-rose-500",
       )}
       whileHover={reducedMotion ? undefined : { translateY: -2 }}
@@ -151,7 +151,7 @@ export default function TransactionCard({
           </div>
 
           {/* Amount + quick controls */}
-          <div className="flex flex-col items-end gap-2 flex-shrink-0">
+          <div className="flex flex-col items-end gap-2 flex-shrink-0 ml-2">
             <div
               className={cn(
                 "text-base font-semibold sm:text-lg whitespace-nowrap",

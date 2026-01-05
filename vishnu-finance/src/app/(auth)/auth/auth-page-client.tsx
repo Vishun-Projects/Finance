@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { Browser } from '@capacitor/browser';
 import { Eye, EyeOff, Mail, Lock, User, AlertCircle, LogIn, UserPlus } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
@@ -58,7 +59,7 @@ function AuthPageInner({ initialTab }: AuthPageClientProps) {
   const [registerError, setRegisterError] = useState('');
   const [isRegistering, setIsRegistering] = useState(false);
   const [logoSrc, setLogoSrc] = useState('/icon-removebg-preview.png');
-  
+
   // OAuth provider availability
   const [oauthProviders, setOauthProviders] = useState({
     google: true, // Assume Google is always available (existing)
@@ -263,8 +264,8 @@ function AuthPageInner({ initialTab }: AuthPageClientProps) {
                       type="button"
                       variant="outline"
                       className="w-full h-11 border-slate-200 bg-white hover:bg-slate-50 transition-all duration-200"
-                      onClick={() => {
-                        window.location.href = '/api/auth/oauth/google';
+                      onClick={async () => {
+                        await Browser.open({ url: `${window.location.origin}/api/auth/oauth/google`, windowName: '_self' });
                       }}
                     >
                       <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
@@ -295,8 +296,8 @@ function AuthPageInner({ initialTab }: AuthPageClientProps) {
                       type="button"
                       variant="outline"
                       className="w-full h-11 border-slate-200 bg-white hover:bg-slate-50 transition-all duration-200"
-                      onClick={() => {
-                        window.location.href = '/api/auth/oauth/microsoft';
+                      onClick={async () => {
+                        await Browser.open({ url: `${window.location.origin}/api/auth/oauth/microsoft`, windowName: '_self' });
                       }}
                     >
                       <svg className="mr-2 h-4 w-4" viewBox="0 0 23 23" fill="none">

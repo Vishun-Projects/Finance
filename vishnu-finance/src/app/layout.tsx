@@ -75,6 +75,8 @@ export const viewport: Viewport = {
   viewportFit: 'cover',
 };
 
+import FetchInterceptor from "@/components/fetch-interceptor";
+
 export default async function RootLayout({
   children,
 }: Readonly<{
@@ -86,6 +88,7 @@ export default async function RootLayout({
   return (
     <html lang="en">
       <body>
+        <FetchInterceptor />
         <AuthProvider initialUser={normalizedUser}>
           <ThemeProvider>
             <CurrencyProvider>

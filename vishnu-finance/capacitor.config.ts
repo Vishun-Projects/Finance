@@ -4,9 +4,10 @@ const config: CapacitorConfig = {
   appId: 'com.vishnu.finance',
   appName: 'Vishnu Finance',
   webDir: 'out',
-  server: {
-    url: 'https://vishun-finance.vercel.app/',
-    cleartext: false,
+  plugins: {
+    CapacitorHttp: {
+      enabled: true,
+    },
   },
 };
 

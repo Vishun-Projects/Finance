@@ -77,6 +77,20 @@ export const viewport: Viewport = {
 
 import FetchInterceptor from "@/components/fetch-interceptor";
 
+import { Inter, JetBrains_Mono } from "next/font/google";
+
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-sans",
+  display: "swap",
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--font-mono",
+  display: "swap",
+});
+
 export default async function RootLayout({
   children,
 }: Readonly<{
@@ -86,8 +100,8 @@ export default async function RootLayout({
   const normalizedUser = normalizeAuthUser(currentUser);
 
   return (
-    <html lang="en">
-      <body>
+    <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable}`}>
+      <body className="font-sans antialiased bg-background text-foreground">
         <FetchInterceptor />
         <AuthProvider initialUser={normalizedUser}>
           <ThemeProvider>

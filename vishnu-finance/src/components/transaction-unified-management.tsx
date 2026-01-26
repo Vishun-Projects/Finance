@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Plus, Search, Filter, X, RefreshCw, CheckSquare, Square, Trash2, RotateCw, Tag, Layers, ChevronLeft, ChevronRight, Sparkles, Check, Calendar as CalendarIcon, FileText, Upload, AlertCircle, TrendingUp } from 'lucide-react';
+import { Plus, Search, Filter, X, RefreshCw, CheckSquare, Square, Trash2, RotateCw, Tag, Layers, ChevronLeft, ChevronRight, Sparkles, Check, Calendar as CalendarIcon, FileText, Upload, AlertCircle, TrendingUp, ChevronDown, Edit, Download, ArrowUp, ShoppingCart, Utensils, Zap, ShoppingBag } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
@@ -10,7 +10,7 @@ import { useToast } from '../contexts/ToastContext';
 import { Transaction, TransactionCategory } from '@/types';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { format } from 'date-fns';
+import { format, startOfMonth, subDays } from 'date-fns';
 import { DateRange } from 'react-day-picker';
 import TransactionCard from './transaction-card';
 import TransactionFormModal, { TransactionFormData } from './transaction-form-modal';
@@ -24,6 +24,7 @@ import { Badge } from './ui/badge';
 import { Combobox } from './ui/combobox';
 import { Button } from './ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { Input } from './ui/input';
 import { calculateTotalsByCategory, formatCurrency } from '@/lib/transaction-utils';
 import { cn } from '@/lib/utils';
 import type { ISODateRange } from '@/lib/date-range';
@@ -85,7 +86,6 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
   const [isLoading, setIsLoading] = useState(!(bootstrap?.transactions && bootstrap.transactions.length > 0));
   const [pagination, setPagination] = useState(bootstrap?.pagination ?? { total: 0, page: 1, pageSize: 50, totalPages: 0 });
   const [apiTotals, setApiTotals] = useState<{ income: number; expense: number } | null>(bootstrap?.totals ?? null);
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [deletingTransaction, setDeletingTransaction] = useState<Transaction | null>(null);
@@ -97,11 +97,23 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
   const [showBulkCategorize, setShowBulkCategorize] = useState(false);
   const [bulkCategoryId, setBulkCategoryId] = useState<string>('');
   const [isBulkUpdating, setIsBulkUpdating] = useState(false);
+
+  const toggleSelect = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+  // Analytics is now permanent
   // Inline debug info
-  const [parseDebug, setParseDebug] = useState<any>(null);
-  const [importDebug, setImportDebug] = useState<any>(null);
+
   const [showDeleted, setShowDeleted] = useState(false);
   const [showSelectionMode, setShowSelectionMode] = useState(false); // Toggle checkbox visibility
+  const [isFilterOpen, setIsFilterOpen] = useState(false); // Advanced filter modal
+  const [period, setPeriod] = useState<'daily' | 'weekly' | 'monthly' | 'custom'>('monthly');
+
 
   // PDF Import state
   const [showFileDialog, setShowFileDialog] = useState(false);
@@ -135,14 +147,62 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
   const [selectionPulse, setSelectionPulse] = useState(false);
 
   // Filters from URL
-  const financialCategory = (searchParams.get('type') as TransactionCategory | 'ALL') || 'ALL';
-  const searchTerm = searchParams.get('search') || '';
   const startDateParam = searchParams.get('startDate') || '';
   const endDateParam = searchParams.get('endDate') || '';
-  const quickRange = (searchParams.get('range') as QuickRange) || 'month';
+  const quickRangeParam = (searchParams.get('range') as QuickRange) || 'month';
   const pageParam = parseInt(searchParams.get('page') || '1');
-  const amountPreset = (searchParams.get('amountPreset') as 'all' | 'lt1k' | '1to10k' | '10to50k' | '50to100k' | 'gt100k') || 'all';
-  const categoryIdParam = searchParams.get('categoryId') || '';
+
+  // Filter State (Client-Side) - Initialized from URL, but managed locally
+  const [financialCategory, setFinancialCategory] = useState<TransactionCategory | 'ALL'>((searchParams.get('type') as TransactionCategory | 'ALL') || 'ALL');
+  const [currentSearchTerm, setCurrentSearchTerm] = useState(searchParams.get('search') || '');
+  const [amountPreset, setAmountPreset] = useState<'all' | 'lt1k' | '1to10k' | '10to50k' | '50to100k' | 'gt100k'>((searchParams.get('amountPreset') as any) || 'all');
+  const [selectedCategoryId, setSelectedCategoryId] = useState(searchParams.get('categoryId') || '');
+  const [quickRange, setQuickRange] = useState<QuickRange>(quickRangeParam);
+
+  // Draft Filter State for Deferred Application
+  const [draftFilters, setDraftFilters] = useState({
+    search: currentSearchTerm,
+    categoryId: selectedCategoryId,
+    type: financialCategory,
+    amountPreset: amountPreset,
+    range: quickRange,
+    startDate: startDateParam,
+    endDate: endDateParam,
+  });
+
+  // Sync draft filters when modal opens
+  useEffect(() => {
+    if (isFilterOpen) {
+      setDraftFilters({
+        search: currentSearchTerm,
+        categoryId: selectedCategoryId,
+        type: financialCategory,
+        amountPreset: amountPreset,
+        range: quickRange,
+        startDate: startDateParam,
+        endDate: endDateParam,
+      });
+    }
+  }, [isFilterOpen, currentSearchTerm, selectedCategoryId, financialCategory, amountPreset, quickRange, startDateParam, endDateParam]);
+
+
+  // Sync state if URL changes externally (e.g. back button)
+  useEffect(() => {
+    setFinancialCategory((searchParams.get('type') as TransactionCategory | 'ALL') || 'ALL');
+    setCurrentSearchTerm(searchParams.get('search') || '');
+    setAmountPreset((searchParams.get('amountPreset') as any) || 'all');
+    setSelectedCategoryId(searchParams.get('categoryId') || '');
+    setQuickRange((searchParams.get('range') as QuickRange) || 'month');
+  }, [searchParams]);
+
+  // Client-side pagination state
+  const [visibleCount, setVisibleCount] = useState(50);
+
+  // Reset visible count when filters change
+  useEffect(() => {
+    setVisibleCount(50);
+  }, [financialCategory, currentSearchTerm, amountPreset, selectedCategoryId]);
+
 
   // Compute date range from quick range
   const computeRange = useCallback((range: QuickRange): [string, string] => {
@@ -204,10 +264,9 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
   }, [startDateParam, endDateParam, quickRange, computeRange, bootstrapRange]);
 
   // Local filter state
-  const [localSearch, setLocalSearch] = useState(searchTerm);
+  const [localSearch, setLocalSearch] = useState(currentSearchTerm);
   const [localStartDate, setLocalStartDate] = useState(startDate);
   const [localEndDate, setLocalEndDate] = useState(endDate);
-  const [selectedCategoryId, setSelectedCategoryId] = useState(categoryIdParam);
   const [dateRangePickerOpen, setDateRangePickerOpen] = useState(false);
 
   // Update local dates when URL params change
@@ -216,38 +275,133 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
     setLocalEndDate(endDate);
   }, [startDate, endDate]);
 
-  // Update selected category when URL param changes
-  useEffect(() => {
-    setSelectedCategoryId(categoryIdParam);
-  }, [categoryIdParam]);
-
   useEffect(() => {
     if (!filterPulse) return;
     const timeout = window.setTimeout(() => setFilterPulse(false), 1200);
     return () => window.clearTimeout(timeout);
   }, [filterPulse]);
 
-  useEffect(() => {
-    if (!selectionPulse) return;
-    const timeout = window.setTimeout(() => setSelectionPulse(false), 1200);
-    return () => window.clearTimeout(timeout);
-  }, [selectionPulse]);
+  // Date range for calculations
+  const daysInRange = useMemo(() => {
+    if (!startDate || !endDate) return 30;
+    try {
+      const s = new Date(startDate);
+      const e = new Date(endDate);
+      const diffTime = Math.abs(e.getTime() - s.getTime());
+      return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) || 1;
+    } catch (err) {
+      return 30;
+    }
+  }, [startDate, endDate]);
+
+
 
   // Update URL params
   const updateURLParams = useCallback((updates: Record<string, string | null>) => {
-    if (resolvedUserId) {
-      setIsLoading(true);
+    // Check if we need to fetch new data (Date Range changes)
+    const requiresFetch = 'startDate' in updates || 'endDate' in updates || 'range' in updates;
+
+    // If fetching, show loader and use router.push (server round trip for new data)
+    if (requiresFetch) {
+      if (resolvedUserId) {
+        setIsLoading(true);
+      }
+      const params = new URLSearchParams(searchParams.toString());
+      Object.entries(updates).forEach(([key, value]) => {
+        if (value === null || value === '' || (key === 'page' && value === '1')) {
+          params.delete(key);
+        } else {
+          params.set(key, value);
+        }
+      });
+      router.push(`/transactions?${params.toString()}`);
+      return;
     }
+
+    // Client-side filtering filtering - Update local state first
+    if ('type' in updates) setFinancialCategory((updates.type as TransactionCategory | 'ALL') || 'ALL');
+    if ('search' in updates) setCurrentSearchTerm(updates.search || '');
+    if ('amountPreset' in updates) setAmountPreset((updates.amountPreset as any) || 'all');
+    if ('categoryId' in updates) setSelectedCategoryId(updates.categoryId || '');
+
+    // Client-side filtering only - use window.history to update URL without server hit
     const params = new URLSearchParams(searchParams.toString());
     Object.entries(updates).forEach(([key, value]) => {
-      if (value === null || value === '') {
+      if (value === null || value === '' || (key === 'page' && value === '1')) {
         params.delete(key);
       } else {
         params.set(key, value);
       }
     });
-    router.push(`/transactions?${params.toString()}`);
-  }, [router, searchParams, resolvedUserId]);
+
+    // Update URL silently
+    const newUrl = `/transactions?${params.toString()}`;
+    window.history.replaceState(null, '', newUrl);
+  }, [router, searchParams, resolvedUserId, setFinancialCategory, setCurrentSearchTerm, setAmountPreset, setSelectedCategoryId]);
+
+  const applyDraftFilters = useCallback(() => {
+    const updates: Record<string, string | null> = {
+      search: draftFilters.search || null,
+      categoryId: draftFilters.categoryId || null,
+      type: draftFilters.type === 'ALL' ? null : draftFilters.type,
+      amountPreset: draftFilters.amountPreset === 'all' ? null : draftFilters.amountPreset,
+      page: '1'
+    };
+
+    // Only update date params if they actually changed
+    // Use permissive comparison for null/empty string handling
+    if ((draftFilters.range || 'month') !== (quickRangeParam || 'month')) {
+      updates.range = draftFilters.range;
+    }
+    if ((draftFilters.startDate || '') !== (startDateParam || '')) {
+      updates.startDate = draftFilters.startDate;
+    }
+    if ((draftFilters.endDate || '') !== (endDateParam || '')) {
+      updates.endDate = draftFilters.endDate;
+    }
+
+    updateURLParams(updates);
+    setIsFilterOpen(false);
+  }, [draftFilters, updateURLParams, quickRangeParam, startDateParam, endDateParam]);
+
+  const resetDraftFilters = useCallback(() => {
+    setDraftFilters({
+      search: '',
+      categoryId: '',
+      type: 'ALL',
+      amountPreset: 'all',
+      range: 'month',
+      startDate: '',
+      endDate: '',
+    });
+  }, []);
+
+  // Handle period changes to update date range (synced with Expense Management)
+  useEffect(() => {
+    if (!period || period === 'custom') return;
+    const end = new Date();
+    let start = new Date();
+
+    if (period === 'daily') {
+      start = startOfMonth(end);
+    } else if (period === 'weekly') {
+      start = subDays(end, 7);
+    } else if (period === 'monthly') {
+      start = startOfMonth(subDays(end, 30));
+    }
+
+    const newStart = format(start, 'yyyy-MM-dd');
+    const newEnd = format(end, 'yyyy-MM-dd');
+
+    // Only update if different from current
+    if (newStart !== startDate || newEnd !== endDate) {
+      updateURLParams({
+        range: 'custom',
+        startDate: newStart,
+        endDate: newEnd,
+      });
+    }
+  }, [period, updateURLParams, startDate, endDate]);
 
   // Apply quick range
   const applyQuickRange = useCallback((range: QuickRange) => {
@@ -265,7 +419,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
     return '100'; // Default page size
   }, [quickRange, startDate, endDate]);
 
-  // Fetch transactions with pagination
+  // Fetch transactions with pagination (Client-Side Filtering Strategy: Fetch ALL for the range)
   const fetchTransactions = useCallback(async ({ showSpinner = true }: { showSpinner?: boolean } = {}) => {
     if (!resolvedUserId) return;
 
@@ -273,33 +427,58 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
       setIsLoading(true);
     }
     try {
-      const response = await fetch('/api/app', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'transactions_list',
-          page: pageParam,
-          pageSize: getPageSize(),
-          includeTotals: true,
-          type: financialCategory !== 'ALL' ? financialCategory : undefined,
-          categoryId: selectedCategoryId || undefined,
-          startDate: startDate || undefined,
-          endDate: endDate || undefined,
-          search: searchTerm || undefined,
-          includeDeleted: showDeleted,
-          sortField: 'transactionDate',
-          sortDirection: 'desc',
-          amountPreset: amountPreset !== 'all' ? amountPreset : undefined,
-        }),
-      });
-      if (!response.ok) throw new Error('Failed to fetch transactions');
+      let allTransactions: Transaction[] = [];
+      let currentPage = 1;
+      let hasMore = true;
+      let fetchedTotals = null;
+      let firstPagination = null;
 
-      const data = await response.json();
-      setTransactions(data.transactions || []);
-      if (data.pagination) {
-        setPagination(data.pagination);
+      // Recursive fetch loop to get EVERYTHING
+      while (hasMore) {
+        const response = await fetch('/api/app', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'transactions_list',
+            page: currentPage,
+            pageSize: 'all', // Request max (5000)
+            includeTotals: currentPage === 1, // Only need totals once
+            startDate: startDate || undefined,
+            endDate: endDate || undefined,
+            includeDeleted: true,
+            sortField: 'transactionDate',
+            sortDirection: 'desc',
+          }),
+        });
+
+        if (!response.ok) throw new Error('Failed to fetch transactions');
+
+        const data = await response.json();
+        const pageTransactions = data.transactions || [];
+
+        // Add to accumulator
+        allTransactions = [...allTransactions, ...pageTransactions];
+
+        if (currentPage === 1) {
+          fetchedTotals = data.totals;
+          firstPagination = data.pagination;
+        }
+
+        // Check if we need to fetch more
+        const totalRecords = data.pagination?.total || 0;
+        const currentCount = allTransactions.length;
+
+        // Safety break for extremely large datasets (e.g. > 50k) to prevent browser crash
+        if (currentCount >= totalRecords || pageTransactions.length === 0 || currentCount > 50000) {
+          hasMore = false;
+        } else {
+          currentPage++;
+        }
       }
-      setApiTotals(data.totals ?? null);
+
+      setTransactions(allTransactions);
+      setPagination(firstPagination || { page: 1, pageSize: allTransactions.length, total: allTransactions.length, totalPages: 1 });
+      setApiTotals(fetchedTotals ?? null);
     } catch (error) {
       console.error('Error fetching transactions:', error);
       showError('Error', 'Failed to load transactions');
@@ -308,7 +487,8 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
         setIsLoading(false);
       }
     }
-  }, [resolvedUserId, financialCategory, searchTerm, startDate, endDate, showDeleted, pageParam, getPageSize, showError, amountPreset, selectedCategoryId]);
+    // Dependencies only on DATE RANGE and User. Not on filters.
+  }, [resolvedUserId, startDate, endDate, showDeleted, quickRange, showError]);
 
   // Fetch all categories (not just those with transactions)
   const fetchCategories = useCallback(async () => {
@@ -354,10 +534,10 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
     fetchTransactions({ showSpinner });
   }, [resolvedUserId, fetchTransactions]);
 
-  // Update local search when URL changes
+  // Update local search when URL state changes
   useEffect(() => {
-    setLocalSearch(searchTerm);
-  }, [searchTerm]);
+    setLocalSearch(currentSearchTerm);
+  }, [currentSearchTerm]);
 
   // Handle search with debounce
   const debouncedSearch = useMemo(() => {
@@ -365,7 +545,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
     return (value: string) => {
       clearTimeout(timeoutId);
       timeoutId = setTimeout(() => {
-        updateURLParams({ search: value || null, page: '1' });
+        updateURLParams({ search: value || null });
       }, 500);
     };
   }, [updateURLParams]);
@@ -375,18 +555,71 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
     debouncedSearch(value);
   }, [debouncedSearch]);
 
-  // Calculate totals - use API totals if available, otherwise calculate from visible transactions
-  const totals = useMemo(() => {
-    if (apiTotals) {
-      return apiTotals;
-    }
-    return calculateTotalsByCategory(transactions);
-  }, [apiTotals, transactions]);
-
-  // Filtered transactions (already filtered by API)
+  // Client-Side Filtering
   const filteredTransactions = useMemo(() => {
-    return transactions;
-  }, [transactions]);
+    return transactions.filter(t => {
+      // 0. Deleted Filter
+      if (t.isDeleted && !showDeleted) return false;
+      if (!t.isDeleted && showDeleted) {
+        // ...
+      }
+      if (!showDeleted && t.isDeleted) return false;
+
+      // 1. Search (Description, Store, Person, Amount)
+      if (currentSearchTerm) { // Use currentSearchTerm state
+        const query = currentSearchTerm.toLowerCase();
+        const desc = (t.description || '').toLowerCase();
+        const store = (t.store || '').toLowerCase();
+        const person = (t.personName || '').toLowerCase();
+        const amt = (t.creditAmount || t.debitAmount || 0).toString();
+        const notes = (t.notes || '').toLowerCase();
+
+        if (!desc.includes(query) &&
+          !store.includes(query) &&
+          !person.includes(query) &&
+          !amt.includes(query) &&
+          !notes.includes(query)) {
+          return false;
+        }
+      }
+
+      // 2. Transaction Type
+      if (financialCategory !== 'ALL' && t.financialCategory !== financialCategory) {
+        return false;
+      }
+
+      // 3. Category
+      if (selectedCategoryId && t.categoryId !== selectedCategoryId) {
+        return false;
+      }
+
+      // 4. Amount Preset
+      if (amountPreset !== 'all') {
+        const val = t.creditAmount || t.debitAmount || 0;
+        switch (amountPreset) {
+          case 'lt1k': if (val >= 1000) return false; break;
+          case '1to10k': if (val < 1000 || val >= 10000) return false; break;
+          case '10to50k': if (val < 10000 || val >= 50000) return false; break;
+          case '50to100k': if (val < 50000 || val >= 100000) return false; break;
+          case 'gt100k': if (val < 100000) return false; break;
+        }
+      }
+
+      return true;
+    });
+  }, [transactions, currentSearchTerm, financialCategory, selectedCategoryId, amountPreset, showDeleted]);
+
+  // Calculate totals - ALWAYS calculate from filtered transactions for dynamic updates
+  // Only use API totals as a fallback if no transactions are loaded yet (rare)
+  const totals = useMemo(() => {
+    // If we have filtered transactions, calculate locally to reflect filters instantly
+    return calculateTotalsByCategory(filteredTransactions);
+  }, [filteredTransactions]);
+
+  // Client-side pagination slice
+  const visibleTransactions = useMemo(() => {
+    return filteredTransactions.slice(0, visibleCount);
+  }, [filteredTransactions, visibleCount]);
 
   const formatAmount = useCallback(
     (value: number) => {
@@ -571,18 +804,10 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
       endDate: null,
       amountPreset: null,
       categoryId: null,
-      page: '1',
     });
   }, [updateURLParams]);
 
   const openFilterSheet = useCallback(() => {
-    if (typeof window !== 'undefined' && window.innerWidth >= 768) {
-      setFilterPulse(true);
-      requestAnimationFrame(() => {
-        filterBarRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      });
-      return;
-    }
     setIsFilterOpen(true);
   }, []);
 
@@ -674,7 +899,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
         return;
       }
 
-      console.log(`🤖 Starting auto-categorization for ${selectedTransactions.length} transactions...`);
+      // console.log(`🤖 Starting auto-categorization for ${selectedTransactions.length} transactions...`);
 
       // Prepare transactions for categorization API
       const transactionsToCategorize = selectedTransactions.map(t => {
@@ -884,14 +1109,14 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
         filters.push(categoryLabel);
       }
     }
-    if (searchTerm) {
-      filters.push(`Search: "${searchTerm}"`);
+    if (currentSearchTerm) {
+      filters.push(`Search: "${currentSearchTerm}"`);
     }
     if (showDeleted) {
       filters.push('Including deleted');
     }
     return filters;
-  }, [amountPreset, categories, financialCategory, searchTerm, selectedCategoryId, showDeleted]);
+  }, [amountPreset, categories, financialCategory, currentSearchTerm, selectedCategoryId, showDeleted]);
 
   const heroChips = useMemo(() => {
     const chips: string[] = [];
@@ -1098,8 +1323,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
     setIsParsingFile(true);
     setParseProgress(5);
     setFileError(null);
-    setParseDebug(null);
-    setImportDebug(null);
+
 
     try {
       // Simulate progressive parse progress up to 90%
@@ -1121,7 +1345,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
         throw new Error(err.error || 'Failed to parse PDF');
       }
       const data = await res.json();
-      if (data?.debug) setParseDebug(data.debug);
+
 
       const transactionsToSet = data.transactions || [];
       setParsedTransactions(transactionsToSet);
@@ -1378,7 +1602,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
         throw new Error(err.error || 'Batch import failed');
       }
       const result = await response.json();
-      if (result) setImportDebug({ request: { count: normalized.length, useAICategorization: true, categorizeInBackground: useBackgroundCategorization }, response: result });
+
       const incomeCount = result.incomeInserted || 0;
       const expenseCount = result.expenseInserted || 0;
       const totalInserted = result.inserted || (incomeCount + expenseCount);
@@ -1484,1216 +1708,828 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
   };
 
   return (
-    <div className="w-full bg-background pb-16 md:pb-20 lg:pb-6">
-      {/* Always-visible Debug Panels */}
-      <div className="px-4 md:px-6 lg:px-8 mt-4 mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="rounded-lg border p-3 bg-card">
-          <div className="text-sm font-semibold mb-1">Parser Debug (PDF parsing)</div>
-          {parseDebug ? (
-            <>
-              {parseDebug.method && (
-                <p className="text-xs mb-1"><span className="font-medium">Method:</span> {parseDebug.method}</p>
-              )}
-              {parseDebug.explanation && (
-                <p className="text-xs mb-2 text-muted-foreground">{parseDebug.explanation}</p>
-              )}
-              {parseDebug.codeFiles && Array.isArray(parseDebug.codeFiles) && (
-                <div className="mb-2">
-                  <p className="text-xs font-medium">Code files referenced:</p>
-                  <ul className="list-disc pl-4 text-xs">
-                    {parseDebug.codeFiles.map((f: string, idx: number) => (<li key={idx}>{f}</li>))}
-                  </ul>
-                </div>
-              )}
-              <pre className="text-xs overflow-auto max-h-64 bg-muted/40 p-2 rounded">{JSON.stringify(parseDebug, null, 2)}</pre>
-            </>
-          ) : (
-            <pre className="text-xs overflow-auto max-h-64 bg-muted/40 p-2 rounded">
-              {JSON.stringify({ message: 'No parse data yet. Select a PDF and click Parse.' }, null, 2)}
-            </pre>
-          )}
-        </div>
-        <div className="rounded-lg border p-3 bg-card">
-          <div className="text-sm font-semibold mb-1">Import Debug (DB import)</div>
-          {importDebug ? (
-            <>
-              {importDebug.request && (
-                <p className="text-xs mb-1"><span className="font-medium">Requested:</span> {importDebug.request.count} transactions, AI={String(importDebug.request.useAICategorization)}, Background={String(importDebug.request.categorizeInBackground)}</p>
-              )}
-              <pre className="text-xs overflow-auto max-h-64 bg-muted/40 p-2 rounded">{JSON.stringify(importDebug, null, 2)}</pre>
-            </>
-          ) : (
-            <pre className="text-xs overflow-auto max-h-64 bg-muted/40 p-2 rounded">
-              {JSON.stringify({ message: 'No import yet. After parsing, click Import to see details.' }, null, 2)}
-            </pre>
-          )}
-        </div>
-      </div>
-      {/* Categorization Progress Indicator - Mobile */}
-      {categorizationProgress && categorizationProgress.isActive && (
-        <div className="md:hidden sticky top-0 z-50 bg-primary/10 border-b border-primary/20 backdrop-blur-sm">
-          <div className="px-4 py-2">
+    <div className="flex flex-col min-w-0 bg-background overflow-hidden h-full flex-1">
+      {/* Mobile Header - Hidden on Desktop */}
+      <div className="md:hidden">
+        <MobileHeader
+          title="Transactions"
+          subtitle={`${pagination.total > 0 ? `${pagination.total.toLocaleString()} total` : `${filteredTransactions.length} shown`}`}
+          right={
             <div className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-primary animate-pulse flex-shrink-0" />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between gap-2 mb-1">
-                  <span className="text-xs font-medium truncate">
-                    Auto-categorizing...
-                  </span>
-                  <span className="text-xs text-muted-foreground whitespace-nowrap">
-                    {categorizationProgress.categorized}/{categorizationProgress.total}
-                  </span>
-                </div>
-                <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-primary transition-all duration-500 rounded-full"
-                    style={{ width: `${categorizationProgress.progress}%` }}
-                  />
-                </div>
-                <div className="text-xs text-muted-foreground mt-0.5 text-center">
-                  {categorizationProgress.progress}% complete
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Mobile Header */}
-      <MobileHeader
-        title="Transactions"
-        subtitle={`${pagination.total > 0 ? `${pagination.total.toLocaleString()} total` : `${filteredTransactions.length} shown`}${selectedIds.size > 0 ? ` • ${selectedIds.size} selected` : ''}`}
-        right={
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => {
-                const next = !showSelectionMode;
-                setShowSelectionMode(next);
-                if (!next) {
-                  setSelectedIds(new Set());
-                }
-              }}
-              className={`p-2 rounded-md hover:bg-muted ${showSelectionMode ? 'bg-primary/10' : ''}`}
-              aria-label={showSelectionMode ? 'Exit selection mode' : 'Enter selection mode'}
-            >
-              <CheckSquare className="w-5 h-5" />
-            </button>
-            <button
-              onClick={() => setShowFileDialog(true)}
-              className="p-2 rounded-md hover:bg-muted"
-              aria-label="Open importer"
-            >
-              <FileText className="w-5 h-5" />
-            </button>
-            <div className="relative">
               <button
-                onClick={() => setIsFilterOpen(true)}
-                className="p-2 rounded-md hover:bg-muted"
-                aria-label="Filters"
+                onClick={() => setShowSelectionMode(!showSelectionMode)}
+                className={`p-2 rounded-md hover:bg-muted ${showSelectionMode ? 'bg-primary/10' : ''}`}
               >
-                <Filter className="w-5 h-5" />
+                <CheckSquare className="w-5 h-5" />
               </button>
-              {(financialCategory !== 'ALL' || searchTerm || quickRange !== 'month' || amountPreset !== 'all' || selectedCategoryId) && (
-                <span className="absolute -top-1 -right-1 w-2 h-2 bg-primary rounded-full"></span>
-              )}
+              <button onClick={openImportDialog} className="p-2 rounded-md hover:bg-muted">
+                <FileText className="w-5 h-5" />
+              </button>
+              <button onClick={() => { setEditingTransaction(null); setShowForm(true); }} className="p-2 rounded-md hover:bg-muted">
+                <Plus className="w-5 h-5" />
+              </button>
+            </div>
+          }
+        />
+        {categorizationProgress && categorizationProgress.isActive && (
+          <div className="bg-primary/10 border-b border-primary/20 p-2">
+            <div className="flex items-center gap-2 text-xs">
+              <Sparkles className="w-3 h-3 text-primary animate-pulse" />
+              <span className="flex-1 truncate">Categorizing... {categorizationProgress.progress}%</span>
+            </div>
+            <div className="h-1 bg-muted rounded-full mt-1 overflow-hidden">
+              <div className="h-full bg-primary transition-all duration-500" style={{ width: `${categorizationProgress.progress}%` }} />
             </div>
           </div>
-        }
-      />
-
-      {/* Categorization Progress Indicator */}
-      {categorizationProgress && categorizationProgress.isActive && (
-        <div className="sticky top-0 z-50 bg-primary/10 border-b border-primary/20 backdrop-blur-sm">
-          <div className="container mx-auto px-4 py-3">
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2 flex-1">
-                <Sparkles className="w-4 h-4 text-primary animate-pulse" />
-                <span className="text-sm font-medium">
-                  Auto-categorizing transactions...
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  {categorizationProgress.categorized}/{categorizationProgress.total} ({categorizationProgress.progress}%)
-                </span>
-              </div>
-              <div className="w-32 md:w-48 h-2 bg-muted rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-primary transition-all duration-500 rounded-full"
-                  style={{ width: `${categorizationProgress.progress}%` }}
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Desktop Header */}
-      <div className="hidden md:block sticky top-16 z-30 bg-background/80 backdrop-blur border-b">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold">Transactions</h1>
-              <p className="text-sm text-muted-foreground">
-                {pagination.total > 0 ? `${pagination.total.toLocaleString()} total` : `${filteredTransactions.length} shown`}
-                {selectedIds.size > 0 && ` • ${selectedIds.size} selected`}
-                {financialCategory !== 'ALL' && ` • ${typeOptions.find(o => o.value === financialCategory)?.label}`}
-                {selectedCategoryId && categories.find(c => c.id === selectedCategoryId) && ` • ${categories.find(c => c.id === selectedCategoryId)?.name}`}
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              {selectedIds.size > 0 && (
-                <>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowBulkCategorize(true)}
-                    disabled={isBulkUpdating}
-                  >
-                    <Tag className="w-4 h-4 mr-2" />
-                    Categorize ({selectedIds.size})
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleBulkDelete}
-                    disabled={isDeleting}
-                  >
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Delete ({selectedIds.size})
-                  </Button>
-                  {showDeleted && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleBulkRestore}
-                      disabled={isDeleting}
-                    >
-                      <RotateCw className="w-4 h-4 mr-2" />
-                      Restore ({selectedIds.size})
-                    </Button>
-                  )}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setSelectedIds(new Set());
-                      setShowSelectionMode(false);
-                    }}
-                  >
-                    Clear Selection
-                  </Button>
-                </>
-              )}
-              <Button
-                variant={showSelectionMode ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => {
-                  const next = !showSelectionMode;
-                  setShowSelectionMode(next);
-                  if (next) {
-                    setSelectionPulse(true);
-                    if (typeof window !== 'undefined') {
-                      window.requestAnimationFrame(() => {
-                        selectionToolbarRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                      });
-                    }
-                  } else {
-                    setSelectedIds(new Set());
-                    setSelectionPulse(false);
-                  }
-                }}
-              >
-                <CheckSquare className="w-4 h-4 mr-2" />
-                {showSelectionMode ? 'Exit selection mode' : 'Selection mode'}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowFileDialog(true)}
-              >
-                <FileText className="w-4 h-4 mr-2" />
-                Open importer
-              </Button>
-              <Button onClick={() => {
-                setEditingTransaction(null);
-                setShowForm(true);
-              }}>
-                <Plus className="w-4 h-4 mr-2" />
-                Add Transaction
-              </Button>
-            </div>
-          </div>
+      <header className="hidden md:flex h-16 border-b border-border items-center justify-between px-8 shrink-0 bg-background sticky top-0 z-30">
+        <div className="flex items-center gap-4">
+          <h1 className="text-xl font-bold tracking-tight">Transactions</h1>
+          <span className="text-muted-foreground text-sm">{totalRecords} total</span>
         </div>
-      </div>
-
-      {/* Desktop Overview */}
-      <div className="hidden md:block border-b border-border/60 bg-background/80">
-        <div className="container mx-auto px-4 pb-6 pt-6">
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr),minmax(0,1fr)]">
-            <Card className="relative overflow-hidden border border-border/60 bg-card/95 text-card-foreground shadow-sm backdrop-blur-sm dark:border-border/40 dark:bg-background/80">
-              <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/10 via-primary/0 to-primary/0 dark:from-primary/25 dark:via-primary/10 dark:to-transparent" />
-              <CardHeader className="relative z-10 space-y-4 pb-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    <Sparkles className="h-4 w-4 text-primary" />
-                    <span>Overview</span>
-                  </div>
-                  <Badge variant="outline" className="rounded-full border-border/50 bg-muted/30 px-3 py-1 text-xs font-medium text-muted-foreground dark:bg-muted/20">
-                    {rangeLabel}
-                  </Badge>
-                </div>
-                <div className="space-y-2">
-                  <CardTitle className="text-2xl font-semibold text-foreground">Cashflow snapshot</CardTitle>
-                  <CardDescription className="max-w-xl text-sm text-muted-foreground">
-                    Track inflow versus spend for the selected period. Numbers update automatically as you filter.
-                  </CardDescription>
-                </div>
-              </CardHeader>
-              <CardContent className="relative z-10 space-y-4 pb-5">
-                <div className="grid gap-3 lg:grid-cols-3">
-                  {desktopMetrics.map((metric) => (
-                    <div
-                      key={metric.key}
-                      className="rounded-2xl border border-border/60 bg-muted/20 p-4 dark:border-border/40 dark:bg-muted/10"
-                    >
-                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{metric.label}</p>
-                      <p className={`text-lg font-semibold ${metric.tone}`}>{metric.value}</p>
-                      <p className="text-xs text-muted-foreground">{metric.helper}</p>
-                    </div>
-                  ))}
-                </div>
-                {heroChips.length > 0 && (
-                  <div className="flex flex-wrap items-center gap-2">
-                    {heroChips.map((chip) => (
-                      <span
-                        key={chip}
-                        className="rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground dark:bg-muted/20"
-                      >
-                        {chip}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-            <Card className="border border-border/60 bg-card/95 text-card-foreground shadow-sm dark:border-border/40 dark:bg-background/80">
-              <CardHeader className="space-y-3 pb-4">
-                <div className="flex items-center gap-2 text-primary">
-                  <Sparkles className="h-5 w-5" />
-                  <CardTitle className="text-xl font-semibold text-foreground">Next actions</CardTitle>
-                </div>
-                <CardDescription className="text-sm">
-                  Desktop shortcuts to keep reconciliations moving. Mobile retains the compact view you already use.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3 pb-5">
-                {focusRows.map((row) => {
-                  const Icon = row.icon;
-                  return (
-                    <div
-                      key={row.key}
-                      className="flex items-start justify-between gap-3 rounded-2xl border border-border/60 bg-muted/20 p-3 dark:border-border/40 dark:bg-muted/10"
-                    >
-                      <div className="flex items-start gap-3">
-                        <span className="rounded-full bg-primary/10 p-2 text-primary dark:bg-primary/20">
-                          <Icon className="h-4 w-4" />
-                        </span>
-                        <div className="space-y-1">
-                          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{row.label}</p>
-                          <p className="text-sm font-medium text-foreground">{row.primary}</p>
-                          <p className="text-xs text-muted-foreground">{row.secondary}</p>
-                        </div>
-                      </div>
-                      {row.actionLabel && row.onAction ? (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="-mr-1 mt-1 text-sm font-medium text-primary"
-                          onClick={row.onAction}
-                        >
-                          {row.actionLabel}
-                        </Button>
-                      ) : null}
-                    </div>
-                  );
-                })}
-              </CardContent>
-            </Card>
-          </div>
+        <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsFilterOpen(true)}
+            className={cn("gap-2 shadow-sm border-border bg-card/50", (financialCategory !== 'ALL' || selectedCategoryId || amountPreset !== 'all') && "bg-accent/50 border-primary/50 text-primary")}
+          >
+            <Filter className="w-4 h-4" />
+            Advanced Filters
+          </Button>
+          <div className="h-4 w-[1px] bg-border mx-1 hidden lg:block"></div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowSelectionMode(!showSelectionMode)}
+            className={cn("gap-2 shadow-sm border-border bg-card/50", showSelectionMode && "bg-accent/50 border-primary/50")}
+          >
+            <CheckSquare className="w-4 h-4" />
+            Selection mode
+          </Button>
+          <Button variant="outline" size="sm" onClick={openImportDialog} className="gap-2 shadow-sm border-border bg-card/50">
+            <FileText className="w-4 h-4" />
+            Open importer
+          </Button>
+          <div className="h-4 w-[1px] bg-border mx-1"></div>
+          <Button size="sm" onClick={() => { setEditingTransaction(null); setShowForm(true); }} className="gap-2 font-bold bg-foreground text-background hover:bg-foreground/90 shadow-lg transition-all active:scale-95">
+            <Plus className="w-4 h-4" />
+            Add Transaction
+          </Button>
         </div>
-      </div>
+      </header>
 
-      {/* Selection Toolbar - Only show when selection mode is active */}
-      {showSelectionMode && (
-        <div
-          ref={selectionToolbarRef}
-          className={`sticky top-16 md:top-32 z-20 border-b px-4 py-2 transition-shadow ${selectionPulse ? 'bg-primary/10 shadow-[0_0_0_3px_rgba(59,130,246,0.25)]' : 'bg-primary/5'
-            }`}
-        >
-          <div className="container mx-auto flex items-center justify-between gap-4">
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleSelectAll}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-md text-sm hover:bg-primary/10"
-              >
-                {selectedIds.size === filteredTransactions.length && filteredTransactions.length > 0 ? (
-                  <CheckSquare className="w-4 h-4" />
-                ) : (
-                  <Square className="w-4 h-4" />
-                )}
-                <span className="hidden sm:inline">Select All</span>
-                <span className="sm:hidden">All</span>
-              </button>
-              {selectedIds.size > 0 && (
-                <span className="text-sm text-muted-foreground">
-                  {selectedIds.size} selected
-                </span>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              <label className="flex items-center gap-2 text-sm cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={showDeleted}
-                  onChange={(e) => {
-                    setShowDeleted(e.target.checked);
-                    setSelectedIds(new Set());
-                  }}
-                  className="rounded"
+      {/* Unified Main Layout with Optional Analytics */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Main Content Area */}
+        <div className="flex-1 flex flex-col overflow-hidden border-r border-border/50">
+
+          {/* Top Filter Bar (Always Visible on Desktop) */}
+          <div className="hidden md:flex p-6 py-4 items-center justify-between gap-4 border-b border-border/50 bg-card/10 backdrop-blur-sm">
+            <div className="flex-1 max-w-xl">
+              <div className="relative group">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground size-4 group-focus-within:text-foreground transition-colors" />
+                <Input
+                  type="text"
+                  placeholder="Search transactions, merchants, categories..."
+                  className="w-full bg-card/50 border-border rounded-lg pl-10 pr-4 py-2.5 text-sm focus-visible:ring-1 focus-visible:ring-foreground placeholder:text-muted-foreground/30 transition-all outline-none"
+                  value={localSearch}
+                  onChange={(e) => handleSearch(e.target.value)}
                 />
-                <span className="hidden sm:inline">Show Deleted</span>
-                <span className="sm:hidden">Deleted</span>
-              </label>
-            </div>
-          </div>
-          {/* Mobile Action Buttons - Show when items are selected */}
-          {selectedIds.size > 0 && (
-            <div className="md:hidden mt-2 pt-2 border-t flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowBulkCategorize(true)}
-                disabled={isBulkUpdating}
-                className="flex-1"
-              >
-                <Tag className="w-4 h-4 mr-2" />
-                Categorize
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleBulkDelete}
-                disabled={isDeleting}
-                className="flex-1"
-              >
-                <Trash2 className="w-4 h-4 mr-2" />
-                Delete
-              </Button>
-              {showDeleted && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleBulkRestore}
-                  disabled={isDeleting}
-                  className="flex-1"
-                >
-                  <RotateCw className="w-4 h-4 mr-2" />
-                  Restore
-                </Button>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Quick Filter Chips - Mobile Only (Transaction Types) - Shown only when filter sheet is closed */}
-      {!isFilterOpen && (
-        <div className={`md:hidden sticky ${showSelectionMode ? 'top-28 md:top-40' : 'top-16 md:top-32'} z-20 bg-background/95 backdrop-blur border-b px-4 py-2.5`}>
-          <div className="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-            {typeOptions.map((option) => {
-              const isActive = financialCategory === option.value || (option.value === 'ALL' && financialCategory === 'ALL');
-              return (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => updateURLParams({ type: option.value, page: '1' })} // Reset to page 1
-                  className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 ${isActive
-                    ? 'bg-primary text-primary-foreground shadow-sm'
-                    : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                    }`}
-                  aria-pressed={isActive}
-                >
-                  {option.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Filters - Desktop Only */}
-      <div
-        ref={filterBarRef}
-        className={`hidden md:block sticky ${showSelectionMode ? 'top-40' : 'top-32'} z-20 bg-background/95 backdrop-blur border-b transition-shadow ${filterPulse ? 'ring-2 ring-primary/40 shadow-lg' : ''
-          }`}
-      >
-        <div className="container mx-auto px-4 py-4">
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1.6fr),minmax(0,2fr),minmax(0,1.6fr)]">
-            {/* Search & category */}
-            <div className="rounded-2xl border border-border/60 bg-card/95 p-4 shadow-sm dark:border-border/40 dark:bg-background/80">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Find transactions</span>
-                {activeFilters.length > 0 && (
-                  <Button variant="ghost" size="sm" onClick={clearAllFilters} className="text-xs font-medium text-primary">
-                    Reset all
-                  </Button>
-                )}
               </div>
-              <div className="mt-3 space-y-3">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <input
-                    type="text"
-                    value={localSearch}
-                    onChange={(e) => handleSearch(e.target.value)}
-                    placeholder="Search description, store, person, or notes"
-                    className="w-full rounded-lg border border-border bg-background py-2.5 pl-10 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="flex items-center bg-card/50 border border-border rounded-lg p-1 shadow-sm">
+                {(['daily', 'weekly', 'monthly'] as const).map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => setPeriod(p)}
+                    className={cn(
+                      "p-1.5 px-3 text-[10px] font-black uppercase tracking-widest rounded transition-all",
+                      period === p ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    {p}
+                  </button>
+                ))}
+              </div>
+
+              <Popover open={dateRangePickerOpen} onOpenChange={setDateRangePickerOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="gap-2 bg-card/50 border-border font-bold text-[10px] uppercase tracking-widest shadow-sm h-10 px-4">
+                    <CalendarIcon size={14} />
+                    {rangeLabel}
+                    <ChevronDown size={12} />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0 shadow-2xl border-border" align="end">
+                  <Calendar
+                    initialFocus
+                    mode="range"
+                    defaultMonth={localStartDate ? new Date(localStartDate) : undefined}
+                    selected={localStartDate && localEndDate ? { from: new Date(localStartDate), to: new Date(localEndDate) } : undefined}
+                    onSelect={(range) => {
+                      if (range?.from) {
+                        const newStart = format(range.from, 'yyyy-MM-dd');
+                        const newEnd = range.to ? format(range.to, 'yyyy-MM-dd') : '';
+                        setPeriod('custom');
+                        updateURLParams({
+                          range: 'custom',
+                          startDate: newStart,
+                          endDate: newEnd,
+                          page: '1'
+                        });
+                        if (range.to) setDateRangePickerOpen(false);
+                      }
+                    }}
+                    numberOfMonths={1}
                   />
-                  {localSearch && (
-                    <button
-                      onClick={() => handleSearch('')}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted"
-                      aria-label="Clear search"
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </button>
-                  )}
+                </PopoverContent>
+              </Popover>
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-8 bg-background/50">
+            {/* Overview Section - Always Visible */}
+            <div className="space-y-8 animate-in fade-in slide-in-from-top-4 duration-300">
+              <section>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-primary" />
+                    <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Financial Overview</h2>
+                  </div>
+                  <Badge variant="outline" className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground bg-card/50 px-2 py-0.5">{rangeLabel}</Badge>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="bg-card border border-border p-6 rounded-2xl hover:border-emerald-500/30 transition-all shadow-sm group">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-4 group-hover:text-emerald-500 transition-colors">Total Income</p>
+                    <h3 className="text-2xl font-black text-emerald-500">{formatAmount(income)}</h3>
+                    <p className="text-[10px] text-muted-foreground mt-1">Total inflow in this range</p>
+                  </div>
+                  <div className="bg-card border border-border p-6 rounded-2xl hover:border-foreground/30 transition-all shadow-sm group">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-4 group-hover:text-foreground transition-colors">Total Spends</p>
+                    <h3 className="text-2xl font-black text-foreground">{formatAmount(expense)}</h3>
+                    <p className="text-[10px] text-muted-foreground mt-1">Total outflow in this range</p>
+                  </div>
+                  <div className="bg-card border border-border p-6 rounded-2xl border-t-4 border-t-primary/20 hover:border-primary/50 transition-all shadow-sm group">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-4 group-hover:text-primary transition-colors">Net Flow</p>
+                    <h3 className="text-2xl font-black text-foreground">{formatAmount(net)}</h3>
+                    <p className="text-[10px] text-muted-foreground mt-1">Savings or deficit</p>
+                  </div>
+                </div>
+                <div className="flex gap-4 mt-4 text-[10px] text-muted-foreground font-black uppercase tracking-widest">
+                  <span className="bg-muted px-2 py-1 rounded-md">{count} records identified</span>
+                  {rangeSummary && <span className="bg-muted px-2 py-1 rounded-md">{rangeSummary}</span>}
+                </div>
+              </section>
+            </div>
+
+            {/* Standardized Transaction Table */}
+            <section className="bg-card border border-border rounded-2xl shadow-xl overflow-hidden flex flex-col">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse min-w-[800px]">
+                  <thead>
+                    <tr className="border-b border-border bg-muted/20">
+                      {showSelectionMode && <th className="w-14 px-6 py-5"></th>}
+                      <th className="px-6 py-5 text-[10px] font-black text-muted-foreground uppercase tracking-widest">Date</th>
+                      <th className="px-6 py-5 text-[10px] font-black text-muted-foreground uppercase tracking-widest">Merchant / Description</th>
+                      <th className="px-6 py-5 text-[10px] font-black text-muted-foreground uppercase tracking-widest">Category</th>
+                      <th className="px-6 py-5 text-[10px] font-black text-muted-foreground uppercase tracking-widest">Status</th>
+                      <th className="px-6 py-5 text-[10px] font-black text-muted-foreground uppercase tracking-widest text-right">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/50">
+                    {isLoading && !transactions.length ? (
+                      <tr><td colSpan={6} className="px-6 py-16 text-center text-muted-foreground italic font-medium">Loading your transactions...</td></tr>
+                    ) : filteredTransactions.length === 0 ? (
+                      <tr><td colSpan={6} className="px-6 py-16 text-center text-muted-foreground italic font-medium">No transactions found matching criteria.</td></tr>
+                    ) : (
+                      visibleTransactions.map(transaction => {
+                        const isIncome = transaction.financialCategory === 'INCOME';
+                        const isExpense = transaction.financialCategory === 'EXPENSE';
+                        const amount = transaction.creditAmount || transaction.debitAmount || 0;
+                        const isSelected = selectedIds.has(transaction.id);
+                        const transactionDate = transaction.transactionDate ? new Date(transaction.transactionDate) : null;
+                        const isValidDate = transactionDate && !isNaN(transactionDate.getTime());
+
+                        return (
+                          <tr
+                            key={transaction.id}
+                            onClick={() => {
+                              if (showSelectionMode) toggleSelect(transaction.id);
+                              else { setEditingTransaction(transaction); setShowForm(true); }
+                            }}
+                            className={cn(
+                              "hover:bg-muted/30 transition-all cursor-pointer group border-l-4 border-l-transparent",
+                              isSelected ? "bg-primary/5 border-l-primary hover:bg-primary/10" : "hover:border-l-primary/30"
+                            )}
+                          >
+                            {showSelectionMode && (
+                              <td className="px-6 py-5" onClick={e => e.stopPropagation()}>
+                                <button
+                                  onClick={() => toggleSelect(transaction.id)}
+                                  className={cn(
+                                    "w-5 h-5 rounded-md border flex items-center justify-center transition-all",
+                                    isSelected ? "bg-foreground border-foreground text-background shadow-md" : "bg-background border-input hover:border-foreground"
+                                  )}
+                                >
+                                  {isSelected && <Check className="w-3.5 h-3.5" />}
+                                </button>
+                              </td>
+                            )}
+                            <td className="px-6 py-5 text-xs font-bold text-muted-foreground">
+                              {isValidDate ? format(transactionDate, 'MMM dd, yyyy') : 'No Date'}
+                            </td>
+                            <td className="px-6 py-5">
+                              <div className="flex items-center gap-4">
+                                <div className="size-9 rounded-xl bg-muted border border-border flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                                  <CategoryIcon category={transaction.category?.name || ''} />
+                                </div>
+                                <div className="flex flex-col min-w-0">
+                                  <span className="text-sm font-bold text-foreground truncate max-w-[240px] tracking-tight">{transaction.store || transaction.description}</span>
+                                  {transaction.personName && <span className="text-[10px] text-muted-foreground font-black uppercase tracking-widest mt-0.5">By {transaction.personName}</span>}
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-5">
+                              <span className={cn(
+                                "px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest border transition-colors",
+                                isIncome ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" : "bg-muted text-muted-foreground border-border"
+                              )}>
+                                {transaction.category?.name || 'General'}
+                              </span>
+                            </td>
+                            <td className="px-6 py-5">
+                              <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 group-hover:text-muted-foreground transition-colors">
+                                <div className={cn("size-2 rounded-full", transaction.accountStatementId ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.3)]" : "bg-amber-500 shadow-[0_0_8_8px_rgba(245,158,11,0.2)]")}></div>
+                                {transaction.accountStatementId ? 'Cleared' : 'Pending'}
+                              </div>
+                            </td>
+                            <td className={cn(
+                              "px-6 py-5 text-sm font-black text-right tracking-tight tabular-nums",
+                              isIncome ? "text-emerald-500" : isExpense ? "text-rose-500" : "text-foreground"
+                            )}>
+                              {isIncome ? '+' : '-'}{formatAmount(amount)}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Load More Button - Satisfies "overall data" request while preserving performance */}
+              {visibleCount < filteredTransactions.length && (
+                <div className="flex justify-center p-8 border-t border-border bg-muted/5">
+                  <Button
+                    variant="outline"
+                    onClick={() => setVisibleCount(prev => prev + 100)}
+                    className="gap-2 px-8 font-bold text-[10px] uppercase tracking-widest h-10 rounded-xl"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Load more ({filteredTransactions.length - visibleCount} remaining)
+                  </Button>
+                </div>
+              )}
+            </section>
+          </div>
+        </div>
+        {/* Analytics Panel (Right Sidebar) - Permanent */}
+        <aside className="w-80 lg:w-96 flex flex-col bg-card/30 border-l border-border overflow-y-auto custom-scrollbar shrink-0 hidden md:flex">
+          <div className="p-6">
+            <div className="flex items-center justify-between mb-8">
+              <h2 className="text-xl font-bold tracking-tight">Analytics</h2>
+              <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs font-bold border-border bg-background" onClick={() => {
+                // Basic export logic mockup
+                const csv = transactions.map(t => `${t.transactionDate},${t.description},${t.debitAmount || 0},${t.creditAmount || 0}`).join('\n');
+                const blob = new Blob([csv], { type: 'text/csv' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'transactions.csv';
+                a.click();
+              }}>
+                <Download size={14} />
+                Export
+              </Button>
+            </div>
+
+            {/* Monthly Spend Card */}
+            <div className="bg-card border border-border p-6 rounded-2xl mb-8 shadow-sm">
+              <p className="text-muted-foreground text-[10px] font-bold uppercase tracking-widest mb-2">Expenditure Summary</p>
+              <div className="flex items-end gap-3 mb-6">
+                <h3 className="text-3xl font-bold tracking-tighter">{formatAmount(expense)}</h3>
+                <div className="bg-emerald-500/10 text-emerald-500 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center mb-1 border border-emerald-500/20">
+                  <ArrowUp size={12} className="mr-0.5" />
+                  12%
+                </div>
+              </div>
+
+              {/* Histogram Visual */}
+              <div className="h-20 flex items-end gap-2 w-full">
+                {[40, 30, 60, 100, 50, 35, 55].map((h, i) => (
+                  <div
+                    key={i}
+                    className={cn(
+                      "flex-1 transition-all duration-700 rounded-t-md",
+                      i === 3 ? "bg-foreground h-full shadow-sm" : "bg-muted hover:bg-muted-foreground/20"
+                    )}
+                    style={{ height: `${h}%` }}
+                  ></div>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-8">
+              {/* Radial Chart Visual */}
+              <div className="relative flex justify-center py-4">
+                <div className="relative size-48">
+                  <svg className="size-full -rotate-90">
+                    <circle cx="96" cy="96" r="88" fill="none" stroke="currentColor" strokeWidth="12" className="text-muted/20" />
+                    <circle
+                      cx="96" cy="96" r="88" fill="none" stroke="currentColor" strokeWidth="12"
+                      className="text-foreground transition-all duration-1000 ease-in-out"
+                      strokeDasharray={2 * Math.PI * 88}
+                      strokeDashoffset={2 * Math.PI * 88 * (1 - Math.min(1, expense / (income || 1)))}
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+                    <p className="text-muted-foreground text-[10px] uppercase tracking-widest font-bold mb-0.5">Avg / Day</p>
+                    <p className="text-2xl font-black tracking-tight">{formatAmount(expense / daysInRange)}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Category Progress */}
+              <div className="space-y-6">
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Top Categories</h4>
+                  <Button variant="link" className="h-auto p-0 text-[10px] font-bold text-foreground">View All</Button>
+                </div>
+
+                <div className="space-y-5">
+                  {(() => {
+                    const totalExp = totals.expense || 1;
+                    const catMap = new Map<string, { amount: number, count: number }>();
+                    filteredTransactions.forEach(t => {
+                      if (t.financialCategory === 'EXPENSE') {
+                        const name = t.category?.name || 'Uncategorized';
+                        const curr = catMap.get(name) || { amount: 0, count: 0 };
+                        catMap.set(name, { amount: curr.amount + (t.debitAmount || 0), count: curr.count + 1 });
+                      }
+                    });
+                    const topCats = Array.from(catMap.entries())
+                      .sort((a, b) => b[1].amount - a[1].amount)
+                      .slice(0, 5);
+
+                    if (topCats.length === 0) return <p className="text-xs text-muted-foreground italic">No expense data</p>;
+
+                    return topCats.map(([name, stats], i) => {
+                      const percent = Math.round((stats.amount / totalExp) * 100);
+                      return (
+                        <div key={i} className="group">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-3">
+                              <div className={cn("size-2 rounded-full", i === 0 ? "bg-foreground" : "bg-muted-foreground/40")}></div>
+                              <span className="text-sm font-bold text-foreground capitalize">{name.toLowerCase()}</span>
+                            </div>
+                            <p className="text-xs font-bold">{formatAmount(stats.amount)}</p>
+                          </div>
+                          <div className="w-full bg-muted h-1 rounded-full overflow-hidden">
+                            <div className={cn("h-full transition-all duration-1000", i === 0 ? "bg-foreground" : "bg-muted-foreground/60")} style={{ width: `${percent}%` }}></div>
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+              </div>
+            </div>
+
+            {/* Detailed Report CTA */}
+            <div className="mt-10 p-5 rounded-2xl bg-foreground text-background shadow-xl">
+              <div className="flex items-start gap-3 mb-4">
+                <div className="p-2 bg-background/10 rounded-lg">
+                  <FileText size={20} className="text-background" />
                 </div>
                 <div>
-                  <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Category</span>
-                  <Select
-                    value={selectedCategoryId || 'all'}
-                    onValueChange={(value) => {
-                      setSelectedCategoryId(value === 'all' ? '' : value);
-                      updateURLParams({ categoryId: value === 'all' ? null : value, page: '1' });
-                    }}
-                  >
-                    <SelectTrigger className="mt-1 w-full">
-                      <SelectValue placeholder="All Categories" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Categories</SelectItem>
-                      {categories
-                        .filter((c) => !financialCategory || financialCategory === 'ALL' || c.type === financialCategory)
-                        .map((category) => (
-                          <SelectItem key={category.id} value={category.id}>
-                            <div className="flex items-center gap-2">
-                              {category.color && <div className="h-3 w-3 rounded-full" style={{ backgroundColor: category.color }} />}
-                              <span>{category.name}</span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
+                  <p className="font-bold text-sm">Monthly Report</p>
+                  <p className="text-[10px] text-background/60 mt-0.5">Your financial summary is ready for review.</p>
                 </div>
               </div>
-            </div>
-
-            {/* Type & amount */}
-            <div className="rounded-2xl border border-border/60 bg-card/95 p-4 shadow-sm dark:border-border/40 dark:bg-background/80">
-              <div>
-                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Transaction type</span>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {typeOptions.map((option) => {
-                    const isActive = financialCategory === option.value || (option.value === 'ALL' && financialCategory === 'ALL');
-                    return (
-                      <button
-                        key={option.value}
-                        type="button"
-                        onClick={() => updateURLParams({ type: option.value, page: '1' })}
-                        className={`rounded-full px-3 py-1.5 text-sm font-medium transition-all ${isActive ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/30' : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                          }`}
-                        aria-pressed={isActive}
-                      >
-                        {option.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-              <div className="mt-4">
-                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Amount range</span>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {amountOptions.map((option) => {
-                    const isActive = amountPreset === option.value;
-                    return (
-                      <button
-                        key={option.value}
-                        type="button"
-                        onClick={() => updateURLParams({ amountPreset: option.value === 'all' ? null : option.value, page: '1' })}
-                        className={`rounded-full px-3 py-1.5 text-sm font-medium transition-all ${isActive ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/30' : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                          }`}
-                        aria-pressed={isActive}
-                      >
-                        {option.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-
-            {/* Date & quality controls */}
-            <div className="rounded-2xl border border-border/60 bg-card/95 p-4 shadow-sm dark:border-border/40 dark:bg-background/80">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Date range</span>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => {
-                    void fetchTransactions();
-                  }}
-                  disabled={isLoading}
-                >
-                  <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-                </Button>
-              </div>
-              <div className="mt-3 overflow-hidden">
-                <QuickRangeChips value={quickRange} onChange={applyQuickRange} className="w-full justify-start px-1" />
-              </div>
-              <div className="mt-3">
-                <DateRangeFilter
-                  startDate={localStartDate}
-                  endDate={localEndDate}
-                  onRangeChange={(start, end, preset) => {
-                    setLocalStartDate(start);
-                    setLocalEndDate(end);
-                    updateURLParams({ startDate: start, endDate: end, range: preset });
-                  }}
-                  showPresets={false}
-                  className="w-full"
-                />
-              </div>
-              <label className="mt-4 flex items-center gap-2 rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-xs font-medium text-muted-foreground">
-                <input
-                  type="checkbox"
-                  checked={showDeleted}
-                  onChange={(e) => {
-                    setShowDeleted(e.target.checked);
-                    setSelectedIds(new Set());
-                  }}
-                  className="h-3.5 w-3.5 rounded border-border"
-                />
-                Include deleted transactions
-              </label>
+              <Button className="w-full bg-background text-foreground hover:bg-background/90 text-xs font-bold h-9">
+                Generate Report
+              </Button>
             </div>
           </div>
-
-          {activeFilters.length > 0 && (
-            <div className="mt-4 flex flex-wrap items-center gap-2 rounded-2xl border border-border/60 bg-muted/20 px-4 py-3 text-xs text-muted-foreground shadow-sm dark:border-border/40">
-              <span className="font-semibold uppercase tracking-wide text-muted-foreground">Active filters</span>
-              {activeFilters.map((badge) => (
-                <span key={badge} className="rounded-full bg-background px-2.5 py-1 text-[11px] font-medium text-foreground shadow-sm">
-                  {badge}
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
+        </aside>
       </div>
 
-      {/* Main Content */}
-      <div className="container mx-auto px-4 py-4 md:py-6">
-        {/* Summary Cards - Compact, always 2 columns */}
-        <div className="grid grid-cols-2 gap-2 md:gap-3 mb-3 md:mb-4 md:hidden">
-          <div className="bg-card rounded-lg border p-2.5 md:p-3">
-            <div className="text-[10px] sm:text-xs text-muted-foreground mb-0.5">Total Income</div>
-            <div className="text-base sm:text-lg md:text-xl font-bold text-green-600 dark:text-green-400 truncate">
-              {formatCurrency(totals.income)}
-            </div>
-          </div>
-          <div className="bg-card rounded-lg border p-2.5 md:p-3">
-            <div className="text-[10px] sm:text-xs text-muted-foreground mb-0.5">Total Expense</div>
-            <div className="text-base sm:text-lg md:text-xl font-bold text-red-600 dark:text-red-400 truncate">
-              {formatCurrency(totals.expense)}
-            </div>
-          </div>
-        </div>
+      {/* Floating Action Button (Mobile) */}
+      <div className="md:hidden">
+        <FabButton
+          icon={<Plus className="h-5 w-5" />}
+          label="Add"
+          onClick={() => { setEditingTransaction(null); setShowForm(true); }}
+        />
+      </div>
 
-        {/* Transactions List */}
-        {isLoading ? (
+      {/* Advanced Filters Sheet */}
+      <FilterSheet
+        open={isFilterOpen}
+        onClose={() => setIsFilterOpen(false)}
+        activeFiltersCount={activeFilters.length}
+        onClearFilters={clearAllFilters}
+      >
+        <div className="space-y-8 py-6">
+          {/* Date Range Section */}
           <div className="space-y-4">
-            {[...Array(5)].map((_, i) => (
-              <div key={i} className="bg-card rounded-lg border p-4 animate-pulse">
-                <div className="h-4 bg-muted rounded w-3/4 mb-2"></div>
-                <div className="h-4 bg-muted rounded w-1/2"></div>
-              </div>
-            ))}
-          </div>
-        ) : filteredTransactions.length === 0 ? (
-          <div className="text-center py-12 md:py-16">
-            <div className="mx-auto w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
-              <Search className="w-8 h-8 text-muted-foreground" />
-            </div>
-            <p className="text-muted-foreground mb-2 font-medium">No transactions found</p>
-            <p className="text-sm text-muted-foreground mb-6">
-              {searchTerm || financialCategory !== 'ALL'
-                ? 'Try adjusting your filters'
-                : 'Get started by adding your first transaction'}
-            </p>
-            {!showSelectionMode && (
-              <Button onClick={() => {
-                setEditingTransaction(null);
-                setShowForm(true);
-              }}>
-                <Plus className="w-4 h-4 mr-2" />
-                Add Transaction
-              </Button>
-            )}
-          </div>
-        ) : (
-          <div className="space-y-3 md:space-y-4">
-            {filteredTransactions.map((transaction) => (
-              <div key={transaction.id} className="relative">
-                {showSelectionMode && (
-                  <button
-                    onClick={() => handleSelectOne(transaction.id)}
-                    className={`absolute left-2 top-2 z-10 p-1.5 rounded-md bg-background/90 backdrop-blur shadow-sm border ${selectedIds.has(transaction.id) ? 'text-primary border-primary' : 'text-muted-foreground border-border'
-                      }`}
-                  >
-                    {selectedIds.has(transaction.id) ? (
-                      <CheckSquare className="w-5 h-5" />
-                    ) : (
-                      <Square className="w-5 h-5" />
-                    )}
-                  </button>
-                )}
-                <div
-                  className={cn(
-                    'overflow-hidden rounded-2xl',
-                    showSelectionMode && selectedIds.has(transaction.id) && 'ring-2 ring-primary',
-                  )}
-                >
-                  <TransactionCard
-                    transaction={transaction}
-                    onEdit={showSelectionMode || transaction.documentId ? undefined : (t) => {
-                      // Disable edit for imported transactions (have documentId)
-                      setEditingTransaction(t);
-                      setShowForm(true);
+            <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground block">Date Range</label>
+            <QuickRangeChips
+              value={draftFilters.range}
+              onChange={(val) => {
+                const range = computeRange(val);
+                setDraftFilters(prev => ({
+                  ...prev,
+                  range: val,
+                  startDate: range[0],
+                  endDate: range[1] || ''
+                }));
+              }}
+              className="gap-2"
+            />
+
+            <div className="pt-2">
+              <Popover open={dateRangePickerOpen} onOpenChange={setDateRangePickerOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-full justify-start gap-3 bg-muted/50 border-border font-bold text-xs h-12 px-4 rounded-xl">
+                    <CalendarIcon size={16} className="text-muted-foreground" />
+                    {rangeLabel}
+                    <ChevronDown size={14} className="ml-auto text-muted-foreground" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0 shadow-2xl border-border" align="start">
+                  <Calendar
+                    initialFocus
+                    mode="range"
+                    defaultMonth={draftFilters.startDate ? new Date(draftFilters.startDate) : undefined}
+                    selected={
+                      draftFilters.startDate
+                        ? {
+                          from: new Date(draftFilters.startDate),
+                          to: draftFilters.endDate ? new Date(draftFilters.endDate) : undefined,
+                        }
+                        : undefined
+                    }
+                    onSelect={(range) => {
+                      if (range?.from) {
+                        const newStart = format(range.from, 'yyyy-MM-dd');
+                        const newEnd = range.to ? format(range.to, 'yyyy-MM-dd') : '';
+                        setDraftFilters(prev => ({
+                          ...prev,
+                          range: 'custom',
+                          startDate: newStart,
+                          endDate: newEnd
+                        }));
+                        if (range.to) setDateRangePickerOpen(false);
+                      }
                     }}
-                    onDelete={showSelectionMode || transaction.documentId ? undefined : (t) => {
-                      // Disable delete for imported transactions (have documentId)
-                      setDeletingTransaction(t);
-                      setShowDeleteDialog(true);
-                    }}
-                    currency="INR"
+                    numberOfMonths={1}
                   />
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Pagination Controls */}
-        {pagination.totalPages > 1 && (
-          <div className="mt-6 flex items-center justify-between border-t pt-4">
-            <div className="text-sm text-muted-foreground">
-              Showing {((pagination.page - 1) * pagination.pageSize) + 1} to {Math.min(pagination.page * pagination.pageSize, pagination.total)} of {pagination.total.toLocaleString()} transactions
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => updateURLParams({ page: (pagination.page - 1).toString() })}
-                disabled={pagination.page === 1 || isLoading}
-              >
-                <ChevronLeft className="w-4 h-4 mr-1" />
-                Previous
-              </Button>
-              <div className="flex items-center gap-1">
-                {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
-                  let pageNum;
-                  if (pagination.totalPages <= 5) {
-                    pageNum = i + 1;
-                  } else if (pagination.page <= 3) {
-                    pageNum = i + 1;
-                  } else if (pagination.page >= pagination.totalPages - 2) {
-                    pageNum = pagination.totalPages - 4 + i;
-                  } else {
-                    pageNum = pagination.page - 2 + i;
-                  }
-                  return (
-                    <Button
-                      key={pageNum}
-                      variant={pagination.page === pageNum ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => updateURLParams({ page: pageNum.toString() })}
-                      disabled={isLoading}
-                      className="min-w-[40px]"
-                    >
-                      {pageNum}
-                    </Button>
-                  );
-                })}
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => updateURLParams({ page: (pagination.page + 1).toString() })}
-                disabled={pagination.page >= pagination.totalPages || isLoading}
-              >
-                Next
-                <ChevronRight className="w-4 h-4 ml-1" />
-              </Button>
+                </PopoverContent>
+              </Popover>
             </div>
           </div>
-        )}
-      </div>
 
-      {/* Filter Sheet - Mobile */}
-      <FilterSheet open={isFilterOpen} onClose={() => setIsFilterOpen(false)}>
-        <div className="space-y-5">
-          <div className="flex items-center justify-between pb-3 border-b">
-            <h2 className="text-lg font-semibold">Filters</h2>
-            <button
-              onClick={() => setIsFilterOpen(false)}
-              className="p-1 rounded-md hover:bg-muted"
-              aria-label="Close"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-
-          {/* Search */}
-          <div>
-            <label className="block text-sm font-medium mb-2">Search</label>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <input
+          {/* Search Section */}
+          <div className="space-y-3">
+            <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground block">Search</label>
+            <div className="relative group">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground size-4 group-focus-within:text-foreground transition-colors" />
+              <Input
                 type="text"
-                value={localSearch}
-                onChange={(e) => setLocalSearch(e.target.value)}
-                placeholder="Search transactions..."
-                className="w-full pl-10 pr-4 py-2.5 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+                placeholder="Search description, store, UPI..."
+                className="w-full bg-muted/50 border-border rounded-xl pl-10 pr-4 py-2 text-sm focus-visible:ring-1 focus-visible:ring-foreground transition-all outline-none"
+                value={draftFilters.search}
+                onChange={(e) => setDraftFilters(prev => ({ ...prev, search: e.target.value }))}
               />
             </div>
           </div>
 
-          {/* Type */}
-          <div>
-            <label className="block text-sm font-medium mb-2">Transaction Type</label>
-            <div className="grid grid-cols-2 gap-2">
-              {typeOptions.map((option) => {
-                const isActive = financialCategory === option.value || (option.value === 'ALL' && financialCategory === 'ALL');
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => {
-                      updateURLParams({ type: option.value, page: '1' }); // Reset to page 1
-                    }}
-                    className={`px-4 py-2.5 rounded-md text-sm font-medium transition-all ${isActive
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                      }`}
-                  >
-                    {option.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Amount Filter */}
-          <div>
-            <label className="block text-sm font-medium mb-2">Amount Range</label>
-            <div className="flex flex-wrap gap-2">
-              {amountOptions.map((option) => {
-                const isActive = amountPreset === option.value;
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => {
-                      updateURLParams({ amountPreset: option.value === 'all' ? null : option.value, page: '1' });
-                    }}
-                    className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${isActive
-                      ? 'bg-primary text-primary-foreground border-primary'
-                      : 'bg-muted text-muted-foreground border-border hover:bg-muted/80'
-                      } border`}
-                    aria-pressed={isActive}
-                  >
-                    {option.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Quick Range */}
-          <div>
-            <label className="block text-sm font-medium mb-2">Quick Date Range</label>
-            <QuickRangeChips value={quickRange} onChange={applyQuickRange} />
-          </div>
-
-          {/* Single Calendar Date Range Picker - Mobile */}
-          <div>
-            <label className="block text-sm font-medium mb-2">Custom Date Range</label>
-            <Popover open={dateRangePickerOpen} onOpenChange={setDateRangePickerOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="w-full justify-start text-left font-normal"
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {localStartDate && localEndDate ? (
-                    <>
-                      {format(new Date(localStartDate), 'dd MMM yyyy')} - {format(new Date(localEndDate), 'dd MMM yyyy')}
-                    </>
-                  ) : (
-                    <span>Pick a date range</span>
-                  )}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  initialFocus
-                  mode="range"
-                  defaultMonth={localStartDate ? new Date(localStartDate) : new Date()}
-                  selected={{
-                    from: localStartDate ? new Date(localStartDate) : undefined,
-                    to: localEndDate ? new Date(localEndDate) : undefined,
-                  }}
-                  onSelect={(range: DateRange | undefined) => {
-                    if (range?.from && range?.to) {
-                      setLocalStartDate(range.from.toISOString().split('T')[0]);
-                      setLocalEndDate(range.to.toISOString().split('T')[0]);
-                      setDateRangePickerOpen(false);
-                    } else if (range?.from) {
-                      setLocalStartDate(range.from.toISOString().split('T')[0]);
-                    }
-                  }}
-                  numberOfMonths={1}
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
-
-          {/* Category Filter */}
-          <div>
-            <label className="block text-sm font-medium mb-2">Category</label>
-            <Select value={selectedCategoryId || 'all'} onValueChange={(value) => {
-              if (value === 'uncategorized') {
-                setSelectedCategoryId('uncategorized');
-                updateURLParams({ categoryId: 'uncategorized', page: '1' });
-              } else {
-                setSelectedCategoryId(value === 'all' ? '' : value);
-                updateURLParams({ categoryId: value === 'all' ? null : value, page: '1' });
-              }
-            }}>
-              <SelectTrigger>
-                <SelectValue placeholder="All Categories" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
-                <SelectItem value="uncategorized">Uncategorized</SelectItem>
-                {categories
-                  .filter(c => !financialCategory || financialCategory === 'ALL' || c.type === financialCategory)
-                  .map(category => (
-                    <SelectItem key={category.id} value={category.id}>
-                      <div className="flex items-center gap-2">
-                        {category.color && (
-                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: category.color }} />
-                        )}
-                        <span>{category.name}</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Apply Button */}
-          <div className="pt-2 space-y-2">
-            <Button
-              className="w-full"
-              onClick={() => {
-                handleSearch(localSearch);
-                updateURLParams({
-                  startDate: localStartDate,
-                  endDate: localEndDate,
-                  categoryId: selectedCategoryId || null
-                });
-                setIsFilterOpen(false);
-              }}
-            >
-              Apply Filters
-            </Button>
-            {(localSearch || financialCategory !== 'ALL' || quickRange !== 'month' || amountPreset !== 'all' || selectedCategoryId) && (
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={() => {
-                  setLocalSearch('');
-                  updateURLParams({
-                    search: null,
-                    type: 'ALL',
-                    range: 'month',
-                    startDate: null,
-                    endDate: null,
-                    amountPreset: null,
-                    categoryId: null
-                  });
-                  setSelectedCategoryId('');
-                  setIsFilterOpen(false);
-                }}
+          {/* Category Section */}
+          <div className="space-y-3">
+            <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground block">Category</label>
+            <div className="relative">
+              <select
+                value={draftFilters.categoryId || ''}
+                onChange={(e) => setDraftFilters(prev => ({ ...prev, categoryId: e.target.value }))}
+                className="w-full bg-muted/50 border border-border rounded-xl px-4 py-3 text-sm appearance-none focus:ring-1 focus:ring-ring transition-all text-foreground outline-none cursor-pointer"
               >
-                Clear All Filters
-              </Button>
-            )}
+                <option value="">All Categories</option>
+                {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+              <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none w-4 h-4" />
+            </div>
           </div>
+
+          {/* Type Section */}
+          <div className="space-y-3">
+            <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground block">Transaction Type</label>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => setDraftFilters(prev => ({ ...prev, type: 'ALL' }))}
+                className={cn("px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all", (draftFilters.type === 'ALL' || !draftFilters.type) ? "bg-foreground text-background shadow-md" : "bg-muted/50 text-muted-foreground hover:bg-muted")}
+              >
+                All Types
+              </button>
+              {['INCOME', 'EXPENSE', 'TRANSFER', 'INVESTMENT'].map(t => (
+                <button
+                  key={t}
+                  onClick={() => setDraftFilters(prev => ({ ...prev, type: t as any }))}
+                  className={cn("px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all", draftFilters.type === t ? "bg-foreground text-background shadow-md" : "bg-muted/50 text-muted-foreground hover:bg-muted")}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Amount Section */}
+          <div className="space-y-3">
+            <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground block">Amount Range</label>
+            <div className="flex flex-wrap gap-2">
+              {[{ value: 'all', label: 'All' }, { value: 'lt1k', label: '<1k' }, { value: '1to10k', label: '1-10k' }, { value: '10to50k', label: '10-50k' }, { value: '50to100k', label: '50-100k' }, { value: 'gt100k', label: '>100k' }].map(opt => (
+                <button
+                  key={opt.value}
+                  onClick={() => setDraftFilters(prev => ({ ...prev, amountPreset: opt.value as any }))}
+                  className={cn("px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all", (draftFilters.amountPreset === opt.value || (!draftFilters.amountPreset && opt.value === 'all')) ? "bg-foreground text-background shadow-md" : "bg-muted/50 text-muted-foreground hover:bg-muted")}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="pt-6 border-t mt-4 flex gap-3">
+          <Button variant="outline" className="flex-1 font-bold text-xs uppercase tracking-widest" onClick={resetDraftFilters}>
+            Reset
+          </Button>
+          <Button className="flex-1 font-bold text-xs uppercase tracking-widest" onClick={applyDraftFilters}>
+            Apply Filters
+          </Button>
         </div>
       </FilterSheet>
 
       {/* Bulk Categorize Modal */}
-      {showBulkCategorize && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => {
-          setShowBulkCategorize(false);
-          setBulkCategoryId('');
-        }}>
-          <div className="bg-background rounded-lg border shadow-lg max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
-            <div className="p-4 md:p-6 border-b flex items-center justify-between">
-              <h2 className="text-lg md:text-xl font-semibold">Categorize {selectedIds.size} Transaction{selectedIds.size !== 1 ? 's' : ''}</h2>
-              <button
-                onClick={() => {
-                  setShowBulkCategorize(false);
-                  setBulkCategoryId('');
-                }}
-                className="p-1 rounded-md hover:bg-muted"
-                aria-label="Close"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="overflow-y-auto flex-1 p-4 md:p-6">
-              {/* Comprehensive Category List with Subcategories */}
-              {categories.length === 0 ? (
-                <div className="text-center py-8">
-                  <Tag className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground mb-2">No categories found</p>
-                  <p className="text-sm text-muted-foreground">Please create categories first in Settings</p>
-                </div>
-              ) : (
-                <div className="space-y-6">
-                  {/* Income Categories */}
-                  {categories.filter(c => c.type === 'INCOME').length > 0 && (
-                    <div>
-                      <h3 className="text-sm font-semibold text-green-600 dark:text-green-400 mb-3 flex items-center gap-2">
-                        <Layers className="w-4 h-4" />
-                        Income Categories
-                      </h3>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        {categories
-                          .filter(c => c.type === 'INCOME')
-                          .map(category => (
-                            <button
-                              key={category.id}
-                              type="button"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                setBulkCategoryId(category.id);
-                              }}
-                              className={`p-3 rounded-lg border text-left transition-all cursor-pointer ${bulkCategoryId === category.id
-                                ? 'border-primary bg-primary/10 ring-2 ring-primary'
-                                : 'border-border hover:bg-muted hover:border-primary/50'
-                                }`}
-                            >
-                              <div className="flex items-center justify-between gap-2">
-                                <div className="flex items-center gap-2 flex-1">
-                                  {category.color && (
-                                    <div
-                                      className="w-4 h-4 rounded-full flex-shrink-0"
-                                      style={{ backgroundColor: category.color }}
-                                    />
-                                  )}
-                                  <span className="font-medium text-sm">{category.name}</span>
-                                </div>
-                                {bulkCategoryId === category.id && (
-                                  <Check className="w-4 h-4 text-primary flex-shrink-0" />
-                                )}
-                              </div>
-                              {/* Common subcategories for income */}
-                              {category.name === 'Salary' && (
-                                <div className="mt-2 text-xs text-muted-foreground">
-                                  Regular, Bonus, Commission
-                                </div>
-                              )}
-                              {category.name === 'Freelance' && (
-                                <div className="mt-2 text-xs text-muted-foreground">
-                                  Projects, Consulting, Services
-                                </div>
-                              )}
-                              {category.name === 'Investment' && (
-                                <div className="mt-2 text-xs text-muted-foreground">
-                                  Dividends, Returns, Interest
-                                </div>
-                              )}
-                              {category.name === 'Business' && (
-                                <div className="mt-2 text-xs text-muted-foreground">
-                                  Revenue, Profit, Sales
-                                </div>
-                              )}
-                            </button>
-                          ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Expense Categories */}
-                  {categories.filter(c => c.type === 'EXPENSE').length > 0 && (
-                    <div>
-                      <h3 className="text-sm font-semibold text-red-600 dark:text-red-400 mb-3 flex items-center gap-2">
-                        <Layers className="w-4 h-4" />
-                        Expense Categories
-                      </h3>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        {categories
-                          .filter(c => c.type === 'EXPENSE')
-                          .map(category => (
-                            <button
-                              key={category.id}
-                              type="button"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                setBulkCategoryId(category.id);
-                              }}
-                              className={`p-3 rounded-lg border text-left transition-all cursor-pointer ${bulkCategoryId === category.id
-                                ? 'border-primary bg-primary/10 ring-2 ring-primary'
-                                : 'border-border hover:bg-muted hover:border-primary/50'
-                                }`}
-                            >
-                              <div className="flex items-center justify-between gap-2">
-                                <div className="flex items-center gap-2 flex-1">
-                                  {category.color && (
-                                    <div
-                                      className="w-4 h-4 rounded-full flex-shrink-0"
-                                      style={{ backgroundColor: category.color }}
-                                    />
-                                  )}
-                                  <span className="font-medium text-sm">{category.name}</span>
-                                </div>
-                                {bulkCategoryId === category.id && (
-                                  <Check className="w-4 h-4 text-primary flex-shrink-0" />
-                                )}
-                              </div>
-                              {/* Common subcategories for expenses */}
-                              {category.name === 'Food' && (
-                                <div className="mt-2 text-xs text-muted-foreground">
-                                  Groceries, Restaurants, Snacks, Beverages
-                                </div>
-                              )}
-                              {category.name === 'Transportation' && (
-                                <div className="mt-2 text-xs text-muted-foreground">
-                                  Fuel, Taxi, Public Transport, Parking
-                                </div>
-                              )}
-                              {category.name === 'Housing' && (
-                                <div className="mt-2 text-xs text-muted-foreground">
-                                  Rent, Mortgage, Maintenance, Repairs
-                                </div>
-                              )}
-                              {category.name === 'Entertainment' && (
-                                <div className="mt-2 text-xs text-muted-foreground">
-                                  Movies, Games, Events, Subscriptions
-                                </div>
-                              )}
-                              {category.name === 'Healthcare' && (
-                                <div className="mt-2 text-xs text-muted-foreground">
-                                  Doctor, Medicine, Insurance, Tests
-                                </div>
-                              )}
-                              {category.name === 'Shopping' && (
-                                <div className="mt-2 text-xs text-muted-foreground">
-                                  Clothes, Electronics, Gifts, Online
-                                </div>
-                              )}
-                              {category.name === 'Education' && (
-                                <div className="mt-2 text-xs text-muted-foreground">
-                                  Tuition, Books, Courses, Supplies
-                                </div>
-                              )}
-                              {category.name === 'Utilities' && (
-                                <div className="mt-2 text-xs text-muted-foreground">
-                                  Electricity, Water, Internet, Phone
-                                </div>
-                              )}
-                              {category.name === 'Insurance' && (
-                                <div className="mt-2 text-xs text-muted-foreground">
-                                  Health, Life, Vehicle, Property
-                                </div>
-                              )}
-                            </button>
-                          ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Show message if no categories match selected transaction types */}
-                  {categories.filter(c => c.type === 'INCOME').length === 0 &&
-                    categories.filter(c => c.type === 'EXPENSE').length === 0 && (
-                      <div className="text-center py-4 text-sm text-muted-foreground">
-                        No categories available. Please create categories in Settings.
-                      </div>
-                    )}
-                </div>
-              )}
-            </div>
-            <div className="p-4 md:p-6 border-t space-y-3">
-              {/* Auto-categorize by UPI/Account */}
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={handleAutoCategorizeByUpiAccount}
-                disabled={isBulkUpdating}
-              >
-                <Sparkles className="w-4 h-4 mr-2" />
-                Auto-categorize by UPI/Account Number
-              </Button>
-              <div className="flex gap-2">
-                <Button
-                  className="flex-1"
-                  onClick={handleBulkCategorize}
-                  disabled={!bulkCategoryId || isBulkUpdating || categories.length === 0}
-                >
-                  {isBulkUpdating ? 'Updating...' : bulkCategoryId ? `Apply to ${selectedIds.size} Transaction${selectedIds.size !== 1 ? 's' : ''}` : 'Select a Category'}
-                </Button>
-                <Button
-                  variant="outline"
+      {
+        showBulkCategorize && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => {
+            setShowBulkCategorize(false);
+            setBulkCategoryId('');
+          }}>
+            <div className="bg-card rounded-lg border shadow-lg max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+              <div className="p-4 md:p-6 border-b flex items-center justify-between">
+                <h2 className="text-lg md:text-xl font-semibold">Categorize {selectedIds.size} Transaction{selectedIds.size !== 1 ? 's' : ''}</h2>
+                <button
                   onClick={() => {
                     setShowBulkCategorize(false);
                     setBulkCategoryId('');
                   }}
+                  className="p-1 rounded-md hover:bg-muted"
+                  aria-label="Close"
                 >
-                  Cancel
-                </Button>
+                  <X className="w-5 h-5" />
+                </button>
               </div>
-            </div>
-          </div>
-        </div>
-      )}
+              <div className="overflow-y-auto flex-1 p-4 md:p-6">
+                {categories.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Tag className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+                    <p className="text-muted-foreground mb-2">No categories found</p>
+                    <p className="text-sm text-muted-foreground">Please create categories first in Settings</p>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {/* Income Categories */}
+                    {categories.filter(c => c.type === 'INCOME').length > 0 && (
+                      <div>
+                        <h3 className="text-sm font-semibold text-green-600 dark:text-green-400 mb-3 flex items-center gap-2">
+                          <Layers className="w-4 h-4" />
+                          Income Categories
+                        </h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {categories
+                            .filter(c => c.type === 'INCOME')
+                            .map(category => (
+                              <button
+                                key={category.id}
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setBulkCategoryId(category.id);
+                                }}
+                                className={`p-3 rounded-lg border text-left transition-all cursor-pointer ${bulkCategoryId === category.id
+                                  ? 'border-primary bg-primary/10 ring-2 ring-primary'
+                                  : 'border-border hover:bg-muted hover:border-primary/50'
+                                  }`}
+                              >
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="flex items-center gap-2 flex-1">
+                                    {category.color && (
+                                      <div
+                                        className="w-4 h-4 rounded-full flex-shrink-0"
+                                        style={{ backgroundColor: category.color }}
+                                      />
+                                    )}
+                                    <span className="font-medium text-sm">{category.name}</span>
+                                  </div>
+                                  {bulkCategoryId === category.id && (
+                                    <Check className="w-4 h-4 text-primary flex-shrink-0" />
+                                  )}
+                                </div>
+                                {/* Common subcategories for income */}
+                                {category.name === 'Salary' && (
+                                  <div className="mt-2 text-xs text-muted-foreground">
+                                    Regular, Bonus, Commission
+                                  </div>
+                                )}
+                                {category.name === 'Freelance' && (
+                                  <div className="mt-2 text-xs text-muted-foreground">
+                                    Projects, Consulting, Services
+                                  </div>
+                                )}
+                                {category.name === 'Investment' && (
+                                  <div className="mt-2 text-xs text-muted-foreground">
+                                    Dividends, Returns, Interest
+                                  </div>
+                                )}
+                                {category.name === 'Business' && (
+                                  <div className="mt-2 text-xs text-muted-foreground">
+                                    Revenue, Profit, Sales
+                                  </div>
+                                )}
+                              </button>
+                            ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Expense Categories */}
+                    {categories.filter(c => c.type === 'EXPENSE').length > 0 && (
+                      <div>
+                        <h3 className="text-sm font-semibold text-red-600 dark:text-red-400 mb-3 flex items-center gap-2">
+                          <Layers className="w-4 h-4" />
+                          Expense Categories
+                        </h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {categories
+                            .filter(c => c.type === 'EXPENSE')
+                            .map(category => (
+                              <button
+                                key={category.id}
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setBulkCategoryId(category.id);
+                                }}
+                                className={`p-3 rounded-lg border text-left transition-all cursor-pointer ${bulkCategoryId === category.id
+                                  ? 'border-primary bg-primary/10 ring-2 ring-primary'
+                                  : 'border-border hover:bg-muted hover:border-primary/50'
+                                  }`}
+                              >
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="flex items-center gap-2 flex-1">
+                                    {category.color && (
+                                      <div
+                                        className="w-4 h-4 rounded-full flex-shrink-0"
+                                        style={{ backgroundColor: category.color }}
+                                      />
+                                    )}
+                                    <span className="font-medium text-sm">{category.name}</span>
+                                  </div>
+                                  {bulkCategoryId === category.id && (
+                                    <Check className="w-4 h-4 text-primary flex-shrink-0" />
+                                  )}
+                                </div>
+                                {/* Common subcategories for expenses */}
+                                {category.name === 'Food' && (
+                                  <div className="mt-2 text-xs text-muted-foreground">
+                                    Groceries, Restaurants, Snacks, Beverages
+                                  </div>
+                                )}
+                                {category.name === 'Transportation' && (
+                                  <div className="mt-2 text-xs text-muted-foreground">
+                                    Fuel, Taxi, Public Transport, Parking
+                                  </div>
+                                )}
+                                {category.name === 'Housing' && (
+                                  <div className="mt-2 text-xs text-muted-foreground">
+                                    Rent, Mortgage, Maintenance, Repairs
+                                  </div>
+                                )}
+                                {category.name === 'Entertainment' && (
+                                  <div className="mt-2 text-xs text-muted-foreground">
+                                    Movies, Games, Events, Subscriptions
+                                  </div>
+                                )}
+                                {category.name === 'Healthcare' && (
+                                  <div className="mt-2 text-xs text-muted-foreground">
+                                    Doctor, Medicine, Insurance, Tests
+                                  </div>
+                                )}
+                                {category.name === 'Shopping' && (
+                                  <div className="mt-2 text-xs text-muted-foreground">
+                                    Clothes, Electronics, Gifts, Online
+                                  </div>
+                                )}
+                                {category.name === 'Education' && (
+                                  <div className="mt-2 text-xs text-muted-foreground">
+                                    Tuition, Books, Courses, Supplies
+                                  </div>
+                                )}
+                                {category.name === 'Utilities' && (
+                                  <div className="mt-2 text-xs text-muted-foreground">
+                                    Electricity, Water, Internet, Phone
+                                  </div>
+                                )}
+                                {category.name === 'Insurance' && (
+                                  <div className="mt-2 text-xs text-muted-foreground">
+                                    Health, Life, Vehicle, Property
+                                  </div>
+                                )}
+                              </button>
+                            ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Show message if no categories match selected transaction types */}
+                    {categories.filter(c => c.type === 'INCOME').length === 0 &&
+                      categories.filter(c => c.type === 'EXPENSE').length === 0 && (
+                        <div className="text-center py-4 text-sm text-muted-foreground">
+                          No categories available. Please create categories in Settings.
+                        </div>
+                      )}
+                  </div>
+                )}
+              </div>
+              <div className="p-4 md:p-6 border-t space-y-3">
+                {/* Auto-categorize by UPI/Account */}
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={handleAutoCategorizeByUpiAccount}
+                  disabled={isBulkUpdating}
+                >
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  Auto-categorize by UPI/Account Number
+                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    className="flex-1"
+                    onClick={handleBulkCategorize}
+                    disabled={!bulkCategoryId || isBulkUpdating || categories.length === 0}
+                  >
+                    {isBulkUpdating ? 'Updating...' : bulkCategoryId ? `Apply to ${selectedIds.size} Transaction${selectedIds.size !== 1 ? 's' : ''}` : 'Select a Category'}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setShowBulkCategorize(false);
+                      setBulkCategoryId('');
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            </div >
+          </div >
+        )
+      }
 
       {/* FAB - Mobile */}
-      {!showSelectionMode && (
-        <FabButton
-          icon={<Plus className="h-5 w-5" />}
-          label="Add Transaction"
-          onClick={() => {
-            setEditingTransaction(null);
-            setShowForm(true);
-          }}
-        />
-      )}
+      {
+        !showSelectionMode && (
+          <FabButton
+            icon={<Plus className="h-5 w-5" />}
+            label="Add Transaction"
+            onClick={() => {
+              setEditingTransaction(null);
+              setShowForm(true);
+            }}
+          />
+        )
+      }
 
       {/* Transaction Form Modal */}
       <TransactionFormModal
@@ -2709,648 +2545,639 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
       />
 
       {/* File Parse Dialog */}
-      {showFileDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => {
-          setShowFileDialog(false);
-          setSelectedFile(null);
-          setFileError(null);
-          setParsedTransactions([]);
-          setShowCsvPreview(false);
-        }}>
-          <div className="bg-card rounded-lg border shadow-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <div className="p-4 md:p-6 border-b flex items-center justify-between">
-              <h3 className="text-xl font-bold text-foreground">Parse Financial Documents</h3>
-              <button
-                onClick={() => {
-                  setShowFileDialog(false);
-                  setSelectedFile(null);
-                  setFileError(null);
-                  setParsedTransactions([]);
-                  setShowCsvPreview(false);
-                }}
-                className="p-2 rounded-md hover:bg-muted"
-                aria-label="Close"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="p-4 md:p-6 space-y-6">
-              {/* Instructions */}
-              <div className="bg-muted/50 rounded-lg p-4 border border-border">
-                <div className="flex items-start space-x-3">
-                  <FileText className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
-                  <div className="flex-1">
-                    <h4 className="font-semibold text-foreground mb-2">Supported File Formats:</h4>
-                    <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
-                      <li><strong>PDF:</strong> Bank statements, transaction reports</li>
-                    </ul>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      Duplicates will be automatically skipped during import
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* File Input with Drag and Drop */}
-              <div>
-                <label className="block text-sm font-semibold text-foreground mb-3">
-                  Select File
-                </label>
-                <div
-                  onDragEnter={handleDragEnter}
-                  onDragOver={handleDragOver}
-                  onDragLeave={handleDragLeave}
-                  onDrop={handleDrop}
-                  className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${isDragging
-                    ? 'border-primary bg-primary/10'
-                    : 'border-border hover:border-primary/50'
-                    }`}
+      {
+        showFileDialog && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => {
+            setShowFileDialog(false);
+            setSelectedFile(null);
+            setFileError(null);
+            setParsedTransactions([]);
+            setShowCsvPreview(false);
+          }}>
+            <div className="bg-card rounded-lg border shadow-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+              <div className="p-4 md:p-6 border-b flex items-center justify-between">
+                <h3 className="text-xl font-bold text-foreground">Parse Financial Documents</h3>
+                <button
+                  onClick={() => {
+                    setShowFileDialog(false);
+                    setSelectedFile(null);
+                    setFileError(null);
+                    setParsedTransactions([]);
+                    setShowCsvPreview(false);
+                  }}
+                  className="p-2 rounded-md hover:bg-muted"
+                  aria-label="Close"
                 >
-                  <Upload className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground mb-2">
-                    {isDragging ? 'Drop file here' : 'Drag and drop your file here, or click to browse'}
-                  </p>
-                  <input
-                    type="file"
-                    accept=".pdf,application/pdf"
-                    onChange={handleMultiFormatFileSelect}
-                    className="hidden"
-                    id="file-upload-transactions"
-                  />
-                  <label htmlFor="file-upload-transactions" className="inline-block px-4 py-2 bg-primary text-primary-foreground rounded-md cursor-pointer hover:bg-primary/90 transition-colors">
-                    Choose File
-                  </label>
-                </div>
-                {selectedFile && (
-                  <p className="text-sm text-success mt-2">
-                    Selected: {selectedFile.name}
-                  </p>
-                )}
-
-                <div className="mt-4 space-y-3">
-                  <div className="rounded-lg border p-3">
-                    <div className="text-sm font-medium mb-1">Parse Debug</div>
-                    <pre className="text-xs overflow-auto max-h-64 bg-muted/40 p-2 rounded">
-                      {JSON.stringify(parseDebug ?? { message: 'No parse data yet. Select a PDF and click Parse.' }, null, 2)}
-                    </pre>
-                  </div>
-                  <div className="rounded-lg border p-3">
-                    <div className="text-sm font-medium mb-1">Import Debug</div>
-                    <pre className="text-xs overflow-auto max-h-64 bg-muted/40 p-2 rounded">
-                      {JSON.stringify(importDebug ?? { message: 'No import yet. After parsing, click Import to see details.' }, null, 2)}
-                    </pre>
-                  </div>
-                </div>
+                  <X className="w-5 h-5" />
+                </button>
               </div>
 
-              {/* Error Display */}
-              {fileError && (
-                <div className="bg-destructive/10 border border-destructive rounded-lg p-4">
-                  <div className="flex items-center space-x-3">
-                    <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0" />
-                    <span className="text-destructive text-sm">{fileError}</span>
+              <div className="p-4 md:p-6 space-y-6">
+                {/* Instructions */}
+                <div className="bg-muted/50 rounded-lg p-4 border border-border">
+                  <div className="flex items-start space-x-3">
+                    <FileText className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-foreground mb-2">Supported File Formats:</h4>
+                      <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
+                        <li><strong>PDF:</strong> Bank statements, transaction reports</li>
+                      </ul>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Duplicates will be automatically skipped during import
+                      </p>
+                    </div>
                   </div>
                 </div>
-              )}
 
-              {/* Bank selector and Parse Button */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* File Input with Drag and Drop */}
                 <div>
                   <label className="block text-sm font-semibold text-foreground mb-3">
-                    Bank (optional)
+                    Select File
                   </label>
-                  <Combobox
-                    options={[
-                      { value: '', label: 'Auto-detect' },
-                      { value: 'sbi', label: 'SBI' },
-                      { value: 'hdfc', label: 'HDFC' },
-                      { value: 'icici', label: 'ICICI' },
-                      { value: 'axis', label: 'Axis' },
-                      { value: 'bob', label: 'Bank of Baroda' },
-                      { value: 'kotak', label: 'Kotak' },
-                      { value: 'yes', label: 'YES Bank' }
-                    ]}
-                    value={selectedBank}
-                    onValueChange={(value) => setSelectedBank(value || '')}
-                    placeholder="Auto-detect"
-                    searchPlaceholder="Search banks..."
-                  />
-                </div>
-                <div className="flex items-end">
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      handleParseFile();
-                    }}
-                    disabled={!selectedFile || isParsingFile}
-                    className="w-full px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                  <div
+                    onDragEnter={handleDragEnter}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                    className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${isDragging
+                      ? 'border-primary bg-primary/10'
+                      : 'border-border hover:border-primary/50'
+                      }`}
                   >
-                    {isParsingFile ? (
-                      <div className="flex items-center">
-                        <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                        Parsing File...
-                      </div>
-                    ) : (
-                      <div className="flex items-center">
-                        <FileText className="w-4 h-4 mr-2" />
-                        Parse File
-                      </div>
-                    )}
-                  </button>
-                </div>
-              </div>
-
-              {/* Parse Progress */}
-              {isParsingFile && parseProgress > 0 && (
-                <div className="space-y-2">
-                  <div className="w-full bg-muted rounded-full h-2">
-                    <div className="bg-primary h-2 rounded-full transition-all" style={{ width: `${parseProgress}%` }}></div>
-                  </div>
-                  <div className="text-xs text-muted-foreground text-center">Parsing... {parseProgress}%</div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* CSV Preview Dialog */}
-      {showCsvPreview && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => {
-          setShowCsvPreview(false);
-          setParsedTransactions([]);
-        }}>
-          <div className="bg-card rounded-lg border shadow-lg max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
-            <div className="p-4 md:p-6 border-b flex items-center justify-between">
-              <h3 className="text-xl font-bold text-foreground">Review Parsed Transactions</h3>
-              <button
-                onClick={() => {
-                  setShowCsvPreview(false);
-                  setParsedTransactions([]);
-                }}
-                className="p-2 rounded-md hover:bg-muted"
-                aria-label="Close"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="overflow-y-auto flex-1 p-4 md:p-6 space-y-6">
-              {/* Summary */}
-              <div className="bg-muted/50 rounded-lg p-4 border border-border">
-                <div className="flex items-center space-x-3">
-                  <TrendingUp className="w-5 h-5 text-success flex-shrink-0" />
-                  <div>
-                    <p className="font-semibold text-foreground">Found {filteredParsed.length} transactions</p>
-                    <p className="text-sm text-muted-foreground">
-                      Credits will be added as Income, Debits as Expenses.
-                      Zero amounts will be skipped. Duplicates will be automatically skipped.
-                      Store and product information will be preserved.
+                    <Upload className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground mb-2">
+                      {isDragging ? 'Drop file here' : 'Drag and drop your file here, or click to browse'}
                     </p>
+                    <input
+                      type="file"
+                      accept=".pdf,application/pdf"
+                      onChange={handleMultiFormatFileSelect}
+                      className="hidden"
+                      id="file-upload-transactions"
+                    />
+                    <label htmlFor="file-upload-transactions" className="inline-block px-4 py-2 bg-primary text-primary-foreground rounded-md cursor-pointer hover:bg-primary/90 transition-colors">
+                      Choose File
+                    </label>
+                  </div>
+                  {selectedFile && (
+                    <p className="text-sm text-success mt-2">
+                      Selected: {selectedFile.name}
+                    </p>
+                  )}
+
+
+                </div>
+
+                {/* Error Display */}
+                {fileError && (
+                  <div className="bg-destructive/10 border border-destructive rounded-lg p-4">
+                    <div className="flex items-center space-x-3">
+                      <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0" />
+                      <span className="text-destructive text-sm">{fileError}</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Bank selector and Parse Button */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-foreground mb-3">
+                      Bank (optional)
+                    </label>
+                    <Combobox
+                      options={[
+                        { value: '', label: 'Auto-detect' },
+                        { value: 'sbi', label: 'SBI' },
+                        { value: 'hdfc', label: 'HDFC' },
+                        { value: 'icici', label: 'ICICI' },
+                        { value: 'axis', label: 'Axis' },
+                        { value: 'bob', label: 'Bank of Baroda' },
+                        { value: 'kotak', label: 'Kotak' },
+                        { value: 'yes', label: 'YES Bank' }
+                      ]}
+                      value={selectedBank}
+                      onValueChange={(value) => setSelectedBank(value || '')}
+                      placeholder="Auto-detect"
+                      searchPlaceholder="Search banks..."
+                    />
+                  </div>
+                  <div className="flex items-end">
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handleParseFile();
+                      }}
+                      disabled={!selectedFile || isParsingFile}
+                      className="w-full px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                    >
+                      {isParsingFile ? (
+                        <div className="flex items-center">
+                          <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                          Parsing File...
+                        </div>
+                      ) : (
+                        <div className="flex items-center">
+                          <FileText className="w-4 h-4 mr-2" />
+                          Parse File
+                        </div>
+                      )}
+                    </button>
                   </div>
                 </div>
-                {isParsingFile && (
-                  <div className="mt-3">
+
+                {/* Parse Progress */}
+                {isParsingFile && parseProgress > 0 && (
+                  <div className="space-y-2">
                     <div className="w-full bg-muted rounded-full h-2">
                       <div className="bg-primary h-2 rounded-full transition-all" style={{ width: `${parseProgress}%` }}></div>
                     </div>
-                    <div className="text-xs text-muted-foreground mt-1">Parsing... {parseProgress}%</div>
+                    <div className="text-xs text-muted-foreground text-center">Parsing... {parseProgress}%</div>
                   </div>
                 )}
               </div>
+            </div>
+          </div>
+        )
+      }
 
-              {/* Credits & Debits Summary - Parser vs Actual */}
-              {parsedTransactions.length > 0 && (
-                <div className="bg-gradient-to-br from-green-50 to-blue-50 dark:from-green-950/20 dark:to-blue-950/20 rounded-lg p-4 border border-green-200 dark:border-green-800">
-                  <div className="flex items-center space-x-3 mb-4">
-                    <Sparkles className="w-5 h-5 text-primary flex-shrink-0" />
-                    <h4 className="text-lg font-semibold text-foreground">Credits & Debits Summary</h4>
+      {/* CSV Preview Dialog */}
+      {
+        showCsvPreview && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => {
+            setShowCsvPreview(false);
+            setParsedTransactions([]);
+          }}>
+            <div className="bg-card rounded-lg border shadow-lg max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+              <div className="p-4 md:p-6 border-b flex items-center justify-between">
+                <h3 className="text-xl font-bold text-foreground">Review Parsed Transactions</h3>
+                <button
+                  onClick={() => {
+                    setShowCsvPreview(false);
+                    setParsedTransactions([]);
+                  }}
+                  className="p-2 rounded-md hover:bg-muted"
+                  aria-label="Close"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="overflow-y-auto flex-1 p-4 md:p-6 space-y-6">
+                {/* Summary */}
+                <div className="bg-muted/50 rounded-lg p-4 border border-border">
+                  <div className="flex items-center space-x-3">
+                    <TrendingUp className="w-5 h-5 text-success flex-shrink-0" />
+                    <div>
+                      <p className="font-semibold text-foreground">Found {filteredParsed.length} transactions</p>
+                      <p className="text-sm text-muted-foreground">
+                        Credits will be added as Income, Debits as Expenses.
+                        Zero amounts will be skipped. Duplicates will be automatically skipped.
+                        Store and product information will be preserved.
+                      </p>
+                    </div>
                   </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Parser Found (from PDF metadata) */}
-                    <div className="bg-background rounded-lg p-4 border border-border">
-                      <div className="flex items-center space-x-2 mb-3">
-                        <FileText className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                        <h5 className="text-sm font-semibold text-foreground">Parser Found (from PDF)</h5>
+                  {isParsingFile && (
+                    <div className="mt-3">
+                      <div className="w-full bg-muted rounded-full h-2">
+                        <div className="bg-primary h-2 rounded-full transition-all" style={{ width: `${parseProgress}%` }}></div>
                       </div>
-                      <div className="space-y-2">
-                        {statementMetadata?.totalCredits !== undefined ? (
+                      <div className="text-xs text-muted-foreground mt-1">Parsing... {parseProgress}%</div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Credits & Debits Summary - Parser vs Actual */}
+                {parsedTransactions.length > 0 && (
+                  <div className="bg-gradient-to-br from-green-50 to-blue-50 dark:from-green-950/20 dark:to-blue-950/20 rounded-lg p-4 border border-green-200 dark:border-green-800">
+                    <div className="flex items-center space-x-3 mb-4">
+                      <Sparkles className="w-5 h-5 text-primary flex-shrink-0" />
+                      <h4 className="text-lg font-semibold text-foreground">Credits & Debits Summary</h4>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Parser Found (from PDF metadata) */}
+                      <div className="bg-background rounded-lg p-4 border border-border">
+                        <div className="flex items-center space-x-2 mb-3">
+                          <FileText className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                          <h5 className="text-sm font-semibold text-foreground">Parser Found (from PDF)</h5>
+                        </div>
+                        <div className="space-y-2">
+                          {statementMetadata?.totalCredits !== undefined ? (
+                            <div>
+                              <p className="text-xs font-medium text-muted-foreground mb-1">Total Credits</p>
+                              <p className="text-base font-bold text-green-600 dark:text-green-400">
+                                ₹{Number(statementMetadata.totalCredits).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </p>
+                            </div>
+                          ) : (
+                            <div>
+                              <p className="text-xs font-medium text-muted-foreground mb-1">Total Credits</p>
+                              <p className="text-sm text-muted-foreground">Not available in PDF</p>
+                            </div>
+                          )}
+                          {statementMetadata?.totalDebits !== undefined ? (
+                            <div>
+                              <p className="text-xs font-medium text-muted-foreground mb-1">Total Debits</p>
+                              <p className="text-base font-bold text-red-600 dark:text-red-400">
+                                ₹{Number(statementMetadata.totalDebits).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </p>
+                            </div>
+                          ) : (
+                            <div>
+                              <p className="text-xs font-medium text-muted-foreground mb-1">Total Debits</p>
+                              <p className="text-sm text-muted-foreground">Not available in PDF</p>
+                            </div>
+                          )}
+                          {statementMetadata?.transactionCount !== undefined && (
+                            <div className="mt-2 pt-2 border-t border-border">
+                              <p className="text-xs font-medium text-muted-foreground mb-1">Transaction Count</p>
+                              <p className="text-sm font-semibold text-foreground">
+                                {statementMetadata.transactionCount}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Actual Parsed (calculated from transactions) */}
+                      <div className="bg-background rounded-lg p-4 border border-border">
+                        <div className="flex items-center space-x-2 mb-3">
+                          <Check className="w-4 h-4 text-success" />
+                          <h5 className="text-sm font-semibold text-foreground">Actual Parsed (from transactions)</h5>
+                        </div>
+                        <div className="space-y-2">
                           <div>
                             <p className="text-xs font-medium text-muted-foreground mb-1">Total Credits</p>
                             <p className="text-base font-bold text-green-600 dark:text-green-400">
-                              ₹{Number(statementMetadata.totalCredits).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              ₹{actualTotals.totalCredits.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </p>
                           </div>
-                        ) : (
-                          <div>
-                            <p className="text-xs font-medium text-muted-foreground mb-1">Total Credits</p>
-                            <p className="text-sm text-muted-foreground">Not available in PDF</p>
-                          </div>
-                        )}
-                        {statementMetadata?.totalDebits !== undefined ? (
                           <div>
                             <p className="text-xs font-medium text-muted-foreground mb-1">Total Debits</p>
                             <p className="text-base font-bold text-red-600 dark:text-red-400">
-                              ₹{Number(statementMetadata.totalDebits).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              ₹{actualTotals.totalDebits.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </p>
                           </div>
-                        ) : (
-                          <div>
-                            <p className="text-xs font-medium text-muted-foreground mb-1">Total Debits</p>
-                            <p className="text-sm text-muted-foreground">Not available in PDF</p>
-                          </div>
-                        )}
-                        {statementMetadata?.transactionCount !== undefined && (
                           <div className="mt-2 pt-2 border-t border-border">
                             <p className="text-xs font-medium text-muted-foreground mb-1">Transaction Count</p>
                             <p className="text-sm font-semibold text-foreground">
-                              {statementMetadata.transactionCount}
+                              {parsedTransactions.length}
                             </p>
                           </div>
-                        )}
+                        </div>
                       </div>
                     </div>
 
-                    {/* Actual Parsed (calculated from transactions) */}
-                    <div className="bg-background rounded-lg p-4 border border-border">
-                      <div className="flex items-center space-x-2 mb-3">
-                        <Check className="w-4 h-4 text-success" />
-                        <h5 className="text-sm font-semibold text-foreground">Actual Parsed (from transactions)</h5>
+                    {/* Difference/Comparison */}
+                    {(statementMetadata?.totalCredits !== undefined || statementMetadata?.totalDebits !== undefined) && (
+                      <div className="mt-4 pt-4 border-t border-border">
+                        <h5 className="text-sm font-semibold text-foreground mb-3">Comparison</h5>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {statementMetadata?.totalCredits !== undefined && (
+                            <div className="bg-muted/50 rounded p-3">
+                              <p className="text-xs font-medium text-muted-foreground mb-1">Credit Difference</p>
+                              <p className={`text-sm font-semibold ${Math.abs(actualTotals.totalCredits - Number(statementMetadata.totalCredits)) < 0.01
+                                ? 'text-success'
+                                : 'text-yellow-600 dark:text-yellow-400'
+                                }`}>
+                                {Math.abs(actualTotals.totalCredits - Number(statementMetadata.totalCredits)) < 0.01
+                                  ? '✓ Matches'
+                                  : `₹${Math.abs(actualTotals.totalCredits - Number(statementMetadata.totalCredits)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${actualTotals.totalCredits > Number(statementMetadata.totalCredits) ? 'more' : 'less'}`
+                                }
+                              </p>
+                            </div>
+                          )}
+                          {statementMetadata?.totalDebits !== undefined && (
+                            <div className="bg-muted/50 rounded p-3">
+                              <p className="text-xs font-medium text-muted-foreground mb-1">Debit Difference</p>
+                              <p className={`text-sm font-semibold ${Math.abs(actualTotals.totalDebits - Number(statementMetadata.totalDebits)) < 0.01
+                                ? 'text-success'
+                                : 'text-yellow-600 dark:text-yellow-400'
+                                }`}>
+                                {Math.abs(actualTotals.totalDebits - Number(statementMetadata.totalDebits)) < 0.01
+                                  ? '✓ Matches'
+                                  : `₹${Math.abs(actualTotals.totalDebits - Number(statementMetadata.totalDebits)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${actualTotals.totalDebits > Number(statementMetadata.totalDebits) ? 'more' : 'less'}`
+                                }
+                              </p>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      <div className="space-y-2">
+                    )}
+                  </div>
+                )}
+
+                {/* Account Details from PDF */}
+                {statementMetadata && (
+                  <div className="bg-blue-50 dark:bg-blue-950/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
+                    <div className="flex items-center space-x-3 mb-4">
+                      <FileText className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+                      <h4 className="text-lg font-semibold text-foreground">Account Details from PDF</h4>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {statementMetadata.accountNumber && (
+                        <div>
+                          <p className="text-xs font-medium text-muted-foreground mb-1">Account Number</p>
+                          <p className="text-sm font-mono text-foreground bg-background px-2 py-1 rounded border">
+                            {statementMetadata.accountNumber}
+                          </p>
+                        </div>
+                      )}
+                      {statementMetadata.ifsc && (
+                        <div>
+                          <p className="text-xs font-medium text-muted-foreground mb-1">IFSC Code</p>
+                          <p className="text-sm font-mono text-foreground bg-background px-2 py-1 rounded border">
+                            {statementMetadata.ifsc}
+                          </p>
+                        </div>
+                      )}
+                      {statementMetadata.branch && (
+                        <div>
+                          <p className="text-xs font-medium text-muted-foreground mb-1">Branch</p>
+                          <p className="text-sm text-foreground bg-background px-2 py-1 rounded border">
+                            {statementMetadata.branch}
+                          </p>
+                        </div>
+                      )}
+                      {statementMetadata.accountHolderName && (
+                        <div>
+                          <p className="text-xs font-medium text-muted-foreground mb-1">Account Holder</p>
+                          <p className="text-sm text-foreground bg-background px-2 py-1 rounded border">
+                            {statementMetadata.accountHolderName}
+                          </p>
+                        </div>
+                      )}
+                      {statementMetadata.openingBalance !== null && statementMetadata.openingBalance !== undefined && (
+                        <div>
+                          <p className="text-xs font-medium text-muted-foreground mb-1">Opening Balance</p>
+                          <p className="text-sm font-semibold text-foreground bg-background px-2 py-1 rounded border">
+                            ₹{Number(statementMetadata.openingBalance).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </p>
+                        </div>
+                      )}
+                      {statementMetadata.closingBalance !== null && statementMetadata.closingBalance !== undefined && (
+                        <div>
+                          <p className="text-xs font-medium text-muted-foreground mb-1">Closing Balance</p>
+                          <p className="text-sm font-semibold text-foreground bg-background px-2 py-1 rounded border">
+                            ₹{Number(statementMetadata.closingBalance).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </p>
+                        </div>
+                      )}
+                      {statementMetadata.statementStartDate && (
+                        <div>
+                          <p className="text-xs font-medium text-muted-foreground mb-1">Statement Period (Start)</p>
+                          <p className="text-sm text-foreground bg-background px-2 py-1 rounded border">
+                            {new Date(statementMetadata.statementStartDate).toLocaleDateString('en-IN', {
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric'
+                            })}
+                          </p>
+                        </div>
+                      )}
+                      {statementMetadata.statementEndDate && (
+                        <div>
+                          <p className="text-xs font-medium text-muted-foreground mb-1">Statement Period (End)</p>
+                          <p className="text-sm text-foreground bg-background px-2 py-1 rounded border">
+                            {new Date(statementMetadata.statementEndDate).toLocaleDateString('en-IN', {
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric'
+                            })}
+                          </p>
+                        </div>
+                      )}
+                      {statementMetadata.totalCredits !== undefined && (
                         <div>
                           <p className="text-xs font-medium text-muted-foreground mb-1">Total Credits</p>
-                          <p className="text-base font-bold text-green-600 dark:text-green-400">
-                            ₹{actualTotals.totalCredits.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          <p className="text-sm font-semibold text-green-600 dark:text-green-400 bg-background px-2 py-1 rounded border">
+                            ₹{Number(statementMetadata.totalCredits).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </p>
                         </div>
+                      )}
+                      {statementMetadata.totalDebits !== undefined && (
                         <div>
                           <p className="text-xs font-medium text-muted-foreground mb-1">Total Debits</p>
-                          <p className="text-base font-bold text-red-600 dark:text-red-400">
-                            ₹{actualTotals.totalDebits.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          <p className="text-sm font-semibold text-red-600 dark:text-red-400 bg-background px-2 py-1 rounded border">
+                            ₹{Number(statementMetadata.totalDebits).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </p>
                         </div>
-                        <div className="mt-2 pt-2 border-t border-border">
+                      )}
+                      {statementMetadata.transactionCount !== undefined && (
+                        <div>
                           <p className="text-xs font-medium text-muted-foreground mb-1">Transaction Count</p>
-                          <p className="text-sm font-semibold text-foreground">
-                            {parsedTransactions.length}
+                          <p className="text-sm font-semibold text-foreground bg-background px-2 py-1 rounded border">
+                            {statementMetadata.transactionCount}
                           </p>
                         </div>
-                      </div>
+                      )}
                     </div>
-                  </div>
-
-                  {/* Difference/Comparison */}
-                  {(statementMetadata?.totalCredits !== undefined || statementMetadata?.totalDebits !== undefined) && (
-                    <div className="mt-4 pt-4 border-t border-border">
-                      <h5 className="text-sm font-semibold text-foreground mb-3">Comparison</h5>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {statementMetadata?.totalCredits !== undefined && (
-                          <div className="bg-muted/50 rounded p-3">
-                            <p className="text-xs font-medium text-muted-foreground mb-1">Credit Difference</p>
-                            <p className={`text-sm font-semibold ${Math.abs(actualTotals.totalCredits - Number(statementMetadata.totalCredits)) < 0.01
-                              ? 'text-success'
-                              : 'text-yellow-600 dark:text-yellow-400'
-                              }`}>
-                              {Math.abs(actualTotals.totalCredits - Number(statementMetadata.totalCredits)) < 0.01
-                                ? '✓ Matches'
-                                : `₹${Math.abs(actualTotals.totalCredits - Number(statementMetadata.totalCredits)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${actualTotals.totalCredits > Number(statementMetadata.totalCredits) ? 'more' : 'less'}`
-                              }
-                            </p>
-                          </div>
-                        )}
-                        {statementMetadata?.totalDebits !== undefined && (
-                          <div className="bg-muted/50 rounded p-3">
-                            <p className="text-xs font-medium text-muted-foreground mb-1">Debit Difference</p>
-                            <p className={`text-sm font-semibold ${Math.abs(actualTotals.totalDebits - Number(statementMetadata.totalDebits)) < 0.01
-                              ? 'text-success'
-                              : 'text-yellow-600 dark:text-yellow-400'
-                              }`}>
-                              {Math.abs(actualTotals.totalDebits - Number(statementMetadata.totalDebits)) < 0.01
-                                ? '✓ Matches'
-                                : `₹${Math.abs(actualTotals.totalDebits - Number(statementMetadata.totalDebits)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${actualTotals.totalDebits > Number(statementMetadata.totalDebits) ? 'more' : 'less'}`
-                              }
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Account Details from PDF */}
-              {statementMetadata && (
-                <div className="bg-blue-50 dark:bg-blue-950/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
-                  <div className="flex items-center space-x-3 mb-4">
-                    <FileText className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0" />
-                    <h4 className="text-lg font-semibold text-foreground">Account Details from PDF</h4>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {statementMetadata.accountNumber && (
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground mb-1">Account Number</p>
-                        <p className="text-sm font-mono text-foreground bg-background px-2 py-1 rounded border">
-                          {statementMetadata.accountNumber}
-                        </p>
-                      </div>
-                    )}
-                    {statementMetadata.ifsc && (
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground mb-1">IFSC Code</p>
-                        <p className="text-sm font-mono text-foreground bg-background px-2 py-1 rounded border">
-                          {statementMetadata.ifsc}
-                        </p>
-                      </div>
-                    )}
-                    {statementMetadata.branch && (
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground mb-1">Branch</p>
-                        <p className="text-sm text-foreground bg-background px-2 py-1 rounded border">
-                          {statementMetadata.branch}
-                        </p>
-                      </div>
-                    )}
-                    {statementMetadata.accountHolderName && (
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground mb-1">Account Holder</p>
-                        <p className="text-sm text-foreground bg-background px-2 py-1 rounded border">
-                          {statementMetadata.accountHolderName}
-                        </p>
-                      </div>
-                    )}
-                    {statementMetadata.openingBalance !== null && statementMetadata.openingBalance !== undefined && (
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground mb-1">Opening Balance</p>
-                        <p className="text-sm font-semibold text-foreground bg-background px-2 py-1 rounded border">
-                          ₹{Number(statementMetadata.openingBalance).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </p>
-                      </div>
-                    )}
-                    {statementMetadata.closingBalance !== null && statementMetadata.closingBalance !== undefined && (
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground mb-1">Closing Balance</p>
-                        <p className="text-sm font-semibold text-foreground bg-background px-2 py-1 rounded border">
-                          ₹{Number(statementMetadata.closingBalance).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </p>
-                      </div>
-                    )}
-                    {statementMetadata.statementStartDate && (
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground mb-1">Statement Period (Start)</p>
-                        <p className="text-sm text-foreground bg-background px-2 py-1 rounded border">
-                          {new Date(statementMetadata.statementStartDate).toLocaleDateString('en-IN', {
-                            year: 'numeric',
-                            month: 'long',
-                            day: 'numeric'
-                          })}
-                        </p>
-                      </div>
-                    )}
-                    {statementMetadata.statementEndDate && (
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground mb-1">Statement Period (End)</p>
-                        <p className="text-sm text-foreground bg-background px-2 py-1 rounded border">
-                          {new Date(statementMetadata.statementEndDate).toLocaleDateString('en-IN', {
-                            year: 'numeric',
-                            month: 'long',
-                            day: 'numeric'
-                          })}
-                        </p>
-                      </div>
-                    )}
-                    {statementMetadata.totalCredits !== undefined && (
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground mb-1">Total Credits</p>
-                        <p className="text-sm font-semibold text-green-600 dark:text-green-400 bg-background px-2 py-1 rounded border">
-                          ₹{Number(statementMetadata.totalCredits).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </p>
-                      </div>
-                    )}
-                    {statementMetadata.totalDebits !== undefined && (
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground mb-1">Total Debits</p>
-                        <p className="text-sm font-semibold text-red-600 dark:text-red-400 bg-background px-2 py-1 rounded border">
-                          ₹{Number(statementMetadata.totalDebits).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </p>
-                      </div>
-                    )}
-                    {statementMetadata.transactionCount !== undefined && (
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground mb-1">Transaction Count</p>
-                        <p className="text-sm font-semibold text-foreground bg-background px-2 py-1 rounded border">
-                          {statementMetadata.transactionCount}
+                    {(!statementMetadata.accountNumber && !statementMetadata.ifsc && !statementMetadata.branch && !statementMetadata.accountHolderName) && (
+                      <div className="mt-3 p-2 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800 rounded">
+                        <p className="text-xs text-yellow-800 dark:text-yellow-200">
+                          ⚠️ Account details could not be extracted from this PDF. The transactions will still be imported.
                         </p>
                       </div>
                     )}
                   </div>
-                  {(!statementMetadata.accountNumber && !statementMetadata.ifsc && !statementMetadata.branch && !statementMetadata.accountHolderName) && (
-                    <div className="mt-3 p-2 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800 rounded">
-                      <p className="text-xs text-yellow-800 dark:text-yellow-200">
-                        ⚠️ Account details could not be extracted from this PDF. The transactions will still be imported.
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
+                )}
 
-              {/* Split View: Raw Data (Left) and Processed Data (Right) */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Left Half - Raw Data */}
-                <div>
-                  <h4 className="text-lg font-semibold text-foreground mb-4 flex items-center">
-                    <FileText className="w-5 h-5 mr-2" />
-                    Raw Transaction Data
-                  </h4>
-                  <div className="max-h-96 overflow-y-auto border border-border rounded-lg">
-                    <div className="bg-muted px-4 py-2 border-b border-border sticky top-0">
-                      <p className="text-sm font-medium text-foreground">
-                        {filteredParsed.length} transactions found
-                      </p>
+                {/* Split View: Raw Data (Left) and Processed Data (Right) */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Left Half - Raw Data */}
+                  <div>
+                    <h4 className="text-lg font-semibold text-foreground mb-4 flex items-center">
+                      <FileText className="w-5 h-5 mr-2" />
+                      Raw Transaction Data
+                    </h4>
+                    <div className="max-h-96 overflow-y-auto border border-border rounded-lg">
+                      <div className="bg-muted px-4 py-2 border-b border-border sticky top-0">
+                        <p className="text-sm font-medium text-foreground">
+                          {filteredParsed.length} transactions found
+                        </p>
+                      </div>
+                      <div className="space-y-2 p-4">
+                        {visibleParsed.map((transaction: BankTransaction, index: number) => (
+                          <div key={index} className="bg-card p-3 rounded border border-border">
+                            <div className="text-xs text-muted-foreground mb-1">
+                              Transaction #{index + 1} (Raw Length: {(transaction.raw || transaction.description || '').length})
+                            </div>
+                            <div className="text-sm font-mono text-foreground break-all whitespace-pre-wrap overflow-x-auto">
+                              {transaction.raw || transaction.description || 'No raw data available'}
+                            </div>
+                            <div className="text-xs text-muted-foreground mt-1">
+                              Length: {(transaction.raw || transaction.description || '').length} chars
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                    <div className="space-y-2 p-4">
-                      {visibleParsed.map((transaction: BankTransaction, index: number) => (
-                        <div key={index} className="bg-card p-3 rounded border border-border">
-                          <div className="text-xs text-muted-foreground mb-1">
-                            Transaction #{index + 1} (Raw Length: {(transaction.raw || transaction.description || '').length})
-                          </div>
-                          <div className="text-sm font-mono text-foreground break-all whitespace-pre-wrap overflow-x-auto">
-                            {transaction.raw || transaction.description || 'No raw data available'}
-                          </div>
-                          <div className="text-xs text-muted-foreground mt-1">
-                            Length: {(transaction.raw || transaction.description || '').length} chars
-                          </div>
+                  </div>
+
+                  {/* Right Half - Processed Data */}
+                  <div>
+                    <h4 className="text-lg font-semibold text-foreground mb-4 flex items-center">
+                      <TrendingUp className="w-5 h-5 mr-2" />
+                      Processed Data
+                    </h4>
+                    <div className="max-h-96 overflow-y-auto">
+                      {/* Preview filters */}
+                      <div className="flex items-center justify-between mb-3">
+                        <label className="inline-flex items-center gap-2 text-sm">
+                          <input type="checkbox" checked={previewMonthOnly} onChange={(e) => { setPreviewMonthOnly(e.target.checked); setPreviewPage(1); }} />
+                          Current month only
+                        </label>
+                        <div className="flex items-center gap-2 text-xs">
+                          <span>Rows per page</span>
+                          <select value={previewPageSize} onChange={(e) => { setPreviewPageSize(parseInt(e.target.value || '200')); setPreviewPage(1); }} className="border rounded px-1 py-0.5 bg-background text-foreground">
+                            <option value={100}>100</option>
+                            <option value={200}>200</option>
+                            <option value={500}>500</option>
+                          </select>
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Right Half - Processed Data */}
-                <div>
-                  <h4 className="text-lg font-semibold text-foreground mb-4 flex items-center">
-                    <TrendingUp className="w-5 h-5 mr-2" />
-                    Processed Data
-                  </h4>
-                  <div className="max-h-96 overflow-y-auto">
-                    {/* Preview filters */}
-                    <div className="flex items-center justify-between mb-3">
-                      <label className="inline-flex items-center gap-2 text-sm">
-                        <input type="checkbox" checked={previewMonthOnly} onChange={(e) => { setPreviewMonthOnly(e.target.checked); setPreviewPage(1); }} />
-                        Current month only
-                      </label>
-                      <div className="flex items-center gap-2 text-xs">
-                        <span>Rows per page</span>
-                        <select value={previewPageSize} onChange={(e) => { setPreviewPageSize(parseInt(e.target.value || '200')); setPreviewPage(1); }} className="border rounded px-1 py-0.5 bg-background text-foreground">
-                          <option value={100}>100</option>
-                          <option value={200}>200</option>
-                          <option value={500}>500</option>
-                        </select>
                       </div>
-                    </div>
-                    {/* Table (md+) */}
-                    <div className="hidden md:block overflow-x-auto">
-                      <table className="min-w-full bg-card border border-border rounded-lg">
-                        <thead className="bg-muted">
-                          <tr>
-                            <th className="px-3 py-2 text-left text-xs font-medium text-foreground uppercase tracking-wider">Date</th>
-                            <th className="px-3 py-2 text-left text-xs font-medium text-foreground uppercase tracking-wider">Store/Person</th>
-                            <th className="px-3 py-2 text-left text-xs font-medium text-foreground uppercase tracking-wider">Commodity</th>
-                            <th className="px-3 py-2 text-left text-xs font-medium text-foreground uppercase tracking-wider">Type</th>
-                            <th className="px-3 py-2 text-left text-xs font-medium text-foreground uppercase tracking-wider">Credit</th>
-                            <th className="px-3 py-2 text-left text-xs font-medium text-foreground uppercase tracking-wider">Debit</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border">
-                          {visibleParsed.map((transaction: BankTransaction, index: number) => {
+                      {/* Table (md+) */}
+                      <div className="hidden md:block overflow-x-auto">
+                        <table className="min-w-full bg-card border border-border rounded-lg">
+                          <thead className="bg-muted">
+                            <tr>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-foreground uppercase tracking-wider">Date</th>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-foreground uppercase tracking-wider">Store/Person</th>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-foreground uppercase tracking-wider">Commodity</th>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-foreground uppercase tracking-wider">Type</th>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-foreground uppercase tracking-wider">Credit</th>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-foreground uppercase tracking-wider">Debit</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-border">
+                            {visibleParsed.map((transaction: BankTransaction, index: number) => {
+                              const debitAmount = parseFloat(String(transaction.debit || '0'));
+                              const creditAmount = parseFloat(String(transaction.credit || '0'));
+                              const isIncome = creditAmount > 0;
+                              const storeOrPerson = transaction.store || transaction.personName || '';
+                              const commodity = transaction.commodity || '';
+
+                              return (
+                                <tr key={index} className="hover:bg-muted/50">
+                                  <td className="px-3 py-2 text-xs text-foreground">
+                                    {transaction.date_iso || transaction.date || new Date().toISOString().split('T')[0]}
+                                  </td>
+                                  <td className="px-3 py-2 text-xs text-foreground font-medium">
+                                    {storeOrPerson || '-'}
+                                  </td>
+                                  <td className="px-3 py-2 text-xs text-muted-foreground">
+                                    {commodity || '-'}
+                                  </td>
+                                  <td className="px-3 py-2">
+                                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${isIncome
+                                      ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                      : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                                      }`}>
+                                      {isIncome ? 'Credit' : 'Debit'}
+                                    </span>
+                                  </td>
+                                  <td className="px-3 py-2 text-xs font-bold text-green-600 dark:text-green-400">
+                                    {creditAmount > 0 ? `₹${creditAmount.toFixed(2)}` : '-'}
+                                  </td>
+                                  <td className="px-3 py-2 text-xs font-bold text-red-600 dark:text-red-400">
+                                    {debitAmount > 0 ? `₹${debitAmount.toFixed(2)}` : '-'}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* Mobile Card List */}
+                      <div className="md:hidden divide-y divide-border border border-border rounded-lg overflow-hidden">
+                        {visibleParsed.length === 0 ? (
+                          <div className="px-4 py-6 text-center text-sm text-muted-foreground">No records</div>
+                        ) : (
+                          visibleParsed.map((transaction: BankTransaction, index: number) => {
                             const debitAmount = parseFloat(String(transaction.debit || '0'));
                             const creditAmount = parseFloat(String(transaction.credit || '0'));
                             const isIncome = creditAmount > 0;
                             const storeOrPerson = transaction.store || transaction.personName || '';
                             const commodity = transaction.commodity || '';
-
                             return (
-                              <tr key={index} className="hover:bg-muted/50">
-                                <td className="px-3 py-2 text-xs text-foreground">
-                                  {transaction.date_iso || transaction.date || new Date().toISOString().split('T')[0]}
-                                </td>
-                                <td className="px-3 py-2 text-xs text-foreground font-medium">
-                                  {storeOrPerson || '-'}
-                                </td>
-                                <td className="px-3 py-2 text-xs text-muted-foreground">
-                                  {commodity || '-'}
-                                </td>
-                                <td className="px-3 py-2">
-                                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${isIncome
-                                    ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                                    : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                                    }`}>
-                                    {isIncome ? 'Credit' : 'Debit'}
-                                  </span>
-                                </td>
-                                <td className="px-3 py-2 text-xs font-bold text-green-600 dark:text-green-400">
-                                  {creditAmount > 0 ? `₹${creditAmount.toFixed(2)}` : '-'}
-                                </td>
-                                <td className="px-3 py-2 text-xs font-bold text-red-600 dark:text-red-400">
-                                  {debitAmount > 0 ? `₹${debitAmount.toFixed(2)}` : '-'}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-
-                    {/* Mobile Card List */}
-                    <div className="md:hidden divide-y divide-border border border-border rounded-lg overflow-hidden">
-                      {visibleParsed.length === 0 ? (
-                        <div className="px-4 py-6 text-center text-sm text-muted-foreground">No records</div>
-                      ) : (
-                        visibleParsed.map((transaction: BankTransaction, index: number) => {
-                          const debitAmount = parseFloat(String(transaction.debit || '0'));
-                          const creditAmount = parseFloat(String(transaction.credit || '0'));
-                          const isIncome = creditAmount > 0;
-                          const storeOrPerson = transaction.store || transaction.personName || '';
-                          const commodity = transaction.commodity || '';
-                          return (
-                            <div key={index} className="p-4 bg-card">
-                              <div className="flex items-start justify-between gap-3">
-                                <div className="flex-1">
-                                  <div className="text-xs text-muted-foreground">{transaction.date_iso || transaction.date || '-'}</div>
-                                  <div className="text-sm font-medium text-foreground mt-1" title={transaction.description || transaction.narration || ''}>
-                                    {transaction.description || transaction.narration || '—'}
+                              <div key={index} className="p-4 bg-card">
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="flex-1">
+                                    <div className="text-xs text-muted-foreground">{transaction.date_iso || transaction.date || '-'}</div>
+                                    <div className="text-sm font-medium text-foreground mt-1" title={transaction.description || transaction.narration || ''}>
+                                      {transaction.description || transaction.narration || '—'}
+                                    </div>
+                                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                                      <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${isIncome ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'}`}>
+                                        {isIncome ? 'Credit' : 'Debit'}
+                                      </span>
+                                      {storeOrPerson && (
+                                        <span className="px-2 py-0.5 rounded text-xs bg-muted text-foreground">{storeOrPerson}</span>
+                                      )}
+                                      {commodity && (
+                                        <span className="px-2 py-0.5 rounded text-xs bg-muted text-foreground">{commodity}</span>
+                                      )}
+                                    </div>
                                   </div>
-                                  <div className="mt-2 flex flex-wrap items-center gap-2">
-                                    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${isIncome ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'}`}>
-                                      {isIncome ? 'Credit' : 'Debit'}
-                                    </span>
-                                    {storeOrPerson && (
-                                      <span className="px-2 py-0.5 rounded text-xs bg-muted text-foreground">{storeOrPerson}</span>
-                                    )}
-                                    {commodity && (
-                                      <span className="px-2 py-0.5 rounded text-xs bg-muted text-foreground">{commodity}</span>
+                                  <div className="text-right">
+                                    {isIncome ? (
+                                      <div className="text-sm font-semibold text-green-600 dark:text-green-400">₹{creditAmount.toFixed(2)}</div>
+                                    ) : (
+                                      <div className="text-sm font-semibold text-red-600 dark:text-red-400">₹{debitAmount.toFixed(2)}</div>
                                     )}
                                   </div>
-                                </div>
-                                <div className="text-right">
-                                  {isIncome ? (
-                                    <div className="text-sm font-semibold text-green-600 dark:text-green-400">₹{creditAmount.toFixed(2)}</div>
-                                  ) : (
-                                    <div className="text-sm font-semibold text-red-600 dark:text-red-400">₹{debitAmount.toFixed(2)}</div>
-                                  )}
                                 </div>
                               </div>
-                            </div>
-                          );
-                        })
+                            );
+                          })
+                        )}
+                      </div>
+
+                      {/* Pagination */}
+                      {totalPages > 1 && (
+                        <div className="flex items-center justify-between mt-3 text-sm">
+                          <span className="text-muted-foreground">Page {previewPage} of {totalPages}</span>
+                          <div className="flex items-center gap-2">
+                            <button className="px-2 py-1 border rounded disabled:opacity-50 bg-background text-foreground hover:bg-muted" onClick={() => setPreviewPage(p => Math.max(1, p - 1))} disabled={previewPage === 1}>Prev</button>
+                            <button className="px-2 py-1 border rounded disabled:opacity-50 bg-background text-foreground hover:bg-muted" onClick={() => setPreviewPage(p => Math.min(totalPages, p + 1))} disabled={previewPage === totalPages}>Next</button>
+                          </div>
+                        </div>
                       )}
                     </div>
-
-                    {/* Pagination */}
-                    {totalPages > 1 && (
-                      <div className="flex items-center justify-between mt-3 text-sm">
-                        <span className="text-muted-foreground">Page {previewPage} of {totalPages}</span>
-                        <div className="flex items-center gap-2">
-                          <button className="px-2 py-1 border rounded disabled:opacity-50 bg-background text-foreground hover:bg-muted" onClick={() => setPreviewPage(p => Math.max(1, p - 1))} disabled={previewPage === 1}>Prev</button>
-                          <button className="px-2 py-1 border rounded disabled:opacity-50 bg-background text-foreground hover:bg-muted" onClick={() => setPreviewPage(p => Math.min(totalPages, p + 1))} disabled={previewPage === totalPages}>Next</button>
-                        </div>
-                      </div>
-                    )}
                   </div>
                 </div>
-              </div>
 
-              {/* Import Button with progress */}
-              <div className="space-y-3">
-                {isImporting && (
-                  <div className="w-full bg-muted rounded-full h-2">
-                    <div className="bg-primary h-2 rounded-full transition-all" style={{ width: `${importProgress}%` }}></div>
-                  </div>
-                )}
-                <button
-                  onClick={handleImportParsedTransactions}
-                  disabled={isImporting}
-                  className="w-full px-4 py-3 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center font-semibold"
-                >
-                  {isImporting ? (
-                    <div className="flex items-center gap-2">
-                      <RefreshCw className="w-4 h-4 animate-spin" />
-                      <span>Importing... {importProgress}%</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center">
-                      <Upload className="w-4 h-4 mr-2" />
-                      Import Transactions
+                {/* Import Button with progress */}
+                <div className="space-y-3">
+                  {isImporting && (
+                    <div className="w-full bg-muted rounded-full h-2">
+                      <div className="bg-primary h-2 rounded-full transition-all" style={{ width: `${importProgress}%` }}></div>
                     </div>
                   )}
-                </button>
+                  <button
+                    onClick={handleImportParsedTransactions}
+                    disabled={isImporting}
+                    className="w-full px-4 py-3 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center font-semibold"
+                  >
+                    {isImporting ? (
+                      <div className="flex items-center gap-2">
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                        <span>Importing... {importProgress}%</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center">
+                        <Upload className="w-4 h-4 mr-2" />
+                        Import Transactions
+                      </div>
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      }
 
       {/* Delete Confirmation */}
       <DeleteConfirmationDialog
@@ -3364,6 +3191,14 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
         count={1}
         actionType="delete"
       />
-    </div>
+    </div >
   );
+}
+
+function CategoryIcon({ category }: { category: string }) {
+  const cat = category.toLowerCase();
+  if (cat.includes('tech') || cat.includes('apple') || cat.includes('electronic')) return <ShoppingCart className="size-4" />;
+  if (cat.includes('food') || cat.includes('dine') || cat.includes('sushi')) return <Utensils className="size-4" />;
+  if (cat.includes('utility') || cat.includes('bill') || cat.includes('con edison')) return <Zap className="size-4" />;
+  return <ShoppingBag className="size-4" />;
 }

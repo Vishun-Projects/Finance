@@ -48,12 +48,12 @@ interface ImportRecord {
 
 export async function POST(request: NextRequest) {
   console.log('🏦 Import Bank Statement API: Starting request');
-  
-  
+
+
   try {
     const body = await request.json();
-    const { userId, records, metadata, document, useAICategorization = true, validateBalance = true, categorizeInBackground = false, forceInsert = false } = body as { 
-      userId: string; 
+    const { userId, records, metadata, document, useAICategorization = true, validateBalance = true, categorizeInBackground = false, forceInsert = false } = body as {
+      userId: string;
       records: ImportRecord[];
       metadata?: StatementMetadata;
       document?: {
@@ -68,13 +68,13 @@ export async function POST(request: NextRequest) {
       categorizeInBackground?: boolean; // If true, skip categorization during import and do it in background
       forceInsert?: boolean; // Skip duplicate check and force insert
     };
-    
+
     // Log categorization settings
     console.log(`📋 Categorization settings: useAICategorization=${useAICategorization}, categorizeInBackground=${categorizeInBackground}, records=${records.length}`);
 
     if (!userId || !Array.isArray(records)) {
       return NextResponse.json(
-        { error: 'userId and records are required' }, 
+        { error: 'userId and records are required' },
         { status: 400 }
       );
     }
@@ -88,9 +88,9 @@ export async function POST(request: NextRequest) {
     }
 
     if (records.length === 0) {
-      return NextResponse.json({ 
-        inserted: 0, 
-        skipped: 0, 
+      return NextResponse.json({
+        inserted: 0,
+        skipped: 0,
         duplicates: 0,
         incomeInserted: 0,
         expenseInserted: 0
@@ -149,7 +149,7 @@ export async function POST(request: NextRequest) {
             const debit = Number(r.debit || 0);
             return sum + debit;
           }, 0);
-          
+
           const totalCredits = records.reduce((sum, r) => {
             const credit = Number(r.credit || 0);
             return sum + credit;
@@ -228,19 +228,19 @@ export async function POST(request: NextRequest) {
             date = new Date(dateStr);
           }
         }
-        
+
         if (isNaN(date.getTime())) {
           console.warn(`⚠️ Invalid date: ${dateInput}`);
           return null;
         }
-        
+
         // More lenient year validation (allow 2010-2030 for historical and future transactions)
         const year = date.getFullYear();
         if (year < 2010 || year > 2030) {
           console.warn(`⚠️ Date year out of range: ${year} for date: ${dateInput}`);
           return null;
         }
-        
+
         return date;
       } catch (error) {
         console.warn(`⚠️ Date parsing error for: ${dateInput}`, error);
@@ -261,7 +261,7 @@ export async function POST(request: NextRequest) {
         const dateInput = (r.date_iso || r.date) as string | Date | null | undefined;
         let parsedDate = parseDate(dateInput);
         let hasInvalidDate = false;
-        
+
         // If date parsing failed, try to infer from context
         if (!parsedDate || isNaN(parsedDate.getTime())) {
           // Try to infer from previous transaction date
@@ -269,7 +269,7 @@ export async function POST(request: NextRequest) {
             parsedDate = new Date(lastValidDate);
             hasInvalidDate = true;
             console.warn(`⚠️ [${idx}] Date inference: using previous transaction date for missing/invalid date`);
-          } 
+          }
           // Try to infer from statement date range
           else if (statementStartDate) {
             parsedDate = new Date(statementStartDate);
@@ -283,17 +283,17 @@ export async function POST(request: NextRequest) {
             console.warn(`⚠️ [${idx}] Date inference: using current date as last resort for missing/invalid date`);
           }
         }
-        
+
         // Update last valid date for next transaction
         if (parsedDate && !isNaN(parsedDate.getTime())) {
           lastValidDate = parsedDate;
         }
-        
+
         // Determine credit and debit amounts
         // CRITICAL: Ensure amounts are never negative - debitAmount and creditAmount must be >= 0
         let debitAmount = Math.max(0, Number(r.debit || 0));
         let creditAmount = Math.max(0, Number(r.credit || 0));
-        
+
         // If credit/debit not provided, infer from amount and legacy type
         if (debitAmount === 0 && creditAmount === 0) {
           const amount = Number(r.amount || 0);
@@ -316,14 +316,14 @@ export async function POST(request: NextRequest) {
             }
           }
         }
-        
+
         // Final validation: ensure amounts are never negative
         debitAmount = Math.max(0, debitAmount);
         creditAmount = Math.max(0, creditAmount);
-        
+
         // Check if amount is zero
         const hasZeroAmount = debitAmount === 0 && creditAmount === 0;
-        
+
         // Determine financial category (default based on debit/credit)
         let financialCategory: 'INCOME' | 'EXPENSE' | 'TRANSFER' | 'INVESTMENT' | 'OTHER' = 'EXPENSE';
         if (creditAmount > 0) {
@@ -331,12 +331,12 @@ export async function POST(request: NextRequest) {
         } else if (debitAmount > 0) {
           financialCategory = 'EXPENSE'; // Default debits to EXPENSE
         }
-        
+
         // IMPORTANT: NEFT/RTGS/IMPS credits are INCOME (salary), not TRANSFER
         // Only mark as TRANSFER if it's a true transfer (both credit and debit, or explicit transfer)
         const descriptionUpper = ((r.title || r.description || '').toString().toUpperCase());
         const isNEFT = descriptionUpper.includes('NEFT') || descriptionUpper.includes('RTGS') || descriptionUpper.includes('IMPS');
-        
+
         // If it's a credit with NEFT/RTGS/IMPS, keep it as INCOME (for salary detection)
         // Only mark as TRANSFER if it's explicitly a transfer between accounts
         if (creditAmount > 0 && isNEFT) {
@@ -350,11 +350,11 @@ export async function POST(request: NextRequest) {
           // Only mark outgoing transfers as TRANSFER
           financialCategory = 'TRANSFER';
         }
-        
+
         // Handle missing description - use raw data or fallback
         let description = (r.title || r.description || '').toString().trim();
         const isPartialData = !description || hasZeroAmount || hasInvalidDate;
-        
+
         if (!description) {
           // Try to use raw data
           description = (r.raw || r.rawData || '').toString().trim();
@@ -364,7 +364,7 @@ export async function POST(request: NextRequest) {
             console.warn(`⚠️ [${idx}] Missing description: using fallback "Uncategorized Transaction"`);
           }
         }
-        
+
         return {
           description: description,
           transactionDate: parsedDate!,
@@ -396,21 +396,21 @@ export async function POST(request: NextRequest) {
       .filter((r, idx) => {
         // LENIENT FILTERING: Only filter truly invalid records (completely empty)
         // All other records are kept with appropriate flags
-        
+
         // Only reject if transaction date is still invalid after inference attempts
         if (!r.transactionDate || isNaN(r.transactionDate.getTime())) {
           console.warn(`⚠️ [${idx}] Filtered: completely invalid date after all inference attempts`);
           return false;
         }
-        
+
         // Log partial data transactions but keep them
         if (r.isPartialData) {
           console.log(`ℹ️ [${idx}] Partial data transaction kept: hasInvalidDate=${r.hasInvalidDate}, hasZeroAmount=${r.hasZeroAmount}, missingDescription=${!r.description || r.description === 'Uncategorized Transaction'}`);
         }
-        
+
         return true;
       });
-    
+
     // Log normalization statistics
     const normalizedCount = normalized.length;
     const filteredCount = records.length - normalizedCount;
@@ -418,14 +418,29 @@ export async function POST(request: NextRequest) {
       console.log(`📊 Normalization: ${records.length} records → ${normalizedCount} valid (${filteredCount} filtered)`);
     }
 
-    // Apply entity mappings before saving to database
+    // Apply entity mappings before saving to database (Optimized Batch)
     if (userId && normalized.length > 0) {
+      const { getCanonicalNamesBatch } = await import('@/lib/entity-mapping-service');
+
+      const personNames = normalized
+        .map(r => r.personName)
+        .filter((n): n is string => !!n);
+
+      const storeNames = normalized
+        .map(r => r.store)
+        .filter((n): n is string => !!n);
+
+      const [personMappings, storeMappings] = await Promise.all([
+        getCanonicalNamesBatch(userId, personNames, ['PERSON']),
+        getCanonicalNamesBatch(userId, storeNames, ['STORE'])
+      ]);
+
       for (const record of normalized) {
-        if (record.personName) {
-          record.personName = await getCanonicalName(userId, record.personName, 'PERSON');
+        if (record.personName && personMappings[record.personName]) {
+          record.personName = personMappings[record.personName];
         }
-        if (record.store) {
-          record.store = await getCanonicalName(userId, record.store, 'STORE');
+        if (record.store && storeMappings[record.store]) {
+          record.store = storeMappings[record.store];
         }
       }
     }
@@ -470,17 +485,17 @@ export async function POST(request: NextRequest) {
     // 2. normalized.length > 100 transactions (large import), OR
     // 3. useAICategorization is true and normalized.length > 50 (any import with AI enabled and > 50 transactions)
     // This ensures categorization happens for both small and large imports
-    const shouldUseBackground = categorizeInBackground || 
-                                 (normalized.length > 100 && useAICategorization) ||
-                                 (normalized.length > 50 && useAICategorization);
-    
+    const shouldUseBackground = categorizeInBackground ||
+      (normalized.length > 100 && useAICategorization) ||
+      (normalized.length > 50 && useAICategorization);
+
     // BATCH CATEGORIZATION BEFORE IMPORT (ensures consistency)
     // Skip if background mode is enabled
     let categorizedCount = 0;
     if (useAICategorization && !shouldUseBackground && userId && normalized.length > 0) {
       try {
         console.log(`🤖 Starting batch categorization for ${normalized.length} transactions...`);
-        
+
         // Pre-fetch ALL categories once for fast lookup
         const allExpenseCategories = await (prisma as any).category.findMany({
           where: {
@@ -492,7 +507,7 @@ export async function POST(request: NextRequest) {
           },
           select: { id: true, name: true },
         });
-        
+
         const allIncomeCategories = await (prisma as any).category.findMany({
           where: {
             type: 'INCOME',
@@ -503,7 +518,7 @@ export async function POST(request: NextRequest) {
           },
           select: { id: true, name: true },
         });
-        
+
         // Create lookup map for fast category matching
         const categoryMap = new Map<string, string>(); // name -> id
         for (const cat of [...allExpenseCategories, ...allIncomeCategories]) {
@@ -517,7 +532,7 @@ export async function POST(request: NextRequest) {
             }
           }
         }
-        
+
         // Prepare transactions for categorization
         const transactionsToCategorize = normalized
           .filter((r): r is typeof r & { transactionDate: Date | string } => {
@@ -548,7 +563,7 @@ export async function POST(request: NextRequest) {
                 }
               }
             }
-            
+
             return {
               description: r.description,
               store: r.store,
@@ -565,24 +580,24 @@ export async function POST(request: NextRequest) {
         // Categorize entire batch at once (ensures consistency)
         console.log(`🤖 Categorizing ${transactionsToCategorize.length} transactions...`);
         const categorizationResults = await categorizeTransactions(userId, transactionsToCategorize);
-        
+
         // Log categorization results
         const foundWithId = categorizationResults.filter(r => r.categoryId).length;
         const foundWithName = categorizationResults.filter(r => r.categoryName && !r.categoryId).length;
         console.log(`📊 Categorization results: ${foundWithId} with ID, ${foundWithName} with name only, ${categorizationResults.length - foundWithId - foundWithName} uncategorized`);
-        
+
         // Apply categories to normalized records
         for (let i = 0; i < normalized.length; i++) {
           const result = categorizationResults[i];
           if (result && (result.categoryId || result.categoryName)) {
             let finalCategoryId: string | null = null;
-            
+
             if (result.categoryId) {
               finalCategoryId = result.categoryId;
             } else if (result.categoryName) {
               const categoryNameLower = result.categoryName.toLowerCase().trim();
               finalCategoryId = categoryMap.get(categoryNameLower) ?? null;
-              
+
               // Try fuzzy matching if exact match fails
               if (!finalCategoryId) {
                 const categoryVariations: Record<string, string[]> = {
@@ -594,7 +609,7 @@ export async function POST(request: NextRequest) {
                   'entertainment': ['entertain'],
                   'shopping': ['shop', 'retail'],
                 };
-                
+
                 const variations = categoryVariations[categoryNameLower] ?? [];
                 for (const variation of variations) {
                   const foundId = categoryMap.get(variation.toLowerCase().trim());
@@ -602,12 +617,12 @@ export async function POST(request: NextRequest) {
                   if (finalCategoryId) break;
                 }
               }
-              
+
               if (!finalCategoryId) {
                 console.warn(`⚠️ Category name "${result.categoryName}" not found in database for transaction ${i}`);
               }
             }
-            
+
             if (finalCategoryId) {
               (normalized[i] as any).categoryId = finalCategoryId;
               categorizedCount++;
@@ -616,7 +631,7 @@ export async function POST(request: NextRequest) {
             }
           }
         }
-        
+
         console.log(`✅ Applied categories to ${categorizedCount}/${normalized.length} transactions`);
       } catch (error: any) {
         console.error('Error in batch categorization:', error);
@@ -629,7 +644,7 @@ export async function POST(request: NextRequest) {
     if (userId && normalized.length > 0) {
       try {
         console.log('🔍 Detecting auto-pay transactions (EMI, subscriptions)...');
-        
+
         // Prepare transactions for auto-pay detection
         // First, get category names for transactions that have categoryId
         const categoryIds = [...new Set(normalized.map(r => (r as any).categoryId).filter(Boolean))];
@@ -643,7 +658,7 @@ export async function POST(request: NextRequest) {
             categoryMap.set(cat.id, cat.name);
           }
         }
-        
+
         const transactionsForDetection = normalized
           .filter(r => r.transactionDate !== null && !isNaN(r.transactionDate.getTime()))
           .map(r => ({
@@ -657,12 +672,12 @@ export async function POST(request: NextRequest) {
             categoryId: (r as any).categoryId || null,
             categoryName: (r as any).categoryId ? (categoryMap.get((r as any).categoryId) ?? null) : null,
           }));
-        
+
         // Detect auto-pay patterns
         const autoPayPatterns = await detectAutoPayTransactions(userId, transactionsForDetection);
-        
+
         console.log(`📋 Found ${autoPayPatterns.length} auto-pay patterns with confidence >= 0.8`);
-        
+
         // Helper function to calculate next due date
         const calculateNextDueDate = (lastDate: Date, frequency: 'MONTHLY' | 'WEEKLY' | 'DAILY'): Date => {
           const next = new Date(lastDate);
@@ -675,7 +690,7 @@ export async function POST(request: NextRequest) {
           }
           return next;
         };
-        
+
         // Helper function to check if deadline already exists
         // Get all recurring deadlines once for efficient checking
         const existingDeadlines = await (prisma as any).deadline.findMany({
@@ -688,18 +703,18 @@ export async function POST(request: NextRequest) {
             amount: true,
           },
         });
-        
+
         const checkExistingDeadline = (title: string, amount: number): boolean => {
           try {
             const titleLower = title.substring(0, 50).toLowerCase().trim();
             const minAmount = amount * 0.95;
             const maxAmount = amount * 1.05;
-            
+
             // Check if any existing deadline matches (title and amount within tolerance)
             for (const existing of existingDeadlines) {
               const existingTitle = (existing.title || '').toLowerCase().trim();
               const existingAmount = Number(existing.amount || 0);
-              
+
               // Check if amount is within 5% tolerance
               if (existingAmount >= minAmount && existingAmount <= maxAmount) {
                 // Check if title matches (case-insensitive, partial match)
@@ -713,20 +728,20 @@ export async function POST(request: NextRequest) {
             return false;
           }
         };
-        
+
         // Create deadlines for detected patterns
         for (const pattern of autoPayPatterns) {
           if (pattern.confidence >= 0.8) {
             try {
               // Check if deadline already exists (synchronous check using pre-fetched deadlines)
               const exists = checkExistingDeadline(pattern.title, pattern.amount);
-              
+
               if (!exists) {
                 const nextDueDate = calculateNextDueDate(pattern.lastTransactionDate, pattern.frequency);
-                
+
                 // Round amount to 2 decimal places to avoid precision issues
                 const roundedAmount = Math.round(pattern.amount * 100) / 100;
-                
+
                 await (prisma as any).deadline.create({
                   data: {
                     title: pattern.title,
@@ -742,7 +757,7 @@ export async function POST(request: NextRequest) {
                     notes: `Auto-detected from transaction history (${pattern.occurrenceCount} occurrences, confidence: ${(pattern.confidence * 100).toFixed(0)}%)`,
                   },
                 });
-                
+
                 deadlinesCreated++;
                 console.log(`✅ Created deadline: ${pattern.title} - ₹${roundedAmount.toFixed(2)} (${pattern.frequency})`);
               } else {
@@ -754,7 +769,7 @@ export async function POST(request: NextRequest) {
             }
           }
         }
-        
+
         if (deadlinesCreated > 0) {
           console.log(`✅ Created ${deadlinesCreated} deadlines from auto-pay patterns`);
         }
@@ -788,7 +803,7 @@ export async function POST(request: NextRequest) {
       seen.add(key);
       return true;
     });
-    
+
     // Log deduplication statistics
     const duplicateCount = normalized.length - unique.length - invalidDateCount;
     if (duplicateCount > 0 || invalidDateCount > 0) {
@@ -816,18 +831,21 @@ export async function POST(request: NextRequest) {
     // Check for existing transactions (skip if forceInsert is true)
     const range = rangeFor(unique);
     let existing: any[] = [];
-    let existingSet = new Set<string>();
-    
+    // Define sets at higher scope
+    const existingIds = new Set<string>();
+    const existingCompositeKeys = new Set<string>();
+    const existingBuckets = new Map<string, Array<{ description: string, id: string, transactionId: string }>>();
+
     if (!forceInsert) {
       try {
         // Check if transaction table exists
         await (prisma as any).$queryRaw`SELECT 1 FROM transactions LIMIT 1`;
-        
+
         // First, check if DB is actually empty (quick count check)
         const totalCount = await (prisma as any).transaction.count({
           where: { userId, isDeleted: false },
         });
-        
+
         if (totalCount === 0) {
           console.log('✅ Database is empty for this user, skipping duplicate check');
         } else {
@@ -837,44 +855,57 @@ export async function POST(request: NextRequest) {
             gte: new Date(range.min.getTime() - 30 * 24 * 60 * 60 * 1000), // 30 days before
             lte: new Date(range.max.getTime() + 30 * 24 * 60 * 60 * 1000), // 30 days after
           } : undefined;
-          
+
           existing = await (prisma as any).transaction.findMany({
             where: {
               userId,
               isDeleted: false,
               ...(expandedRange ? { transactionDate: expandedRange } : {}),
             },
-            select: { 
-              id: true, 
-              description: true, 
-              creditAmount: true, 
-              debitAmount: true, 
+            select: {
+              id: true,
+              description: true,
+              creditAmount: true,
+              debitAmount: true,
               transactionDate: true,
               transactionId: true,
               accountNumber: true,
             },
           });
-          
-          console.log(`🔍 Found ${existing.length} existing transactions in date range for deduplication (total in DB: ${totalCount})`);
-          
-          // Build deduplication key for existing records
-          // Improved key: includes transactionId and accountNumber if available for better accuracy
-          existingSet = new Set(
-            existing.map((e: any) => {
-              try {
-                const date = new Date(e.transactionDate);
-                if (isNaN(date.getTime())) return null;
-                const desc = (e.description || '').substring(0, 50); // Match MySQL index prefix
-                const txnId = (e.transactionId || '').trim();
-                const accNum = (e.accountNumber || '').trim();
-                // Include transactionId and accountNumber if available for more accurate matching
-                const key = `${userId}|${desc}|${Number(e.creditAmount)}|${Number(e.debitAmount)}|${date.toISOString().slice(0,10)}|${txnId}|${accNum}|${e.isDeleted || false}`;
-                return key;
-              } catch {
-                return null;
+
+
+          // Build deduplication index: Map<Key, Array<{description: string, id: string}>>
+          // Key = "Date|Credit|Debit"
+          // const existingIds = new Set<string>(); // Already defined at higher scope
+
+          existing.forEach((e: any) => {
+            // 1. Transaction ID Set
+            if (e.transactionId && e.transactionId.trim().length > 0) {
+              existingIds.add(e.transactionId.trim());
+            }
+
+            // 2. Date+Amount Bucket
+            try {
+              const date = new Date(e.transactionDate);
+              if (!isNaN(date.getTime())) {
+                const credit = Number(e.creditAmount).toFixed(2);
+                const debit = Number(e.debitAmount).toFixed(2);
+                const dateStr = date.toISOString().slice(0, 10);
+
+                const bucketKey = `${dateStr}|${credit}|${debit}`;
+                if (!existingBuckets.has(bucketKey)) {
+                  existingBuckets.set(bucketKey, []);
+                }
+                existingBuckets.get(bucketKey)?.push({
+                  description: (e.description || '').toLowerCase(),
+                  id: e.id,
+                  transactionId: e.transactionId
+                });
               }
-            }).filter((k: string | null): k is string => k !== null)
-          );
+            } catch { }
+          });
+
+          console.log(`🔍 Built deduplication index: ${existingIds.size} IDs, ${existingBuckets.size} date-amount buckets`);
         }
       } catch (error: any) {
         // Transaction table doesn't exist yet, skip deduplication
@@ -884,46 +915,93 @@ export async function POST(request: NextRequest) {
     } else {
       console.log('⚡ Force insert mode: Skipping duplicate check');
     }
-    
+
+    // Helper for fuzzy string matching (Levenshtein-like or simple token overlap)
+    const areDescriptionsSimilar = (desc1: string, desc2: string): boolean => {
+      if (desc1 === desc2) return true;
+
+      // Normalize: remove special chars, extra spaces
+      const norm1 = desc1.replace(/[^a-z0-9]/g, '');
+      const norm2 = desc2.replace(/[^a-z0-9]/g, '');
+
+      if (norm1 === norm2) return true;
+      if (norm1.includes(norm2) || norm2.includes(norm1)) return true;
+
+      // If one is very short, require exact match
+      if (norm1.length < 5 || norm2.length < 5) return false;
+
+      // Simple variation check: allow 20% difference in length
+      const lenDiff = Math.abs(norm1.length - norm2.length);
+      if (lenDiff > Math.max(norm1.length, norm2.length) * 0.3) return false;
+
+      // Count matching characters (approximate)
+      let matches = 0;
+      const minLen = Math.min(norm1.length, norm2.length);
+      for (let i = 0; i < minLen; i++) {
+        if (norm1[i] === norm2[i]) matches++;
+      }
+
+      // If > 70% match from start
+      if (matches / minLen > 0.7) return true;
+
+      return false;
+    };
+
     // Filter out duplicates before insertion (in-memory check)
     // Note: This helps but database constraint is the ultimate protection against race conditions
     const toInsert = unique.filter(r => {
       if (!r.transactionDate || isNaN(r.transactionDate.getTime())) return false;
-      
+
       if (forceInsert) {
         // Force insert mode: skip duplicate check
         return true;
       }
-      
+
       try {
-        const desc = (r.description || '').substring(0, 50);
-        const txnId = (r.transactionId || '').trim();
-        const accNum = (r.accountNumber || '').trim();
-        // Improved key: includes transactionId and accountNumber if available
-        const key = `${userId}|${desc}|${r.creditAmount}|${r.debitAmount}|${r.transactionDate.toISOString().slice(0,10)}|${txnId}|${accNum}|false`;
-        
-        const isDuplicate = existingSet.has(key);
-        if (isDuplicate) {
-          console.log(`🔍 Duplicate detected: ${desc.substring(0, 30)}... (${r.transactionDate.toISOString().slice(0,10)}, ${r.creditAmount > 0 ? `+${r.creditAmount}` : `-${r.debitAmount}`})`);
+        // Check 1: Transaction ID (Exact Match)
+        if (r.transactionId && r.transactionId.trim().length > 0) {
+          if (existingIds.has(r.transactionId.trim())) {
+            console.log(`🔍 Duplicate detected by ID: ${r.transactionId}`);
+            return false;
+          }
         }
-        return !isDuplicate;
+
+        // Check 2: Fuzzy Date+Amount+Description
+        const credit = Number(r.creditAmount).toFixed(2);
+        const debit = Number(r.debitAmount).toFixed(2);
+        const dateStr = r.transactionDate.toISOString().slice(0, 10);
+        const bucketKey = `${dateStr}|${credit}|${debit}`;
+
+        const candidates = existingBuckets.get(bucketKey);
+
+        if (candidates) {
+          const currentDesc = (r.description || '').toLowerCase();
+          for (const candidate of candidates) {
+            if (areDescriptionsSimilar(currentDesc, candidate.description)) {
+              console.log(`🔍 Duplicate detected by content: "${r.description?.substring(0, 20)}..." matches existing "${candidate.description.substring(0, 20)}..."`);
+              return false;
+            }
+          }
+        }
+
+        return true;
       } catch {
         return false;
       }
     });
-    
+
     const existingDuplicates = unique.length - toInsert.length;
     duplicates += existingDuplicates;
-    
+
     console.log(`📊 Import summary: ${records.length} total records → ${normalized.length} normalized → ${unique.length} unique → ${toInsert.length} to insert`);
     console.log(`📊 Breakdown: ${records.length - normalized.length} filtered during normalization, ${normalized.length - unique.length} duplicates/invalid in file, ${existingDuplicates} existing in DB`);
-    
+
     // If significant number of records lost, log warning
     const totalLost = records.length - toInsert.length;
     if (totalLost > 0 && totalLost > records.length * 0.1) {
       console.warn(`⚠️ WARNING: ${totalLost} out of ${records.length} records were not inserted (${Math.round(totalLost / records.length * 100)}%)`);
     }
-    
+
     if (toInsert.length) {
       // Check if Transaction table exists before inserting
       try {
@@ -937,7 +1015,7 @@ export async function POST(request: NextRequest) {
           fallback: true
         }, { status: 400 });
       }
-      
+
       // Optimize batch size based on total count
       // Larger batches = fewer round trips = faster imports
       const batchSize = toInsert.length > 5000 ? 2000 : toInsert.length > 1000 ? 1000 : 500;
@@ -945,12 +1023,12 @@ export async function POST(request: NextRequest) {
       for (let i = 0; i < toInsert.length; i += batchSize) {
         chunks.push(toInsert.slice(i, i + batchSize));
       }
-      
+
       console.log(`📦 Processing ${toInsert.length} transactions in ${chunks.length} batches of ${batchSize}`);
-      
+
       // Process batches with controlled parallelism for optimal performance
       const CONCURRENT_BATCHES = 5; // Process 5 batches in parallel (optimized for MySQL)
-      
+
       const processBatch = async (chunk: typeof toInsert, batchNum: number): Promise<{ inserted: number; credit: number; debit: number }> => {
         try {
           // Use raw SQL INSERT IGNORE for maximum performance (fastest method)
@@ -984,17 +1062,17 @@ export async function POST(request: NextRequest) {
             const hasZeroAmount = (r as any).hasZeroAmount ? 1 : 0;
             const parsingMethod = (r as any).parsingMethod ? `'${String((r as any).parsingMethod).replace(/'/g, "''")}'` : 'NULL';
             const parsingConfidence = (r as any).parsingConfidence !== null && (r as any).parsingConfidence !== undefined ? Number((r as any).parsingConfidence) : 'NULL';
-            
+
             return `(${id},'${userId}',${date},'${desc}',${credit},${debit},'${r.financialCategory}',${categoryId},${accountStatementId},${bankCode},${transactionId},${accountNumber},${transferType},${personName},${upiId},${branch},${store},${rawData},${balance},${notes},${receiptUrl},0,${isPartialData},${hasInvalidDate},${hasZeroAmount},${parsingMethod},${parsingConfidence},'${now}','${now}',${documentId})`;
           }).join(',');
-          
+
           // Execute raw SQL INSERT IGNORE (fastest method, handles duplicates automatically)
           await (prisma as any).$executeRawUnsafe(`
             INSERT IGNORE INTO transactions 
             (id, userId, transactionDate, description, creditAmount, debitAmount, financialCategory, categoryId, accountStatementId, bankCode, transactionId, accountNumber, transferType, personName, upiId, branch, store, rawData, balance, notes, receiptUrl, isDeleted, isPartialData, hasInvalidDate, hasZeroAmount, parsingMethod, parsingConfidence, createdAt, updatedAt, documentId)
             VALUES ${values}
           `);
-          
+
           // Count credits and debits
           let batchCredit = 0;
           let batchDebit = 0;
@@ -1002,7 +1080,7 @@ export async function POST(request: NextRequest) {
             if (r.creditAmount > 0) batchCredit++;
             if (r.debitAmount > 0) batchDebit++;
           }
-          
+
           return {
             inserted: chunk.length, // INSERT IGNORE handles duplicates, so we count attempted
             credit: batchCredit,
@@ -1041,19 +1119,19 @@ export async function POST(request: NextRequest) {
               parsingMethod: (r as any).parsingMethod || null,
               parsingConfidence: (r as any).parsingConfidence || null,
             }));
-            
+
             const result = await (prisma as any).transaction.createMany({
               data,
               skipDuplicates: true,
             });
-            
+
             let batchCredit = 0;
             let batchDebit = 0;
             for (const r of chunk) {
               if (r.creditAmount > 0) batchCredit++;
               if (r.debitAmount > 0) batchDebit++;
             }
-            
+
             return {
               inserted: result.count,
               credit: batchCredit,
@@ -1065,35 +1143,35 @@ export async function POST(request: NextRequest) {
           }
         }
       };
-      
+
       // Process batches in parallel with concurrency control
       const processBatchesInParallel = async () => {
         const results: Array<{ inserted: number; credit: number; debit: number }> = [];
-        
+
         for (let i = 0; i < chunks.length; i += CONCURRENT_BATCHES) {
           const batchGroup = chunks.slice(i, i + CONCURRENT_BATCHES);
-          const batchPromises = batchGroup.map((chunk, idx) => 
+          const batchPromises = batchGroup.map((chunk, idx) =>
             processBatch(chunk, i + idx + 1)
           );
-          
+
           const batchResults = await Promise.all(batchPromises);
           results.push(...batchResults);
-          
+
           // Aggregate results
           for (const result of batchResults) {
             inserted += result.inserted;
             creditInserted += result.credit;
             debitInserted += result.debit;
           }
-          
+
           console.log(`✅ Processed batches ${i + 1}-${Math.min(i + CONCURRENT_BATCHES, chunks.length)}/${chunks.length}`);
         }
-        
+
         return results;
       };
-      
+
       await processBatchesInParallel();
-      
+
       // Note: Duplicates are handled by INSERT IGNORE, so we can't count them accurately from DB
       // But we already counted existingDuplicates from the in-memory check above
       // The actual DB duplicates (from INSERT IGNORE) would be: toInsert.length - inserted
@@ -1129,34 +1207,34 @@ export async function POST(request: NextRequest) {
       ipAddress: meta.ipAddress,
       userAgent: meta.userAgent,
     });
- 
+
     // If background categorization is enabled, fetch inserted transaction IDs and trigger background job
     let backgroundJobStarted = false;
     let insertedTransactionIds: string[] = [];
-    
+
     // Re-evaluate shouldUseBackground based on actual inserted count (not just normalized length)
     // This ensures we trigger background categorization even if some transactions were filtered
     // Check if we determined shouldUseBackground earlier (for immediate categorization skip)
-    const earlierShouldUseBackground = categorizeInBackground || 
-                                      (normalized.length > 100 && useAICategorization) ||
-                                      (normalized.length > 50 && useAICategorization);
-    
-    const finalShouldUseBackground = categorizeInBackground || 
-                                     (inserted > 100 && useAICategorization) ||
-                                     (inserted > 50 && useAICategorization && normalized.length > 50) ||
-                                     earlierShouldUseBackground; // Use the earlier determination as fallback
-    
+    const earlierShouldUseBackground = categorizeInBackground ||
+      (normalized.length > 100 && useAICategorization) ||
+      (normalized.length > 50 && useAICategorization);
+
+    const finalShouldUseBackground = categorizeInBackground ||
+      (inserted > 100 && useAICategorization) ||
+      (inserted > 50 && useAICategorization && normalized.length > 50) ||
+      earlierShouldUseBackground; // Use the earlier determination as fallback
+
     console.log(`🔍 Background categorization check: categorizeInBackground=${categorizeInBackground}, inserted=${inserted}, useAICategorization=${useAICategorization}, earlierShouldUseBackground=${earlierShouldUseBackground}, finalShouldUseBackground=${finalShouldUseBackground}`);
-    
+
     // Use the final shouldUseBackground flag, but also check if we actually inserted transactions
     if (finalShouldUseBackground && inserted > 0) {
       try {
         console.log(`🔍 Fetching transaction IDs for background categorization...`);
-        
+
         // Fetch the IDs of recently inserted transactions
         // Use a wider time window (5 minutes) and account statement ID if available
         const timeWindow = new Date(Date.now() - 300000); // 5 minutes ago
-        
+
         let recentTransactions = await prisma.transaction.findMany({
           where: {
             userId,
@@ -1170,7 +1248,7 @@ export async function POST(request: NextRequest) {
           take: inserted * 2, // Get more than expected to account for timing
           orderBy: { createdAt: 'desc' },
         });
-        
+
         // If account statement ID was used but no results, try without it
         if (recentTransactions.length === 0 && accountStatement?.id) {
           console.log(`⚠️ No transactions found with accountStatementId, trying without it...`);
@@ -1187,56 +1265,29 @@ export async function POST(request: NextRequest) {
             orderBy: { createdAt: 'desc' },
           });
         }
-        
+
         insertedTransactionIds = recentTransactions.map(t => t.id);
-        
+
         console.log(`📊 Found ${insertedTransactionIds.length} transaction IDs (expected: ${inserted})`);
-        
+
         if (insertedTransactionIds.length > 0) {
-          // Trigger background categorization (fire and forget)
-          // For server-side calls, we need to pass the auth token
-          const baseUrl = process.env.VERCEL_URL 
-            ? `https://${process.env.VERCEL_URL}` 
-            : process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-          
-          // Get auth token from the original request to pass to background job
-          const authToken = request.cookies.get('auth-token');
-          const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-          
-          if (authToken) {
-            headers['Cookie'] = `auth-token=${authToken.value}`;
-          }
-          
-          console.log(`🚀 Starting background categorization for ${insertedTransactionIds.length} transactions via ${baseUrl}...`);
-          
-          fetch(`${baseUrl}/api/transactions/categorize`, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify({
-              userId,
-              transactionIds: insertedTransactionIds,
-              background: true,
-              batchSize: 100,
-            }),
-          })
-          .then(async (response) => {
-            if (response.ok) {
-              const result = await response.json().catch(() => ({}));
-              console.log(`✅ Background categorization job started successfully:`, result);
-              backgroundJobStarted = true;
-            } else {
-              const errorText = await response.text().catch(() => 'Unknown error');
-              console.error(`❌ Background categorization failed: ${response.status} ${response.statusText} - ${errorText}`);
-            }
-          })
-          .catch((error) => {
-            console.error('❌ Failed to trigger background categorization:', error);
-            // Fallback: If background categorization fails and we have transactions, try immediate categorization
-            if (inserted > 0 && inserted <= 200 && useAICategorization && !categorizeInBackground) {
-              console.log(`🔄 Background categorization failed, attempting immediate categorization as fallback...`);
-              // This will be handled by the existing immediate categorization logic below
-            }
+          // Trigger background categorization (direct function call to avoid Auth/Timeout issues)
+          console.log(`🚀 Starting background categorization for ${insertedTransactionIds.length} transactions via internal service...`);
+
+          // Fire and forget - don't await to avoid blocking response
+          // In production serverless (Vercel), this promise might be killed if function returns early.
+          // For robust background jobs, use Inngest/TaskQueue, but for now this fixes the 401 loopback issue.
+          import('@/lib/multi-pass-categorization').then(({ multiPassCategorization }) => {
+            multiPassCategorization(userId, insertedTransactionIds)
+              .then(result => {
+                console.log(`✅ Background categorization complete: ${result.categorized} categorized`);
+              })
+              .catch(error => {
+                console.error('❌ Background categorization failed:', error);
+              });
           });
+
+          backgroundJobStarted = true;
         } else {
           console.warn(`⚠️ No transaction IDs found for background categorization (inserted: ${inserted}, timeWindow: ${timeWindow.toISOString()})`);
           // Fallback: If we can't find transaction IDs but have inserted transactions, try immediate categorization
@@ -1263,9 +1314,9 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ 
-      inserted, 
-      skipped: unique.length - inserted, 
+    return NextResponse.json({
+      inserted,
+      skipped: unique.length - inserted,
       duplicates,
       creditInserted,
       debitInserted,
@@ -1301,12 +1352,12 @@ export async function POST(request: NextRequest) {
         },
       } : {})
     });
-    
+
   } catch (error: any) {
     console.error('❌ IMPORT BANK STATEMENT ERROR:', error);
     console.error('❌ ERROR STACK:', error?.stack);
     const errorMessage = error?.message || 'Failed to import bank statements';
-    return NextResponse.json({ 
+    return NextResponse.json({
       error: errorMessage,
       details: process.env.NODE_ENV === 'development' ? error?.stack : undefined
     }, { status: 500 });
@@ -1319,13 +1370,13 @@ function formatNotes(record: any): string {
   if (record.commodity) {
     return record.commodity;
   }
-  
+
   // Fallback: if no commodity, save a meaningful part of description
   if (record.description) {
     // Extract meaningful note from description if available
     return record.description;
   }
-  
+
   return '';
 }
 

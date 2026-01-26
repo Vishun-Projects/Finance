@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { FinancialEducation } from '../../../lib/financial-education';
 
 export async function GET(request: NextRequest) {
   try {
@@ -60,7 +59,6 @@ export async function GET(request: NextRequest) {
           urgency: 'medium'
         }
       ],
-      dailyTip: FinancialEducation.getTipOfTheDay(),
       spendingPatterns: {
         totalTransactions: 25,
         averageTransaction: 1800,
@@ -129,7 +127,7 @@ export async function GET(request: NextRequest) {
         }
       ]
     };
-    
+
     return NextResponse.json(fallbackData);
   } catch (error) {
     console.error('Error in fallback API:', error);

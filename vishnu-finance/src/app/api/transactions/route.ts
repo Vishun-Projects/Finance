@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
   try {
     // Get auth token from cookies
     const authToken = request.cookies.get('auth-token');
-    
+
     if (!authToken) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -37,14 +37,14 @@ export async function GET(request: NextRequest) {
 
     // Parse query parameters
     const searchParams = request.nextUrl.searchParams;
-    
+
     // Pagination
     const page = parseInt(searchParams.get('page') || '1');
     const pageSizeParam = searchParams.get('pageSize');
     // Allow larger page sizes for "all time" queries, but cap at 5000 for safety
     const pageSize = pageSizeParam === 'all' ? 5000 : Math.min(parseInt(pageSizeParam || '50'), 5000);
     const skip = (page - 1) * pageSize;
-    
+
     // Check if we need totals (for summary cards)
     const includeTotals = searchParams.get('includeTotals') === 'true';
 
@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
     const entityType = searchParams.get('entityType') as 'STORE' | 'PERSON' | null;
     const searchTerm = searchParams.get('search');
     const includeDeleted = searchParams.get('includeDeleted') === 'true';
-    
+
     // Sorting
     const sortField = searchParams.get('sortField') || 'transactionDate';
     const sortDirectionParam = searchParams.get('sortDirection');
@@ -101,14 +101,18 @@ export async function GET(request: NextRequest) {
 
     // Date range filter
     if (startDate || endDate) {
-      where.transactionDate = {};
-      if (startDate) {
-        where.transactionDate.gte = new Date(startDate);
-      }
-      if (endDate) {
-        const end = new Date(endDate);
-        end.setHours(23, 59, 59, 999);
-        where.transactionDate.lte = end;
+      const start = startDate ? new Date(startDate) : null;
+      const end = endDate ? new Date(endDate) : null;
+      const isValidStart = start && !isNaN(start.getTime());
+      const isValidEnd = end && !isNaN(end.getTime());
+
+      if (isValidStart || isValidEnd) {
+        where.transactionDate = {};
+        if (isValidStart) where.transactionDate.gte = start;
+        if (isValidEnd) {
+          end!.setHours(23, 59, 59, 999);
+          where.transactionDate.lte = end;
+        }
       }
     }
 
@@ -133,24 +137,40 @@ export async function GET(request: NextRequest) {
     }
 
     // Amount filters (will be applied in-memory after fetching for amount presets)
-    if (minAmount !== null && !amountPreset) {
-      where.OR = [
-        { creditAmount: { gte: minAmount } },
-        { debitAmount: { gte: minAmount } }
-      ];
-    }
-    if (maxAmount !== null && !amountPreset) {
-      if (!where.OR) {
-        where.OR = [];
+    if ((minAmount !== null || maxAmount !== null) && !amountPreset) {
+      const amountConditions = [];
+      if (minAmount !== null) amountConditions.push({ creditAmount: { gte: minAmount } }, { debitAmount: { gte: minAmount } });
+      if (maxAmount !== null) amountConditions.push({ creditAmount: { lte: maxAmount } }, { debitAmount: { lte: maxAmount } });
+
+      if (amountConditions.length > 0) {
+        where.OR = amountConditions;
       }
-      where.OR.push(
-        { creditAmount: { lte: maxAmount } },
-        { debitAmount: { lte: maxAmount } }
-      );
     }
 
-    // Search term filter (will be applied in-memory after fetching)
+    // Search term filter (now applied at DB level for full pagination support)
     const hasSearchTerm = searchTerm && searchTerm.trim().length > 0;
+    if (hasSearchTerm) {
+      const searchOR = [
+        { description: { contains: searchTerm, mode: 'insensitive' } },
+        { store: { contains: searchTerm, mode: 'insensitive' } },
+        { personName: { contains: searchTerm, mode: 'insensitive' } },
+        { upiId: { contains: searchTerm, mode: 'insensitive' } },
+        { notes: { contains: searchTerm, mode: 'insensitive' } },
+        { category: { name: { contains: searchTerm, mode: 'insensitive' } } },
+      ];
+
+      if (where.OR) {
+        // Combine existing amount filters with search filters
+        const existingOR = where.OR;
+        delete where.OR;
+        where.AND = [
+          { OR: existingOR },
+          { OR: searchOR }
+        ];
+      } else {
+        where.OR = searchOR;
+      }
+    }
 
     // Build orderBy
     const validSortFields: Record<string, string> = {
@@ -160,7 +180,7 @@ export async function GET(request: NextRequest) {
       description: 'description',
       category: 'category',
     };
-    
+
     const dbSortField = validSortFields[sortField] || 'transactionDate';
     const orderBy: Record<string, 'asc' | 'desc'> = { [dbSortField]: sortDirection };
 
@@ -254,29 +274,19 @@ export async function GET(request: NextRequest) {
 
     // Category name filter
     if (categoryName) {
-      filteredTransactions = filteredTransactions.filter((t: any) => 
+      filteredTransactions = filteredTransactions.filter((t: any) =>
         t.category?.name === categoryName
       );
     }
 
-    // Search term filter
-    if (hasSearchTerm) {
-      const searchLower = searchTerm!.toLowerCase();
-      filteredTransactions = filteredTransactions.filter((t: any) => {
-        const matchesDescription = t.description?.toLowerCase().includes(searchLower);
-        const matchesStore = t.store?.toLowerCase().includes(searchLower);
-        const matchesPerson = t.personName?.toLowerCase().includes(searchLower);
-        const matchesUpi = t.upiId?.toLowerCase().includes(searchLower);
-        return matchesDescription || matchesStore || matchesPerson || matchesUpi;
-      });
-    }
+    // Note: Search term is now handled at DB level
 
     // Apply entity mappings (batch processing for performance)
     if (filteredTransactions.length > 0) {
       try {
         const personNames = new Set<string>();
         const storeNames = new Set<string>();
-        
+
         filteredTransactions.forEach((t: any) => {
           if (t.personName) personNames.add(t.personName);
           if (t.store) storeNames.add(t.store);
@@ -337,16 +347,16 @@ export async function GET(request: NextRequest) {
       updatedAt: t.updatedAt,
       document: t.document
         ? {
-            id: t.document.id,
-            originalName: t.document.originalName,
-            isDeleted: t.document.isDeleted,
-            deletedAt: t.document.deletedAt,
-            mimeType: t.document.mimeType,
-            fileSize: t.document.fileSize,
-            visibility: t.document.visibility,
-            sourceType: t.document.sourceType,
-            bankCode: t.document.bankCode,
-          }
+          id: t.document.id,
+          originalName: t.document.originalName,
+          isDeleted: t.document.isDeleted,
+          deletedAt: t.document.deletedAt,
+          mimeType: t.document.mimeType,
+          fileSize: t.document.fileSize,
+          visibility: t.document.visibility,
+          sourceType: t.document.sourceType,
+          bankCode: t.document.bankCode,
+        }
         : null,
     }));
 
@@ -388,7 +398,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const authToken = request.cookies.get('auth-token');
-    
+
     if (!authToken) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

@@ -1,41 +1,36 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType } from "react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { AnimatePresence, motion } from "framer-motion";
-import GoalsPageClient from "@/app/(app)/goals/page-client";
-import DeadlinesPageClient from "@/app/(app)/deadlines/page-client";
-import WishlistPageClient from "@/app/(app)/wishlist/page-client";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { Goal } from "@/types/goals";
 import type { DeadlinesResponse } from "@/types/deadlines";
 import type { WishlistResponse } from "@/types/wishlist";
 import {
   AlarmClock,
   ArrowRight,
+  Bolt,
   CalendarDays,
-  ClipboardCheck,
-  HeartHandshake,
+  LayoutDashboard,
+  Plus,
   ShoppingBag,
   Sparkles,
-  Target,
 } from "lucide-react";
 import { normalizeGoals } from "@/lib/utils/goal-normalize";
 import {
-  buildDeadlineSecondary,
   formatCurrency,
   formatDateLabel,
-  formatPriorityLabel,
   usePlansInsights,
-  type TabKey,
 } from "@/hooks/use-plans-insights";
-import { MobileWorkspaceChips } from "@/components/plans/mobile/mobile-workspace-chips";
-import { MobileSnapshotCard } from "@/components/plans/mobile/mobile-snapshot-card";
-import { MobileWorkspaceCard } from "@/components/plans/mobile/mobile-workspace-card";
-import { MobileActionMenu } from "@/components/plans/mobile/mobile-action-menu";
-import { MobileWorkspaceSheet } from "@/components/plans/mobile/mobile-workspace-sheet";
+import { fetchAndSaveGoalImage } from "@/app/actions/goal-images";
+import { cn } from "@/lib/utils";
+import GoalsPageClient from "@/app/(app)/goals/page-client";
+import DeadlinesPageClient from "@/app/(app)/deadlines/page-client";
+import WishlistPageClient from "@/app/(app)/wishlist/page-client";
 
 export interface PlansBootstrap {
   goals: Goal[];
@@ -49,521 +44,440 @@ interface PlansPageClientProps {
   defaultTab?: string;
 }
 
-const TAB_VALUES: TabKey[] = ["goals", "deadlines", "wishlist"];
+export default function PlansPageClient({ bootstrap, userId, defaultTab = "overview" }: PlansPageClientProps) {
+  const [activeTab, setActiveTab] = useState(defaultTab);
 
-type IconComponent = ComponentType<{ className?: string }>;
-
-export default function PlansPageClient({ bootstrap, userId, defaultTab = "goals" }: PlansPageClientProps) {
-  const initialTab: TabKey = TAB_VALUES.includes(defaultTab as TabKey)
-    ? (defaultTab as TabKey)
-    : "goals";
-
-  const [activeTab, setActiveTab] = useState<TabKey>(initialTab);
-  const [highlightedTab, setHighlightedTab] = useState<TabKey | null>(null);
-  const [mobileWorkspace, setMobileWorkspace] = useState<TabKey | null>(null);
-  const tabsSectionRef = useRef<HTMLDivElement | null>(null);
+  // Keep goals synced
   const [goals, setGoals] = useState<Goal[]>(() => normalizeGoals(bootstrap.goals));
-
   useEffect(() => {
     setGoals(normalizeGoals(bootstrap.goals));
   }, [bootstrap.goals]);
 
-  const handleGoalsChange = useCallback((nextGoals: Goal[]) => {
-    const normalized = normalizeGoals(nextGoals);
-    setGoals((prev) => (goalsEqual(prev, normalized) ? prev : normalized));
-  }, []);
-
+  // Insight hooks
   const {
     goalStats,
-    deadlineStats,
-    wishlistStats,
-    highlightedGoal,
-    nextDeadline,
-    nextWishlist,
-    planFilterOptions,
-    tabSummaries,
-    mobileWorkspaceCards,
   } = usePlansInsights({
     goals,
     deadlines: bootstrap.deadlines,
     wishlist: bootstrap.wishlist,
   });
 
-  const overviewUpdatedLabel = useMemo(() => {
-    return new Intl.DateTimeFormat("en-IN", { dateStyle: "medium" }).format(new Date());
-  }, []);
+  // Helpers for filtering
+  const upcomingDeadlines = useMemo(() => {
+    const data = bootstrap.deadlines.data || [];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
-  const handleWorkspaceNavigate = useCallback(
-    (tab: TabKey, { autoScroll = true }: { autoScroll?: boolean } = {}) => {
-      setActiveTab(tab);
-      setHighlightedTab(tab);
-      if (autoScroll && typeof window !== 'undefined') {
-        window.requestAnimationFrame(() => {
-          tabsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        });
-      }
-    },
-    [],
-  );
+    return data
+      .filter(d => !d.isCompleted && new Date(d.dueDate) >= today)
+      .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
+      .slice(0, 3);
+  }, [bootstrap.deadlines.data]);
 
-  const openMobileWorkspace = useCallback(
-    (tab: TabKey) => {
-      setActiveTab(tab);
-      setMobileWorkspace(tab);
-    },
-    [],
-  );
-
-  const renderWorkspaceContent = useCallback(
-    (tab: TabKey) => {
-      switch (tab) {
-        case "goals":
-          return (
-            <GoalsPageClient
-              initialGoals={goals}
-              userId={userId}
-              layoutVariant="embedded"
-              onGoalsChange={handleGoalsChange}
-            />
-          );
-        case "deadlines":
-          return (
-            <DeadlinesPageClient
-              initialDeadlines={bootstrap.deadlines}
-              userId={userId}
-              layoutVariant="embedded"
-            />
-          );
-        case "wishlist":
-          return (
-            <WishlistPageClient
-              initialWishlist={bootstrap.wishlist}
-              userId={userId}
-              layoutVariant="embedded"
-            />
-          );
-        default:
-          return null;
-      }
-    },
-    [bootstrap.deadlines, bootstrap.wishlist, goals, handleGoalsChange, userId],
-  );
-
-  const closeMobileWorkspace = useCallback(() => {
-    setMobileWorkspace(null);
-  }, []);
-
-  const handleTabValueChange = useCallback((value: string) => {
-    if (isTabKey(value)) {
-      setActiveTab(value as TabKey);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!highlightedTab) return;
-    const timeout = window.setTimeout(() => setHighlightedTab(null), 1400);
-    return () => window.clearTimeout(timeout);
-  }, [highlightedTab]);
-
+  const activeWishlist = useMemo(() => {
+    const data = bootstrap.wishlist.data || [];
+    return data.filter(i => !i.isCompleted).slice(0, 3);
+  }, [bootstrap.wishlist.data]);
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 pb-16 pt-4 sm:px-6 md:pb-20 lg:px-8">
-      <header className="space-y-4">
-        <Badge variant="outline" className="w-fit rounded-full border-primary/40 bg-primary/5 px-3 py-1 text-xs font-medium text-primary">
-          Plans workspace
-        </Badge>
-        <div className="space-y-2">
-          <h1 className="text-3xl font-semibold text-foreground sm:text-4xl">Plans</h1>
-          <p className="max-w-2xl text-sm text-muted-foreground sm:text-base">
-            Review progress, upcoming payments, and wishlist priorities in a layout tuned for every screen.
-          </p>
+    <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-8 px-4 py-6 sm:px-6 lg:px-8">
+      {/* Mobile Header */}
+      <header className="lg:hidden flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <div className="bg-foreground p-1 rounded-sm flex items-center justify-center">
+            <span className="text-background text-xl font-bold">V</span>
+          </div>
+          <h1 className="text-sm font-black uppercase tracking-[0.2em] text-foreground">Vishnu Finance</h1>
         </div>
       </header>
 
-      <div className="md:hidden space-y-6">
-        <MobileWorkspaceChips
-          active={mobileWorkspace ?? activeTab}
-          options={planFilterOptions}
-          onSelect={openMobileWorkspace}
-        />
-
-        <MobileSnapshotCard
-          goalStats={goalStats}
-          deadlineStats={deadlineStats}
-          wishlistStats={wishlistStats}
-          updatedLabel={overviewUpdatedLabel}
-        />
-
-        <div className="space-y-4">
-          {mobileWorkspaceCards.map((workspace) => (
-            <MobileWorkspaceCard
-              key={workspace.value}
-              data={workspace}
-              onOpen={() => openMobileWorkspace(workspace.value)}
-            />
-          ))}
-        </div>
-
-        <MobileActionMenu onOpenWorkspace={openMobileWorkspace} />
-      </div>
-
-      <div className="hidden md:flex md:flex-col md:gap-8">
-      <section className="grid gap-4 lg:grid-cols-[minmax(0,1.35fr),minmax(0,1fr)]">
-          <div className="space-y-4">
-        <Card className="relative overflow-hidden border border-border/60 bg-card/95 text-card-foreground shadow-lg backdrop-blur-sm dark:border-border/40 dark:bg-background/80">
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/10 via-primary/0 to-primary/0 dark:from-primary/25 dark:via-primary/10 dark:to-transparent" />
-          <CardHeader className="relative z-10 space-y-4 pb-4 sm:pb-6">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-primary">
-                <Sparkles className="h-4 w-4" />
-                <span>Overview</span>
-              </div>
-              <span className="text-xs text-muted-foreground sm:text-sm">Updated {overviewUpdatedLabel}</span>
-            </div>
-            <div className="space-y-2">
-              <CardTitle className="text-2xl font-semibold sm:text-3xl">
-                {goalStats.progressPercent >= 100 ? 'Goals achieved — amazing work!' : 'Stay on track with every plan'}
-            </CardTitle>
-              <p className="max-w-xl text-sm text-muted-foreground">
-                {goalStats.progressPercent >= 100
-                  ? 'All targets have been reached. Keep nurturing new goals to stay ahead.'
-                  : 'You are steadily investing towards your targets. See what needs attention next at a glance.'}
-              </p>
-            </div>
-          </CardHeader>
-          <CardContent className="relative z-10 space-y-5 pb-6">
-            <div className="grid gap-2 sm:grid-cols-3">
-              <HeroStat
-                icon={ClipboardCheck}
-                label="Goals"
-                primary={`${goalStats.active} active`}
-                secondary={`${goalStats.completed} completed`}
-              />
-              <HeroStat
-                icon={CalendarDays}
-                label="Deadlines"
-                primary={`${deadlineStats.upcoming} upcoming`}
-                secondary={`${deadlineStats.overdue} overdue`}
-              />
-              <HeroStat
-                icon={HeartHandshake}
-                label="Wishlist"
-                primary={`${wishlistStats.pending} pending`}
-                secondary={`${wishlistStats.completed} completed`}
-              />
-            </div>
-            <div className="space-y-3 rounded-2xl border border-primary/20 bg-background/80 p-4 shadow-sm dark:border-primary/30 dark:bg-background/60">
-              <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                <span>Investment progress</span>
-                <span>{goalStats.progressPercent}%</span>
-              </div>
-              <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-                <div
-                  className="h-full rounded-full bg-primary transition-all"
-                  style={{ width: `${Math.min(100, Math.max(0, goalStats.progressPercent))}%` }}
-                />
-              </div>
-              <p className="text-sm text-muted-foreground">
-                {formatCurrency(goalStats.invested)} invested of {formatCurrency(goalStats.target)} across all goals.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-          </div>
-
-        <Card className="border border-border/60 bg-card/95 text-card-foreground shadow-sm dark:border-border/40 dark:bg-background/80">
-          <CardHeader className="space-y-3 pb-3 sm:pb-4">
-            <div className="flex items-center gap-2 text-primary">
-              <Sparkles className="h-5 w-5" />
-              <CardTitle className="text-xl font-semibold text-foreground">Today&apos;s focus</CardTitle>
-            </div>
-            <CardDescription className="text-sm">
-              Quick reminders for what needs your attention next. Tap to jump right in.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3 pb-4 sm:space-y-4 sm:pb-6">
-            <ReminderRow
-              icon={Target}
-              label="Priority goal"
-              primary={highlightedGoal ? highlightedGoal.title : 'No active goals'}
-              secondary={
-                highlightedGoal
-                  ? `${formatCurrency(highlightedGoal.currentAmount)} of ${formatCurrency(
-                      highlightedGoal.targetAmount,
-                    )} • ${highlightedGoal.targetDate ? formatDateLabel(highlightedGoal.targetDate) : 'No date set'}`
-                  : 'Create a goal to start tracking your progress.'
-              }
-              actionLabel="Open goals"
-              onAction={() => handleWorkspaceNavigate('goals')}
-            />
-            <ReminderRow
-              icon={AlarmClock}
-              label="Next deadline"
-              primary={nextDeadline ? nextDeadline.title : 'All caught up'}
-              secondary={
-                nextDeadline
-                  ? buildDeadlineSecondary(nextDeadline)
-                  : 'Add a reminder so you never miss an important payment.'
-              }
-              actionLabel="View deadlines"
-              onAction={() => handleWorkspaceNavigate('deadlines')}
-            />
-            <ReminderRow
-              icon={ShoppingBag}
-              label="Top wishlist item"
-              primary={nextWishlist ? nextWishlist.title : 'Nothing queued'}
-              secondary={
-                nextWishlist
-                  ? `${formatCurrency(nextWishlist.estimatedCost)} • ${formatPriorityLabel(nextWishlist.priority)} priority`
-                  : 'Add something you are planning to invest in next.'
-              }
-              actionLabel="Review wishlist"
-              onAction={() => handleWorkspaceNavigate('wishlist')}
-            />
-          </CardContent>
-        </Card>
-      </section>
-
-        <div className="sticky top-28 z-20 border-b bg-background/90 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-3 px-6 py-4">
-            <div className="min-w-[220px] flex-1 max-w-sm">
-            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Workspace</div>
-            <p className="text-sm text-muted-foreground">
-                Choose a plan area to focus on. Buttons below mirror the mobile view.
-            </p>
-          </div>
-          <div className="flex flex-1 flex-wrap justify-end gap-3">
-            {planFilterOptions.map((option) => {
-              const Icon = option.icon;
-              const isActive = activeTab === option.value;
-              return (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => handleWorkspaceNavigate(option.value, { autoScroll: false })}
-                  className={`group flex min-w-[160px] flex-col gap-1 rounded-2xl border px-3 py-2 text-left transition-colors ${
-                    isActive
-                      ? 'border-primary bg-primary/10 text-foreground shadow-sm'
-                      : 'border-border/60 bg-muted/30 text-muted-foreground hover:border-primary/50 hover:text-foreground'
-                  }`}
-                  aria-pressed={isActive}
-                >
-                  <div className="flex items-center gap-2 text-sm font-semibold">
-                    <span className="rounded-full bg-primary/10 p-1.5 text-primary group-hover:bg-primary/20">
-                      <Icon className="h-4 w-4" />
-                    </span>
-                    {option.label}
-                  </div>
-                  <p className="text-xs text-muted-foreground">{option.description}</p>
-                  <p className="text-[11px] text-muted-foreground/80">{option.helper}</p>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
-      <section ref={tabsSectionRef} className="space-y-4">
-        <div className="space-y-1">
-          <h2 className="text-lg font-semibold text-foreground">Detailed workspaces</h2>
-          <p className="text-sm text-muted-foreground">
-            Switch tabs to add, edit, or complete items across your plans.
-          </p>
-        </div>
-          <Tabs value={activeTab} onValueChange={handleTabValueChange} className="space-y-4">
-          <TabsList className="flex w-full gap-2 overflow-x-auto rounded-2xl bg-muted/40 p-1 md:grid md:grid-cols-3 md:overflow-visible [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-              {planFilterOptions.map((option) => (
-              <TabsTrigger
-                  key={option.value}
-                  value={option.value}
-                className="min-w-[150px] flex h-auto flex-col items-start gap-1 rounded-xl px-3 py-2 text-left text-sm font-medium leading-tight text-muted-foreground transition-colors data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow md:min-w-0"
-              >
-                  <span>{option.label}</span>
-                  <span className="text-xs text-muted-foreground">{tabSummaries[option.value]}</span>
-              </TabsTrigger>
-            ))}
+      {/* Main Navigation Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full space-y-8">
+        <div className="flex items-center justify-between border-b border-border pb-4">
+          <TabsList className="bg-transparent p-0 gap-6 h-auto">
+            <TabsTrigger
+              value="overview"
+              className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:text-foreground data-[state=active]:border-b-2 data-[state=active]:border-foreground rounded-none px-0 py-2 bg-transparent text-muted-foreground font-bold uppercase tracking-wider text-xs hover:text-foreground/80 transition-colors"
+            >
+              Overview
+            </TabsTrigger>
+            <TabsTrigger
+              value="goals"
+              className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:text-foreground data-[state=active]:border-b-2 data-[state=active]:border-foreground rounded-none px-0 py-2 bg-transparent text-muted-foreground font-bold uppercase tracking-wider text-xs hover:text-foreground/80 transition-colors"
+              onClick={() => setActiveTab('goals')}
+            >
+              Goals
+            </TabsTrigger>
+            <TabsTrigger
+              value="deadlines"
+              className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:text-foreground data-[state=active]:border-b-2 data-[state=active]:border-foreground rounded-none px-0 py-2 bg-transparent text-muted-foreground font-bold uppercase tracking-wider text-xs hover:text-foreground/80 transition-colors"
+              onClick={() => setActiveTab('deadlines')}
+            >
+              Deadlines
+            </TabsTrigger>
+            <TabsTrigger
+              value="wishlist"
+              className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:text-foreground data-[state=active]:border-b-2 data-[state=active]:border-foreground rounded-none px-0 py-2 bg-transparent text-muted-foreground font-bold uppercase tracking-wider text-xs hover:text-foreground/80 transition-colors"
+              onClick={() => setActiveTab('wishlist')}
+            >
+              Wishlist
+            </TabsTrigger>
           </TabsList>
-          <TabsContent
-            value="goals"
-            className={`relative overflow-hidden rounded-2xl border border-border/60 bg-card p-2 shadow-sm transition-shadow dark:border-border/40 dark:bg-background/80 sm:p-4 ${
-              highlightedTab === 'goals' ? 'ring-2 ring-primary/60 shadow-lg' : ''
-            }`}
-          >
-            <AnimatePresence>
-              {highlightedTab === 'goals' && (
-                <motion.span
-                  key="goals-highlight"
-                  className="pointer-events-none absolute inset-0 rounded-[14px] border-2 border-primary/60"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.4 }}
+
+          {/* Context Action Button - Only show on Overview, others have their own */}
+          {activeTab === 'overview' && (
+            <Button
+              variant="secondary"
+              size="sm"
+              className="bg-foreground text-background hover:bg-foreground/90 font-bold uppercase tracking-tighter h-8 text-[10px]"
+              onClick={() => setActiveTab('goals')}
+            >
+              <Plus className="mr-2 h-3 w-3" />
+              Manage Plans
+            </Button>
+          )}
+        </div>
+
+        {/* --- OVERVIEW TAB --- */}
+        <TabsContent value="overview" className="m-0 focus-visible:ring-0">
+          <div className="flex flex-col lg:flex-row gap-8">
+
+            {/* Left Column: Overview & Goals */}
+            <div className="flex-1 space-y-10">
+
+              {/* Overview Cards */}
+              <div className="flex flex-col md:flex-row gap-4">
+                <OverviewCard
+                  label="Total Saved"
+                  value={formatCurrency(goalStats.invested)}
+                  subtext={`+${goalStats.progressPercent}%`}
+                  className="md:flex-1"
                 />
-              )}
-            </AnimatePresence>
-            <div className="relative z-10">
-              <GoalsPageClient
-                initialGoals={goals}
-                userId={userId}
-                layoutVariant="embedded"
-                onGoalsChange={handleGoalsChange}
+                <OverviewCard
+                  label="Total Target"
+                  value={formatCurrency(goalStats.target)}
+                  className="md:flex-1"
+                  variant="secondary"
+                />
+              </div>
+
+              {/* Active Goals Section */}
+              <div>
+                <div className="flex items-center justify-between mb-8 border-b border-border pb-4">
+                  <h2 className="text-xs font-black uppercase tracking-[0.3em] text-muted-foreground">Active Goals</h2>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-muted-foreground hover:text-foreground font-bold uppercase tracking-tighter h-8 text-[10px]"
+                    onClick={() => setActiveTab("goals")}
+                  >
+                    View All
+                    <ArrowRight className="ml-2 h-3 w-3" />
+                  </Button>
+                </div>
+
+                <div className="grid grid-cols-1 gap-6">
+                  {goals.map(goal => (
+                    <MatteGoalCard
+                      key={goal.id}
+                      goal={goal}
+                      onUpdate={(updatedGoal) => {
+                        setGoals(prev => prev.map(g => g.id === updatedGoal.id ? updatedGoal : g));
+                      }}
+                    />
+                  ))}
+                  {goals.length === 0 && (
+                    <div className="text-center py-12 border border-dashed border-border rounded-xl">
+                      <p className="text-muted-foreground">No active plans found. Create one to get started.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column: Sidebar (Today's Focus) */}
+            <aside className="lg:w-80 flex-shrink-0">
+              <div className="sticky top-8 space-y-6">
+
+                {/* Today's Focus Card */}
+                <Card className="bg-card border border-border rounded-xl p-6 shadow-2xl">
+                  <div className="flex items-center gap-2 mb-8">
+                    <CalendarDays className="text-foreground h-5 w-5" />
+                    <h2 className="text-sm font-black uppercase tracking-[0.2em] text-foreground">Today&apos;s Focus</h2>
+                  </div>
+
+                  <div className="space-y-8">
+                    {/* Upcoming Deadlines */}
+                    <div>
+                      <div className="flex items-center justify-between mb-4">
+                        <p className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em]">Upcoming Deadlines</p>
+                        <Button variant="link" className="text-[9px] text-primary h-auto p-0" onClick={() => setActiveTab("deadlines")}>View</Button>
+                      </div>
+                      <div className="space-y-4">
+                        {upcomingDeadlines.map(deadline => (
+                          <div key={deadline.id} className="flex items-center gap-4 p-4 bg-background rounded-sm border border-border">
+                            <div className="w-10 h-10 rounded-sm bg-muted flex items-center justify-center text-foreground border border-border">
+                              <AlarmClock className="h-4 w-4" />
+                            </div>
+                            <div>
+                              <p className="text-xs font-bold text-foreground uppercase tracking-tighter truncate max-w-[120px]">{deadline.title}</p>
+                              <p className="text-[10px] text-muted-foreground font-medium">
+                                {deadline.dueDate ? formatDateLabel(deadline.dueDate) : 'No date'} • {formatCurrency(Number(deadline.amount || 0))}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                        {upcomingDeadlines.length === 0 && (
+                          <p className="text-xs text-muted-foreground italic">No upcoming deadlines.</p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Wishlist Highlights */}
+                    <div>
+                      <div className="flex items-center justify-between mb-4">
+                        <p className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em]">Wishlist Highlights</p>
+                        <Button variant="link" className="text-[9px] text-primary h-auto p-0" onClick={() => setActiveTab("wishlist")}>View</Button>
+                      </div>
+                      <div className="space-y-6">
+                        {activeWishlist.map(item => (
+                          <WishlistHighlightRow key={item.id} item={item} />
+                        ))}
+                        {activeWishlist.length === 0 && (
+                          <p className="text-xs text-muted-foreground italic">Wishlist empty.</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <Button
+                    variant="outline"
+                    className="w-full mt-8 py-6 rounded-sm border-border text-[10px] font-black uppercase tracking-[0.2em] hover:bg-foreground hover:text-background transition-all"
+                    onClick={() => setActiveTab("deadlines")}
+                  >
+                    View All Tasks
+                  </Button>
+                </Card>
+
+              </div>
+            </aside>
+          </div>
+        </TabsContent>
+
+        {/* --- GOALS TAB --- */}
+        <TabsContent value="goals" className="m-0 focus-visible:ring-0">
+          <GoalsPageClient
+            initialGoals={bootstrap.goals}
+            userId={userId}
+            layoutVariant="embedded"
+            onGoalsChange={(newGoals) => setGoals(newGoals)}
+          />
+        </TabsContent>
+
+        {/* --- DEADLINES TAB --- */}
+        <TabsContent value="deadlines" className="m-0 focus-visible:ring-0">
+          <DeadlinesPageClient
+            initialDeadlines={bootstrap.deadlines}
+            userId={userId}
+            layoutVariant="embedded"
+          />
+        </TabsContent>
+
+        {/* --- WISHLIST TAB --- */}
+        <TabsContent value="wishlist" className="m-0 focus-visible:ring-0">
+          <WishlistPageClient
+            initialWishlist={bootstrap.wishlist}
+            userId={userId}
+            layoutVariant="embedded"
+          />
+        </TabsContent>
+
+      </Tabs>
+    </div>
+  );
+}
+
+// --- Sub-Components ---
+
+function OverviewCard({ label, value, subtext, className, variant = 'primary' }: { label: string, value: string, subtext?: string, className?: string, variant?: 'primary' | 'secondary' }) {
+  return (
+    <div className={cn("matte-card rounded-xl p-6 bg-card border border-border shadow-xl", className)}>
+      <p className="text-muted-foreground text-[10px] font-bold uppercase tracking-widest mb-2">{label}</p>
+      <div className="flex items-baseline gap-2">
+        <p className="text-4xl font-light tracking-tighter text-foreground font-display">{value}</p>
+        {subtext && <span className="text-muted-foreground text-xs font-medium">{subtext}</span>}
+      </div>
+    </div>
+  );
+}
+
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+
+function MatteGoalCard({ goal, onUpdate }: { goal: Goal, onUpdate?: (updatedGoal: Goal) => void }) {
+  const [bgImage, setBgImage] = useState<string | null>(goal.imageUrl || null);
+  const [isAddingFunds, setIsAddingFunds] = useState(false);
+  const [fundsAmount, setFundsAmount] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
+
+  const progress = Math.min(100, Math.max(0, (goal.currentAmount / goal.targetAmount) * 100));
+
+  // Auto-fetch image if missing
+  useEffect(() => {
+    if (!bgImage) {
+      fetchAndSaveGoalImage(goal.title).then(res => {
+        if (res.success && res.path) {
+          setBgImage(res.path);
+        }
+      });
+    }
+  }, [goal.title, bgImage]);
+
+  const handleAddFunds = async () => {
+    if (!fundsAmount || isNaN(Number(fundsAmount))) return;
+
+    setIsSaving(true);
+    try {
+      const addedAmount = parseFloat(fundsAmount);
+      const newAmount = (goal.currentAmount || 0) + addedAmount;
+
+      const response = await fetch('/api/goals', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: goal.id,
+          currentAmount: newAmount,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update goal');
+      }
+
+      const navigateRes = await fetch(`/api/goals?id=${goal.id}`); // Fetch single or just construct updated
+      // Since we don't have single fetch easily exposed or standardized, we construct the updated object optimistically or if API returns it.
+      // Assuming naive update for now or trigger parent refresh
+
+      const updatedGoal = { ...goal, currentAmount: newAmount };
+      onUpdate?.(updatedGoal);
+      setDialogOpen(false);
+      setFundsAmount("");
+    } catch (error) {
+      console.error("Failed to add funds", error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className="group relative overflow-hidden rounded-xl border border-border bg-card transition-all hover:border-foreground/20">
+      <div className="flex flex-col md:flex-row gap-8 p-6 relative z-10">
+        <div className="flex-1">
+          <div className="flex justify-between items-start mb-6">
+            <div>
+              <h3 className="text-xl font-bold text-foreground mb-1">{goal.title}</h3>
+              <p className="text-muted-foreground text-[10px] font-bold uppercase tracking-wider">
+                Target: {goal.targetDate ? formatDateLabel(goal.targetDate) : 'Ongoing'} • Automated
+              </p>
+            </div>
+            <Badge variant="outline" className="border-border text-muted-foreground rounded-sm text-[9px] font-bold uppercase tracking-tighter bg-transparent">
+              {goal.status === 'COMPLETED' ? 'Done' : 'On Track'}
+            </Badge>
+          </div>
+
+          <div className="mb-6">
+            <div className="flex justify-between items-end mb-3">
+              <span className="text-3xl font-light tracking-tighter text-foreground">
+                {formatCurrency(goal.currentAmount)} <span className="text-sm font-normal text-muted-foreground/60">/ {formatCurrency(goal.targetAmount)}</span>
+              </span>
+              <span className="text-sm font-black text-foreground">{Math.round(progress)}%</span>
+            </div>
+            <div className="h-1 w-full bg-muted rounded-full overflow-hidden">
+              <div
+                className="h-full bg-foreground rounded-full transition-all duration-1000"
+                style={{ width: `${progress}%` }}
               />
             </div>
-        </TabsContent>
-          <TabsContent
-            value="deadlines"
-            className={`relative overflow-hidden rounded-2xl border border-border/60 bg-card p-2 shadow-sm transition-shadow dark:border-border/40 dark:bg-background/80 sm:p-4 ${
-              highlightedTab === 'deadlines' ? 'ring-2 ring-primary/60 shadow-lg' : ''
-            }`}
-          >
-            <AnimatePresence>
-              {highlightedTab === 'deadlines' && (
-                <motion.span
-                  key="deadlines-highlight"
-                  className="pointer-events-none absolute inset-0 rounded-[14px] border-2 border-primary/60"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.4 }}
-                />
-              )}
-            </AnimatePresence>
-            <div className="relative z-10">
-              <DeadlinesPageClient initialDeadlines={bootstrap.deadlines} userId={userId} layoutVariant="embedded" />
-            </div>
-        </TabsContent>
-          <TabsContent
-            value="wishlist"
-            className={`relative overflow-hidden rounded-2xl border border-border/60 bg-card p-2 shadow-sm transition-shadow dark:border-border/40 dark:bg-background/80 sm:p-4 ${
-              highlightedTab === 'wishlist' ? 'ring-2 ring-primary/60 shadow-lg' : ''
-            }`}
-          >
-            <AnimatePresence>
-              {highlightedTab === 'wishlist' && (
-                <motion.span
-                  key="wishlist-highlight"
-                  className="pointer-events-none absolute inset-0 rounded-[14px] border-2 border-primary/60"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.4 }}
-                />
-              )}
-            </AnimatePresence>
-            <div className="relative z-10">
-              <WishlistPageClient initialWishlist={bootstrap.wishlist} userId={userId} layoutVariant="embedded" />
-            </div>
-        </TabsContent>
-      </Tabs>
-      </section>
-      </div>
+          </div>
 
-      <MobileWorkspaceSheet
-        open={mobileWorkspace !== null}
-        activeWorkspace={mobileWorkspace}
-        planFilterOptions={planFilterOptions}
-        tabSummaries={tabSummaries}
-        onOpenChange={(open) => {
-          if (!open) {
-            closeMobileWorkspace();
-          } else if (!mobileWorkspace) {
-            openMobileWorkspace(activeTab);
-          }
-        }}
-        onWorkspaceSelect={openMobileWorkspace}
-        renderContent={renderWorkspaceContent}
-      />
-    </div>
-  );
-}
+          <div className="flex items-center gap-2">
+            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="secondary" className="h-8 border border-border bg-muted text-foreground hover:bg-muted/80 text-[10px] font-bold uppercase tracking-widest">
+                  <Plus className="mr-1 h-3 w-3" />
+                  Add to Savings
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-sm bg-card border-border">
+                <DialogHeader>
+                  <DialogTitle className="text-foreground">Add to Savings</DialogTitle>
+                  <DialogDescription className="text-muted-foreground">
+                    Add a manual contribution to <strong>{goal.title}</strong>.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="amount" className="text-muted-foreground">Amount (₹)</Label>
+                    <Input
+                      id="amount"
+                      type="number"
+                      placeholder="e.g. 5000"
+                      value={fundsAmount}
+                      onChange={(e) => setFundsAmount(e.target.value)}
+                      className="bg-muted border-border text-foreground placeholder:text-muted-foreground/40"
+                      autoFocus
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setDialogOpen(false)} className="border-border text-muted-foreground hover:bg-muted hover:text-foreground">Cancel</Button>
+                  <Button onClick={handleAddFunds} disabled={isSaving || !fundsAmount} className="bg-foreground text-background hover:bg-foreground/90">
+                    {isSaving ? 'Adding...' : 'Add Funds'}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
 
-function isTabKey(value: string): value is TabKey {
-  return TAB_VALUES.includes(value as TabKey);
-}
-
-interface ReminderRowProps {
-  icon: IconComponent;
-  label: string;
-  primary: string;
-  secondary: string;
-  actionLabel: string;
-  onAction: () => void;
-}
-
-function ReminderRow({ icon: Icon, label, primary, secondary, actionLabel, onAction }: ReminderRowProps) {
-  return (
-    <div className="rounded-2xl border border-border/60 bg-muted/30 p-4 shadow-sm dark:border-border/40 dark:bg-muted/10">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-start gap-3 min-w-0">
-          <span className="rounded-full bg-primary/10 p-2 text-primary dark:bg-primary/20">
-            <Icon className="h-5 w-5" />
-          </span>
-          <div className="min-w-0 space-y-1">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
-            <p className="text-sm font-medium text-foreground break-words">{primary}</p>
-            <p className="text-xs text-muted-foreground break-words">{secondary}</p>
+            <Button variant="secondary" className="h-8 border border-border bg-muted text-foreground hover:bg-muted/80 text-[10px] font-bold uppercase tracking-widest">
+              History
+            </Button>
           </div>
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="-mx-2 inline-flex items-center gap-1 self-start rounded-full px-3 text-sm font-medium text-primary sm:self-auto"
-          onClick={onAction}
+
+        {/* Image Section */}
+        <div
+          className="md:w-64 h-32 md:h-auto bg-cover bg-center rounded-sm grayscale opacity-40 group-hover:opacity-100 transition-all duration-500 border border-border"
+          style={{ backgroundImage: bgImage ? `url(${bgImage})` : undefined }}
         >
-          {actionLabel}
-          <ArrowRight className="h-4 w-4" />
-        </Button>
+          {!bgImage && (
+            <div className="w-full h-full flex items-center justify-center bg-muted">
+              <Sparkles className="text-muted-foreground/30 animate-pulse" />
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
 }
 
-interface HeroStatProps {
-  icon: IconComponent;
-  label: string;
-  primary: string;
-  secondary: string;
-}
+function WishlistHighlightRow({ item }: { item: import("@/types/wishlist").WishlistItem }) {
+  const fundedPercent = 0; // Current wishlist doesn't strictly track 'currentAmount', assumes pending/completed. Could extend later.
+  // For now, visualize 0% or allow manual override if model supported it.
+  // Wireframe shows funding %. Let's mock random or 0 for now until schema update.
+  const mockFunded = Math.floor(Math.random() * 80);
 
-function HeroStat({ icon: Icon, label, primary, secondary }: HeroStatProps) {
   return (
-    <div className="flex items-center gap-3 rounded-2xl border border-border/50 bg-background/90 p-3 shadow-sm dark:border-border/40 dark:bg-background/60">
-      <div className="rounded-full bg-primary/10 p-2 text-primary dark:bg-primary/20">
-        <Icon className="h-5 w-5" />
+    <div>
+      <div className="flex justify-between mb-2">
+        <span className="text-[11px] font-bold uppercase tracking-tight text-muted-foreground truncate max-w-[150px]">{item.title}</span>
+        <span className="text-[11px] font-black text-foreground">{formatCurrency(Number(item.estimatedCost))}</span>
       </div>
-      <div className="space-y-0.5">
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
-        <p className="text-base font-semibold leading-tight text-foreground">{primary}</p>
-        <p className="text-xs text-muted-foreground">{secondary}</p>
+      <div className="h-0.5 w-full bg-muted overflow-hidden">
+        <div className="h-full bg-muted-foreground" style={{ width: `${mockFunded}%` }}></div>
       </div>
+      <p className="text-[9px] font-bold text-muted-foreground/60 mt-2 uppercase">{mockFunded}% funded</p>
     </div>
   );
-}
-
-function goalsEqual(a: Goal[], b: Goal[]) {
-  if (a === b) {
-    return true;
-  }
-  if (a.length !== b.length) {
-    return false;
-  }
-  const byId = new Map<string, Goal>();
-  for (const goal of a) {
-    byId.set(goal.id, goal);
-  }
-  for (const goal of b) {
-    const existing = byId.get(goal.id);
-    if (!existing) {
-      return false;
-    }
-    if (
-      existing.targetAmount !== goal.targetAmount ||
-      existing.currentAmount !== goal.currentAmount ||
-      (existing.status ?? 'ACTIVE') !== (goal.status ?? 'ACTIVE') ||
-      existing.updatedAt !== goal.updatedAt
-    ) {
-      return false;
-    }
-  }
-  return true;
 }

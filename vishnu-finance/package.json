@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbo",
-    "dev:fast": "next dev --turbo",
+    "dev": "next dev",
+    "dev:fast": "next dev",
     "build": "next build",
     "build:analyze": "ANALYZE=true next build",
     "start": "next start",

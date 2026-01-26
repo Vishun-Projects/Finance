@@ -147,7 +147,7 @@ export default function DeadlinesPageClient({ initialDeadlines, userId, layoutVa
       const matchesCategory = categoryFilter === 'all' ? true : deadline.category === categoryFilter;
       const matchesSearch = searchTerm
         ? deadline.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          (deadline.description ?? '').toLowerCase().includes(searchTerm.toLowerCase())
+        (deadline.description ?? '').toLowerCase().includes(searchTerm.toLowerCase())
         : true;
       return matchesStatus && matchesCategory && matchesSearch;
     });
@@ -400,7 +400,7 @@ export default function DeadlinesPageClient({ initialDeadlines, userId, layoutVa
                 value={categoryFilter}
                 onValueChange={(value) => setCategoryFilter(value)}
               >
-                <SelectTrigger className="w-full sm:w-48">
+                <SelectTrigger className="w-full sm:w-48 bg-card border-border text-foreground">
                   <SelectValue placeholder="Filter by category" />
                 </SelectTrigger>
                 <SelectContent>
@@ -416,7 +416,7 @@ export default function DeadlinesPageClient({ initialDeadlines, userId, layoutVa
                 placeholder="Search deadlines"
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
-                className="w-full min-w-[200px] sm:w-64"
+                className="w-full min-w-[200px] sm:w-64 bg-card border-border text-foreground placeholder:text-muted-foreground/50 focus-visible:ring-border"
               />
             </div>
           </div>
@@ -424,7 +424,7 @@ export default function DeadlinesPageClient({ initialDeadlines, userId, layoutVa
           <Tabs value="list">
             <TabsContent value="list" className="mt-4 space-y-4">
               {filteredDeadlines.length === 0 ? (
-                <Card className="border-dashed">
+                <Card className="border-dashed border-border bg-card">
                   <CardContent className="py-12 text-center text-muted-foreground">
                     {deadlines.length === 0 ? 'No reminders yet. Add your first deadline.' : 'No deadlines match the current filters.'}
                   </CardContent>
@@ -437,88 +437,92 @@ export default function DeadlinesPageClient({ initialDeadlines, userId, layoutVa
                   const isOverdue = statusMeta.status === 'OVERDUE';
 
                   return (
-                    <Card key={deadline.id} className="border-border/70 shadow-none">
-                      <CardContent className="flex flex-col gap-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+                    <Card key={deadline.id} className="matte-card bg-card border border-border shadow-none hover:border-foreground/20 transition-colors">
+                      <CardContent className="flex flex-col gap-4 py-6 sm:flex-row sm:items-center sm:justify-between">
                         <div className="flex-1 space-y-3">
                           <div className="flex flex-wrap items-center gap-2">
                             <span
                               className={cn(
-                                'inline-flex items-center rounded-md px-2.5 py-0.5 text-xs font-semibold',
-                                statusMeta.tone === 'destructive' && 'bg-destructive/10 text-destructive-foreground',
-                                statusMeta.tone === 'secondary' && 'bg-emerald-100 text-emerald-700',
-                                statusMeta.tone === 'default' && 'bg-primary/10 text-primary'
+                                'inline-flex items-center rounded-sm px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider',
+                                statusMeta.tone === 'destructive' && 'bg-red-950/30 text-red-500 border border-red-900/50',
+                                statusMeta.tone === 'secondary' && 'bg-emerald-950/30 text-emerald-500 border border-emerald-900/50',
+                                statusMeta.tone === 'default' && 'bg-muted text-muted-foreground border border-border'
                               )}
                             >
                               {statusMeta.label}
                             </span>
                             {deadline.category && (
-                              <span className="inline-flex items-center rounded-md border border-border px-2.5 py-0.5 text-xs font-semibold capitalize text-muted-foreground">
+                              <span className="inline-flex items-center rounded-sm border border-border bg-muted/50 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                                 {deadline.category.toLowerCase()}
                               </span>
                             )}
                             {deadline.isRecurring && (
-                              <span className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-0.5 text-xs font-semibold text-muted-foreground">
+                              <span className="inline-flex items-center gap-1 rounded-sm border border-border px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                                 <Repeat className="h-3 w-3" />
                                 {deadline.frequency?.toLowerCase()}
                               </span>
                             )}
                           </div>
                           <div>
-                            <h3 className="text-lg font-semibold text-foreground">
+                            <h3 className="text-xl font-bold text-foreground mb-1">
                               {deadline.title}
                             </h3>
                             {deadline.description && (
-                              <p className="text-sm text-muted-foreground">
+                              <p className="text-xs text-muted-foreground font-medium">
                                 {deadline.description}
                               </p>
                             )}
                           </div>
-                          <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+                          <div className="flex flex-wrap items-center gap-4 text-xs text-neutral-400 font-mono">
                             <span className="flex items-center gap-2">
-                              <Calendar className="h-4 w-4" />
+                              <Calendar className="h-3 w-3" />
                               Due {toLocalDate(deadline.dueDate)}
                             </span>
                             <span className="flex items-center gap-2">
-                              <AlarmClock className="h-4 w-4" />
+                              <AlarmClock className={cn("h-3 w-3", isOverdue && "text-red-500")} />
                               {isOverdue
-                                ? `${Math.abs(daysLeft)} day${Math.abs(daysLeft) === 1 ? '' : 's'} overdue`
+                                ? <span className="text-red-500">{Math.abs(daysLeft)} day{Math.abs(daysLeft) === 1 ? '' : 's'} overdue</span>
                                 : daysLeft >= 0
                                   ? `${daysLeft} day${daysLeft === 1 ? '' : 's'} remaining`
                                   : 'Due today'}
                             </span>
                             <span className="flex items-center gap-2">
-                              <Clock className="h-4 w-4" />
-                              {formatCurrency(deadline.amount)}
+                              <Clock className="h-3 w-3" />
+                              <span className="text-foreground">{formatCurrency(deadline.amount)}</span>
                             </span>
                           </div>
                         </div>
-                        <div className="flex flex-col items-stretch gap-2 sm:w-64">
+                        <div className="flex flex-col items-stretch gap-2 sm:w-48">
                           <Button
-                            className="justify-between border border-border bg-card text-foreground hover:bg-muted"
+                            variant="secondary"
+                            size="sm"
+                            className="justify-between border border-border bg-muted text-muted-foreground hover:bg-border hover:text-foreground h-8 text-[10px] uppercase font-bold tracking-wider"
                             onClick={() => openEditDialog(deadline)}
                           >
                             <span>Edit</span>
-                            <Calendar className="h-4 w-4" />
+                            <Calendar className="h-3 w-3" />
                           </Button>
                           <Button
+                            size="sm"
                             className={cn(
-                              'justify-between',
+                              'justify-between h-8 text-[10px] uppercase font-bold tracking-wider',
                               deadline.isCompleted
-                                ? 'border border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                                : 'bg-primary text-primary-foreground hover:bg-primary/90'
+                                ? 'border border-emerald-900/50 bg-emerald-950/20 text-emerald-500 hover:bg-emerald-900/30'
+                                : 'bg-foreground text-background hover:bg-foreground/90'
                             )}
                             onClick={() => handleToggleCompleted(deadline)}
                           >
-                            <span>{deadline.isCompleted ? 'Mark as pending' : 'Mark as paid'}</span>
-                            <CheckCircle className="h-4 w-4" />
+                            <span>{deadline.isCompleted ? 'Reset' : 'Mark paid'}</span>
+                            <CheckCircle className="h-3 w-3" />
                           </Button>
                           <Button
-                            className="justify-between bg-destructive text-destructive-foreground hover:bg-destructive/90 disabled:opacity-70"
+                            size="sm"
+                            className="justify-between bg-red-950/20 text-red-700 border border-red-900/30 hover:bg-red-950/40 hover:text-red-500 h-8 text-[10px] uppercase font-bold tracking-wider"
                             onClick={() => handleDelete(deadline.id)}
                             disabled={isDeleting === deadline.id}
                           >
                             <span>{isDeleting === deadline.id ? 'Deleting…' : 'Delete'}</span>
-                            <Trash2 className="h-4 w-4" />
+                            <Trash2 className="h-3 w-3" />
                           </Button>
                         </div>
                       </CardContent>

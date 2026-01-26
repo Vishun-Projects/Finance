@@ -12,6 +12,7 @@ export interface Goal {
   category?: string | null;
   priority: GoalPriority;
   status?: GoalStatus;
+  imageUrl?: string | null;
   userId: string;
   isActive?: boolean;
   createdAt: string;

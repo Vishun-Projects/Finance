@@ -15,19 +15,23 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   await requireUser({ redirectTo: "/auth?tab=login" });
 
   return (
-    <div className="min-h-screen w-full overflow-x-hidden bg-background">
+    <div className="flex h-screen w-full overflow-hidden bg-background text-foreground">
       <Suspense
         fallback={
-          <RouteLoadingState
-            title="Loading workspace"
-            description="Preparing your dashboard navigation…"
-            className="min-h-[4rem]"
-          />
+          <div className="hidden lg:flex w-64 border-r border-border bg-sidebar flex-col shrink-0 h-full p-4">
+            <div className="h-8 w-32 bg-foreground/5 rounded animate-pulse mb-8" />
+            <div className="space-y-4">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <div key={i} className="h-10 w-full bg-foreground/5 rounded animate-pulse" />
+              ))}
+            </div>
+          </div>
         }
       >
         <NavigationIsland />
       </Suspense>
-      <main className="mx-auto w-full max-w-screen-2xl px-3 pb-16 pt-[calc(3.5rem+env(safe-area-inset-top))] sm:px-6 md:px-8 md:pt-28 md:pb-20 lg:px-10 xl:px-12 2xl:px-16 lg:pb-10">
+
+      <main className="flex-1 flex flex-col min-w-0 bg-background overflow-y-auto custom-scrollbar">
         {children}
       </main>
     </div>

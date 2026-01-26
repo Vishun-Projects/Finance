@@ -16,6 +16,7 @@ export function normalizeGoal(goal: Goal): Goal {
     ...goal,
     targetAmount: toNumber(goal.targetAmount),
     currentAmount: toNumber(goal.currentAmount),
+    imageUrl: goal.imageUrl,
   };
 }
 

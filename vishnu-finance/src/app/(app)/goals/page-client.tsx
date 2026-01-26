@@ -147,8 +147,8 @@ export default function GoalsPageClient({
     return goals.filter((goal) => {
       const matchesSearch = searchTerm
         ? goal.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          (goal.description ?? '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-          (goal.category ?? '').toLowerCase().includes(searchTerm.toLowerCase())
+        (goal.description ?? '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (goal.category ?? '').toLowerCase().includes(searchTerm.toLowerCase())
         : true;
 
       const matchesStatus = statusFilter === 'all'
@@ -420,11 +420,12 @@ export default function GoalsPageClient({
                 {PRIORITY_OPTIONS.map((priority) => (
                   <Button
                     key={priority}
+                    variant="outline"
                     className={cn(
-                      'h-9 rounded-md border px-3 text-sm capitalize transition-colors',
+                      'h-9 rounded-md border text-sm capitalize transition-colors',
                       priorityFilter === priority
-                        ? 'border-transparent bg-primary text-primary-foreground hover:bg-primary/90'
-                        : 'border-border bg-card text-foreground hover:bg-muted'
+                        ? 'bg-foreground text-background hover:bg-foreground/90'
+                        : 'border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground'
                     )}
                     onClick={() => setPriorityFilter(priority)}
                   >
@@ -436,7 +437,7 @@ export default function GoalsPageClient({
                 placeholder="Search goals"
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
-                className="w-full min-w-[200px] sm:w-64"
+                className="w-full min-w-[200px] sm:w-64 bg-card border-border text-foreground placeholder:text-muted-foreground/50 focus-visible:ring-border"
               />
             </div>
           </div>
@@ -444,7 +445,7 @@ export default function GoalsPageClient({
           <Tabs value="list">
             <TabsContent value="list" className="mt-4 space-y-4">
               {filteredGoals.length === 0 ? (
-                <Card className="border-dashed">
+                <Card className="border-dashed border-border bg-card">
                   <CardContent className="py-12 text-center text-muted-foreground">
                     {goals.length === 0 ? 'Create your first goal to get started.' : 'No goals match the current filters.'}
                   </CardContent>
@@ -455,48 +456,48 @@ export default function GoalsPageClient({
                   const isCompleted = progress >= 100 || goal.status === 'COMPLETED';
 
                   return (
-                    <Card key={goal.id} className="border-border/70 shadow-none">
-                      <CardContent className="flex flex-col gap-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+                    <Card key={goal.id} className="matte-card bg-card border border-border shadow-none hover:border-foreground/20 transition-colors">
+                      <CardContent className="flex flex-col gap-4 py-6 sm:flex-row sm:items-center sm:justify-between">
                         <div className="flex-1 space-y-3">
                           <div className="flex flex-wrap items-center gap-2">
                             <span
                               className={cn(
-                                'inline-flex items-center rounded-md px-2.5 py-0.5 text-xs font-semibold capitalize',
+                                'inline-flex items-center rounded-sm px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider',
                                 isCompleted
-                                  ? 'bg-emerald-100 text-emerald-700'
-                                  : 'bg-primary/10 text-primary'
+                                  ? 'bg-emerald-950/30 text-emerald-500 border border-emerald-900/50'
+                                  : 'bg-muted text-muted-foreground border border-border'
                               )}
                             >
                               {goal.priority.toLowerCase()}
                             </span>
                             {goal.category && (
-                              <span className="inline-flex items-center rounded-md border border-border px-2.5 py-0.5 text-xs font-semibold capitalize text-muted-foreground">
+                              <span className="inline-flex items-center rounded-sm border border-neutral-800 bg-neutral-900/50 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-neutral-500">
                                 {goal.category.toLowerCase()}
                               </span>
                             )}
                             {isCompleted && (
-                              <span className="inline-flex items-center rounded-md px-2.5 py-0.5 text-xs font-semibold text-emerald-600">
+                              <span className="inline-flex items-center rounded-sm px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-500">
                                 Completed
                               </span>
                             )}
                           </div>
                           <div>
-                            <h3 className="text-lg font-semibold text-foreground">
+                            <h3 className="text-xl font-bold text-foreground mb-1">
                               {goal.title}
                             </h3>
                             {goal.description && (
-                              <p className="text-sm text-muted-foreground">
+                              <p className="text-xs text-muted-foreground font-medium">
                                 {goal.description}
                               </p>
                             )}
                           </div>
-                          <div className="space-y-2">
-                            <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+                          <div className="space-y-2 max-w-md">
+                            <div className="flex flex-wrap items-center gap-4 text-xs text-neutral-400 font-mono">
                               <span>
-                                Target: {formatCurrency(goal.targetAmount ?? 0)}
+                                Target: <span className="text-foreground">{formatCurrency(goal.targetAmount ?? 0)}</span>
                               </span>
                               <span>
-                                Saved: {formatCurrency(goal.currentAmount ?? 0)}
+                                Saved: <span className="text-foreground">{formatCurrency(goal.currentAmount ?? 0)}</span>
                               </span>
                               {goal.targetDate && (
                                 <span>
@@ -508,10 +509,10 @@ export default function GoalsPageClient({
                                 </span>
                               )}
                             </div>
-                            <div className="h-2 w-full rounded-full bg-muted">
+                            <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
                               <div
                                 className={cn(
-                                  'h-2 rounded-full bg-primary transition-all',
+                                  'h-full rounded-full bg-foreground transition-all duration-1000',
                                   progress >= 100 && 'bg-emerald-500'
                                 )}
                                 style={{ width: `${progress}%` }}
@@ -520,34 +521,38 @@ export default function GoalsPageClient({
                           </div>
                         </div>
 
-                        <div className="flex flex-col items-stretch gap-2 sm:w-64">
+                        <div className="flex flex-col items-stretch gap-2 sm:w-48">
                           <Button
-                            className="justify-between border border-border bg-card text-foreground hover:bg-muted"
+                            variant="secondary"
+                            size="sm"
+                            className="justify-between border border-border bg-muted text-muted-foreground hover:bg-border hover:text-foreground h-8 text-[10px] uppercase font-bold tracking-wider"
                             onClick={() => openEditDialog(goal)}
                           >
-                            <span>Edit goal</span>
-                            <Target className="h-4 w-4" />
+                            <span>Edit</span>
+                            <Target className="h-3 w-3" />
                           </Button>
                           <Button
+                            size="sm"
                             className={cn(
-                              'justify-between',
+                              'justify-between h-8 text-[10px] uppercase font-bold tracking-wider',
                               isCompleted
-                                ? 'border border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                                : 'bg-primary text-primary-foreground hover:bg-primary/90'
+                                ? 'border border-emerald-900/50 bg-emerald-950/20 text-emerald-500'
+                                : 'bg-foreground text-background hover:bg-foreground/90'
                             )}
                             disabled={isCompleted}
                             onClick={() => handleMarkCompleted(goal)}
                           >
-                            <span>{isCompleted ? 'Completed' : 'Mark complete'}</span>
-                            <CheckCircle className="h-4 w-4" />
+                            <span>{isCompleted ? 'Done' : 'Complete'}</span>
+                            <CheckCircle className="h-3 w-3" />
                           </Button>
                           <Button
-                            className="justify-between bg-destructive text-destructive-foreground hover:bg-destructive/90 disabled:opacity-70"
+                            size="sm"
+                            className="justify-between bg-red-950/20 text-red-700 border border-red-900/30 hover:bg-red-950/40 hover:text-red-500 h-8 text-[10px] uppercase font-bold tracking-wider"
                             onClick={() => handleDelete(goal.id)}
                             disabled={isDeleting === goal.id}
                           >
                             <span>{isDeleting === goal.id ? 'Deleting…' : 'Delete'}</span>
-                            <Trash2 className="h-4 w-4" />
+                            <Trash2 className="h-3 w-3" />
                           </Button>
                         </div>
                       </CardContent>
@@ -559,6 +564,7 @@ export default function GoalsPageClient({
           </Tabs>
         </div>
       </div>
+
 
       <Dialog open={dialogOpen} onOpenChange={(open) => {
         setDialogOpen(open);

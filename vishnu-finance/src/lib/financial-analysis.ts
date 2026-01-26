@@ -11,7 +11,7 @@ export interface TransactionDetail {
   description?: string;
   amount: number;
   type: 'INCOME' | 'EXPENSE' | 'TRANSFER' | 'INVESTMENT' | 'OTHER';
-  category?: string;
+  category?: { name: string; icon?: string; color?: string } | null;
   store?: string;
   personName?: string;
 }
@@ -168,11 +168,11 @@ export async function analyzeUserFinances(userId: string, dateRange?: DateRange)
             isDeleted: false,
             ...(dateRange?.startDate || dateRange?.endDate
               ? {
-                  transactionDate: {
-                    ...(dateRange.startDate ? { gte: dateRange.startDate } : {}),
-                    ...(dateRange.endDate ? { lte: dateRange.endDate } : {}),
-                  },
-                }
+                transactionDate: {
+                  ...(dateRange.startDate ? { gte: dateRange.startDate } : {}),
+                  ...(dateRange.endDate ? { lte: dateRange.endDate } : {}),
+                },
+              }
               : {}),
           },
         },
@@ -210,17 +210,21 @@ export async function analyzeUserFinances(userId: string, dateRange?: DateRange)
 
     // Convert transactions to detail format
     const transactionDetails: TransactionDetail[] = transactions.map((t) => {
-      const amount = t.financialCategory === 'INCOME' 
-        ? Number(t.creditAmount) 
+      const amount = t.financialCategory === 'INCOME'
+        ? Number(t.creditAmount)
         : Number(t.debitAmount);
-      
+
       return {
         id: t.id,
         date: t.transactionDate,
         description: t.description || undefined,
         amount,
         type: t.financialCategory,
-        category: t.category?.name || undefined,
+        category: t.category ? {
+          name: t.category.name,
+          icon: t.category.icon || undefined, // Handle potential nulls
+          color: t.category.color || undefined
+        } : null,
         store: t.store || undefined,
         personName: t.personName || undefined,
       };
@@ -295,7 +299,7 @@ export async function analyzeUserFinances(userId: string, dateRange?: DateRange)
  */
 export function formatFinancialSummary(summary: FinancialSummary): string {
   let text = 'User Financial Summary:\n\n';
-  
+
   // Add date range information if specified
   if (summary.dateRange?.startDate || summary.dateRange?.endDate) {
     const startStr = summary.dateRange.startDate
@@ -308,7 +312,7 @@ export function formatFinancialSummary(summary: FinancialSummary): string {
   } else {
     text += `Data Period: All available data\n\n`;
   }
-  
+
   text += `Income & Expenses:\n`;
   text += `- Total Income: ₹${summary.totalIncome.toLocaleString('en-IN')}\n`;
   text += `- Total Expenses: ₹${summary.totalExpenses.toLocaleString('en-IN')}\n`;
@@ -377,7 +381,7 @@ export function formatFinancialSummary(summary: FinancialSummary): string {
     // If a specific date range is requested, show ALL transactions (not limited)
     // Otherwise, limit to prevent token overflow for very large datasets
     const MAX_TRANSACTIONS_TO_SHOW = summary.dateRange ? summary.transactions.length : 1000;
-    
+
     // If date range is specified, show transactions chronologically (by date)
     // Otherwise, sort by amount (descending) for overview
     let transactionsToShow = [...summary.transactions];
@@ -390,7 +394,7 @@ export function formatFinancialSummary(summary: FinancialSummary): string {
         .sort((a, b) => b.amount - a.amount)
         .slice(0, MAX_TRANSACTIONS_TO_SHOW);
     }
-    
+
     text += `Transaction Details (${summary.totalTransactionCount} total transactions`;
     if (!summary.dateRange && summary.transactions.length > MAX_TRANSACTIONS_TO_SHOW) {
       text += `, showing top ${MAX_TRANSACTIONS_TO_SHOW} by amount`;
@@ -400,42 +404,43 @@ export function formatFinancialSummary(summary: FinancialSummary): string {
       text += ` for ${startStr === endStr ? startStr : `${startStr} to ${endStr}`}`;
     }
     text += `):\n\n`;
-    
+
     // Group transactions by type for better organization
     const incomeTransactions = transactionsToShow.filter(t => t.type === 'INCOME');
     const expenseTransactions = transactionsToShow.filter(t => t.type === 'EXPENSE');
-    
+
     if (incomeTransactions.length > 0) {
       const totalIncome = incomeTransactions.length;
       const allIncome = summary.transactions.filter(t => t.type === 'INCOME').length;
       const showCount = summary.dateRange || totalIncome === allIncome ? totalIncome : `${totalIncome} of ${allIncome}`;
       text += `Income Transactions (${showCount}):\n`;
       incomeTransactions.forEach((t) => {
-          const dateStr = t.date.toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' });
-          const desc = t.description || 'No description';
-          const category = t.category ? ` [Category: ${t.category}]` : '';
-          text += `- ${dateStr}: ₹${t.amount.toLocaleString('en-IN')} - ${desc}${category}\n`;
-        });
+        const dateStr = t.date.toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' });
+        const desc = t.description || 'No description';
+        const category = t.category ? ` [Category: ${t.category.name}]` : '';
+        text += `- ${dateStr}: ₹${t.amount.toLocaleString('en-IN')} - ${desc}${category}\n`;
+      });
       text += '\n';
     }
-    
+
     if (expenseTransactions.length > 0) {
       const totalExpense = expenseTransactions.length;
       const allExpense = summary.transactions.filter(t => t.type === 'EXPENSE').length;
       const showCount = summary.dateRange || totalExpense === allExpense ? totalExpense : `${totalExpense} of ${allExpense}`;
       text += `Expense Transactions (${showCount}):\n`;
       expenseTransactions.forEach((t) => {
-          const dateStr = t.date.toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' });
-          const desc = t.description || 'No description';
-          const category = t.category ? ` [Category: ${t.category}]` : '';
-          // Clearly distinguish between store (business) and person
-          const store = t.store ? ` [Business/Store: ${t.store}]` : '';
-          const person = t.personName ? ` [Person: ${t.personName}]` : '';
-          text += `- ${dateStr}: ₹${t.amount.toLocaleString('en-IN')} - ${desc}${category}${store}${person}\n`;
-        });
+        const dateStr = t.date.toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' });
+        const desc = t.description || 'No description';
+        const category = t.category ? ` [Category: ${t.category.name}]` : '';
+
+        // Clearly distinguish between store (business) and person
+        const store = t.store ? ` [Business/Store: ${t.store}]` : '';
+        const person = t.personName ? ` [Person: ${t.personName}]` : '';
+        text += `- ${dateStr}: ₹${t.amount.toLocaleString('en-IN')} - ${desc}${category}${store}${person}\n`;
+      });
       text += '\n';
     }
-    
+
     // Add summary statistics
     const largeTransactions = summary.transactions.filter(t => t.amount >= 15000);
     if (largeTransactions.length > 0) {
@@ -445,4 +450,5 @@ export function formatFinancialSummary(summary: FinancialSummary): string {
 
   return text;
 }
+
 

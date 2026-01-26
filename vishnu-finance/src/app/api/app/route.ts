@@ -6,25 +6,25 @@ function processMonthlyTrends(income: any[], expenses: any[], months: number) {
   const trends: any[] = [];
   const currentDate = new Date();
   const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  
+
   for (let i = months - 1; i >= 0; i--) {
     const date = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1);
     const monthKey = `${date.getFullYear()}-${date.getMonth()}`;
-    
+
     const monthIncome = income
       .filter(item => {
         const itemDate = new Date(item.startDate || item.date);
         return `${itemDate.getFullYear()}-${itemDate.getMonth()}` === monthKey;
       })
       .reduce((sum, item) => sum + parseFloat(item.amount || 0), 0);
-    
+
     const monthExpenses = expenses
       .filter(item => {
         const itemDate = new Date(item.date);
         return `${itemDate.getFullYear()}-${itemDate.getMonth()}` === monthKey;
       })
       .reduce((sum, item) => sum + parseFloat(item.amount || 0), 0);
-    
+
     trends.push({
       month: monthNames[date.getMonth()],
       income: monthIncome,
@@ -32,19 +32,19 @@ function processMonthlyTrends(income: any[], expenses: any[], months: number) {
       savings: monthIncome - monthExpenses,
     });
   }
-  
+
   return trends;
 }
 
 function processCategoryBreakdown(expenses: any[]) {
   const categoryMap = new Map<string, number>();
-  
+
   expenses.forEach(expense => {
     const category = expense.category || expense.categoryName || 'Uncategorized';
     const amount = parseFloat(expense.amount || 0);
     categoryMap.set(category, (categoryMap.get(category) || 0) + amount);
   });
-  
+
   return Array.from(categoryMap.entries())
     .map(([name, amount]) => ({ name, amount }))
     .sort((a, b) => b.amount - a.amount);
@@ -309,7 +309,7 @@ export async function POST(request: NextRequest) {
       if (!authToken) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
       const user = await AuthService.getUserFromToken(authToken.value);
       if (!user || !user.isActive) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-      
+
       const {
         page = 1,
         pageSize: pageSizeParam = '50',
@@ -346,12 +346,18 @@ export async function POST(request: NextRequest) {
         }
       }
       if (startDate || endDate) {
-        where.transactionDate = {};
-        if (startDate) where.transactionDate.gte = new Date(startDate);
-        if (endDate) {
-          const end = new Date(endDate);
-          end.setHours(23, 59, 59, 999);
-          where.transactionDate.lte = end;
+        const start = startDate ? new Date(startDate) : null;
+        const end = endDate ? new Date(endDate) : null;
+        const isValidStart = start && !isNaN(start.getTime());
+        const isValidEnd = end && !isNaN(end.getTime());
+
+        if (isValidStart || isValidEnd) {
+          where.transactionDate = {};
+          if (isValidStart) where.transactionDate.gte = start;
+          if (isValidEnd) {
+            end!.setHours(23, 59, 59, 999);
+            where.transactionDate.lte = end;
+          }
         }
       }
 
@@ -365,6 +371,20 @@ export async function POST(request: NextRequest) {
       const dbSortField = validSortFields[sortField] || 'transactionDate';
       const orderBy: Record<string, 'asc' | 'desc'> = { [dbSortField]: sortDirection };
 
+      // Search term filter (now applied at DB level for full pagination support)
+      const hasSearchTerm = searchTerm && searchTerm.trim().length > 0;
+      if (hasSearchTerm) {
+        where.OR = [
+          { description: { contains: searchTerm, mode: 'insensitive' } },
+          { store: { contains: searchTerm, mode: 'insensitive' } },
+          { personName: { contains: searchTerm, mode: 'insensitive' } },
+          { upiId: { contains: searchTerm, mode: 'insensitive' } },
+          { notes: { contains: searchTerm, mode: 'insensitive' } },
+          { category: { name: { contains: searchTerm, mode: 'insensitive' } } },
+        ];
+      }
+
+      // Fetch transactions
       let transactions: any[] = [];
       let totalCount = 0;
       let totals: { income: number; expense: number } | null = null;
@@ -411,16 +431,7 @@ export async function POST(request: NextRequest) {
         };
       }
 
-      if (searchTerm && searchTerm.trim()) {
-        const searchLower = searchTerm.toLowerCase();
-        transactions = transactions.filter((t: any) =>
-          t.description?.toLowerCase().includes(searchLower) ||
-          t.store?.toLowerCase().includes(searchLower) ||
-          t.personName?.toLowerCase().includes(searchLower) ||
-          t.notes?.toLowerCase().includes(searchLower) ||
-          t.category?.name?.toLowerCase().includes(searchLower)
-        );
-      }
+      // No need for in-memory searchTerm filter here as it's now in 'where'
 
       if (amountPreset) {
         transactions = transactions.filter((t: any) => {
@@ -516,7 +527,7 @@ export async function POST(request: NextRequest) {
       try {
         if (store) finalStore = await getCanonicalName(user.id, store, 'STORE');
         if (personName) finalPersonName = await getCanonicalName(user.id, personName, 'PERSON');
-      } catch {}
+      } catch { }
 
       const transaction = await (prisma as any).transaction.create({
         data: {
@@ -579,7 +590,7 @@ export async function POST(request: NextRequest) {
           if (updateData.personName && updateData.personName !== existing.personName) {
             finalPersonName = await getCanonicalName(user.id, updateData.personName, 'PERSON');
           }
-        } catch {}
+        } catch { }
       }
 
       const data: any = {};
@@ -744,6 +755,8 @@ export async function POST(request: NextRequest) {
         message: `Successfully restored ${restoredCount} transaction(s)`,
       });
     }
+
+
 
     // Transactions - Batch Update
     if (action === 'transactions_batch_update') {

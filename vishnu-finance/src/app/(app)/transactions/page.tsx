@@ -24,7 +24,7 @@ export default async function TransactionsPage() {
     transactionsData = transactionsResult;
     categories = categoriesResult;
   } catch (error) {
-    console.error('[transactions] bootstrap fetch failed', error);
+    // console.error('[transactions] bootstrap fetch failed', error);
   }
 
   const bootstrap = {

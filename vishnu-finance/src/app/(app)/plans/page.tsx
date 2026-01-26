@@ -6,7 +6,7 @@ import { loadDeadlines } from '@/lib/loaders/deadlines';
 import { loadWishlist } from '@/lib/loaders/wishlist';
 import PlansPageClient, { PlansBootstrap } from './page-client';
 
-const ALLOWED_TABS = ['goals', 'deadlines', 'wishlist'] as const;
+const ALLOWED_TABS = ['overview', 'goals', 'deadlines', 'wishlist'] as const;
 type PlansTab = (typeof ALLOWED_TABS)[number];
 
 function isValidPlansTab(tab?: string): tab is PlansTab {
@@ -35,7 +35,7 @@ export default async function PlansPage({ searchParams }: PlansPageProps) {
     wishlist,
   };
 
-  const defaultTab = isValidPlansTab(resolvedSearchParams?.tab) ? resolvedSearchParams.tab : 'goals';
+  const defaultTab = isValidPlansTab(resolvedSearchParams?.tab) ? resolvedSearchParams.tab : 'overview';
 
   return (
     <Suspense

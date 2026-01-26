@@ -145,9 +145,13 @@ export async function POST(request: NextRequest) {
     // Use /tmp directory for serverless environments (Vercel, AWS Lambda, etc.)
     // /tmp is the only writable directory in serverless functions
     const uploadsDir = join(tmpdir(), 'pdf-uploads');
-    const toolsDir = join(process.cwd(), 'tools');
-    const toolsMasterDir = join(process.cwd(), 'tools-master');
-    const legacyToolsDir = join(process.cwd(), 'legacy', 'tools');
+
+    // Determine the correct path for Python tools
+    // In production/Vercel, path might be different, but for local:
+    // It seems tools are in 'api/parse-pdf-python' based on file search
+    const toolsDir = join(process.cwd(), 'api', 'parse-pdf-python');
+    const toolsMasterDir = join(process.cwd(), 'tools-master'); // Keep this if valid, or update
+    const legacyToolsDir = join(process.cwd(), 'legacy', 'tools'); // Keep this if valid
 
     // Ensure uploads directory exists
     try {
@@ -262,9 +266,7 @@ def main():
     metadata = None
     detected_bank = None
     try:
-        import sys
-        import os
-        parsers_path = os.path.join(os.path.dirname(os.path.dirname(PDF_FILE)), 'tools', 'parsers')
+        parsers_path = os.path.join(r'${toolsDir.replace(/\\/g, '\\\\')}', 'parsers')
         if parsers_path not in sys.path:
             sys.path.insert(0, parsers_path)
         from bank_detector import BankDetector
@@ -272,7 +274,7 @@ def main():
         print(f"Detected bank: {detected_bank}", file=sys.stderr)
         if detected_bank in ['SBIN', 'IDIB', 'KKBK', 'KKBK_V2', 'HDFC', 'MAHB']:
             # Add tools directory to path
-            tools_path = os.path.join(os.path.dirname(os.path.dirname(PDF_FILE)), 'tools')
+            tools_path = r'${toolsDir.replace(/\\/g, '\\\\')}'
             if tools_path not in sys.path:
                 sys.path.insert(0, tools_path)
             from bank_statement_parser import parse_bank_statement

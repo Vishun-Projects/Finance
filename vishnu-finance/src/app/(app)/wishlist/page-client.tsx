@@ -13,13 +13,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 import {
+  ArrowRight,
   Calendar,
   CheckCircle,
   Gift,
   Heart,
   Loader2,
+  Pencil,
   Plus,
   RefreshCw,
+  ShoppingBag,
   Tag,
   Trash2,
 } from 'lucide-react';
@@ -82,6 +85,7 @@ export default function WishlistPageClient({ initialWishlist, userId, layoutVari
   const [items, setItems] = useState<WishlistItem[]>(initialWishlist.data);
   const [statusFilter, setStatusFilter] = useState<'all' | 'completed' | 'pending'>('all');
   const [priorityFilter, setPriorityFilter] = useState<'all' | WishlistPriority>('all');
+  const [sortOrder, setSortOrder] = useState<string>('priority'); // Added sortOrder state
   const [searchTerm, setSearchTerm] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<WishlistItem | null>(null);
@@ -127,12 +131,12 @@ export default function WishlistPageClient({ initialWishlist, userId, layoutVari
         const data = (await response.json()) as WishlistResponse;
         const normalised = Array.isArray(data?.data)
           ? (data.data.map((item) => {
-              const apiItem = item as WishlistApiItem;
-              return {
-                ...apiItem,
-                tags: parseTags(apiItem.tags),
-              };
-            }) as WishlistItem[])
+            const apiItem = item as WishlistApiItem;
+            return {
+              ...apiItem,
+              tags: parseTags(apiItem.tags),
+            };
+          }) as WishlistItem[])
           : [];
         setItems(normalised);
       } catch (error) {
@@ -153,8 +157,8 @@ export default function WishlistPageClient({ initialWishlist, userId, layoutVari
 
       const matchesSearch = searchTerm
         ? item.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          (item.description ?? '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-          (item.category ?? '').toLowerCase().includes(searchTerm.toLowerCase())
+        (item.description ?? '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (item.category ?? '').toLowerCase().includes(searchTerm.toLowerCase())
         : true;
 
       return matchesStatus && matchesPriority && matchesSearch;
@@ -441,8 +445,8 @@ export default function WishlistPageClient({ initialWishlist, userId, layoutVari
                     className={cn(
                       'h-9 rounded-md border px-3 text-sm capitalize transition-colors',
                       priorityFilter === priority
-                        ? 'border-transparent bg-primary text-primary-foreground hover:bg-primary/90'
-                        : 'border-border bg-card text-foreground hover:bg-muted'
+                        ? 'bg-foreground text-background hover:bg-foreground/90'
+                        : 'border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground'
                     )}
                     onClick={() => setPriorityFilter(priority)}
                   >
@@ -450,11 +454,24 @@ export default function WishlistPageClient({ initialWishlist, userId, layoutVari
                   </Button>
                 ))}
               </div>
+              <Select
+                value={sortOrder}
+                onValueChange={(value) => setSortOrder(value as typeof sortOrder)}
+              >
+                <SelectTrigger className="w-full sm:w-48 bg-card border-border text-foreground">
+                  <SelectValue placeholder="Sort by" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="priority">Priority</SelectItem>
+                  <SelectItem value="cost-low">Cost: Low to High</SelectItem>
+                  <SelectItem value="cost-high">Cost: High to Low</SelectItem>
+                </SelectContent>
+              </Select>
               <Input
-                placeholder="Search wishlist"
+                placeholder="Search items"
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
-                className="w-full min-w-[200px] sm:w-64"
+                className="w-full min-w-[200px] sm:w-64 bg-card border-border text-foreground placeholder:text-muted-foreground/50 focus-visible:ring-border"
               />
             </div>
           </div>
@@ -462,98 +479,85 @@ export default function WishlistPageClient({ initialWishlist, userId, layoutVari
           <Tabs value="list">
             <TabsContent value="list" className="mt-4 space-y-4">
               {filteredItems.length === 0 ? (
-                <Card className="border-dashed">
+                <Card className="border-dashed border-border bg-card">
                   <CardContent className="py-12 text-center text-muted-foreground">
-                    {items.length === 0
-                      ? 'Add your first wishlist item to get started.'
-                      : 'No items match the current filters.'}
+                    {items.length === 0 ? 'Start your wishlist today.' : 'No items match your filters.'}
                   </CardContent>
                 </Card>
               ) : (
                 filteredItems.map((item) => {
+                  const isCompleted = item.isCompleted;
+
                   return (
-                    <Card key={item.id} className="border-border/70 shadow-none">
-                      <CardContent className="flex flex-col gap-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+                    <Card key={item.id} className="matte-card bg-card border border-border shadow-none hover:border-foreground/20 transition-colors">
+                      <CardContent className="flex flex-col gap-4 py-6 sm:flex-row sm:items-center sm:justify-between">
                         <div className="flex-1 space-y-3">
-                          <div className="flex items-center space-x-3">
+                          <div className="flex flex-wrap items-center gap-2">
                             <span
                               className={cn(
-                                'inline-flex items-center rounded-md px-2.5 py-0.5 text-xs font-semibold capitalize',
-                                item.isCompleted
-                                  ? 'bg-emerald-100 text-emerald-700'
-                                  : 'bg-primary/10 text-primary'
+                                'inline-flex items-center rounded-sm px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider',
+                                isCompleted
+                                  ? 'bg-emerald-950/30 text-emerald-500 border border-emerald-900/50'
+                                  : 'bg-muted text-muted-foreground border border-border'
                               )}
                             >
                               {item.priority.toLowerCase()}
                             </span>
-                            {item.category && (
-                              <span className="inline-flex items-center rounded-md border border-border px-2.5 py-0.5 text-xs font-semibold capitalize text-muted-foreground">
-                                {item.category.toLowerCase()}
+                            {isCompleted && (
+                              <span className="inline-flex items-center rounded-sm px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-500">
+                                Purchased
                               </span>
-                            )}
-                            {item.tags && item.tags.length > 0 && (
-                              <div className="flex flex-wrap gap-1">
-                                {item.tags.map((tag) => (
-                                  <span key={tag} className="inline-flex items-center rounded-md border border-border px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
-                                    #{tag}
-                                  </span>
-                                ))}
-                              </div>
                             )}
                           </div>
                           <div>
-                            <h3 className="text-lg font-semibold text-foreground">
+                            <h3 className="text-xl font-bold text-foreground mb-1">
                               {item.title}
                             </h3>
                             {item.description && (
-                              <p className="text-sm text-muted-foreground">{item.description}</p>
+                              <p className="text-xs text-muted-foreground font-medium">
+                                {item.description}
+                              </p>
                             )}
                           </div>
-                          <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+                          <div className="flex items-center gap-4 text-xs text-neutral-400 font-mono">
                             <span className="flex items-center gap-2">
-                              <Gift className="h-4 w-4" />
-                              {formatCurrency(item.estimatedCost)}
+                              <ShoppingBag className="h-3 w-3" />
+                              <span className="text-foreground">{formatCurrency(item.estimatedCost)}</span>
                             </span>
-                            {item.targetDate && (
-                              <span className="flex items-center gap-2">
-                                <Calendar className="h-4 w-4" />
-                                {new Date(item.targetDate).toLocaleDateString('en-IN', {
-                                  day: 'numeric',
-                                  month: 'short',
-                                  year: 'numeric',
-                                })}
-                              </span>
-                            )}
                           </div>
                         </div>
 
-                        <div className="flex flex-col items-stretch gap-2 sm:w-64">
+                        <div className="flex flex-col items-stretch gap-2 sm:w-48">
                           <Button
-                            className="justify-between border border-border bg-card text-foreground hover:bg-muted"
+                            variant="secondary"
+                            size="sm"
+                            className="justify-between border border-border bg-muted text-muted-foreground hover:bg-border hover:text-foreground h-8 text-[10px] uppercase font-bold tracking-wider"
                             onClick={() => openEditDialog(item)}
                           >
                             <span>Edit</span>
-                            <Tag className="h-4 w-4" />
+                            <Pencil className="h-3 w-3" />
                           </Button>
                           <Button
+                            size="sm"
                             className={cn(
-                              'justify-between',
-                              item.isCompleted
-                                ? 'border border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                                : 'bg-primary text-primary-foreground hover:bg-primary/90'
+                              'justify-between h-8 text-[10px] uppercase font-bold tracking-wider',
+                              isCompleted
+                                ? 'border border-emerald-900/50 bg-emerald-950/20 text-emerald-500 hover:bg-emerald-900/30'
+                                : 'bg-foreground text-background hover:bg-foreground/90'
                             )}
                             onClick={() => handleToggleCompleted(item)}
                           >
-                            <span>{item.isCompleted ? 'Mark as pending' : 'Mark as purchased'}</span>
-                            <CheckCircle className="h-4 w-4" />
+                            <span>{isCompleted ? 'Pending' : 'Mark purchased'}</span>
+                            <CheckCircle className="h-3 w-3" />
                           </Button>
                           <Button
-                            className="justify-between bg-destructive text-destructive-foreground hover:bg-destructive/90 disabled:opacity-70"
+                            size="sm"
+                            className="justify-between bg-red-950/20 text-red-700 border border-red-900/30 hover:bg-red-950/40 hover:text-red-500 h-8 text-[10px] uppercase font-bold tracking-wider"
                             onClick={() => handleDelete(item.id)}
                             disabled={isDeleting === item.id}
                           >
                             <span>{isDeleting === item.id ? 'Deleting…' : 'Delete'}</span>
-                            <Trash2 className="h-4 w-4" />
+                            <Trash2 className="h-3 w-3" />
                           </Button>
                         </div>
                       </CardContent>
@@ -561,6 +565,7 @@ export default function WishlistPageClient({ initialWishlist, userId, layoutVari
                   );
                 })
               )}
+
             </TabsContent>
           </Tabs>
         </div>

@@ -573,3 +573,66 @@ Focus on official sources like:
   }
 }
 
+
+/**
+ * Auto-categorize a batch of transactions
+ */
+export async function categorizeTransactionsBatch(
+  transactions: Array<{ id: string; description: string; amount: number; store?: string }>,
+  categories: Array<{ id: string; name: string; type: string }>
+): Promise<Array<{ id: string; categoryId: string; confidence: number }>> {
+  if (transactions.length === 0) return [];
+
+  // Create category list string
+  const categoryList = categories
+    .map(c => `${c.name} (${c.type}) [ID: ${c.id}]`)
+    .join('\n');
+
+  const prompt = `You are an expert financial categorization AI for personal finance in India.
+  Your job is to categorize bank transactions accurately. AVOID using "Other" unless absolutely necessary.
+  
+  CATEGORY LIST (Pick the BEST specific match):
+  ${categoryList}
+  
+  TRANSACTIONS TO CATEGORIZE:
+  ${transactions.map(t => `ID: ${t.id} | Desc: ${t.description} | Store: ${t.store || 'N/A'} | Amount: ₹${t.amount}`).join('\n')}
+  
+  IMPORTANT RULES:
+  1. UPI transactions (containing @, upi, paytm, phonepe, gpay) are usually Shopping, Food & Dining, or specific stores
+  2. NEFT/RTGS/IMPS are usually Transfers (if to a person) or Bills/Investments
+  3. ATM/Cash withdrawals = Cash (or create if not available)
+  4. Swiggy/Zomato = Food & Dining
+  5. Uber/Ola = Transport
+  6. Amazon/Flipkart/Myntra = Shopping
+  7. Netflix/Hotstar/Spotify = Entertainment or Subscriptions
+  8. Insurance/LIC/HDFC Life = Insurance
+  9. Mutual Fund/SIP/Zerodha/Groww = Investments
+  10. Electricity/Gas/Water/Broadband = Utilities
+  11. School/College/Coaching = Education
+  12. Hospital/Pharmacy/Apollo/Medplus = Healthcare
+  13. Rent/EMI/Loan = Housing/EMI
+  14. Salary/Income credited = Income
+  15. DO NOT use "Other" or "Miscellaneous" unless truly unidentifiable
+  16. If unsure between 2 categories, pick the more SPECIFIC one
+  
+  Return valid JSON array: [{"id": "...", "categoryId": "...", "confidence": 0.9}, ...]
+  JSON ONLY, no markdown, no explanation.`;
+
+  try {
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash', generationConfig: { responseMimeType: "application/json" } });
+    const result = await retryWithBackoff(async () => {
+      return await model.generateContent(prompt);
+    }, 2, 2000);
+    const text = result.response.text();
+    // Clean json if needed (though responseMimeType helps)
+    const cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
+    return JSON.parse(cleaned);
+  } catch (error) {
+    console.error("Batch categorization failed in gemini.ts:", error);
+    // Print full error details if available
+    if (error && typeof error === 'object' && 'response' in error) {
+      console.error("Gemini API Error Response:", JSON.stringify((error as any).response));
+    }
+    return [];
+  }
+}

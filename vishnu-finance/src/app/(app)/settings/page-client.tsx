@@ -195,22 +195,22 @@ function DocumentManagement({ initialDocuments }: DocumentManagementProps) {
   };
 
   return (
-      <Card>
+    <Card>
       <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <CardTitle className="flex items-center space-x-2">
+        <div>
+          <CardTitle className="flex items-center space-x-2">
             <FileText className="w-5 h-5" />
             <span>Your Documents</span>
-              </CardTitle>
-              <CardDescription>
+          </CardTitle>
+          <CardDescription>
             Manage statements and personal uploads. Download originals or remove them when no longer needed.
-              </CardDescription>
-            </div>
+          </CardDescription>
+        </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={() => fetchDocuments({ showSpinner: true })} disabled={loading}>
             <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
             Refresh
-            </Button>
+          </Button>
           <Button size="sm" onClick={handleFilePick} disabled={uploading}>
             <Upload className="w-4 h-4 mr-2" />
             {uploading ? 'Uploading...' : 'Upload PDF'}
@@ -222,8 +222,8 @@ function DocumentManagement({ initialDocuments }: DocumentManagementProps) {
             className="hidden"
             onChange={handleFileSelected}
           />
-          </div>
-        </CardHeader>
+        </div>
+      </CardHeader>
       <CardContent className="space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -234,7 +234,7 @@ function DocumentManagement({ initialDocuments }: DocumentManagementProps) {
               />
               Include portal documents
             </Label>
-              </div>
+          </div>
           <div className="flex items-center gap-2">
             {(['all', 'mine', 'portal'] as const).map(option => (
               <Button
@@ -248,13 +248,13 @@ function DocumentManagement({ initialDocuments }: DocumentManagementProps) {
                 {option === 'portal' && 'Portal'}
               </Button>
             ))}
-            </div>
-              </div>
+          </div>
+        </div>
 
         {loading ? (
           <div className="border border-dashed rounded-lg p-10 text-center text-sm text-muted-foreground">
             Loading documents...
-            </div>
+          </div>
         ) : filteredDocuments.length === 0 ? (
           <div className="border border-dashed rounded-lg p-10 text-center text-sm text-muted-foreground">
             No documents found. Upload a PDF or import a statement to get started.
@@ -278,8 +278,8 @@ function DocumentManagement({ initialDocuments }: DocumentManagementProps) {
                         </Badge>
                         {doc.visibility !== 'PRIVATE' && (
                           <Badge variant="outline">{doc.visibility.toLowerCase()}</Badge>
-                      )}
-                    </div>
+                        )}
+                      </div>
                       <div className="text-xs text-muted-foreground flex flex-wrap items-center gap-3">
                         <span>{new Date(doc.createdAt).toLocaleString()}</span>
                         <Separator orientation="vertical" />
@@ -292,8 +292,8 @@ function DocumentManagement({ initialDocuments }: DocumentManagementProps) {
                             <span>Bank: {doc.bankCode}</span>
                           </>
                         )}
-                  </div>
-                </div>
+                      </div>
+                    </div>
                     <div className="flex items-center gap-2">
                       <Button
                         variant="outline"
@@ -312,12 +312,12 @@ function DocumentManagement({ initialDocuments }: DocumentManagementProps) {
                           className="text-destructive hover:text-destructive"
                           onClick={() => openDeleteDialog(doc)}
                         >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
                       )}
-            </div>
-          </CardContent>
-        </Card>
+                    </div>
+                  </CardContent>
+                </Card>
               );
             })}
           </div>
@@ -325,20 +325,20 @@ function DocumentManagement({ initialDocuments }: DocumentManagementProps) {
 
         <Dialog open={deleteState.open} onOpenChange={open => !open && closeDeleteDialog()}>
           <DialogContent className="sm:max-w-md">
-          <DialogHeader>
+            <DialogHeader>
               <DialogTitle>Remove document</DialogTitle>
-            <DialogDescription>
+              <DialogDescription>
                 Choose whether to remove just the document or delete the linked transactions as well.
-            </DialogDescription>
-          </DialogHeader>
+              </DialogDescription>
+            </DialogHeader>
             <div className="space-y-4">
               <div className="p-3 rounded-md bg-muted/60 text-sm">
                 <p className="font-medium">{deleteState.document?.originalName}</p>
                 <p className="text-xs text-muted-foreground mt-1">
                   {deleteState.document?.transactionCount || 0} transaction(s) linked.
                 </p>
-            </div>
-            <div className="space-y-2">
+              </div>
+              <div className="space-y-2">
                 <Label>Delete Options</Label>
                 <div className="grid gap-2">
                   {(['document-only', 'document-and-transactions'] as const).map(option => (
@@ -355,22 +355,22 @@ function DocumentManagement({ initialDocuments }: DocumentManagementProps) {
                         : 'Delete document and linked transactions'}
                     </Button>
                   ))}
-              </div>
+                </div>
               </div>
             </div>
             <DialogFooter className="flex justify-between">
               <Button variant="outline" onClick={closeDeleteDialog} disabled={deleteState.submitting}>
-              Cancel
-            </Button>
+                Cancel
+              </Button>
               <Button
                 variant="destructive"
                 onClick={confirmDelete}
                 disabled={deleteState.submitting}
               >
                 {deleteState.submitting ? 'Deleting...' : 'Confirm Delete'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
+              </Button>
+            </DialogFooter>
+          </DialogContent>
         </Dialog>
       </CardContent>
     </Card>
@@ -675,7 +675,7 @@ export default function SettingsPageClient({ initialDocuments, initialPreference
   const { selectedCurrency, setSelectedCurrency, lastUpdated } = useCurrency();
   const { success, error: showError } = useToast();
   const { requestPermission, isSupported, permission } = useNotifications();
-  
+
 
   const [preferences, setPreferences] = useState({
     language: initialPreferences?.language ?? 'en',
@@ -809,50 +809,50 @@ export default function SettingsPageClient({ initialDocuments, initialPreference
         {/* Settings Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <div className="w-full overflow-x-auto border-b border-border">
-          <TabsList className="inline-flex h-10 items-center justify-start rounded-none bg-transparent p-0 w-full">
-            <TabsTrigger
-              value="profile"
-              className="rounded-none border-b-2 border-transparent bg-transparent px-4 py-2 text-sm font-medium text-muted-foreground transition-all hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:shadow-none"
-            >
-              <User className="w-4 h-4 mr-2" />
-              <span>Profile</span>
-            </TabsTrigger>
-            <TabsTrigger 
-              value="appearance" 
-              className="rounded-none border-b-2 border-transparent bg-transparent px-4 py-2 text-sm font-medium text-muted-foreground transition-all hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:shadow-none"
-            >
-              <Palette className="w-4 h-4 mr-2" />
-              <span>Appearance</span>
-            </TabsTrigger>
-            <TabsTrigger 
-              value="notifications" 
-              className="rounded-none border-b-2 border-transparent bg-transparent px-4 py-2 text-sm font-medium text-muted-foreground transition-all hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:shadow-none"
-            >
-              <Bell className="w-4 h-4 mr-2" />
-              <span>Notifications</span>
-            </TabsTrigger>
-            <TabsTrigger 
-              value="security" 
-              className="rounded-none border-b-2 border-transparent bg-transparent px-4 py-2 text-sm font-medium text-muted-foreground transition-all hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:shadow-none"
-            >
-              <Shield className="w-4 h-4 mr-2" />
-              <span>Security</span>
-            </TabsTrigger>
-            <TabsTrigger 
-              value="categories" 
-              className="rounded-none border-b-2 border-transparent bg-transparent px-4 py-2 text-sm font-medium text-muted-foreground transition-all hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:shadow-none"
-            >
-              <Tag className="w-4 h-4 mr-2" />
-              <span>Categories</span>
-            </TabsTrigger>
-            <TabsTrigger 
-              value="documentation" 
-              className="rounded-none border-b-2 border-transparent bg-transparent px-4 py-2 text-sm font-medium text-muted-foreground transition-all hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:shadow-none"
-            >
-              <FileText className="w-4 h-4 mr-2" />
-              <span>Docs</span>
-            </TabsTrigger>
-          </TabsList>
+            <TabsList className="inline-flex h-10 items-center justify-start rounded-none bg-transparent p-0 w-full">
+              <TabsTrigger
+                value="profile"
+                className="rounded-none border-b-2 border-transparent bg-transparent px-4 py-2 text-sm font-medium text-muted-foreground transition-all hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:shadow-none"
+              >
+                <User className="w-4 h-4 mr-2" />
+                <span>Profile</span>
+              </TabsTrigger>
+              <TabsTrigger
+                value="appearance"
+                className="rounded-none border-b-2 border-transparent bg-transparent px-4 py-2 text-sm font-medium text-muted-foreground transition-all hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:shadow-none"
+              >
+                <Palette className="w-4 h-4 mr-2" />
+                <span>Appearance</span>
+              </TabsTrigger>
+              <TabsTrigger
+                value="notifications"
+                className="rounded-none border-b-2 border-transparent bg-transparent px-4 py-2 text-sm font-medium text-muted-foreground transition-all hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:shadow-none"
+              >
+                <Bell className="w-4 h-4 mr-2" />
+                <span>Notifications</span>
+              </TabsTrigger>
+              <TabsTrigger
+                value="security"
+                className="rounded-none border-b-2 border-transparent bg-transparent px-4 py-2 text-sm font-medium text-muted-foreground transition-all hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:shadow-none"
+              >
+                <Shield className="w-4 h-4 mr-2" />
+                <span>Security</span>
+              </TabsTrigger>
+              <TabsTrigger
+                value="categories"
+                className="rounded-none border-b-2 border-transparent bg-transparent px-4 py-2 text-sm font-medium text-muted-foreground transition-all hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:shadow-none"
+              >
+                <Tag className="w-4 h-4 mr-2" />
+                <span>Categories</span>
+              </TabsTrigger>
+              <TabsTrigger
+                value="documentation"
+                className="rounded-none border-b-2 border-transparent bg-transparent px-4 py-2 text-sm font-medium text-muted-foreground transition-all hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:shadow-none"
+              >
+                <FileText className="w-4 h-4 mr-2" />
+                <span>Docs</span>
+              </TabsTrigger>
+            </TabsList>
           </div>
 
           {/* Tab Content */}
@@ -898,12 +898,11 @@ export default function SettingsPageClient({ initialDocuments, initialPreference
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {/* Light Theme */}
-                  <Card 
-                    className={`cursor-pointer transition-all ${
-                      theme === 'light' 
-                        ? 'ring-2 ring-primary bg-primary/5' 
+                  <Card
+                    className={`cursor-pointer transition-all ${theme === 'light'
+                        ? 'ring-2 ring-primary bg-primary/5'
                         : 'hover:ring-1 hover:ring-primary/50'
-                    }`}
+                      }`}
                     onClick={() => setTheme('light')}
                   >
                     <CardContent className="p-4">
@@ -920,12 +919,11 @@ export default function SettingsPageClient({ initialDocuments, initialPreference
                   </Card>
 
                   {/* Dark Theme */}
-                  <Card 
-                    className={`cursor-pointer transition-all ${
-                      theme === 'dark' 
-                        ? 'ring-2 ring-primary bg-primary/5' 
+                  <Card
+                    className={`cursor-pointer transition-all ${theme === 'dark'
+                        ? 'ring-2 ring-primary bg-primary/5'
                         : 'hover:ring-1 hover:ring-primary/50'
-                    }`}
+                      }`}
                     onClick={() => setTheme('dark')}
                   >
                     <CardContent className="p-4">
@@ -941,27 +939,7 @@ export default function SettingsPageClient({ initialDocuments, initialPreference
                     </CardContent>
                   </Card>
 
-                  {/* High Contrast Theme */}
-                  <Card 
-                    className={`cursor-pointer transition-all ${
-                      theme === 'high-contrast' 
-                        ? 'ring-2 ring-primary bg-primary/5' 
-                        : 'hover:ring-1 hover:ring-primary/50'
-                    }`}
-                    onClick={() => setTheme('high-contrast')}
-                  >
-                    <CardContent className="p-4">
-                      <div className="flex items-center space-x-3 mb-3">
-                        <Contrast className="w-5 h-5 text-foreground" />
-                        <span className="font-medium text-foreground">High Contrast</span>
-                        {theme === 'high-contrast' && <Badge variant="secondary">Active</Badge>}
-                      </div>
-                      <div className="w-full h-16 bg-black border-2 border-white rounded flex items-center justify-center">
-                        <div className="w-8 h-8 bg-white rounded"></div>
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-2">Maximum accessibility</p>
-                    </CardContent>
-                  </Card>
+
                 </div>
               </CardContent>
             </Card>
@@ -981,8 +959,8 @@ export default function SettingsPageClient({ initialDocuments, initialPreference
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="language">Language</Label>
-                    <Select 
-                      value={preferences.language} 
+                    <Select
+                      value={preferences.language}
                       onValueChange={(value) => setPreferences(prev => ({ ...prev, language: value }))}
                     >
                       <SelectTrigger>
@@ -998,8 +976,8 @@ export default function SettingsPageClient({ initialDocuments, initialPreference
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="currency">Currency</Label>
-                    <Select 
-                      value={selectedCurrency} 
+                    <Select
+                      value={selectedCurrency}
                       onValueChange={(value) => {
                         setSelectedCurrency(value);
                         setPreferences(prev => ({ ...prev, currency: value }));
@@ -1191,7 +1169,7 @@ export default function SettingsPageClient({ initialDocuments, initialPreference
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div className="space-y-1">
                     <Label htmlFor="browser-notifications">Browser Notifications</Label>
                     <p className="text-sm text-muted-foreground">Show notifications in your browser</p>
@@ -1215,8 +1193,8 @@ export default function SettingsPageClient({ initialDocuments, initialPreference
                         Enable Notifications
                       </Button>
                     )}
-                  <Switch
-                    id="browser-notifications"
+                    <Switch
+                      id="browser-notifications"
                       checked={notifications.push && permission === 'granted'}
                       onCheckedChange={(checked) => {
                         if (checked && permission !== 'granted') {

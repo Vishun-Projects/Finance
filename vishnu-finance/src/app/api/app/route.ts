@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
+import { clearUserCache } from '@/lib/api-cache';
 
 // Helper functions for analytics
 function processMonthlyTrends(income: any[], expenses: any[], months: number) {
@@ -555,6 +556,9 @@ export async function POST(request: NextRequest) {
         include: { category: true },
       });
 
+      // Clear cache to ensure Advisor/Dashboard see new data
+      await clearUserCache(user.id);
+
       return NextResponse.json({
         ...transaction,
         creditAmount: Number(transaction.creditAmount),
@@ -619,6 +623,9 @@ export async function POST(request: NextRequest) {
         include: { category: true },
       });
 
+      // Clear cache
+      await clearUserCache(user.id);
+
       return NextResponse.json({
         ...updated,
         creditAmount: Number(updated.creditAmount),
@@ -654,6 +661,9 @@ export async function POST(request: NextRequest) {
         where: { id },
         data: { isDeleted: true, deletedAt: new Date() },
       });
+
+      // Clear cache
+      await clearUserCache(user.id);
 
       return NextResponse.json({
         id: deleted.id,
@@ -701,6 +711,9 @@ export async function POST(request: NextRequest) {
         });
         deletedCount += result.count;
       }
+
+      // Clear cache
+      await clearUserCache(user.id);
 
       return NextResponse.json({
         success: true,
@@ -868,6 +881,295 @@ export async function POST(request: NextRequest) {
         failed: failureCount,
         results,
       });
+    }
+
+    // Transactions - Auto Categorize (Smart Hybrid)
+    if (action === 'transactions_auto_categorize') {
+      const { AuthService } = await import('@/lib/auth');
+      const { prisma } = await import('@/lib/db');
+      const { categorizeTransactionsBatch } = await import('@/lib/gemini');
+
+      const authToken = request.cookies.get('auth-token');
+      if (!authToken) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      const user = await AuthService.getUserFromToken(authToken.value);
+      if (!user || !user.isActive) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+      try {
+        // Fetch all categories to build a name->id lookup
+        const allCategories = await (prisma as any).category.findMany({
+          where: { OR: [{ userId: user.id }, { isDefault: true }] }
+        });
+
+        // Build category lookup by name (case-insensitive)
+        const categoryByName = new Map<string, string>();
+        allCategories.forEach((c: any) => {
+          categoryByName.set(c.name.toLowerCase(), c.id);
+        });
+
+        // Find "Other" category ID to EXCLUDE from matching
+        const otherCategoryId = allCategories.find((c: any) =>
+          c.name.toLowerCase() === 'other' || c.name.toLowerCase() === 'miscellaneous'
+        )?.id;
+
+        // DETERMINISTIC RULES ENGINE - Using EXACT category names from database
+        // Categories: salary, freelance, investment, business, other income, housing, food, 
+        // transportation, utilities, entertainment, healthcare, education, shopping, insurance,
+        // other expenses, food & dining, personal care, travel, subscriptions, debt payment, taxes
+        const PATTERN_RULES: Array<[string[], string]> = [
+          // ===== BANK CHARGES & FEES → 'other expenses' =====
+          [['min bal chg', 'minimum balance', 'service charge', 'atm amc', 'uncoll chrg', 'sms chg', 'annual fee', 'maintenance charge', 'eft charge'], 'other expenses'],
+
+          // ===== ATM WITHDRAWAL / CASH → 'other expenses' =====
+          [['atm wdl', 'tran date', 'atm id', 'cash withdrawal', 'self-', '/self'], 'other expenses'],
+
+          // ===== INCOME → 'salary' or 'other income' =====
+          [['credit interest', 'interest credit', 'neft/hdfc', 'word publish'], 'other income'],
+          [['salary', 'credited'], 'salary'],
+
+          // ===== GROCERIES & DAILY NEEDS → 'food' =====
+          [['milk', 'dud', 'dudh', 'aata', 'atta', 'grocery', 'kirana', 'vegetables', 'sabzi', 'fruits', 'eggs', 'anda', 'rice', 'dal', 'sugar', 'tel', 'oil', 'ghee', 'paneer', 'dahi', 'curd', 'aloo', 'pyaz', 'tamatar', 'soyabean'], 'food'],
+
+          // ===== FOOD & SNACKS → 'food & dining' =====
+          [['paan', 'panipuri', 'chai', 'tea', 'samosa', 'snacks', 'vada', 'poha', 'nashta', 'breakfast', 'lunch', 'dinner', 'hotel', 'dhaba', 'restaurant', 'biryani', 'thali', 'meals', 'frooti', 'cold drink', 'juice', 'dhaniya', 'bhindi'], 'food & dining'],
+          [['swiggy', 'zomato', 'dominos', 'pizza', 'mcdonalds', 'kfc', 'burger king', 'starbucks', 'cafe', 'subway'], 'food & dining'],
+
+          // ===== SWEETS & BAKERY → 'food & dining' =====
+          [['sweets', 'mithai', 'bakery', 'cake', 'pastry', 'dryfruit', 'dry fruit', 'chocolate', 'dairy milk'], 'food & dining'],
+
+          // ===== MEDICAL / HEALTHCARE → 'healthcare' =====
+          [['medical', 'medico', 'pharmacy', 'medicine', 'chemist', 'hospital', 'clinic', 'doctor', 'apollo', 'medplus', '1mg', 'pharmeasy', 'netmeds', 'diagnostic', 'lab', 'cipladine', 'tablet', 'dawai'], 'healthcare'],
+
+          // ===== UTILITIES & RECHARGE → 'utilities' =====
+          [['recharge', 'gpayrecharge', 'vodaf', 'airtel', 'jio', 'bsnl', 'electricity', 'bijli', 'gas', 'lpg', 'water bill', 'broadband', 'wifi', 'internet', 'dth', 'tata sky', 'dish tv'], 'utilities'],
+
+          // ===== TRANSPORT → 'transportation' =====
+          [['uber', 'ola', 'rapido', 'taxi', 'cab', 'metro', 'railway', 'indian railways', 'irctc', 'bus', 'petrol', 'diesel', 'fuel', 'cng', 'parking', 'toll'], 'transportation'],
+
+          // ===== SHOPPING → 'shopping' =====
+          [['amazon', 'flipkart', 'myntra', 'ajio', 'nykaa', 'meesho', 'bigbasket', 'blinkit', 'zepto', 'instamart', 'jiomart', 'dmart', 'shopping', 'cloth', 'kapda', 'footwear', 'shoe'], 'shopping'],
+
+          // ===== ENTERTAINMENT → 'entertainment' =====
+          [['netflix', 'hotstar', 'spotify', 'prime video', 'youtube', 'bookmyshow', 'cinema', 'pvr', 'inox', 'movie', 'game'], 'entertainment'],
+
+          // ===== SUBSCRIPTIONS → 'subscriptions' =====
+          [['subscription', 'monthly', 'renewal', 'autopay'], 'subscriptions'],
+
+          // ===== GIFTS → 'gifts & donations' =====
+          [['gift', 'rakhi', 'shagun', 'mehendi', 'henna', 'birthday', 'anniversary', 'festival', 'donation', 'charity'], 'gifts & donations'],
+
+          // ===== PERSONAL CARE → 'personal care' =====
+          [['salon', 'parlour', 'haircut', 'beauty', 'wheel', 'dettol', 'soap', 'shampoo', 'gum', 'prints', 'stationery'], 'personal care'],
+
+          // ===== INVESTMENTS → 'investment' =====
+          [['zerodha', 'groww', 'upstox', 'mutual fund', 'sip', 'fd', 'stock', 'trading'], 'investment'],
+
+          // ===== INSURANCE → 'insurance' =====
+          [['insurance', 'lic', 'policy', 'premium'], 'insurance'],
+
+          // ===== EDUCATION → 'education' =====
+          [['school', 'college', 'tuition', 'coaching', 'course', 'training'], 'education'],
+
+          // ===== HOUSING → 'housing' =====
+          [['rent', 'landlord', 'society', 'maintenance', 'flat', 'apartment'], 'housing'],
+
+          // ===== LOANS & EMI → 'debt payment' =====
+          [['emi', 'loan', 'bajaj finserv', 'repayment'], 'debt payment'],
+
+          // ===== TRAVEL → 'travel' =====
+          [['hotel', 'oyo', 'booking', 'airbnb', 'trip', 'vacation', 'holiday', 'flight', 'airline'], 'travel'],
+
+          // ===== TAXES → 'taxes' =====
+          [['tax', 'gst', 'income tax', 'tds'], 'taxes'],
+        ];
+
+        // Category fallback mappings (if pattern name doesn't match, try these)
+        const CATEGORY_FALLBACKS: Record<string, string[]> = {
+          'bank charges': ['bank fees', 'charges', 'fees', 'other'],
+          'cash': ['cash withdrawal', 'atm', 'other'],
+          'income': ['salary', 'earnings', 'other income', 'income'],
+          'groceries': ['grocery', 'food', 'food & dining', 'shopping'],
+          'food & dining': ['food', 'dining', 'restaurants', 'eating out'],
+          'healthcare': ['medical', 'health', 'pharmacy'],
+          'utilities': ['bills', 'recharge', 'mobile'],
+          'transport': ['travel', 'transportation', 'commute'],
+          'shopping': ['personal', 'lifestyle'],
+          'entertainment': ['subscriptions', 'leisure'],
+          'gifts': ['gifts & donations', 'personal'],
+          'personal care': ['lifestyle', 'personal', 'shopping'],
+          'investments': ['savings', 'finance'],
+          'insurance': ['finance', 'other'],
+          'education': ['learning', 'other'],
+          'housing': ['rent', 'home', 'other'],
+          'emi & loans': ['emi', 'loans', 'finance'],
+        };
+
+        // Helper to find category by pattern
+        // Improved: Removes all non-alphanumeric chars for matching (handles "mil k", "pay-tm", "gro.cery")
+        const findCategoryByPattern = (text: string): string | null => {
+          const lowerText = text.toLowerCase();
+          const cleanText = lowerText.replace(/[^a-z0-9]/g, ''); // "mil K!" -> "milk"
+
+          for (const [keywords, categoryName] of PATTERN_RULES) {
+            for (const keyword of keywords) {
+              const cleanKeyword = keyword.replace(/[^a-z0-9]/g, '');
+              if (cleanKeyword.length < 3) continue; // Skip very short keywords to avoid false positives
+
+              // match if clean keyword is found in clean text
+              if (cleanText.includes(cleanKeyword)) {
+                // Found keyword match! Now find category ID
+
+                // 1. Try exact category name match
+                for (const [catName, catId] of categoryByName.entries()) {
+                  if (catName === categoryName.toLowerCase()) {
+                    if (catId !== otherCategoryId) return catId;
+                  }
+                }
+
+                // 2. Try partial category name match
+                for (const [catName, catId] of categoryByName.entries()) {
+                  if (catName.includes(categoryName.toLowerCase()) || categoryName.toLowerCase().includes(catName)) {
+                    if (catId !== otherCategoryId) return catId;
+                  }
+                }
+
+                // 3. Try fallback category names
+                const fallbacks = CATEGORY_FALLBACKS[categoryName] || [];
+                for (const fallback of fallbacks) {
+                  for (const [catName, catId] of categoryByName.entries()) {
+                    if (catName.includes(fallback) || fallback.includes(catName)) {
+                      if (catId !== otherCategoryId) return catId;
+                    }
+                  }
+                }
+              }
+            }
+          }
+          return null;
+        };
+
+        // DEBUG: Log categories available
+        console.log('[AutoCat] Categories available:', Array.from(categoryByName.keys()));
+
+        // Fetch Batch of Uncategorized
+        const batchSize = 100;
+        const transactions = await (prisma as any).transaction.findMany({
+          where: { userId: user.id, categoryId: null, isDeleted: false },
+          take: batchSize,
+          select: { id: true, description: true, debitAmount: true, creditAmount: true, store: true }
+        });
+
+        const totalRemaining = await (prisma as any).transaction.count({
+          where: { userId: user.id, categoryId: null, isDeleted: false }
+        });
+
+        if (transactions.length === 0) {
+          // Debug: Count total and categorized separately
+          const totalTx = await (prisma as any).transaction.count({
+            where: { userId: user.id, isDeleted: false }
+          });
+          const categorizedTx = await (prisma as any).transaction.count({
+            where: { userId: user.id, isDeleted: false, categoryId: { not: null } }
+          });
+
+          return NextResponse.json({
+            processed: 0, updated: 0, rulesMatched: 0, aiMatched: 0, remaining: 0,
+            message: 'No uncategorized transactions found for this user',
+            debug: {
+              userId: user.id,
+              userTransactions: totalTx,
+              userCategorized: categorizedTx,
+              userUncategorized: totalTx - categorizedTx,
+              categories: Array.from(categoryByName.keys()).slice(0, 10)
+            }
+          });
+        }
+
+        // Apply Pattern Matching FIRST (deterministic, no AI needed)
+        const aiBatch: any[] = [];
+        const updates: Array<{ id: string, categoryId: string, method: 'RULE' | 'AI' }> = [];
+
+        for (const t of transactions) {
+          const fullText = ((t.description || '') + ' ' + (t.store || '')).toLowerCase();
+
+          // Try pattern matching first
+          const matchedCategoryId = findCategoryByPattern(fullText);
+
+          if (matchedCategoryId) {
+            updates.push({ id: t.id, categoryId: matchedCategoryId, method: 'RULE' });
+          } else {
+            aiBatch.push(t);
+          }
+        }
+
+        // AI Fallback for truly unmatched (ENABLE for all batches, processing locally limited if needed)
+        // We'll process up to 30 items for AI to prevent token limits, but won't skip entirely
+        if (aiBatch.length > 0) {
+          const aiProcessBatch = aiBatch.slice(0, 40); // Process chunk of 40 max per request to be safe with tokens
+          const categories = allCategories.filter((c: any) =>
+            c.id !== otherCategoryId &&
+            !c.name.toLowerCase().includes('miscellaneous')
+          );
+
+          const mappedForAi = aiProcessBatch.map((t: any) => ({
+            id: t.id, description: t.description,
+            amount: Number(t.debitAmount || t.creditAmount), store: t.store || undefined
+          }));
+
+          try {
+            console.log(`[AI Batch] Sending ${mappedForAi.length} items to AI`);
+            const aiResults = await categorizeTransactionsBatch(mappedForAi, categories.map((c: any) => ({ id: c.id, name: c.name, type: c.type })));
+
+            console.log(`[AI Batch] Received ${aiResults.length} results`);
+            if (aiResults.length > 0) console.log(`[AI Batch] Sample result:`, aiResults[0]);
+
+            for (const res of aiResults) {
+              if (res.categoryId && res.confidence > 0.5 && res.categoryId !== otherCategoryId) {
+                updates.push({ id: res.id, categoryId: res.categoryId, method: 'AI' });
+              }
+            }
+          } catch (e) {
+            console.error("AI Batch failed (exception)", e);
+          }
+        }
+
+        // Execute Updates
+        let updatedCount = 0;
+        let rulesCount = 0;
+        let aiCount = 0;
+
+        await Promise.all(updates.map(async (u) => {
+          try {
+            await (prisma as any).transaction.update({ where: { id: u.id }, data: { categoryId: u.categoryId } });
+            updatedCount++;
+            if (u.method === 'RULE') rulesCount++; else aiCount++;
+          } catch (e) { }
+        }));
+
+        await clearUserCache(user.id);
+
+        return NextResponse.json({
+          message: 'Categorization complete',
+          processed: transactions.length,
+          updated: updatedCount,
+          rulesMatched: rulesCount,
+          aiMatched: aiCount,
+          remaining: Math.max(0, totalRemaining - transactions.length),
+          unmatched: aiBatch.length - aiCount,
+          debug: {
+            categoriesAvailable: Array.from(categoryByName.keys()),
+            patternsActive: PATTERN_RULES.length,
+            sampleUnmatched: aiBatch.slice(0, 3).map((t: any) => ({
+              id: t.id.substring(0, 10),
+              desc: (t.description || '').substring(0, 80),
+              store: t.store
+            }))
+          }
+        });
+
+      } catch (err: any) {
+        console.error("Auto categorize error:", err);
+        return NextResponse.json({ error: err.message || 'Auto categorization failed' }, { status: 500 });
+      }
     }
 
     // Transactions - Categorize
@@ -1641,39 +1943,41 @@ export async function POST(request: NextRequest) {
     if (action === 'analytics_get') {
       const { userId, period = '6' } = body || {};
       if (!userId) return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
-      const { QueryOptimizer } = await import('@/lib/api-cache');
-      const dashboardData = await QueryOptimizer.optimizedDashboardData(userId);
-      const totalIncome = dashboardData.income.reduce((sum: number, item: any) => sum + parseFloat(item.amount), 0);
-      const totalExpenses = dashboardData.expenses.reduce((sum: number, item: any) => sum + parseFloat(item.amount), 0);
-      const netSavings = totalIncome - totalExpenses;
-      const savingsRate = totalIncome > 0 ? (netSavings / totalIncome) * 100 : 0;
-      const monthlyTrends = processMonthlyTrends(dashboardData.income, dashboardData.expenses, parseInt(String(period)));
-      const categoryBreakdown = processCategoryBreakdown(dashboardData.expenses);
+
+      const { dashboardService } = await import('@/lib/dashboard-service');
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setMonth(startDate.getMonth() - parseInt(String(period)));
+      startDate.setDate(1);
+
+      const data = await dashboardService.getSimpleStats({ userId, startDate, endDate });
+      const totalDetails = data.categoryBreakdown.reduce((acc, item) => acc + item.amount, 0);
+
       return NextResponse.json({
-        totalIncome,
-        totalExpenses,
-        netSavings,
-        savingsRate,
-        monthlyTrends,
-        categoryBreakdown,
-        activeGoals: dashboardData.goals.length,
-        upcomingDeadlines: dashboardData.deadlines.length,
-        recentTransactions: [
-          ...dashboardData.income.slice(0, 3).map((item: any) => ({
-            id: item.id,
-            type: 'income',
-            amount: parseFloat(item.amount),
-            description: item.name,
-            date: item.startDate,
-          })),
-          ...dashboardData.expenses.slice(0, 3).map((item: any) => ({
-            id: item.id,
-            type: 'expense',
-            amount: parseFloat(item.amount),
-            description: item.description,
-            date: item.date,
-          })),
-        ].sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime()),
+        totalIncome: data.totalIncome,
+        totalExpenses: data.totalExpenses,
+        netSavings: data.netSavings,
+        savingsRate: data.savingsRate,
+        monthlyTrends: data.monthlyTrends.map((t: any) => ({
+          month: t.month,
+          income: t.income,
+          expenses: t.expenses,
+          savings: t.savings
+        })),
+        categoryBreakdown: data.categoryBreakdown.map((c: any) => ({
+          category: c.name,
+          amount: c.amount,
+          percentage: totalDetails > 0 ? (c.amount / totalDetails) * 100 : 0
+        })),
+        activeGoals: data.activeGoals,
+        upcomingDeadlines: data.upcomingDeadlines,
+        recentTransactions: data.recentTransactions.map((t: any) => ({
+          id: t.id,
+          type: t.type === 'credit' ? 'income' : t.type === 'debit' ? 'expense' : t.type,
+          amount: Math.abs(t.amount),
+          description: t.title,
+          date: t.date
+        }))
       });
     }
 

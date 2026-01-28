@@ -1,6 +1,6 @@
 import { Suspense } from 'react';
 import SimpleDashboard from '@/components/dashboard/simple-dashboard';
-import { RouteLoadingState } from '@/components/feedback/route-fallbacks';
+import PageSkeleton from '@/components/page-skeleton';
 import { loadDashboardSummary } from '@/lib/loaders/dashboard';
 import { requireUser } from '@/lib/auth/server-auth';
 import type { SimpleDashboardData } from '@/components/simple-dashboard';
@@ -25,14 +25,7 @@ export default async function DashboardPage() {
   }
 
   return (
-    <Suspense
-      fallback={
-        <RouteLoadingState
-          title="Loading your dashboard"
-          description="Crunching the latest transactions and insights…"
-        />
-      }
-    >
+    <Suspense fallback={<PageSkeleton />}>
       <SimpleDashboard
         initialData={initialData}
         initialStartDate={startDate}

@@ -1,7 +1,6 @@
-
 import { Suspense } from 'react';
-import ExpenseManagementPageClient from './page-client';
-import { RouteLoadingState } from '@/components/feedback/route-fallbacks';
+import ExpenseManagementPageClient from '@/app/(app)/expense-management/page-client';
+import PageSkeleton from '@/components/page-skeleton';
 import { requireUser } from '@/lib/auth/server-auth';
 import { getCurrentMonthRange } from '@/lib/date-range';
 import { loadTransactionsBootstrap, loadTransactionCategories } from '@/lib/loaders/transactions';
@@ -37,15 +36,7 @@ export default async function ExpenseManagementPage() {
     };
 
     return (
-        <Suspense
-            fallback={
-                <RouteLoadingState
-                    title="Loading Expense Management"
-                    description="Preparing your premium analytics dashboard…"
-                    className="min-h-[50vh]"
-                />
-            }
-        >
+        <Suspense fallback={<PageSkeleton />}>
             <ExpenseManagementPageClient bootstrap={bootstrap} />
         </Suspense>
     );

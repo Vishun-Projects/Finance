@@ -3,12 +3,7 @@
 import { useEffect } from 'react';
 
 export function AuthLayoutClient({ children }: { children: React.ReactNode }) {
-  // Force light theme on auth pages
-  useEffect(() => {
-    document.documentElement.classList.remove('dark', 'high-contrast');
-    document.documentElement.classList.add('light');
-  }, []);
-
+  // Theme is managed by ThemeProvider, do not force light mode
   return <>{children}</>;
 }
 

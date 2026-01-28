@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 
 export interface User {
   id: string;
@@ -47,20 +48,22 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
   const [loading, setLoading] = useState(!hasInitialSnapshot);
   const [error, setError] = useState<string | null>(null);
 
+  const router = useRouter();
+
   const checkAuth = useCallback(async () => {
     const startTime = Date.now();
     try {
       console.log('🔐 AUTH CONTEXT - Starting auth check...');
       setLoading(true);
       setError(null);
-      
+
       const response = await fetch('/api/app', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'auth_me' }),
       });
       console.log('🔐 AUTH CONTEXT - /api/app auth_me response status:', response.status);
-      
+
       if (response.ok) {
         const data = await response.json();
         console.log('🔐 AUTH CONTEXT - User data received:', JSON.stringify(data, null, 2));
@@ -99,15 +102,15 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
       console.log('🔐 AUTH CONTEXT - Starting login...');
       setLoading(true);
       setError(null);
-      
+
       const response = await fetch('/api/app', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'auth_login', email, password }),
       });
-      
+
       console.log('🔐 AUTH CONTEXT - Login response status:', response.status);
-      
+
       if (response.ok) {
         const data = await response.json();
         console.log('🔐 AUTH CONTEXT - Login successful, user data:', JSON.stringify(data, null, 2));
@@ -140,15 +143,17 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
       });
       setUser(null);
       // Reset theme to light on logout
-      document.documentElement.classList.remove('dark', 'high-contrast');
+      document.documentElement.classList.remove('dark');
       // Clear any theme-related localStorage if needed
       if (typeof window !== 'undefined') {
         localStorage.removeItem('theme');
       }
+      // Redirect to login page
+      router.push('/auth');
     } catch (err) {
       console.error('Logout failed:', err);
     }
-  }, []);
+  }, [router]);
 
   const refreshUser = useCallback(async (): Promise<void> => {
     await checkAuth();

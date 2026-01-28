@@ -1,4 +1,5 @@
 import { prisma } from './db';
+import { getCachedData, setCachedData, CACHE_TTL } from './api-cache';
 
 export interface DateRange {
   startDate?: Date;
@@ -42,6 +43,8 @@ export interface FinancialSummary {
  */
 export async function analyzeUserFinances(userId: string, dateRange?: DateRange): Promise<FinancialSummary> {
   try {
+
+
     // Build date filter - use provided date range or default to all transactions
     const dateFilter: any = { isDeleted: false };
     if (dateRange?.startDate || dateRange?.endDate) {
@@ -54,18 +57,38 @@ export async function analyzeUserFinances(userId: string, dateRange?: DateRange)
       }
     }
 
-    const transactions = await prisma.transaction.findMany({
-      where: {
-        userId,
-        ...dateFilter,
-      },
-      include: {
-        category: true,
-      },
-      orderBy: {
-        transactionDate: 'asc',
-      },
-    });
+    // AI OPTIMIZATION: Try to fetch from JSON cache first
+    // Create a cache key based on user and date range
+    const cacheKey = `finance_summary:${userId}:${dateRange?.startDate?.toISOString() || 'all'}:${dateRange?.endDate?.toISOString() || 'all'}`;
+    let transactions: any[] | null = await getCachedData(cacheKey);
+
+    if (!transactions) {
+      transactions = await prisma.transaction.findMany({
+        where: {
+          userId,
+          ...dateFilter,
+        },
+        include: {
+          category: true,
+        },
+        orderBy: {
+          transactionDate: 'asc',
+        },
+      });
+
+      // Cache this heavy query result
+      // Use a longer TTL (e.g. 5 minutes or 1 hour depending on needs, using USER_DATA as safe default)
+      await setCachedData(cacheKey, transactions, CACHE_TTL.USER_DATA);
+    } else {
+      // Hydrate dates from JSON (they come back as strings)
+      transactions = transactions.map(t => ({
+        ...t,
+        transactionDate: new Date(t.transactionDate),
+        createdAt: new Date(t.createdAt),
+        updatedAt: new Date(t.updatedAt),
+        // ensure other dates are hydrated if needed
+      }));
+    }
 
     // Calculate totals
     const totalIncome = transactions

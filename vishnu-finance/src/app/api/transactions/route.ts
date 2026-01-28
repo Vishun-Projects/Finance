@@ -41,8 +41,8 @@ export async function GET(request: NextRequest) {
     // Pagination
     const page = parseInt(searchParams.get('page') || '1');
     const pageSizeParam = searchParams.get('pageSize');
-    // Allow larger page sizes for "all time" queries, but cap at 5000 for safety
-    const pageSize = pageSizeParam === 'all' ? 5000 : Math.min(parseInt(pageSizeParam || '50'), 5000);
+    // Allow larger page sizes for "all time" queries, but cap at 500 for safety to prevent timeouts
+    const pageSize = pageSizeParam === 'all' ? 500 : Math.min(parseInt(pageSizeParam || '50'), 500);
     const skip = (page - 1) * pageSize;
 
     // Check if we need totals (for summary cards)

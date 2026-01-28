@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Plus, Search, Filter, X, RefreshCw, CheckSquare, Square, Trash2, RotateCw, Tag, Layers, ChevronLeft, ChevronRight, Sparkles, Check, Calendar as CalendarIcon, FileText, Upload, AlertCircle, TrendingUp, ChevronDown, Edit, Download, ArrowUp, ShoppingCart, Utensils, Zap, ShoppingBag } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from 'recharts';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCurrency } from '../contexts/CurrencyContext';
@@ -12,6 +13,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { format, startOfMonth, subDays } from 'date-fns';
 import { DateRange } from 'react-day-picker';
+import { Skeleton } from '@/components/ui/skeleton';
 import TransactionCard from './transaction-card';
 import TransactionFormModal, { TransactionFormData } from './transaction-form-modal';
 import FabButton from './ui/fab-button';
@@ -379,6 +381,8 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
   // Handle period changes to update date range (synced with Expense Management)
   useEffect(() => {
     if (!period || period === 'custom') return;
+
+    // Calculate target dates based on period
     const end = new Date();
     let start = new Date();
 
@@ -393,15 +397,39 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
     const newStart = format(start, 'yyyy-MM-dd');
     const newEnd = format(end, 'yyyy-MM-dd');
 
-    // Only update if different from current
+    // Only update if we are NOT already in this range
+    // This prevents the effect from firing when we navigate to "Overall" (which changes startDate/endDate)
+    // and resetting us back to "Monthly" because period is still 'monthly'.
     if (newStart !== startDate || newEnd !== endDate) {
+      // Safe guard: Only update if the current range doesn't match 'all' or other specific quick ranges
+      // If the user selected 'all', startDate will be 2020...
+      // We shouldn't overwrite it unless the user *explicitly* clicked a Period toggle (which updates 'period').
+      // However, we don't know if the user clicked or it's default.
+      // The issue is 'period' state is 'monthly' by default.
+
+      // Fix: We only want this to run when 'period' CHANGES. 
+      // But React runs it on mount too.
+      // We can check if quickRange is 'custom' or 'all', in which case we ignore 'period' default.
+      if (quickRange !== 'custom' && quickRange !== 'month' && quickRange !== 'lastMonth') {
+        // If we are in 'all' mode, ignore the 'monthly' default period
+        return;
+      }
+
+      // Actually, the best fix is to simply NOT update if the period is just the default and hasn't changed.
+      // But we can't easily track "changed".
+
+      // Let's rely on the fact that QuickRange chips update 'quickRange'.
+      // If quickRange is 'all', 'year', 'quarter', we should ignore 'period=monthly'.
+      const isCompatibleRange = quickRange === 'month' || quickRange === 'custom';
+      if (period === 'monthly' && !isCompatibleRange) return;
+
       updateURLParams({
         range: 'custom',
         startDate: newStart,
         endDate: newEnd,
       });
     }
-  }, [period, updateURLParams, startDate, endDate]);
+  }, [period]); // REMOVED startDate, endDate, updateURLParams, quickRange from dependency to avoid loop/conflict
 
   // Apply quick range
   const applyQuickRange = useCallback((range: QuickRange) => {
@@ -1803,6 +1831,116 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
             </div>
 
             <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                className="hidden lg:flex items-center gap-2 bg-gradient-to-r from-violet-500/10 to-purple-500/10 hover:from-violet-500/20 hover:to-purple-500/20 border-purple-500/20 text-purple-600 dark:text-purple-400 font-bold text-[10px] uppercase tracking-widest h-10 px-4 transition-all"
+                onClick={async () => {
+                  if (isBulkUpdating) return;
+                  setIsBulkUpdating(true);
+                  let totalRules = 0;
+                  let totalAI = 0;
+
+                  try {
+                    success('Smart Categorization', 'Starting analysis (Hybrid Rules + AI)...');
+
+                    let hasMore = true;
+                    let safetyLimit = 100;
+                    let consecutiveFiles = 0;
+
+                    while (hasMore && safetyLimit > 0) {
+                      try {
+                        const res = await fetch('/api/app', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ action: 'transactions_auto_categorize' })
+                        });
+
+                        // Handle Rate Limiting (Status 429)
+                        if (res.status === 429) {
+                          success('Rate Limit', 'API Quota hit. Waiting 40s...');
+                          await new Promise(r => setTimeout(r, 40000));
+                          continue;
+                        }
+
+                        const text = await res.text();
+
+                        // Check for error in text body (sometimes 500 returns json with error)
+                        if (!res.ok) {
+                          if (text.includes('429') || text.includes('quota') || text.includes('Too Many Requests')) {
+                            success('Rate Limit', 'API Quota hit. Waiting 40s...');
+                            await new Promise(r => setTimeout(r, 40000));
+                            continue;
+                          }
+                          throw new Error('API Request Failed: ' + text);
+                        }
+
+                        const data = JSON.parse(text);
+
+                        // Check for error in JSON property
+                        if (data.error) {
+                          if (JSON.stringify(data.error).includes('429') || JSON.stringify(data.error).includes('quota')) {
+                            success('Rate Limit', 'API Quota hit. Waiting 40s...');
+                            await new Promise(r => setTimeout(r, 40000));
+                            continue;
+                          }
+                          // Warn but don't stop? Or stop?
+                          console.error("Batch error", data.error);
+                        }
+
+                        const batchRules = data.rulesMatched || 0;
+                        const batchAI = data.aiMatched || 0;
+                        const batchUpdated = data.updated || 0;
+
+                        totalRules += batchRules;
+                        totalAI += batchAI;
+
+                        /*
+                        if (data.processed > 0 && batchUpdated === 0) {
+                          consecutiveFiles++;
+                        } else {
+                          consecutiveFiles = 0;
+                        }
+                        */
+
+                        success('Progress', `Updated: ${totalRules + totalAI} (Rules: ${totalRules}, AI: ${totalAI}). Remaining: ${data.remaining}`);
+
+                        if (data.processed === 0 || (data.remaining === 0 && data.processed < 50)) {
+                          hasMore = false;
+                        }
+                        // Removed auto-pause logic as requested
+                        /* else if (consecutiveFiles >= 5) {
+                          showError('Paused', 'Stopping loop: AI cannot categorize remaining items.');
+                          hasMore = false;
+                        } */
+
+                      } catch (err: any) {
+                        if (String(err).includes('quota') || String(err).includes('429')) {
+                          success('Rate Limit', 'API Quota hit. Waiting 40s...');
+                          await new Promise(r => setTimeout(r, 40000));
+                          continue;
+                        }
+                        throw err;
+                      }
+
+                      // Small delay to be nice to API
+                      await new Promise(r => setTimeout(r, 1500));
+                      safetyLimit--;
+                    }
+
+                    success('Completed', `Finished! Total Updated: ${totalRules + totalAI} (Rules: ${totalRules}, AI: ${totalAI}).`);
+                    fetchTransactions();
+                  } catch (e) {
+                    console.error(e);
+                    showError('Error', 'Auto-categorization process interrupted.');
+                  } finally {
+                    setIsBulkUpdating(false);
+                  }
+                }}
+                disabled={isBulkUpdating}
+              >
+                <Sparkles size={14} className={cn(isBulkUpdating && "animate-spin")} />
+                {isBulkUpdating ? 'Processing...' : 'Auto-Cat (Smart)'}
+              </Button>
               <div className="flex items-center bg-card/50 border border-border rounded-lg p-1 shadow-sm">
                 {(['daily', 'weekly', 'monthly'] as const).map((p) => (
                   <button
@@ -1865,21 +2003,29 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                   <Badge variant="outline" className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground bg-card/50 px-2 py-0.5">{rangeLabel}</Badge>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="bg-card border border-border p-6 rounded-2xl hover:border-emerald-500/30 transition-all shadow-sm group">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-4 group-hover:text-emerald-500 transition-colors">Total Income</p>
-                    <h3 className="text-2xl font-black text-emerald-500">{formatAmount(income)}</h3>
-                    <p className="text-[10px] text-muted-foreground mt-1">Total inflow in this range</p>
-                  </div>
-                  <div className="bg-card border border-border p-6 rounded-2xl hover:border-foreground/30 transition-all shadow-sm group">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-4 group-hover:text-foreground transition-colors">Total Spends</p>
-                    <h3 className="text-2xl font-black text-foreground">{formatAmount(expense)}</h3>
-                    <p className="text-[10px] text-muted-foreground mt-1">Total outflow in this range</p>
-                  </div>
-                  <div className="bg-card border border-border p-6 rounded-2xl border-t-4 border-t-primary/20 hover:border-primary/50 transition-all shadow-sm group">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-4 group-hover:text-primary transition-colors">Net Flow</p>
-                    <h3 className="text-2xl font-black text-foreground">{formatAmount(net)}</h3>
-                    <p className="text-[10px] text-muted-foreground mt-1">Savings or deficit</p>
-                  </div>
+                  {isLoading ? (
+                    [1, 2, 3].map((i) => (
+                      <Skeleton key={i} className="h-32 w-full rounded-2xl" />
+                    ))
+                  ) : (
+                    <>
+                      <div className="bg-card border border-border p-6 rounded-2xl hover:border-emerald-500/30 transition-all shadow-sm group">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-4 group-hover:text-emerald-500 transition-colors">Total Income</p>
+                        <h3 className="text-2xl font-black text-emerald-500">{formatAmount(income)}</h3>
+                        <p className="text-[10px] text-muted-foreground mt-1">Total inflow in this range</p>
+                      </div>
+                      <div className="bg-card border border-border p-6 rounded-2xl hover:border-foreground/30 transition-all shadow-sm group">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-4 group-hover:text-foreground transition-colors">Total Spends</p>
+                        <h3 className="text-2xl font-black text-foreground">{formatAmount(expense)}</h3>
+                        <p className="text-[10px] text-muted-foreground mt-1">Total outflow in this range</p>
+                      </div>
+                      <div className="bg-card border border-border p-6 rounded-2xl border-t-4 border-t-primary/20 hover:border-primary/50 transition-all shadow-sm group">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-4 group-hover:text-primary transition-colors">Net Flow</p>
+                        <h3 className="text-2xl font-black text-foreground">{formatAmount(net)}</h3>
+                        <p className="text-[10px] text-muted-foreground mt-1">Savings or deficit</p>
+                      </div>
+                    </>
+                  )}
                 </div>
                 <div className="flex gap-4 mt-4 text-[10px] text-muted-foreground font-black uppercase tracking-widest">
                   <span className="bg-muted px-2 py-1 rounded-md">{count} records identified</span>
@@ -1904,7 +2050,23 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                   </thead>
                   <tbody className="divide-y divide-border/50">
                     {isLoading && !transactions.length ? (
-                      <tr><td colSpan={6} className="px-6 py-16 text-center text-muted-foreground italic font-medium">Loading your transactions...</td></tr>
+                      <tr>
+                        <td colSpan={showSelectionMode ? 6 : 5} className="px-6 py-5">
+                          <div className="space-y-4">
+                            {[1, 2, 3, 4, 5].map((i) => (
+                              <div key={i} className="flex items-center justify-between gap-4">
+                                <Skeleton className="h-12 w-12 rounded-xl" />
+                                <div className="space-y-2 flex-1">
+                                  <Skeleton className="h-4 w-[30%]" />
+                                  <Skeleton className="h-3 w-[20%]" />
+                                </div>
+                                <Skeleton className="h-8 w-24 rounded-lg" />
+                                <Skeleton className="h-4 w-24" />
+                              </div>
+                            ))}
+                          </div>
+                        </td>
+                      </tr>
                     ) : filteredTransactions.length === 0 ? (
                       <tr><td colSpan={6} className="px-6 py-16 text-center text-muted-foreground italic font-medium">No transactions found matching criteria.</td></tr>
                     ) : (
@@ -2019,29 +2181,73 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
               </Button>
             </div>
 
-            {/* Monthly Spend Card */}
+            {/* Expenditure Chart Card */}
             <div className="bg-card border border-border p-6 rounded-2xl mb-8 shadow-sm">
-              <p className="text-muted-foreground text-[10px] font-bold uppercase tracking-widest mb-2">Expenditure Summary</p>
-              <div className="flex items-end gap-3 mb-6">
-                <h3 className="text-3xl font-bold tracking-tighter">{formatAmount(expense)}</h3>
-                <div className="bg-emerald-500/10 text-emerald-500 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center mb-1 border border-emerald-500/20">
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-muted-foreground text-[10px] font-bold uppercase tracking-widest">Expenditure Breakdown</p>
+                <div className="bg-emerald-500/10 text-emerald-500 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center border border-emerald-500/20">
                   <ArrowUp size={12} className="mr-0.5" />
                   12%
                 </div>
               </div>
+              <div className="flex items-end gap-3 mb-2">
+                <h3 className="text-3xl font-bold tracking-tighter">{formatAmount(expense)}</h3>
+              </div>
 
-              {/* Histogram Visual */}
-              <div className="h-20 flex items-end gap-2 w-full">
-                {[40, 30, 60, 100, 50, 35, 55].map((h, i) => (
-                  <div
-                    key={i}
-                    className={cn(
-                      "flex-1 transition-all duration-700 rounded-t-md",
-                      i === 3 ? "bg-foreground h-full shadow-sm" : "bg-muted hover:bg-muted-foreground/20"
-                    )}
-                    style={{ height: `${h}%` }}
-                  ></div>
-                ))}
+              {/* Pie Chart Visual */}
+              <div className="h-64 w-full relative">
+                {(() => {
+                  const totalExp = totals.expense || 1;
+                  const catMap = new Map<string, number>();
+                  filteredTransactions.forEach(t => {
+                    if (t.financialCategory === 'EXPENSE') {
+                      const name = t.category?.name || 'Uncategorized';
+                      catMap.set(name, (catMap.get(name) || 0) + (t.debitAmount || 0));
+                    }
+                  });
+                  const data = Array.from(catMap.entries())
+                    .map(([name, value]) => ({ name, value }))
+                    .sort((a, b) => b.value - a.value)
+                    .slice(0, 5);
+
+                  const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#64748b'];
+
+                  if (data.length === 0) return <div className="flex h-full items-center justify-center text-xs text-muted-foreground">No data</div>;
+
+                  return (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" opacity={0.4} />
+                        <XAxis
+                          dataKey="name"
+                          axisLine={false}
+                          tickLine={false}
+                          tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10, fontWeight: 600 }}
+                          tickFormatter={(val) => val.length > 6 ? val.slice(0, 6) : val}
+                          dy={10}
+                        />
+                        <YAxis
+                          axisLine={false}
+                          tickLine={false}
+                          tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }}
+                          tickFormatter={(val) => `₹${(val / 1000).toFixed(0)}k`}
+                        />
+                        <RechartsTooltip
+                          cursor={{ fill: 'hsl(var(--muted)/0.3)' }}
+                          formatter={(value: number) => [formatAmount(value), 'Spent']}
+                          contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                          itemStyle={{ color: 'hsl(var(--foreground))', fontWeight: 'bold' }}
+                          labelStyle={{ color: 'hsl(var(--muted-foreground))' }}
+                        />
+                        <Bar dataKey="value" radius={[6, 6, 0, 0]} barSize={24}>
+                          {data.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  );
+                })()}
               </div>
             </div>
 
@@ -2492,6 +2698,33 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                 >
                   <Sparkles className="w-4 h-4 mr-2" />
                   Auto-categorize by UPI/Account Number
+                </Button>
+                <Button
+                  variant="default"
+                  className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white border-0"
+                  onClick={async () => {
+                    setIsBulkUpdating(true);
+                    try {
+                      success('AI Categorization', 'Started categorizing transactions...');
+                      const res = await fetch('/api/app', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action: 'transactions_auto_categorize' })
+                      });
+                      const data = await res.json();
+                      success('AI Categorization', `Processed ${data.processed}, Updated ${data.updated} transactions.`);
+                      // Refresh data
+                      loadTransactions();
+                    } catch (e) {
+                      showError('Error', 'Auto-categorization failed');
+                    } finally {
+                      setIsBulkUpdating(false);
+                    }
+                  }}
+                  disabled={isBulkUpdating}
+                >
+                  <BrainCircuit className="w-4 h-4 mr-2" />
+                  Smart Auto-Categorize (AI)
                 </Button>
                 <div className="flex gap-2">
                   <Button

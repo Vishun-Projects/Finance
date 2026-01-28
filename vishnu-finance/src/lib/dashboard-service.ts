@@ -1,11 +1,11 @@
 import { prisma } from './db';
+import { getCachedData, setCachedData, CACHE_TTL } from './api-cache';
 
 interface DashboardStatsParams {
     userId: string;
     startDate: Date;
     endDate: Date;
 }
-
 export interface SimpleDashboardData {
     totalIncome: number;
     totalExpenses: number;
@@ -47,8 +47,16 @@ export class DashboardService {
         const rangeStart = startDate;
         const rangeEnd = endDate;
 
+        // Cache Optimization
+        const cacheKey = `dashboard_stats:${userId}:${rangeStart.toISOString()}:${rangeEnd.toISOString()}`;
+        const cached = await getCachedData(cacheKey);
+        if (cached) {
+            return cached;
+        }
+
         // Direct Database Aggregations
         const [transactionStats, legacyExpenseStats, legacyIncomeStats, activeGoalsCount, upcomingDeadlinesCount, recentTransactions] = await Promise.all([
+            // ... (keep same) ...
             // 1. Transaction Stats
             (async () => {
                 try {
@@ -294,7 +302,7 @@ export class DashboardService {
         else if ((transactionStats._count || 0) + (legacyExpenseStats._count || 0) >= 10) financialHealthScore += 10;
         if (totalIncome > 0) financialHealthScore += 15;
 
-        return {
+        const result = {
             totalIncome,
             totalExpenses,
             totalCredits,
@@ -310,6 +318,9 @@ export class DashboardService {
             financialHealthScore: Math.min(financialHealthScore, 100),
             categoryStats: Object.fromEntries(financialCategoryStatsMap),
         };
+
+        await setCachedData(cacheKey, result, CACHE_TTL.DASHBOARD);
+        return result;
     }
 }
 

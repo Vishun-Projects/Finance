@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
 
     // Check cache first
     const cacheKey = getCacheKey(userId, rangeStart.toISOString(), rangeEnd.toISOString());
-    const cached = getCachedData(cacheKey);
+    const cached = await getCachedData(cacheKey);
     if (cached) {
       return NextResponse.json(cached);
     }
@@ -62,7 +62,7 @@ export async function GET(request: NextRequest) {
     });
 
     // Cache for 30 seconds
-    setCachedData(cacheKey, result, CACHE_TTL.DASHBOARD);
+    await setCachedData(cacheKey, result, CACHE_TTL.DASHBOARD);
 
     // Add cache-control headers for client-side caching
     return NextResponse.json(result, {

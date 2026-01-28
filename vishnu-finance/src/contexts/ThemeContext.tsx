@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 
-export type Theme = 'light' | 'dark' | 'high-contrast';
+export type Theme = 'light' | 'dark';
 
 interface ThemeContextType {
   theme: Theme;
@@ -23,33 +23,22 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   // Apply theme changes
   useEffect(() => {
     console.log('Applying theme:', theme); // Debug log
-    console.log('Document classes before:', document.documentElement.className);
-    
-    if (theme === 'high-contrast') {
-      document.documentElement.classList.add('high-contrast');
-      document.documentElement.classList.remove('dark');
-      document.body.style.backgroundColor = '#000000';
-      document.body.style.color = '#FFFFFF';
-      setIsDark(false);
-      console.log('Applied high-contrast theme');
-    } else if (theme === 'dark') {
+
+    if (theme === 'dark') {
       document.documentElement.classList.add('dark');
-      document.documentElement.classList.remove('high-contrast');
-      // Ensure body also gets dark background via CSS, don't clear inline styles
+      // Ensure body also gets dark background via CSS
       document.body.style.backgroundColor = '';
       document.body.style.color = '';
       setIsDark(true);
       console.log('Applied dark theme');
     } else {
-      document.documentElement.classList.remove('dark', 'high-contrast');
+      document.documentElement.classList.remove('dark');
       // Ensure body gets light background
       document.body.style.backgroundColor = '';
       document.body.style.color = '';
       setIsDark(false);
       console.log('Applied light theme');
     }
-    
-    console.log('Document classes after:', document.documentElement.className);
   }, [theme]);
 
   // Load theme from API on mount or reset to light when user logs out
@@ -60,7 +49,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
           const response = await fetch(`/api/user-preferences?userId=${user.id}`);
           if (response.ok) {
             const data = await response.json();
-            if (data.theme) {
+            if (data.theme && (data.theme === 'light' || data.theme === 'dark')) {
               setTheme(data.theme);
             }
           }
@@ -79,7 +68,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const handleSetTheme = useCallback(async (newTheme: Theme) => {
     setTheme(newTheme);
-    
+
     if (user?.id) {
       try {
         await fetch('/api/user-preferences', {
@@ -87,7 +76,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             userId: user.id,
-            navigationLayout: 'top',
+            navigationLayout: 'top', // Default or preserve existing if possible, but simplest here
             theme: newTheme,
             colorScheme: 'default'
           })

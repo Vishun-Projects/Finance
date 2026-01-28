@@ -1,7 +1,6 @@
-
 import { Suspense } from 'react';
 import TransactionsPageClient from './page-client';
-import { RouteLoadingState } from '@/components/feedback/route-fallbacks';
+import PageSkeleton from '@/components/page-skeleton';
 import { requireUser } from '@/lib/auth/server-auth';
 import { getCurrentMonthRange } from '@/lib/date-range';
 import { loadTransactionsBootstrap, loadTransactionCategories } from '@/lib/loaders/transactions';
@@ -37,15 +36,7 @@ export default async function TransactionsPage() {
   };
 
   return (
-    <Suspense
-      fallback={
-        <RouteLoadingState
-          title="Loading transactions"
-          description="Preparing your latest financial activity…"
-          className="min-h-[50vh]"
-        />
-      }
-    >
+    <Suspense fallback={<PageSkeleton />}>
       <TransactionsPageClient bootstrap={bootstrap} />
     </Suspense>
   );

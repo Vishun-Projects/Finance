@@ -1,7 +1,6 @@
-
 import { Suspense } from 'react';
 import { requireUser } from '@/lib/auth/server-auth';
-import { RouteLoadingState } from '@/components/feedback/route-fallbacks';
+import PageSkeleton from '@/components/page-skeleton';
 import { loadManagedTransactions } from '@/lib/loaders/manage-transactions';
 import { ManageTransactionsPageClient } from './page-client';
 
@@ -13,15 +12,7 @@ export default async function ManageTransactionsPage() {
   const initialData = await loadManagedTransactions();
 
   return (
-    <Suspense
-      fallback={
-        <RouteLoadingState
-          title="Loading transaction manager"
-          description="Preparing your transaction archive…"
-          className="min-h-[50vh]"
-        />
-      }
-    >
+    <Suspense fallback={<PageSkeleton />}>
       <ManageTransactionsPageClient initialData={initialData} />
     </Suspense>
   );

@@ -76,6 +76,8 @@ export const viewport: Viewport = {
 };
 
 import FetchInterceptor from "@/components/fetch-interceptor";
+import { DesignProvider } from "@/components/providers/design-provider";
+import { getDesignSettings } from "@/app/actions/design-system";
 
 import { Inter, JetBrains_Mono } from "next/font/google";
 
@@ -100,22 +102,24 @@ export default async function RootLayout({
   const normalizedUser = normalizeAuthUser(currentUser);
 
   return (
-    <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable}`}>
+    <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable}`} suppressHydrationWarning>
       <body className="font-sans antialiased bg-background text-foreground">
         <FetchInterceptor />
         <AuthProvider initialUser={normalizedUser}>
           <ThemeProvider>
-            <CurrencyProvider>
-              <ToastProvider>
-                <LoadingProvider>
-                  <LayoutProvider>
-                    {children}
-                    <GlobalPreloader />
-                    <Toaster />
-                  </LayoutProvider>
-                </LoadingProvider>
-              </ToastProvider>
-            </CurrencyProvider>
+            <DesignProvider initialSettings={await getDesignSettings()}>
+              <CurrencyProvider>
+                <ToastProvider>
+                  <LoadingProvider>
+                    <LayoutProvider>
+                      {children}
+                      <GlobalPreloader />
+                      <Toaster />
+                    </LayoutProvider>
+                  </LoadingProvider>
+                </ToastProvider>
+              </CurrencyProvider>
+            </DesignProvider>
           </ThemeProvider>
         </AuthProvider>
       </body>

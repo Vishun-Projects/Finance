@@ -1,111 +1,102 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo, useCallback } from 'react';
-import { useAuth } from '../contexts/AuthContext';
+import * as React from 'react';
+import { ThemeProvider as NextThemesProvider, useTheme as useNextTheme } from 'next-themes';
+import type { ComponentProps } from 'react';
+import { useAuth } from './AuthContext';
 
-export type Theme = 'light' | 'dark';
+// Wrapper hook for compatibility with existing code
+// Old interface: { theme: Theme, setTheme: (theme: Theme) => void, isDark: boolean, isLoading: boolean }
+export function useTheme() {
+  const context = useNextTheme();
+  const [mounted, setMounted] = React.useState(false);
 
-interface ThemeContextType {
-  theme: Theme;
-  setTheme: (theme: Theme) => void;
-  isDark: boolean;
-  isLoading: boolean;
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Calculate isDark based on resolvedTheme
+  const isDark = mounted && context.resolvedTheme === 'dark';
+
+  return {
+    ...context,
+    isDark,
+    isLoading: !mounted,
+  };
 }
 
-const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
-
-export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setTheme] = useState<Theme>('light');
-  const [isDark, setIsDark] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+function ThemeSync() {
+  const { theme, setTheme } = useNextTheme();
   const { user } = useAuth();
+  const [mounted, setMounted] = React.useState(false);
 
-  // Apply theme changes
-  useEffect(() => {
-    console.log('Applying theme:', theme); // Debug log
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
 
-    if (theme === 'dark') {
-      document.documentElement.classList.add('dark');
-      // Ensure body also gets dark background via CSS
-      document.body.style.backgroundColor = '';
-      document.body.style.color = '';
-      setIsDark(true);
-      console.log('Applied dark theme');
-    } else {
-      document.documentElement.classList.remove('dark');
-      // Ensure body gets light background
-      document.body.style.backgroundColor = '';
-      document.body.style.color = '';
-      setIsDark(false);
-      console.log('Applied light theme');
-    }
-  }, [theme]);
+  // Sync from Backend on Mount/User Change
+  React.useEffect(() => {
+    const loadThemePreference = async () => {
+      if (!user?.id) return;
 
-  // Load theme from API on mount or reset to light when user logs out
-  useEffect(() => {
-    const loadTheme = async () => {
-      if (user?.id) {
-        try {
-          const response = await fetch(`/api/user-preferences?userId=${user.id}`);
-          if (response.ok) {
-            const data = await response.json();
-            if (data.theme && (data.theme === 'light' || data.theme === 'dark')) {
-              setTheme(data.theme);
-            }
+      try {
+        const response = await fetch(`/api/user-preferences?userId=${user.id}`);
+        if (response.ok) {
+          const data = await response.json();
+          // specific check: 'light', 'dark', or 'system'
+          if (data.theme && ['light', 'dark', 'system'].includes(data.theme)) {
+            setTheme(data.theme);
           }
-        } catch (error) {
-          console.error('Error loading theme:', error);
         }
-      } else {
-        // Reset to light theme when user is null (logged out)
-        setTheme('light');
+      } catch (error) {
+        console.error('Error loading theme preference:', error);
       }
-      setIsLoading(false);
     };
 
-    loadTheme();
-  }, [user]);
+    if (mounted) {
+      loadThemePreference();
+    }
+  }, [user?.id, mounted, setTheme]);
 
-  const handleSetTheme = useCallback(async (newTheme: Theme) => {
-    setTheme(newTheme);
+  // Sync TO Backend when theme changes
+  React.useEffect(() => {
+    if (!mounted || !user?.id) return;
 
-    if (user?.id) {
+    const saveTheme = async () => {
       try {
         await fetch('/api/user-preferences', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             userId: user.id,
-            navigationLayout: 'top', // Default or preserve existing if possible, but simplest here
-            theme: newTheme,
+            theme: theme,
+            navigationLayout: 'top',
             colorScheme: 'default'
           })
         });
       } catch (error) {
-        console.error('Error saving theme:', error);
+        console.error('Error saving theme preference:', error);
       }
-    }
-  }, [user?.id]);
+    };
 
-  // Memoize context value to prevent unnecessary re-renders
-  const value = useMemo(() => ({
-    theme,
-    setTheme: handleSetTheme,
-    isDark,
-    isLoading,
-  }), [theme, handleSetTheme, isDark, isLoading]);
+    saveTheme();
 
-  return (
-    <ThemeContext.Provider value={value}>
-      {children}
-    </ThemeContext.Provider>
-  );
+  }, [theme, user?.id, mounted]);
+
+  return null;
 }
 
-export function useTheme() {
-  const context = useContext(ThemeContext);
-  if (context === undefined) {
-    throw new Error('useTheme must be used within a ThemeProvider');
-  }
-  return context;
+export function ThemeProvider({ children, ...props }: ComponentProps<typeof NextThemesProvider>) {
+  return (
+    <NextThemesProvider
+      attribute="class"
+      defaultTheme="system"
+      enableSystem
+      disableTransitionOnChange
+      {...props}
+    >
+      <ThemeSync />
+      {children}
+    </NextThemesProvider>
+  );
 }

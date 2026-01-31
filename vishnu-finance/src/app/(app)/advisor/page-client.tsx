@@ -233,7 +233,7 @@ export default function AdvisorPageClient() {
             <div>
               <h1 className="text-sm font-bold uppercase tracking-widest text-foreground">AI Wealth Advisor</h1>
               <div className="flex items-center gap-2 mt-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
                 <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Portfolio Synced</span>
               </div>
             </div>

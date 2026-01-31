@@ -86,7 +86,7 @@ export class AuthService {
   static async registerUser(email: string, password: string, name?: string) {
     const startTime = Date.now();
     console.log(`⏱️ REGISTER START: ${email}`);
-    
+
     // Check if user already exists
     const dbStart1 = Date.now();
     const existingUser = await prisma.user.findUnique({
@@ -252,6 +252,10 @@ export class AuthService {
     };
   }
 
+  // Simple in-memory cache to reduce DB load (effective in dev/long-running server)
+  private static userCache = new Map<string, { user: any; expires: number }>();
+  private static CACHE_TTL = 5000; // 5 seconds
+
   // Get user by token
   static async getUserFromToken(token: string) {
     const startTime = Date.now();
@@ -259,6 +263,15 @@ export class AuthService {
     if (!payload) {
       return null;
     }
+
+    // Check cache
+    const cacheKey = payload.userId;
+    const cached = this.userCache.get(cacheKey);
+    if (cached && cached.expires > Date.now()) {
+      // console.log(`⚡ GET USER FROM TOKEN (CACHE HIT)`); // Optional: debug log
+      return cached.user;
+    }
+
 
     const dbStart = Date.now();
     try {
@@ -297,6 +310,13 @@ export class AuthService {
       }
 
       console.log(`✅ GET USER FROM TOKEN SUCCESS in ${Date.now() - startTime}ms`);
+
+      // Update cache
+      this.userCache.set(payload.userId, {
+        user,
+        expires: Date.now() + this.CACHE_TTL
+      });
+
       return user;
     } catch (error) {
       const message = error instanceof Error ? error.message : '';
@@ -335,8 +355,16 @@ export class AuthService {
           return null;
         }
 
+        const userWithStatus = { ...user, status: 'ACTIVE' as const };
+
+        // Update cache
+        this.userCache.set(payload.userId, {
+          user: userWithStatus,
+          expires: Date.now() + this.CACHE_TTL
+        });
+
         console.log(`✅ GET USER FROM TOKEN SUCCESS (fallback) in ${Date.now() - startTime}ms`);
-        return { ...user, status: 'ACTIVE' as const };
+        return userWithStatus;
       }
 
       throw error;

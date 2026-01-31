@@ -561,7 +561,7 @@ function CategoryManagement() {
           {/* Expense Categories */}
           <div>
             <div className="flex items-center gap-2 mb-4">
-              <TrendingDown className="w-5 h-5 text-red-600" />
+              <TrendingDown className="w-5 h-5 text-destructive" />
               <h3 className="font-semibold text-lg">Expense Categories</h3>
               <Badge variant="secondary">{expenseCategories.length}</Badge>
             </div>
@@ -790,7 +790,7 @@ export default function SettingsPageClient({ initialDocuments, initialPreference
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <p className="text-gray-600">Please log in to access settings</p>
+          <p className="text-muted-foreground">Please log in to access settings</p>
         </div>
       </div>
     );
@@ -900,8 +900,8 @@ export default function SettingsPageClient({ initialDocuments, initialPreference
                   {/* Light Theme */}
                   <Card
                     className={`cursor-pointer transition-all ${theme === 'light'
-                        ? 'ring-2 ring-primary bg-primary/5'
-                        : 'hover:ring-1 hover:ring-primary/50'
+                      ? 'ring-2 ring-primary bg-primary/5'
+                      : 'hover:ring-1 hover:ring-primary/50'
                       }`}
                     onClick={() => setTheme('light')}
                   >
@@ -911,8 +911,8 @@ export default function SettingsPageClient({ initialDocuments, initialPreference
                         <span className="font-medium text-foreground">Light</span>
                         {theme === 'light' && <Badge variant="secondary">Active</Badge>}
                       </div>
-                      <div className="w-full h-16 bg-white border border-gray-200 rounded flex items-center justify-center">
-                        <div className="w-8 h-8 bg-gray-800 rounded"></div>
+                      <div className="w-full h-16 bg-card border border-border rounded flex items-center justify-center">
+                        <div className="w-8 h-8 bg-muted rounded"></div>
                       </div>
                       <p className="text-xs text-muted-foreground mt-2">Clean and bright interface</p>
                     </CardContent>
@@ -921,8 +921,8 @@ export default function SettingsPageClient({ initialDocuments, initialPreference
                   {/* Dark Theme */}
                   <Card
                     className={`cursor-pointer transition-all ${theme === 'dark'
-                        ? 'ring-2 ring-primary bg-primary/5'
-                        : 'hover:ring-1 hover:ring-primary/50'
+                      ? 'ring-2 ring-primary bg-primary/5'
+                      : 'hover:ring-1 hover:ring-primary/50'
                       }`}
                     onClick={() => setTheme('dark')}
                   >
@@ -932,8 +932,8 @@ export default function SettingsPageClient({ initialDocuments, initialPreference
                         <span className="font-medium text-foreground">Dark</span>
                         {theme === 'dark' && <Badge variant="secondary">Active</Badge>}
                       </div>
-                      <div className="w-full h-16 bg-gray-800 border border-gray-600 rounded flex items-center justify-center">
-                        <div className="w-8 h-8 bg-white rounded"></div>
+                      <div className="w-full h-16 bg-muted border border-border rounded flex items-center justify-center">
+                        <div className="w-8 h-8 bg-card rounded"></div>
                       </div>
                       <p className="text-xs text-muted-foreground mt-2">Easy on the eyes</p>
                     </CardContent>
@@ -1174,10 +1174,10 @@ export default function SettingsPageClient({ initialDocuments, initialPreference
                     <Label htmlFor="browser-notifications">Browser Notifications</Label>
                     <p className="text-sm text-muted-foreground">Show notifications in your browser</p>
                     {!isSupported && (
-                      <p className="text-xs text-red-500">Notifications not supported in this browser</p>
+                      <p className="text-xs text-destructive">Notifications not supported in this browser</p>
                     )}
                     {isSupported && permission === 'denied' && (
-                      <p className="text-xs text-red-500">Notifications blocked. Please enable in browser settings.</p>
+                      <p className="text-xs text-destructive">Notifications blocked. Please enable in browser settings.</p>
                     )}
                     {isSupported && permission === 'granted' && (
                       <p className="text-xs text-green-500">Notifications enabled</p>
@@ -1305,7 +1305,7 @@ export default function SettingsPageClient({ initialDocuments, initialPreference
             {/* Danger Zone */}
             <Card className="border-red-200">
               <CardHeader>
-                <CardTitle className="flex items-center space-x-2 text-red-600">
+                <CardTitle className="flex items-center space-x-2 text-destructive">
                   <Trash2 className="w-5 h-5" />
                   <span>Danger Zone</span>
                 </CardTitle>

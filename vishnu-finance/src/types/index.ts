@@ -200,6 +200,7 @@ export interface SalaryStructure {
   baseSalary: number;
   allowances?: Record<string, number>;
   deductions?: Record<string, number>;
+  employerContributions?: Record<string, number>;
   effectiveDate: Date;
   endDate?: Date;
   isActive: boolean;
@@ -221,6 +222,7 @@ export interface SalaryHistory {
   baseSalary: number;
   allowances?: Record<string, number>;
   deductions?: Record<string, number>;
+  employerContributions?: Record<string, number>;
   effectiveDate: Date;
   endDate?: Date;
   currency: string;

@@ -39,13 +39,14 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     console.log('➕ SALARY STRUCTURE POST - Request body:', JSON.stringify(body, null, 2));
-    
+
     const {
       jobTitle,
       company,
       baseSalary,
       allowances,
       deductions,
+      employerContributions,
       effectiveDate,
       endDate,
       currency,
@@ -64,6 +65,7 @@ export async function POST(request: NextRequest) {
       baseSalary,
       allowances,
       deductions,
+      employerContributions,
       effectiveDate,
       endDate,
       currency,
@@ -91,6 +93,7 @@ export async function POST(request: NextRequest) {
         baseSalary: parseFloat(baseSalary),
         allowances: allowances ? JSON.stringify(allowances) : null,
         deductions: deductions ? JSON.stringify(deductions) : null,
+        employerContributions: employerContributions ? JSON.stringify(employerContributions) : null,
         effectiveDate: new Date(effectiveDate),
         endDate: endDate ? new Date(endDate) : null,
         currency: currency || 'INR',
@@ -116,6 +119,7 @@ export async function POST(request: NextRequest) {
           baseSalary: newSalaryStructure.baseSalary,
           allowances: newSalaryStructure.allowances,
           deductions: newSalaryStructure.deductions,
+          employerContributions: newSalaryStructure.employerContributions,
           effectiveDate: newSalaryStructure.effectiveDate,
           endDate: newSalaryStructure.endDate,
           currency: newSalaryStructure.currency,
@@ -159,6 +163,7 @@ export async function PUT(request: NextRequest) {
         baseSalary: updateData.baseSalary ? parseFloat(updateData.baseSalary) : undefined,
         allowances: updateData.allowances ? JSON.stringify(updateData.allowances) : undefined,
         deductions: updateData.deductions ? JSON.stringify(updateData.deductions) : undefined,
+        employerContributions: updateData.employerContributions ? JSON.stringify(updateData.employerContributions) : undefined,
         effectiveDate: updateData.effectiveDate ? new Date(updateData.effectiveDate) : undefined,
         endDate: updateData.endDate ? new Date(updateData.endDate) : undefined,
         updatedAt: new Date()

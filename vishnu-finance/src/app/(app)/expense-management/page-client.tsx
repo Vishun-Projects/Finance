@@ -345,7 +345,7 @@ export default function ExpenseManagementPageClient({ bootstrap }: ExpenseManage
                         <p className="text-muted-foreground text-[10px] font-bold uppercase tracking-widest mb-2">Monthly Expenditure</p>
                         <div className="flex items-end gap-3 mb-6">
                             <h3 className="text-3xl font-bold tracking-tighter">{formatAmount(totals.expense)}</h3>
-                            <div className="bg-emerald-500/10 text-emerald-500 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center mb-1 border border-emerald-500/20">
+                            <div className="bg-primary/10 text-primary text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center mb-1 border border-primary/20">
                                 <ArrowUp size={12} className="mr-0.5" />
                                 12%
                             </div>

@@ -302,10 +302,10 @@ export default function PlansPageClient({ bootstrap, userId, defaultTab = "overv
 function OverviewCard({ label, value, subtext, className, variant = 'primary' }: { label: string, value: string, subtext?: string, className?: string, variant?: 'primary' | 'secondary' }) {
   return (
     <div className={cn("matte-card rounded-xl p-6 bg-card border border-border shadow-xl", className)}>
-      <p className="text-muted-foreground text-[10px] font-bold uppercase tracking-widest mb-2">{label}</p>
+      <p className="text-muted-foreground text-[10px] font-bold uppercase tracking-widest mb-2 font-sans">{label}</p>
       <div className="flex items-baseline gap-2">
-        <p className="text-4xl font-light tracking-tighter text-foreground font-display">{value}</p>
-        {subtext && <span className="text-muted-foreground text-xs font-medium">{subtext}</span>}
+        <p className={cn("text-4xl font-light tracking-tighter font-heading", variant === 'primary' ? "text-primary" : "text-foreground")}>{value}</p>
+        {subtext && <span className={cn("text-xs font-medium font-sans", variant === 'primary' ? "text-primary/80" : "text-muted-foreground")}>{subtext}</span>}
       </div>
     </div>
   );
@@ -382,7 +382,7 @@ function MatteGoalCard({ goal, onUpdate }: { goal: Goal, onUpdate?: (updatedGoal
                 Target: {goal.targetDate ? formatDateLabel(goal.targetDate) : 'Ongoing'} • Automated
               </p>
             </div>
-            <Badge variant="outline" className="border-border text-muted-foreground rounded-sm text-[9px] font-bold uppercase tracking-tighter bg-transparent">
+            <Badge variant="outline" className={cn("border-border rounded-sm text-[9px] font-bold uppercase tracking-tighter bg-transparent", goal.status === 'COMPLETED' ? 'text-primary border-primary/50' : 'text-primary border-primary/20')}>
               {goal.status === 'COMPLETED' ? 'Done' : 'On Track'}
             </Badge>
           </div>
@@ -396,7 +396,7 @@ function MatteGoalCard({ goal, onUpdate }: { goal: Goal, onUpdate?: (updatedGoal
             </div>
             <div className="h-1 w-full bg-muted rounded-full overflow-hidden">
               <div
-                className="h-full bg-foreground rounded-full transition-all duration-1000"
+                className="h-full bg-primary rounded-full transition-all duration-1000"
                 style={{ width: `${progress}%` }}
               />
             </div>
@@ -448,7 +448,7 @@ function MatteGoalCard({ goal, onUpdate }: { goal: Goal, onUpdate?: (updatedGoal
 
         {/* Image Section */}
         <div
-          className="md:w-64 h-32 md:h-auto bg-cover bg-center rounded-sm grayscale opacity-40 group-hover:opacity-100 transition-all duration-500 border border-border"
+          className="md:w-64 h-32 md:h-auto bg-cover bg-center rounded-sm opacity-40 group-hover:opacity-100 transition-all duration-500 border border-border"
           style={{ backgroundImage: bgImage ? `url(${bgImage})` : undefined }}
         >
           {!bgImage && (
@@ -475,9 +475,9 @@ function WishlistHighlightRow({ item }: { item: import("@/types/wishlist").Wishl
         <span className="text-[11px] font-black text-foreground">{formatCurrency(Number(item.estimatedCost))}</span>
       </div>
       <div className="h-0.5 w-full bg-muted overflow-hidden">
-        <div className="h-full bg-muted-foreground" style={{ width: `${mockFunded}%` }}></div>
+        <div className="h-full bg-primary" style={{ width: `${mockFunded}%` }}></div>
       </div>
-      <p className="text-[9px] font-bold text-muted-foreground/60 mt-2 uppercase">{mockFunded}% funded</p>
+      <p className="text-[9px] font-bold text-primary/80 mt-2 uppercase">{mockFunded}% funded</p>
     </div>
   );
 }

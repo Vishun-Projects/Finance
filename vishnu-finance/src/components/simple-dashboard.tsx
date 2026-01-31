@@ -159,8 +159,9 @@ export default function SimpleDashboard({
   }));
 
   // Chart Colors using CSS Variables
-  const creditsColor = 'hsl(var(--chart-credits))';
-  const debitsColor = 'hsl(var(--chart-debits))';
+  // Chart Colors using CSS Variables
+  const creditsColor = 'hsl(var(--chart-1))'; // Primary (Gold/Blue/etc)
+  const debitsColor = 'hsl(var(--chart-2))';  // Accent
 
   return (
     <div className="flex flex-col h-full bg-background text-foreground font-display transition-colors duration-300">
@@ -208,11 +209,11 @@ export default function SimpleDashboard({
         {/* Net Worth Card */}
         <section className="glass-card rounded-2xl p-8 flex flex-col md:flex-row justify-between items-start md:items-end gap-6 relative overflow-hidden group">
           {/* Background Glow Effect - Visible mainly in dark mode */}
-          <div className="absolute top-0 right-0 w-64 h-64 bg-foreground/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 group-hover:bg-foreground/10 transition-colors duration-700 pointer-events-none"></div>
+          <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 group-hover:bg-primary/20 transition-colors duration-700 pointer-events-none"></div>
 
           <div className="relative z-10">
             <p className="text-muted-foreground text-sm font-medium mb-2 uppercase tracking-wide">Total Net Worth</p>
-            <h1 className="text-5xl font-bold tracking-tight text-foreground tabular-nums">
+            <h1 className="text-5xl font-bold tracking-tight text-primary tabular-nums">
               {formatRupees(netWorth)}
             </h1>
             <div className="flex items-center gap-3 mt-4">

@@ -1,12 +1,12 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { 
-  Plus, 
-  Edit, 
-  Trash2, 
-  DollarSign, 
-  Building, 
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import {
+  Plus,
+  Edit,
+  Trash2,
+  DollarSign,
+  Building,
   Calendar,
   TrendingUp,
   Calculator,
@@ -15,16 +15,46 @@ import {
   Award,
   History,
   ArrowUpRight,
+  ArrowDown,
   Clock,
   CheckCircle,
   Search,
   Filter,
   Download,
   Share2,
-  X
+  X,
+  CreditCard,
+  Briefcase,
+  PieChart as PieChartIcon,
+  ChevronRight,
+  ArrowRight
 } from 'lucide-react';
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Legend
+} from 'recharts';
 import { SalaryStructure, SalaryHistory } from '../../types';
-import { useAuth } from '../../hooks/useAuth';
+import { useAuth } from '../../contexts/AuthContext'; // Fixed import path
+import { formatRupees } from '../../lib/utils';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Separator } from "@/components/ui/separator";
+
+// Chart colors
+const COLORS = ['#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#3b82f6'];
 
 export default function SalaryStructureManagement() {
   const { user, loading: authLoading } = useAuth();
@@ -32,10 +62,7 @@ export default function SalaryStructureManagement() {
   const [salaryHistory, setSalaryHistory] = useState<SalaryHistory[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [showHistory, setShowHistory] = useState(false);
   const [editingStructure, setEditingStructure] = useState<SalaryStructure | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterType, setFilterType] = useState<'all' | 'active' | 'inactive'>('all');
 
   // Form state
   const [formData, setFormData] = useState({
@@ -44,6 +71,7 @@ export default function SalaryStructureManagement() {
     baseSalary: '',
     allowances: {} as Record<string, number>,
     deductions: {} as Record<string, number>,
+    employerContributions: {} as Record<string, number>,
     effectiveDate: '',
     endDate: '',
     currency: 'INR',
@@ -61,9 +89,12 @@ export default function SalaryStructureManagement() {
   const [deductionName, setDeductionName] = useState('');
   const [deductionAmount, setDeductionAmount] = useState('');
 
+  const [employerContributionName, setEmployerContributionName] = useState('');
+  const [employerContributionAmount, setEmployerContributionAmount] = useState('');
+
   const fetchSalaryStructures = useCallback(async () => {
     if (!user) return;
-    
+
     try {
       setLoading(true);
       const response = await fetch(`/api/salary-structure?userId=${user.id}`);
@@ -82,7 +113,7 @@ export default function SalaryStructureManagement() {
 
   const fetchSalaryHistory = useCallback(async () => {
     if (!user) return;
-    
+
     try {
       const response = await fetch(`/api/salary-history?userId=${user.id}`);
       if (response.ok) {
@@ -98,116 +129,130 @@ export default function SalaryStructureManagement() {
 
   useEffect(() => {
     if (user && !authLoading) {
-      void fetchSalaryStructures();
-      void fetchSalaryHistory();
+      fetchSalaryStructures();
+      fetchSalaryHistory();
     }
   }, [user, authLoading, fetchSalaryStructures, fetchSalaryHistory]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!user) return;
-    
-    setLoading(true);
-    
-    try {
-      const method = editingStructure ? 'PUT' : 'POST';
-      const url = '/api/salary-structure';
-      
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ...formData,
-          userId: user.id,
-          changeType: formData.changeType || 'OTHER',
-          changeReason: formData.changeReason || 'Manual update'
-        }),
-      });
+  const activeStructure = useMemo(() =>
+    salaryStructures.find(s => s.isActive) || salaryStructures[0] || null
+    , [salaryStructures]);
 
-      if (response.ok) {
-        const result = await response.json();
-        
-        if (editingStructure) {
-          setSalaryStructures(prev => 
-            prev.map(structure => 
-              structure.id === editingStructure.id ? result : structure
-            )
-          );
-        } else {
-          setSalaryStructures(prev => [result, ...prev]);
-        }
-        
-        setFormData({
-          jobTitle: '',
-          company: '',
-          baseSalary: '',
-          allowances: {},
-          deductions: {},
-          effectiveDate: '',
-          endDate: '',
-          currency: 'INR',
-          location: '',
-          department: '',
-          grade: '',
-          notes: '',
-          changeType: 'OTHER',
-          changeReason: ''
-        });
-        setShowForm(false);
-        setEditingStructure(null);
-        
-        // Refresh salary history
-        fetchSalaryHistory();
-      } else {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to save salary structure');
-      }
-    } catch (err) {
-      console.error('Error saving salary structure:', err);
-    } finally {
-      setLoading(false);
+  // Derived calculations
+  const totalMonthlyAllowances = useMemo(() => {
+    if (!activeStructure?.allowances) return 0;
+    try {
+      const allowances = typeof activeStructure.allowances === 'string'
+        ? JSON.parse(activeStructure.allowances)
+        : activeStructure.allowances;
+      return Object.values(allowances).reduce((sum: any, val: any) => sum + (Number(val) || 0), 0) as number;
+    } catch { return 0; }
+  }, [activeStructure]);
+
+  const totalMonthlyDeductions = useMemo(() => {
+    if (!activeStructure?.deductions) return 0;
+    try {
+      const deductions = typeof activeStructure.deductions === 'string'
+        ? JSON.parse(activeStructure.deductions)
+        : activeStructure.deductions;
+      return Object.values(deductions).reduce((sum: any, val: any) => sum + (Number(val) || 0), 0) as number;
+    } catch { return 0; }
+  }, [activeStructure]);
+
+  const totalMonthlyEmployerContributions = useMemo(() => {
+    if (!activeStructure?.employerContributions) return 0;
+    try {
+      const contributions = typeof activeStructure.employerContributions === 'string'
+        ? JSON.parse(activeStructure.employerContributions)
+        : activeStructure.employerContributions;
+      return Object.values(contributions).reduce((sum: any, val: any) => sum + (Number(val) || 0), 0) as number;
+    } catch { return 0; }
+  }, [activeStructure]);
+
+  const monthlyBasic = (Number(activeStructure?.baseSalary) || 0) / 12;
+  const grossMonthly = monthlyBasic + totalMonthlyAllowances;
+  const netMonthly = grossMonthly - totalMonthlyDeductions;
+  const grossAnnual = grossMonthly * 12;
+  const monthlyCTC = grossMonthly + totalMonthlyEmployerContributions;
+  const annualCTC = monthlyCTC * 12;
+
+  // Chart Logic
+  const salaryComponents = useMemo(() => {
+    const data = [
+      { name: 'Basic Pay', value: (Number(activeStructure?.baseSalary) || 0) / 12 },
+    ];
+    if (activeStructure?.allowances) {
+      const allowances = typeof activeStructure.allowances === 'string'
+        ? JSON.parse(activeStructure.allowances)
+        : activeStructure.allowances;
+      Object.entries(allowances).forEach(([key, val]) => {
+        data.push({ name: key, value: Number(val) || 0 });
+      });
+    }
+    return data.filter(d => d.value > 0);
+  }, [activeStructure]);
+
+  // Search/Filter state which was used in render but not defined in state in snippets seen.
+  // Assuming these states need to be added or were part of the closure.
+  // From previous file analysis, searchTerm and filterType were used.
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterType, setFilterType] = useState('all');
+  const [showHistory, setShowHistory] = useState(false);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleAddAllowance = () => {
+    if (allowanceName && allowanceAmount) {
+      setFormData(prev => ({
+        ...prev,
+        allowances: { ...prev.allowances, [allowanceName]: Number(allowanceAmount) }
+      }));
+      setAllowanceName('');
+      setAllowanceAmount('');
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!user) return;
-    if (!confirm('Are you sure you want to delete this salary structure?')) return;
-    
-    try {
-      const response = await fetch(`/api/salary-structure?id=${id}`, {
-        method: 'DELETE'
-      });
-      
-      if (response.ok) {
-        fetchSalaryStructures();
-        fetchSalaryHistory();
-      }
-    } catch (error) {
-      console.error('Error deleting salary structure:', error);
+  const handleAddDeduction = () => {
+    if (deductionName && deductionAmount) {
+      setFormData(prev => ({
+        ...prev,
+        deductions: { ...prev.deductions, [deductionName]: Number(deductionAmount) }
+      }));
+      setDeductionName('');
+      setDeductionAmount('');
     }
   };
 
-  const handleEdit = (structure: SalaryStructure) => {
-    setEditingStructure(structure);
-    setFormData({
-      jobTitle: structure.jobTitle,
-      company: structure.company,
-      baseSalary: structure.baseSalary.toString(),
-      allowances: structure.allowances || {},
-      deductions: structure.deductions || {},
-      effectiveDate: structure.effectiveDate.toString().split('T')[0],
-      endDate: structure.endDate ? structure.endDate.toString().split('T')[0] : '',
-      currency: structure.currency,
-      location: structure.location || '',
-      department: structure.department || '',
-      grade: structure.grade || '',
-      notes: structure.notes || '',
-      changeType: 'OTHER',
-      changeReason: ''
-    });
-    setShowForm(true);
+  const handleAddEmployerContribution = () => {
+    if (employerContributionName && employerContributionAmount) {
+      setFormData(prev => ({
+        ...prev,
+        employerContributions: { ...prev.employerContributions, [employerContributionName]: Number(employerContributionAmount) }
+      }));
+      setEmployerContributionName('');
+      setEmployerContributionAmount('');
+    }
+  };
+
+  const handleRemoveAllowance = (key: string) => {
+    const newAllowances = { ...formData.allowances };
+    delete newAllowances[key];
+    setFormData(prev => ({ ...prev, allowances: newAllowances }));
+  };
+
+  const handleRemoveDeduction = (key: string) => {
+    const newDeductions = { ...formData.deductions };
+    delete newDeductions[key];
+    setFormData(prev => ({ ...prev, deductions: newDeductions }));
+  };
+
+  const handleRemoveEmployerContribution = (key: string) => {
+    const newContributions = { ...formData.employerContributions };
+    delete newContributions[key];
+    setFormData(prev => ({ ...prev, employerContributions: newContributions }));
   };
 
   const resetForm = () => {
@@ -217,6 +262,7 @@ export default function SalaryStructureManagement() {
       baseSalary: '',
       allowances: {},
       deductions: {},
+      employerContributions: {},
       effectiveDate: '',
       endDate: '',
       currency: 'INR',
@@ -229,73 +275,84 @@ export default function SalaryStructureManagement() {
     });
   };
 
-  const addAllowance = () => {
-    if (allowanceName && allowanceAmount) {
-      setFormData(prev => ({
-        ...prev,
-        allowances: {
-          ...prev.allowances,
-          [allowanceName]: parseFloat(allowanceAmount)
-        }
-      }));
-      setAllowanceName('');
-      setAllowanceAmount('');
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+
+    try {
+      const url = editingStructure ? `/api/salary-structure` : `/api/salary-structure`;
+      const method = editingStructure ? 'PUT' : 'POST';
+      const body = editingStructure
+        ? { ...formData, id: editingStructure.id, userId: user.id }
+        : { ...formData, userId: user.id };
+
+      const response = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+
+      if (response.ok) {
+        fetchSalaryStructures();
+        fetchSalaryHistory();
+        setShowForm(false);
+        setEditingStructure(null);
+        resetForm();
+      } else {
+        throw new Error('Failed to save salary structure');
+      }
+    } catch (error) {
+      console.error('Error saving salary structure:', error);
     }
   };
 
-  const removeAllowance = (name: string) => {
-    setFormData(prev => {
-      const newAllowances = { ...prev.allowances };
-      delete newAllowances[name];
-      return { ...prev, allowances: newAllowances };
-    });
-  };
-
-  const addDeduction = () => {
-    if (deductionName && deductionAmount) {
-      setFormData(prev => ({
-        ...prev,
-        deductions: {
-          ...prev.deductions,
-          [deductionName]: parseFloat(deductionAmount)
-        }
-      }));
-      setDeductionName('');
-      setDeductionAmount('');
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this salary structure?')) return;
+    try {
+      const response = await fetch(`/api/salary-structure?id=${id}`, { method: 'DELETE' });
+      if (response.ok) {
+        fetchSalaryStructures();
+        fetchSalaryHistory(); // Update history as well if needed
+      }
+    } catch (error) {
+      console.error('Error deleting salary structure:', error);
     }
   };
 
-  const removeDeduction = (name: string) => {
-    setFormData(prev => {
-      const newDeductions = { ...prev.deductions };
-      delete newDeductions[name];
-      return { ...prev, deductions: newDeductions };
+  const handleEdit = (structure: SalaryStructure) => {
+    setEditingStructure(structure);
+
+    let parsedAllowances = {};
+    let parsedDeductions = {};
+    let parsedEmployerContributions = {};
+
+    try {
+      parsedAllowances = typeof structure.allowances === 'string' ? JSON.parse(structure.allowances) : structure.allowances || {};
+      parsedDeductions = typeof structure.deductions === 'string' ? JSON.parse(structure.deductions) : structure.deductions || {};
+      parsedEmployerContributions = typeof structure.employerContributions === 'string' ? JSON.parse(structure.employerContributions) : structure.employerContributions || {};
+    } catch (e) { console.error("Error parsing fields", e); }
+
+    setFormData({
+      jobTitle: structure.jobTitle,
+      company: structure.company,
+      baseSalary: structure.baseSalary.toString(),
+      allowances: parsedAllowances,
+      deductions: parsedDeductions,
+      employerContributions: parsedEmployerContributions,
+      effectiveDate: new Date(structure.effectiveDate).toISOString().split('T')[0],
+      endDate: structure.endDate ? new Date(structure.endDate).toISOString().split('T')[0] : '',
+      currency: structure.currency,
+      location: structure.location || '',
+      department: structure.department || '',
+      grade: structure.grade || '',
+      notes: structure.notes || '',
+      changeType: 'OTHER',
+      changeReason: ''
     });
+    setShowForm(true);
   };
 
-  const calculateTotalAllowances = () => {
-    return Object.values(formData.allowances).reduce((sum, amount) => sum + amount, 0);
-  };
 
-  const calculateTotalDeductions = () => {
-    return Object.values(formData.deductions).reduce((sum, amount) => sum + amount, 0);
-  };
-
-  const calculateNetSalary = () => {
-    const base = parseFloat(formData.baseSalary) || 0;
-    const allowances = calculateTotalAllowances();
-    const deductions = calculateTotalDeductions();
-    return base + allowances - deductions;
-  };
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
 
   const getChangeTypeIcon = (changeType: SalaryHistory['changeType']) => {
     switch (changeType) {
@@ -314,636 +371,448 @@ export default function SalaryStructureManagement() {
 
   const filteredStructures = salaryStructures.filter(structure => {
     const matchesSearch = structure.jobTitle.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         structure.company.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesFilter = filterType === 'all' || 
-                         (filterType === 'active' && structure.isActive) ||
-                         (filterType === 'inactive' && !structure.isActive);
+      structure.company.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesFilter = filterType === 'all' ||
+      (filterType === 'active' && structure.isActive) ||
+      (filterType === 'inactive' && !structure.isActive);
     return matchesSearch && matchesFilter;
   });
 
-  const activeStructure = salaryStructures.find(s => s.isActive);
   const totalSalaryHistory = salaryHistory.length;
-  const averageSalaryChange = salaryHistory.length > 0 
-    ? salaryHistory.reduce((sum, h) => sum + h.baseSalary, 0) / salaryHistory.length 
+  const averageSalaryChange = salaryHistory.length > 0
+    ? salaryHistory.reduce((sum, h) => sum + h.baseSalary, 0) / salaryHistory.length
     : 0;
 
-  if (loading) {
+  if (loading && salaryStructures.length === 0) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <div className="minimal-loading"></div>
-        <span className="ml-3 text-muted">Loading salary data...</span>
+      <div className="flex items-center justify-center p-12">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      {/* Header */}
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
+    <div className="space-y-8 animate-in fade-in duration-500 max-w-7xl mx-auto">
+      {/* Header Section */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-primary">Salary Structure Management</h2>
-          <p className="text-muted">Track your compensation history and career progression</p>
+          <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+            My Compensation
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Manage your salary structures, analyze breakdowns, and track history.
+          </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => setShowHistory(!showHistory)}
-            className="minimal-button-secondary flex items-center space-x-2"
-          >
-            <History className="w-4 h-4" />
-            <span>History</span>
-          </button>
-          <button
-            onClick={() => setShowForm(true)}
-            className="minimal-button-primary flex items-center space-x-2"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Add Structure</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="minimal-stat">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-muted">Active Structure</p>
-              <p className="text-2xl font-bold text-primary">
-                {activeStructure ? activeStructure.jobTitle : 'None'}
-              </p>
-            </div>
-            <div className="minimal-stat-inset">
-              <CheckCircle className="w-6 h-6 text-success" />
-            </div>
-          </div>
-        </div>
-
-        <div className="minimal-stat">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-muted">Current Salary</p>
-              <p className="text-2xl font-bold text-success currency-inr">
-                {activeStructure ? formatCurrency(activeStructure.baseSalary) : '₹0'}
-              </p>
-            </div>
-            <div className="minimal-stat-inset">
-              <DollarSign className="w-6 h-6 text-success" />
-            </div>
-          </div>
-        </div>
-
-        <div className="minimal-stat">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-muted">Total Changes</p>
-              <p className="text-2xl font-bold text-info">{totalSalaryHistory}</p>
-            </div>
-            <div className="minimal-stat-inset">
-              <History className="w-6 h-6 text-info" />
-            </div>
-          </div>
-        </div>
-
-        <div className="minimal-stat">
-      <div className="flex items-center justify-between">
-        <div>
-              <p className="text-sm font-medium text-muted">Avg. Salary</p>
-              <p className="text-2xl font-bold text-warning currency-inr">
-                {formatCurrency(averageSalaryChange)}
-              </p>
-            </div>
-            <div className="minimal-stat-inset">
-              <Calculator className="w-6 h-6 text-warning" />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Search and Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted" />
-          <input
-            type="text"
-            placeholder="Search by job title or company..."
-            value={searchTerm}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 minimal-input"
-          />
-        </div>
-        <div className="flex gap-2">
-          <select
-            value={filterType}
-            onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFilterType(e.target.value as any)}
-            className="minimal-select"
-          >
-            <option value="all">All Structures</option>
-            <option value="active">Active Only</option>
-            <option value="inactive">Inactive Only</option>
-          </select>
-          <button className="minimal-button-small p-2">
-            <Filter className="w-4 h-4" />
-          </button>
-        </div>
-      </div>
-
-      {/* Salary Structures Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-        {filteredStructures.map((structure) => {
-          const allowances = structure.allowances || {};
-          const deductions = structure.deductions || {};
-          const totalAllowances = Object.values(allowances).reduce((sum: number, amount: any) => sum + amount, 0);
-          const totalDeductions = Object.values(deductions).reduce((sum: number, amount: any) => sum + amount, 0);
-          const netSalary = structure.baseSalary + totalAllowances - totalDeductions;
-
-          return (
-            <div key={structure.id} className="minimal-card p-6 hover-lift transition-all">
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-primary">{structure.jobTitle}</h3>
-                  <p className="text-sm text-muted">{structure.company}</p>
-                  {structure.isActive && (
-                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-success bg-opacity-10 text-success mt-1">
-                      <CheckCircle className="w-3 h-3 mr-1" />
-                      Active
-                    </span>
-                  )}
-                </div>
-                <div className="flex space-x-2">
-                  <button
-                    onClick={() => handleEdit(structure)}
-                    className="minimal-button-small p-2"
-                    title="Edit structure"
-                  >
-                    <Edit className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(structure.id)}
-                    className="minimal-button-small p-2 text-error hover:bg-error hover:text-white"
-                    title="Delete structure"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <div className="flex items-center space-x-2">
-                  <DollarSign className="w-4 h-4 text-success" />
-                  <span className="text-sm text-muted">Base Salary:</span>
-                  <span className="font-semibold currency-inr">{formatCurrency(structure.baseSalary)}</span>
-                </div>
-
-                {Object.keys(allowances).length > 0 && (
-                  <div>
-                    <p className="text-sm font-medium text-muted mb-1">Allowances:</p>
-                    {Object.entries(allowances).map(([name, amount]) => (
-                      <div key={name} className="flex justify-between text-sm">
-                        <span className="text-muted">{name}:</span>
-                        <span className="text-success font-medium">+{formatCurrency(amount)}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {Object.keys(deductions).length > 0 && (
-                  <div>
-                    <p className="text-sm font-medium text-muted mb-1">Deductions:</p>
-                    {Object.entries(deductions).map(([name, amount]) => (
-                      <div key={name} className="flex justify-between text-sm">
-                        <span className="text-muted">{name}:</span>
-                        <span className="text-error font-medium">-{formatCurrency(amount)}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                <div className="border-t pt-3">
-                  <div className="flex justify-between items-center">
-                    <span className="font-semibold text-primary">Net Salary:</span>
-                    <span className="text-lg font-bold text-success currency-inr">{formatCurrency(netSalary)}</span>
-                  </div>
-                </div>
-
-                <div className="flex items-center space-x-2 text-sm text-muted">
-                  <Calendar className="w-4 h-4" />
-                  <span>Effective: {new Date(structure.effectiveDate).toLocaleDateString()}</span>
-                </div>
-
-                {structure.location && (
-                  <div className="flex items-center space-x-2 text-sm text-muted">
-                    <MapPin className="w-4 h-4" />
-                    <span>{structure.location}</span>
-                  </div>
-                )}
-
-                {structure.department && (
-                  <div className="flex items-center space-x-2 text-sm text-muted">
-                    <Users className="w-4 h-4" />
-                    <span>{structure.department}</span>
-                  </div>
-                )}
-
-                {structure.grade && (
-                  <div className="flex items-center space-x-2 text-sm text-muted">
-                    <Award className="w-4 h-4" />
-                    <span>Grade: {structure.grade}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {filteredStructures.length === 0 && (
-        <div className="text-center py-12">
-          <DollarSign className="w-16 h-16 text-muted mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-primary mb-2">No Salary Structures</h3>
-          <p className="text-muted mb-4">Add your first salary structure to start tracking your compensation</p>
-          <button
-            onClick={() => setShowForm(true)}
-            className="minimal-button-primary"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Add Salary Structure
-          </button>
-        </div>
-      )}
-
-      {/* Salary History Section */}
-      {showHistory && (
-        <div className="minimal-card p-6 animate-scale-in">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-semibold text-primary">Salary History</h3>
-            <div className="flex space-x-2">
-              <button className="minimal-button-small p-2">
-                <Download className="w-4 h-4" />
-              </button>
-              <button className="minimal-button-small p-2">
-                <Share2 className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-          
-          <div className="space-y-4">
-            {salaryHistory.map((history) => (
-              <div key={history.id} className="minimal-card-inset p-4">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-start space-x-3">
-                    {getChangeTypeIcon(history.changeType)}
-                    <div>
-                      <h4 className="font-medium text-primary">{history.jobTitle}</h4>
-                      <p className="text-sm text-muted">{history.company}</p>
-                      <div className="flex items-center space-x-4 mt-1">
-                        <span className="text-sm text-success font-medium currency-inr">
-                          {formatCurrency(history.baseSalary)}
-                        </span>
-                        <span className="text-xs text-muted">
-                          {new Date(history.effectiveDate).toLocaleDateString()}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-xs px-2 py-1 rounded-full bg-secondary text-muted">
-                      {getChangeTypeLabel(history.changeType)}
-                    </span>
-                    {history.changeReason && (
-                      <p className="text-xs text-muted mt-1">{history.changeReason}</p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
-            
-            {salaryHistory.length === 0 && (
-              <div className="text-center py-8">
-                <History className="w-12 h-12 text-muted mx-auto mb-4" />
-                <p className="text-muted">No salary history available</p>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Form Modal */}
-      {showForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-semibold text-primary">
-                {editingStructure ? 'Edit Salary Structure' : 'Add Salary Structure'}
-              </h3>
-              <button
-                onClick={() => {
-                  setShowForm(false);
-                  setEditingStructure(null);
-                  resetForm();
-                }}
-                className="minimal-button-small p-2"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Basic Information */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-primary mb-1">
-                    Job Title *
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.jobTitle}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData(prev => ({ ...prev, jobTitle: e.target.value }))}
-                    className="minimal-input"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-primary mb-1">
-                    Company *
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.company}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData(prev => ({ ...prev, company: e.target.value }))}
-                    className="minimal-input"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-primary mb-1">
-                    Base Salary *
-                  </label>
-                  <input
-                    type="number"
-                    value={formData.baseSalary}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData(prev => ({ ...prev, baseSalary: e.target.value }))}
-                    className="minimal-input"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-primary mb-1">
-                    Currency
-                  </label>
-                  <select
-                    value={formData.currency}
-                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFormData(prev => ({ ...prev, currency: e.target.value }))}
-                    className="minimal-select"
-                  >
-                    <option value="INR">INR (₹)</option>
-                    <option value="USD">USD ($)</option>
-                    <option value="EUR">EUR (€)</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-primary mb-1">
-                    Effective Date *
-                  </label>
-                  <input
-                    type="date"
-                    value={formData.effectiveDate}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData(prev => ({ ...prev, effectiveDate: e.target.value }))}
-                    className="minimal-input"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-primary mb-1">
-                    End Date
-                  </label>
-                  <input
-                    type="date"
-                    value={formData.endDate}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData(prev => ({ ...prev, endDate: e.target.value }))}
-                    className="minimal-input"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text.sm font-medium text-primary mb-1">
-                    Location
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.location}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData(prev => ({ ...prev, location: e.target.value }))}
-                    className="minimal-input"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-primary mb-1">
-                    Department
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.department}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData(prev => ({ ...prev, department: e.target.value }))}
-                    className="minimal-input"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-primary mb-1">
-                    Grade
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.grade}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData(prev => ({ ...prev, grade: e.target.value }))}
-                    className="minimal-input"
-                  />
-                </div>
-              </div>
-
-              {/* Change Details (for editing) */}
-              {editingStructure && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-primary mb-1">
-                      Change Type
-                    </label>
-                    <select
-                      value={formData.changeType}
-                      onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFormData(prev => ({ ...prev, changeType: e.target.value as any }))}
-                      className="minimal-select"
-                    >
-                      <option value="PROMOTION">Promotion</option>
-                      <option value="SALARY_REVISION">Salary Revision</option>
-                      <option value="COMPANY_CHANGE">Company Change</option>
-                      <option value="LOCATION_CHANGE">Location Change</option>
-                      <option value="DEPARTMENT_CHANGE">Department Change</option>
-                      <option value="TRANSFER">Transfer</option>
-                      <option value="OTHER">Other</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-primary mb-1">
-                      Change Reason
-                    </label>
+        <Sheet open={showForm} onOpenChange={(open) => {
+          setShowForm(open);
+          if (!open) { setEditingStructure(null); resetForm(); }
+        }}>
+          <SheetTrigger asChild>
+            <Button size="lg" className="shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all">
+              <Plus className="mr-2 h-4 w-4" />
+              {salaryStructures.length > 0 ? 'Update Structure' : 'Add Salary'}
+            </Button>
+          </SheetTrigger>
+          <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
+            <SheetHeader>
+              <SheetTitle>{editingStructure ? 'Edit Salary Structure' : 'New  Salary Structure'}</SheetTitle>
+              <SheetDescription>
+                {editingStructure ? 'Modify the details of your existing compensation plan.' : 'Add a new compensation plan to track your earnings.'}
+              </SheetDescription>
+            </SheetHeader>
+            <div className="mt-6 space-y-6 pb-20">
+              {/* Form implementation inline for simplicity in this artifact, ideally extracted */}
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Job Title</label>
                     <input
-                      type="text"
-                      value={formData.changeReason}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData(prev => ({ ...prev, changeReason: e.target.value }))}
-                      className="minimal-input"
-                      placeholder="Brief reason for the change..."
+                      name="jobTitle"
+                      value={formData.jobTitle}
+                      onChange={handleInputChange}
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      placeholder="e.g. Senior Engineer"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Company</label>
+                    <input
+                      name="company"
+                      value={formData.company}
+                      onChange={handleInputChange}
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      placeholder="e.g. Acme Corp"
                     />
                   </div>
                 </div>
-              )}
 
-              {/* Allowances */}
-              <div>
-                <h4 className="text-lg font-medium text-primary mb-3">Allowances</h4>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                  <input
-                    type="text"
-                    placeholder="Allowance name"
-                    value={allowanceName}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAllowanceName(e.target.value)}
-                    className="minimal-input"
-                  />
-                  <input
-                    type="number"
-                    placeholder="Amount"
-                    value={allowanceAmount}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAllowanceAmount(e.target.value)}
-                    className="minimal-input"
-                  />
-                  <button type="button" onClick={addAllowance} className="minimal-button-secondary">
-                    Add Allowance
-                  </button>
-                </div>
-
-                {Object.keys(formData.allowances).length > 0 && (
-                  <div className="space-y-2">
-                    {Object.entries(formData.allowances).map(([name, amount]) => (
-                      <div key={name} className="flex items-center justify-between bg-green-50 p-3 rounded-lg">
-                        <span className="font-medium text-green-800">{name}: +{formatCurrency(amount)}</span>
-                        <button
-                          type="button"
-                          onClick={() => removeAllowance(name)}
-                          className="minimal-button-small p-1 text-error hover:bg-error hover:text-white"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Deductions */}
-              <div>
-                <h4 className="text-lg font-medium text-primary mb-3">Deductions</h4>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                  <input
-                    type="text"
-                    placeholder="Deduction name"
-                    value={deductionName}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDeductionName(e.target.value)}
-                    className="minimal-input"
-                  />
-                  <input
-                    type="number"
-                    placeholder="Amount"
-                    value={deductionAmount}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDeductionAmount(e.target.value)}
-                    className="minimal-input"
-                  />
-                  <button type="button" onClick={addDeduction} className="minimal-button-secondary">
-                    Add Deduction
-                  </button>
-                </div>
-
-                {Object.keys(formData.deductions).length > 0 && (
-                  <div className="space-y-2">
-                    {Object.entries(formData.deductions).map(([name, amount]) => (
-                      <div key={name} className="flex items-center justify-between bg-red-50 p-3 rounded-lg">
-                        <span className="font-medium text-red-800">{name}: -{formatCurrency(amount)}</span>
-                        <button
-                          type="button"
-                          onClick={() => removeDeduction(name)}
-                          className="minimal-button-small p-1 text-error hover:bg-error hover:text-white"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Salary Summary */}
-              <div className="bg-secondary p-4 rounded-lg">
-                <h4 className="text-lg font-medium text-primary mb-3">Salary Summary</h4>
                 <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span>Base Salary:</span>
-                    <span className="font-medium currency-inr">{formatCurrency(parseFloat(formData.baseSalary) || 0)}</span>
+                  <label className="text-sm font-medium">Annual Basic Salary (Total CTC if unsure, but preferably Basic)</label>
+                  <div className="relative">
+                    <DollarSign className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <input
+                      name="baseSalary"
+                      type="number"
+                      value={formData.baseSalary}
+                      onChange={handleInputChange}
+                      className="flex h-10 w-full rounded-md border border-input bg-background pl-9 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      placeholder="0.00"
+                    />
                   </div>
-                  <div className="flex justify-between text-success">
-                    <span>Total Allowances:</span>
-                    <span className="font-medium">+{formatCurrency(calculateTotalAllowances())}</span>
+                </div>
+
+                {/* Allowances Section */}
+                <div className="space-y-2 p-4 border rounded-lg bg-card/50">
+                  <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4 text-green-500" /> Monthly Allowances
+                  </h3>
+                  <div className="flex gap-2">
+                    <input
+                      value={allowanceName}
+                      onChange={(e) => setAllowanceName(e.target.value)}
+                      className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors"
+                      placeholder="Name (e.g. HRA)"
+                    />
+                    <input
+                      type="number"
+                      value={allowanceAmount}
+                      onChange={(e) => setAllowanceAmount(e.target.value)}
+                      className="flex h-9 w-24 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors"
+                      placeholder="Amount"
+                    />
+                    <Button type="button" size="sm" variant="outline" onClick={handleAddAllowance}><Plus className="h-4 w-4" /></Button>
                   </div>
-                  <div className="flex justify-between text-error">
-                    <span>Total Deductions:</span>
-                    <span className="font-medium">-{formatCurrency(calculateTotalDeductions())}</span>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {Object.entries(formData.allowances).map(([key, val]) => (
+                      <Badge key={key} variant="secondary" className="pl-2 pr-1 py-1 flex items-center gap-2">
+                        {key}: {formatRupees(Number(val))}
+                        <X className="h-3 w-3 cursor-pointer hover:text-destructive" onClick={() => handleRemoveAllowance(key)} />
+                      </Badge>
+                    ))}
                   </div>
-                  <div className="border-t pt-2 flex justify-between font-bold text-lg">
-                    <span>Net Salary:</span>
-                    <span className="text-success currency-inr">{formatCurrency(calculateNetSalary())}</span>
+                </div>
+
+                {/* Deductions Section */}
+                <div className="space-y-2 p-4 border rounded-lg bg-card/50">
+                  <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
+                    <ArrowDown className="h-4 w-4 text-red-500" /> Monthly Deductions
+                  </h3>
+                  <div className="flex gap-2">
+                    <input
+                      value={deductionName}
+                      onChange={(e) => setDeductionName(e.target.value)}
+                      className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors"
+                      placeholder="Name (e.g. PF)"
+                    />
+                    <input
+                      type="number"
+                      value={deductionAmount}
+                      onChange={(e) => setDeductionAmount(e.target.value)}
+                      className="flex h-9 w-24 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors"
+                      placeholder="Amount"
+                    />
+                    <Button type="button" size="sm" variant="outline" onClick={handleAddDeduction}><Plus className="h-4 w-4" /></Button>
                   </div>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {Object.entries(formData.deductions).map(([key, val]) => (
+                      <Badge key={key} variant="outline" className="pl-2 pr-1 py-1 flex items-center gap-2 border-red-200 text-red-700 dark:text-red-400 dark:border-red-900">
+                        {key}: {formatRupees(Number(val))}
+                        <X className="h-3 w-3 cursor-pointer hover:text-destructive" onClick={() => handleRemoveDeduction(key)} />
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Employer Contributions Section */}
+                <div className="space-y-2 p-4 border rounded-lg bg-card/50">
+                  <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
+                    <Building className="h-4 w-4 text-blue-500" /> Monthly Employer Contributions
+                  </h3>
+                  <div className="flex gap-2">
+                    <input
+                      value={employerContributionName}
+                      onChange={(e) => setEmployerContributionName(e.target.value)}
+                      className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors"
+                      placeholder="Name (e.g. Employer PF)"
+                    />
+                    <input
+                      type="number"
+                      value={employerContributionAmount}
+                      onChange={(e) => setEmployerContributionAmount(e.target.value)}
+                      className="flex h-9 w-24 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors"
+                      placeholder="Amount"
+                    />
+                    <Button type="button" size="sm" variant="outline" onClick={handleAddEmployerContribution}><Plus className="h-4 w-4" /></Button>
+                  </div>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {Object.entries(formData.employerContributions).map(([key, val]) => (
+                      <Badge key={key} variant="outline" className="pl-2 pr-1 py-1 flex items-center gap-2 border-blue-200 text-blue-700 dark:text-blue-400 dark:border-blue-900">
+                        {key}: {formatRupees(Number(val))}
+                        <X className="h-3 w-3 cursor-pointer hover:text-destructive" onClick={() => handleRemoveEmployerContribution(key)} />
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Effective Date</label>
+                    <input
+                      type="date"
+                      name="effectiveDate"
+                      value={formData.effectiveDate}
+                      onChange={handleInputChange}
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Location</label>
+                    <input
+                      name="location"
+                      value={formData.location}
+                      onChange={handleInputChange}
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      placeholder="e.g. Bangalore"
+                    />
+                  </div>
+                </div>
+
+                <Button onClick={handleSubmit} className="w-full" size="lg">Save Structure</Button>
+              </div>
+            </div>
+          </SheetContent>
+        </Sheet>
+      </div>
+
+      {activeStructure ? (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Main Info Card */}
+          <Card className="md:col-span-2 overflow-hidden border-none shadow-xl bg-gradient-to-br from-primary/10 via-background to-background relative isolate">
+            <div className="absolute inset-0 bg-grid-white/10 [mask-image:linear-gradient(0deg,white,rgba(255,255,255,0.6))] -z-10" />
+
+            <CardHeader className="pb-2">
+              <div className="flex justify-between items-start">
+                <div>
+                  <CardTitle className="text-2xl font-bold flex items-center gap-2">
+                    {activeStructure.jobTitle}
+                    <Badge variant="secondary" className="text-xs font-normal">Active</Badge>
+                  </CardTitle>
+                  <CardDescription className="text-base mt-1 flex items-center gap-2">
+                    <Briefcase className="w-4 h-4" /> {activeStructure.company}
+                    <span className="text-muted-foreground/50">•</span>
+                    <MapPin className="w-4 h-4" /> {activeStructure.location || 'Remote'}
+                  </CardDescription>
+                </div>
+                <div className="h-12 w-12 rounded-full border-2 border-background shadow-sm flex items-center justify-center overflow-hidden bg-primary/20 text-primary font-bold">
+                  {activeStructure.company.substring(0, 2).toUpperCase()}
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 rounded-xl bg-background/50 backdrop-blur-sm border border-border/50">
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Gross Annual</p>
+                  <p className="text-xl font-bold text-foreground">{formatRupees(grossAnnual)}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Annual CTC</p>
+                  <p className="text-xl font-bold text-blue-600 dark:text-blue-400">{formatRupees(annualCTC)}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Monthly Allowances</p>
+                  <p className="text-xl font-bold text-green-600 dark:text-green-400">+{formatRupees(totalMonthlyAllowances)}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Monthly Deductions</p>
+                  <p className="text-xl font-bold text-red-600 dark:text-red-400">-{formatRupees(totalMonthlyDeductions)}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider text-primary">Net Monthly</p>
+                  <p className="text-xl font-bold text-primary">{formatRupees(netMonthly)}</p>
                 </div>
               </div>
 
-              {/* Notes */}
-              <div>
-                <label className="block text-sm font-medium text-primary mb-1">
-                  Notes
-                </label>
-                <textarea
-                  value={formData.notes}
-                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-                  rows={3}
-                  className="minimal-textarea"
-                  placeholder="Additional notes about this salary structure..."
-                />
+              {/* Visual Breakdown using Recharts Pie (Simplified) */}
+              <div className="mt-8 flex flex-col md:flex-row items-center gap-8">
+                <div className="h-48 w-48 relative">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={salaryComponents}
+                        innerRadius={35}
+                        outerRadius={60}
+                        paddingAngle={5}
+                        dataKey="value"
+                        stroke="none"
+                      >
+                        {salaryComponents.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="absolute inset-0 flex items-center justify-center flex-col pointer-events-none">
+                    <span className="text-xs text-muted-foreground">Components</span>
+                    <span className="font-bold">{salaryComponents.length}</span>
+                  </div>
+                </div>
+                <div className="flex-1 w-full space-y-3">
+                  <h4 className="font-semibold text-sm mb-2">Salary Breakdown</h4>
+                  {salaryComponents.map((comp, i) => (
+                    <div key={comp.name} className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
+                        <span className="text-muted-foreground capitalize">{comp.name}</span>
+                      </div>
+                      <span className="font-mono font-medium">{formatRupees(comp.value)}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
+            </CardContent>
+          </Card>
 
-              {/* Form Actions */}
-              <div className="flex justify-end space-x-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowForm(false);
-                    setEditingStructure(null);
-                    resetForm();
-                  }}
-                  className="minimal-button-secondary"
-                >
-                  Cancel
-                </button>
-                <button type="submit" className="minimal-button-primary">
-                  {editingStructure ? 'Update' : 'Create'} Salary Structure
-                </button>
-              </div>
-            </form>
+          {/* Quick Stats / Side Column */}
+          <div className="space-y-6">
+            {/* Net Pay Highlight */}
+            <Card className="bg-primary text-primary-foreground border-none shadow-xl">
+              <CardHeader className="pb-2">
+                <CardDescription className="text-primary-foreground/80">Monthly Take Home</CardDescription>
+                <CardTitle className="text-3xl font-bold tracking-tight">
+                  {formatRupees(netMonthly)}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-xs text-primary-foreground/70 bg-primary-foreground/10 p-2 rounded inline-block">
+                  After all deductions
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Details List */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Details</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-muted-foreground flex items-center gap-2"><Calendar className="w-4 h-4" /> Effective Date</span>
+                  <span className="font-medium">{new Date(activeStructure.effectiveDate).toLocaleDateString()}</span>
+                </div>
+                <Separator />
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-muted-foreground flex items-center gap-2"><Award className="w-4 h-4" /> Grade</span>
+                  <span className="font-medium">{activeStructure.grade || '-'}</span>
+                </div>
+                <Separator />
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-muted-foreground flex items-center gap-2"><Users className="w-4 h-4" /> Department</span>
+                  <span className="font-medium">{activeStructure.department || '-'}</span>
+                </div>
+                {activeStructure.notes && (
+                  <div className="pt-4 text-sm text-muted-foreground italic">
+                    "{activeStructure.notes}"
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
         </div>
+      ) : (
+        <div className="flex flex-col items-center justify-center p-12 border-2 border-dashed rounded-xl bg-muted/20">
+          <div className="bg-primary/10 p-6 rounded-full mb-4">
+            <DollarSign className="w-8 h-8 text-primary" />
+          </div>
+          <h3 className="text-lg font-semibold">No Salary Structure Setup</h3>
+          <p className="text-sm text-muted-foreground max-w-sm text-center mt-2 mb-6">
+            Add your current salary details to get insights into your earnings, deductions, and monthly take-home.
+          </p>
+          <Button onClick={() => setShowForm(true)}>Add Compensation Plan</Button>
+        </div>
       )}
+
+      {/* History Section using Tabs */}
+      <div className="mt-12">
+        <Tabs defaultValue="history" className="w-full">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold flex items-center gap-2">
+              <History className="w-5 h-5 text-muted-foreground" />
+              History
+            </h2>
+            <TabsList>
+              <TabsTrigger value="history">Timeline</TabsTrigger>
+              <TabsTrigger value="list">All Structures</TabsTrigger>
+            </TabsList>
+          </div>
+
+          <TabsContent value="history" className="mt-0">
+            <Card>
+              <CardContent className="p-6">
+                {salaryHistory.length > 0 ? (
+                  <div className="relative border-l border-border ml-3 space-y-8 py-2">
+                    {salaryHistory.map((item, i) => (
+                      <div key={item.id} className="ml-6 relative">
+                        <span className="absolute -left-[31px] top-1 h-4 w-4 rounded-full border-2 border-background bg-primary ring-4 ring-background" />
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-1">
+                          <p className="text-sm font-medium text-muted-foreground">
+                            {new Date(item.effectiveDate).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
+                          </p>
+                          <Badge variant="outline" className="w-fit text-xs">{item.changeType}</Badge>
+                        </div>
+                        <h3 className="font-semibold text-lg">{item.jobTitle} at {item.company}</h3>
+                        <div className="mt-2 p-3 bg-muted/40 rounded-lg text-sm grid grid-cols-2 gap-4 max-w-md">
+                          <div>
+                            <p className="text-muted-foreground text-xs uppercase">Base</p>
+                            <p className="font-medium">{formatRupees(Number(item.baseSalary))}</p>
+                          </div>
+                          {item.changeReason && (
+                            <div className="col-span-2">
+                              <p className="text-muted-foreground text-xs uppercase">Reason</p>
+                              <p>{item.changeReason}</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-center text-muted-foreground py-8">No history available yet.</p>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="list" className="mt-0">
+            <div className="grid gap-4">
+              {salaryStructures.map(structure => (
+                <Card key={structure.id} className={`transition-all hover:bg-accent/40 ${structure.isActive ? 'border-primary/50 bg-primary/5' : ''}`}>
+                  <CardContent className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h4 className="font-semibold">{structure.jobTitle}</h4>
+                        {structure.isActive && <Badge>Active</Badge>}
+                      </div>
+                      <p className="text-sm text-muted-foreground">{structure.company} • {new Date(structure.effectiveDate).getFullYear()}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-bold">{formatRupees(Number(structure.baseSalary))}</p>
+                      <p className="text-xs text-muted-foreground">Annual Base</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button variant="ghost" size="icon" onClick={() => handleEdit(structure)}>
+                        <Edit className="w-4 h-4 text-muted-foreground hover:text-foreground" />
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => handleDelete(structure.id)}>
+                        <Trash2 className="w-4 h-4 text-muted-foreground hover:text-destructive" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </TabsContent>
+        </Tabs>
+      </div>
     </div>
   );
 }
-
-

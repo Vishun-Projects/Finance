@@ -30,6 +30,7 @@ const primaryNavItemsConfig = [
   { href: '/financial-health', label: 'Health Score', icon: Heart },
   { href: '/transactions', label: 'Transactions', icon: ReceiptText },
   { href: '/plans', label: 'Plans', icon: Layers },
+  { href: '/salary', label: 'Salary', icon: Wallet },
   { href: '/advisor', label: 'AI Advisor', icon: Brain },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
@@ -70,8 +71,8 @@ export default function Navigation() {
                 key={item.href}
                 href={item.href}
                 className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-lg transition-colors ${isActive
-                  ? 'text-foreground bg-foreground/5 border border-foreground/10'
-                  : 'text-muted-foreground hover:text-foreground'
+                  ? 'text-primary bg-primary/10 border border-primary/20 shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
                   }`}
               >
                 <Icon className="w-6 h-6 font-light stroke-[1.5]" />
@@ -86,7 +87,7 @@ export default function Navigation() {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="flex items-center gap-3 w-full text-left outline-none group">
-                <div className="size-10 rounded-full border border-border flex items-center justify-center overflow-hidden grayscale shrink-0 group-hover:grayscale-0 transition-all">
+                <div className="size-10 rounded-full border border-border flex items-center justify-center overflow-hidden shrink-0 transition-all">
                   {user?.avatarUrl ? (
                     <img alt="Profile" className="size-full object-cover" src={user.avatarUrl} />
                   ) : (

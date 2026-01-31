@@ -7,6 +7,30 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model GlobalDesignSettings {
+  id               String   @id @default(cuid())
+  theme            String   @default("system") // light, dark, system
+  
+  // Colors (can be hex or hsl strings)
+  primaryColor     String   @default("250 85% 40%")
+  surfaceColor     String   @default("240 5% 97%")
+  accentColor      String   @default("240 4.8% 95.9%")
+  borderColor      String   @default("240 5.9% 90%")
+  
+  // Typography
+  fontFamilyBody   String   @default("Inter")
+  fontFamilyHeading String  @default("Inter")
+  baseFontSize     Int      @default(16)
+  
+  // Shape
+  borderRadius     String   @default("0.5rem")
+  
+  isActive         Boolean  @default(true)
+  updatedAt        DateTime @updatedAt
+  
+  @@map("global_design_settings")
+}
+
 model UserPreferences {
   id               String   @id @default(cuid())
   userId           String   @unique
@@ -286,6 +310,7 @@ model SalaryStructure {
   baseSalary    Decimal         @db.Decimal(10, 2)
   allowances    String?
   deductions    String?
+  employerContributions String?
   effectiveDate DateTime
   endDate       DateTime?
   isActive      Boolean         @default(true)
@@ -312,6 +337,7 @@ model SalaryHistory {
   baseSalary        Decimal          @db.Decimal(10, 2)
   allowances        String?
   deductions        String?
+  employerContributions String?
   effectiveDate     DateTime
   endDate           DateTime?
   currency          String           @default("INR")

@@ -1,6 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
-	darkMode: ['class'],
+	darkMode: 'class',
 	content: [
 		'./src/pages/**/*.{js,ts,jsx,tsx,mdx}',
 		'./src/components/**/*.{js,ts,jsx,tsx,mdx}',
@@ -83,7 +83,7 @@ module.exports = {
 				}
 			},
 			fontFamily: {
-				"display": ["Inter", "sans-serif"],
+				"display": ["var(--font-heading)", "Inter", "sans-serif"],
 				"sans": ["var(--font-sans)", "Inter", "sans-serif"],
 				"mono": ["var(--font-mono)", "JetBrains Mono", "monospace"]
 			},

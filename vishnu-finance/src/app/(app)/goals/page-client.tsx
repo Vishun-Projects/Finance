@@ -424,7 +424,7 @@ export default function GoalsPageClient({
                     className={cn(
                       'h-9 rounded-md border text-sm capitalize transition-colors',
                       priorityFilter === priority
-                        ? 'bg-foreground text-background hover:bg-foreground/90'
+                        ? 'bg-primary text-primary-foreground hover:bg-primary/90'
                         : 'border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground'
                     )}
                     onClick={() => setPriorityFilter(priority)}
@@ -537,7 +537,7 @@ export default function GoalsPageClient({
                               'justify-between h-8 text-[10px] uppercase font-bold tracking-wider',
                               isCompleted
                                 ? 'border border-emerald-900/50 bg-emerald-950/20 text-emerald-500'
-                                : 'bg-foreground text-background hover:bg-foreground/90'
+                                : 'bg-primary text-primary-foreground hover:bg-primary/90'
                             )}
                             disabled={isCompleted}
                             onClick={() => handleMarkCompleted(goal)}

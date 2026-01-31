@@ -444,7 +444,7 @@ export default function DeadlinesPageClient({ initialDeadlines, userId, layoutVa
                             <span
                               className={cn(
                                 'inline-flex items-center rounded-sm px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider',
-                                statusMeta.tone === 'destructive' && 'bg-red-950/30 text-red-500 border border-red-900/50',
+                                statusMeta.tone === 'destructive' && 'bg-destructive/10 text-destructive border border-destructive/20',
                                 statusMeta.tone === 'secondary' && 'bg-emerald-950/30 text-emerald-500 border border-emerald-900/50',
                                 statusMeta.tone === 'default' && 'bg-muted text-muted-foreground border border-border'
                               )}
@@ -479,9 +479,9 @@ export default function DeadlinesPageClient({ initialDeadlines, userId, layoutVa
                               Due {toLocalDate(deadline.dueDate)}
                             </span>
                             <span className="flex items-center gap-2">
-                              <AlarmClock className={cn("h-3 w-3", isOverdue && "text-red-500")} />
+                              <AlarmClock className={cn("h-3 w-3", isOverdue && "text-destructive")} />
                               {isOverdue
-                                ? <span className="text-red-500">{Math.abs(daysLeft)} day{Math.abs(daysLeft) === 1 ? '' : 's'} overdue</span>
+                                ? <span className="text-destructive">{Math.abs(daysLeft)} day{Math.abs(daysLeft) === 1 ? '' : 's'} overdue</span>
                                 : daysLeft >= 0
                                   ? `${daysLeft} day${daysLeft === 1 ? '' : 's'} remaining`
                                   : 'Due today'}
@@ -508,7 +508,7 @@ export default function DeadlinesPageClient({ initialDeadlines, userId, layoutVa
                               'justify-between h-8 text-[10px] uppercase font-bold tracking-wider',
                               deadline.isCompleted
                                 ? 'border border-emerald-900/50 bg-emerald-950/20 text-emerald-500 hover:bg-emerald-900/30'
-                                : 'bg-foreground text-background hover:bg-foreground/90'
+                                : 'bg-primary text-primary-foreground hover:bg-primary/90'
                             )}
                             onClick={() => handleToggleCompleted(deadline)}
                           >
@@ -517,7 +517,7 @@ export default function DeadlinesPageClient({ initialDeadlines, userId, layoutVa
                           </Button>
                           <Button
                             size="sm"
-                            className="justify-between bg-red-950/20 text-red-700 border border-red-900/30 hover:bg-red-950/40 hover:text-red-500 h-8 text-[10px] uppercase font-bold tracking-wider"
+                            className="justify-between bg-destructive/10 text-destructive border border-destructive/20 hover:bg-destructive/20 hover:text-destructive h-8 text-[10px] uppercase font-bold tracking-wider"
                             onClick={() => handleDelete(deadline.id)}
                             disabled={isDeleting === deadline.id}
                           >

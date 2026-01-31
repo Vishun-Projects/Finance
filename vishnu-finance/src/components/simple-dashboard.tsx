@@ -74,7 +74,7 @@ export interface SimpleDashboardData {
     activePlans: number;
     totalCommitted: number;
     topPlan: string | null;
-    items?: Array<{ name: string; targetAmount: number; priority?: number }>;
+    items?: Array<{ name: string; targetAmount: number; currentAmount: number; priority?: number }>;
   };
   wishlistInfo?: {
     totalItems: number;

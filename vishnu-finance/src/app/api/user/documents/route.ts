@@ -5,6 +5,7 @@ import { randomUUID } from 'crypto';
 import { Buffer } from 'buffer';
 import { tmpdir } from 'os';
 import { prisma } from '@/lib/db';
+import { supabase } from '@/lib/supabase';
 import type { DocumentVisibility } from '@prisma/client';
 import { AuthService } from '@/lib/auth';
 import { writeAuditLog, extractRequestMeta } from '@/lib/audit';
@@ -107,15 +108,27 @@ export async function POST(request: NextRequest) {
     }
 
     const filename = `${Date.now()}_${randomUUID()}_${file.name}`;
-    await mkdir(UPLOAD_DIR, { recursive: true });
     const bytes = await file.arrayBuffer();
-    await writeFile(join(UPLOAD_DIR, filename), Buffer.from(bytes));
+    const buffer = Buffer.from(bytes);
+
+    // Upload to Supabase Storage
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('user-docs')
+      .upload(filename, buffer, {
+        contentType: file.type,
+        upsert: false
+      });
+
+    if (uploadError) {
+      console.error('Supabase upload error:', uploadError);
+      throw new Error(`Supabase upload failed: ${uploadError.message}`);
+    }
 
     const document = await prisma.document.create({
       data: {
         ownerId: user.id,
         uploadedById: user.id,
-        storageKey: ['uploads', 'user-docs', filename].join('/'),
+        storageKey: uploadData.path, // Store the Supabase path
         originalName: file.name,
         mimeType: file.type || 'application/octet-stream',
         fileSize: file.size ?? null,
@@ -139,6 +152,7 @@ export async function POST(request: NextRequest) {
       metadata: {
         originalName: file.name,
         visibility,
+        storageProvider: 'supabase',
       },
       message: `${user.email} uploaded ${file.name}`,
       ipAddress: meta.ipAddress,

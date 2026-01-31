@@ -99,18 +99,11 @@ export class DashboardService {
                 }
             })(),
 
-            // 2. Legacy Expenses
-            (prisma as any).expense.aggregate({
-                where: { userId, date: { gte: rangeStart, lte: rangeEnd } },
-                _sum: { amount: true }, _count: true
-            }).catch(() => ({ _sum: { amount: 0 }, _count: 0 })),
+            // 2. Legacy Expenses (Removed)
+            Promise.resolve({ _sum: { amount: 0 }, _count: 0 }),
 
-            // 3. Legacy Income
-            (prisma as any).incomeSource.findMany({
-                where: { userId, isActive: true },
-                select: { id: true, name: true, amount: true, frequency: true, startDate: true, category: { select: { name: true } } },
-                orderBy: { startDate: 'desc' }
-            }).catch(() => []),
+            // 3. Legacy Income (Removed)
+            Promise.resolve([]),
 
             // 4. Goals
             prisma.goal.count({ where: { userId, isActive: true } }).catch(() => 0),
@@ -223,29 +216,8 @@ export class DashboardService {
         const totalDebits = Number(transactionStats._sum?.debitAmount || 0);
         const legacyExpenses = Number(legacyExpenseStats._sum?.amount || 0);
 
-        // Legacy Income Calculation
-        const rangeStartTime = rangeStart.getTime();
-        const rangeEndTime = rangeEnd.getTime();
-        const daysInRange = Math.ceil((rangeEndTime - rangeStartTime) / (1000 * 60 * 60 * 24)) + 1;
-
-        const legacyIncome = legacyIncomeStats.reduce((sum: number, source: { startDate: string | Date, amount: number | string, frequency: string }) => {
-            const sourceDate = new Date(source.startDate);
-            const sourceTime = sourceDate.getTime();
-            if (sourceTime > rangeEndTime) return sum;
-            const amount = Number(source.amount);
-            if (source.frequency === 'ONE_TIME') return (sourceTime >= rangeStartTime && sourceTime <= rangeEndTime) ? sum + amount : sum;
-
-            const effectiveStart = Math.max(rangeStartTime, sourceTime);
-            const effectiveDays = Math.max(0, Math.ceil((rangeEndTime - effectiveStart) / (1000 * 60 * 60 * 24)) + 1);
-
-            switch (source.frequency) {
-                case 'MONTHLY': return sum + (amount * (effectiveDays / 30));
-                case 'YEARLY': return sum + ((amount / 365) * effectiveDays);
-                case 'WEEKLY': return sum + (amount * (effectiveDays / 7));
-                case 'DAILY': return sum + (amount * effectiveDays);
-                default: return sum;
-            }
-        }, 0);
+        // Legacy Income Calculation (Skipped)
+        const legacyIncome = 0;
 
         const totalIncome = totalCredits + legacyIncome;
         const totalExpenses = totalDebits + legacyExpenses;
@@ -377,24 +349,11 @@ export class DashboardService {
             };
         });
 
-        // Legacy Income Trans logic
-        const incomeTransactions = legacyIncomeStats
-            .filter((income: any) => {
-                if (income.frequency !== 'ONE_TIME') return false;
-                const incDate = new Date(income.startDate);
-                return incDate >= rangeStart && incDate <= rangeEnd;
-            })
-            .map((income: any) => ({
-                id: income.id,
-                title: income.name,
-                amount: Number(income.amount),
-                type: 'income',
-                date: income.startDate.toISOString().split('T')[0],
-                category: 'Income'
-            }));
+        // Legacy Income Trans logic (Skipped)
+        const incomeTransactions: any[] = [];
 
         const allTransactions = [...incomeTransactions, ...recentTrans]
-            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+            .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
             .slice(0, 10);
 
         // Health Score

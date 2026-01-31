@@ -1,0 +1,5329 @@
+[
+  {
+    "id": "cmhtbqn3x0002ju04cmz5arip",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in",
+    "metadata": null,
+    "ipAddress": "152.58.29.233",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-10T15:55:47.709Z"
+  },
+  {
+    "id": "cmhtbqyxz0004ju04ij2srhvv",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_LOGOUT",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com logged out",
+    "metadata": null,
+    "ipAddress": "152.58.29.233",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-10T15:56:03.047Z"
+  },
+  {
+    "id": "cmhtbusf70006ju04aywv6e6l",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in",
+    "metadata": null,
+    "ipAddress": "42.111.98.80",
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Mobile Safari/537.36",
+    "createdAt": "2025-11-10T15:59:01.220Z"
+  },
+  {
+    "id": "cmhte41uw0001jy04ezv22m97",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in",
+    "metadata": null,
+    "ipAddress": "42.111.98.80",
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Mobile Safari/537.36",
+    "createdAt": "2025-11-10T17:02:12.585Z"
+  },
+  {
+    "id": "cmhte7a210001jy04vrocobd3",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_LOGOUT",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com logged out",
+    "metadata": null,
+    "ipAddress": "42.111.98.80",
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Mobile Safari/537.36",
+    "createdAt": "2025-11-10T17:04:43.178Z"
+  },
+  {
+    "id": "cmhtwr93w0001l404a57h5sva",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in",
+    "metadata": null,
+    "ipAddress": "42.106.250.172",
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Mobile Safari/537.36",
+    "createdAt": "2025-11-11T01:44:08.157Z"
+  },
+  {
+    "id": "cmhtwssxf0001l404rctenee9",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_LOGOUT",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com logged out",
+    "metadata": null,
+    "ipAddress": "42.106.250.172",
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Mobile Safari/537.36",
+    "createdAt": "2025-11-11T01:45:20.500Z"
+  },
+  {
+    "id": "cmhtx09ma0001k104ea9i1vps",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "42.106.250.172",
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Mobile Safari/537.36",
+    "createdAt": "2025-11-11T01:51:08.722Z"
+  },
+  {
+    "id": "cmhtx1oi80003k104pt31abse",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGOUT",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com logged out",
+    "metadata": null,
+    "ipAddress": "42.106.250.172",
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Mobile Safari/537.36",
+    "createdAt": "2025-11-11T01:52:14.672Z"
+  },
+  {
+    "id": "cmhu1qs7i0001ky041lclmyos",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in",
+    "metadata": null,
+    "ipAddress": "114.143.164.18",
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Mobile Safari/537.36",
+    "createdAt": "2025-11-11T04:03:44.335Z"
+  },
+  {
+    "id": "cmhu2au2h0001kv04k7daq0ri",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in",
+    "metadata": null,
+    "ipAddress": "114.143.164.18",
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Mobile Safari/537.36",
+    "createdAt": "2025-11-11T04:19:19.865Z"
+  },
+  {
+    "id": "cmhu2pibf0003kv04uu36sfjt",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "114.143.164.18",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-11T04:30:44.476Z"
+  },
+  {
+    "id": "cmhu2pzhp0005kv04bva1q5om",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGOUT",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com logged out",
+    "metadata": null,
+    "ipAddress": "114.143.164.18",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-11T04:31:06.734Z"
+  },
+  {
+    "id": "cmhu7fwm50001b27sv9z1y9l5",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-11T06:43:14.525Z"
+  },
+  {
+    "id": "cmhu9y0bs0002jp046nzcjh2b",
+    "actorId": "cmhu9xwf70000jp04dqp1nkfe",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "virajrajguru67@gmail.com signed in",
+    "metadata": null,
+    "ipAddress": "114.143.164.18",
+    "userAgent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0.1 Mobile/15E148 Safari/604.1",
+    "createdAt": "2025-11-11T07:53:18.376Z"
+  },
+  {
+    "id": "cmhu9ykjg0001l704beyeijze",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in",
+    "metadata": null,
+    "ipAddress": "114.143.164.18",
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Mobile Safari/537.36",
+    "createdAt": "2025-11-11T07:53:44.572Z"
+  },
+  {
+    "id": "cmhu9yse30003l70463217lpt",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_LOGOUT",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com logged out",
+    "metadata": null,
+    "ipAddress": "114.143.164.18",
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Mobile Safari/537.36",
+    "createdAt": "2025-11-11T07:53:54.748Z"
+  },
+  {
+    "id": "cmhu9ytl80005l7047i2b21iu",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_LOGOUT",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com logged out",
+    "metadata": null,
+    "ipAddress": "114.143.164.18",
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Mobile Safari/537.36",
+    "createdAt": "2025-11-11T07:53:56.300Z"
+  },
+  {
+    "id": "cmhu9z3nu0007l704xqwho6h5",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in",
+    "metadata": null,
+    "ipAddress": "114.143.164.18",
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Mobile Safari/537.36",
+    "createdAt": "2025-11-11T07:54:09.354Z"
+  },
+  {
+    "id": "cmhu9z7sb0009l704pztuzvbf",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_LOGOUT",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com logged out",
+    "metadata": null,
+    "ipAddress": "114.143.164.18",
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Mobile Safari/537.36",
+    "createdAt": "2025-11-11T07:54:14.699Z"
+  },
+  {
+    "id": "cmhubrqxf0003b27sn6m8irx6",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-11T08:44:25.491Z"
+  },
+  {
+    "id": "cmhucyro10005b27s3k93wmj1",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-11T09:17:52.658Z"
+  },
+  {
+    "id": "cmhudli400001l204nbbf4wp5",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in",
+    "metadata": null,
+    "ipAddress": "42.111.107.8",
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Mobile Safari/537.36",
+    "createdAt": "2025-11-11T09:35:33.361Z"
+  },
+  {
+    "id": "cmhuef3ck0007b27snnjhmzmn",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Mobile/15E148 Safari/604.1",
+    "createdAt": "2025-11-11T09:58:33.908Z"
+  },
+  {
+    "id": "cmhuffik10009b27s8xhf1gcv",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Mobile/15E148 Safari/604.1",
+    "createdAt": "2025-11-11T10:26:53.231Z"
+  },
+  {
+    "id": "cmhug4xl90001ie042c2ipota",
+    "actorId": "cmhu9xwf70000jp04dqp1nkfe",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "virajrajguru67@gmail.com signed in",
+    "metadata": null,
+    "ipAddress": "114.143.164.18",
+    "userAgent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0.1 Mobile/15E148 Safari/604.1",
+    "createdAt": "2025-11-11T10:46:39.117Z"
+  },
+  {
+    "id": "cmhug5emr0001jv04b9yy7w1w",
+    "actorId": "cmhu9xwf70000jp04dqp1nkfe",
+    "event": "USER_LOGOUT",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "virajrajguru67@gmail.com logged out",
+    "metadata": null,
+    "ipAddress": "114.143.164.18",
+    "userAgent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0.1 Mobile/15E148 Safari/604.1",
+    "createdAt": "2025-11-11T10:47:01.204Z"
+  },
+  {
+    "id": "cmhug5ffo0003jv041s76fv9n",
+    "actorId": "cmhu9xwf70000jp04dqp1nkfe",
+    "event": "USER_LOGOUT",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "virajrajguru67@gmail.com logged out",
+    "metadata": null,
+    "ipAddress": "114.143.164.18",
+    "userAgent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0.1 Mobile/15E148 Safari/604.1",
+    "createdAt": "2025-11-11T10:47:02.244Z"
+  },
+  {
+    "id": "cmhug5lsm0005jv042d7x7ws7",
+    "actorId": "cmhu9xwf70000jp04dqp1nkfe",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "virajrajguru67@gmail.com signed in",
+    "metadata": null,
+    "ipAddress": "114.143.164.18",
+    "userAgent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0.1 Mobile/15E148 Safari/604.1",
+    "createdAt": "2025-11-11T10:47:10.487Z"
+  },
+  {
+    "id": "cmhuinzzf000bb27s3jv4wt55",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Mobile/15E148 Safari/604.1",
+    "createdAt": "2025-11-11T11:57:27.915Z"
+  },
+  {
+    "id": "cmhuk7tis000db27sbymjqgg4",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Mobile/15E148 Safari/604.1",
+    "createdAt": "2025-11-11T12:40:52.276Z"
+  },
+  {
+    "id": "cmhukujhr0001k204rcothvnv",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "114.143.164.18",
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Mobile Safari/537.36",
+    "createdAt": "2025-11-11T12:58:32.367Z"
+  },
+  {
+    "id": "cmhvp2fex0002l8048odvts5j",
+    "actorId": "cmhvp2cfs0000l8044i3n7sry",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishaltiw.com@gmail.com signed in",
+    "metadata": null,
+    "ipAddress": "152.58.44.83",
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Mobile Safari/537.36",
+    "createdAt": "2025-11-12T07:44:24.970Z"
+  },
+  {
+    "id": "cmhvpfp7l000fb27scr5ouybq",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-12T07:54:44.193Z"
+  },
+  {
+    "id": "cmhvphd68000jb27sev9y50bh",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "DOCUMENT_UPLOAD",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": "document:cmhvphcu1000hb27sceltmbym",
+    "message": "Admin uploaded Vishnu Vishwakarma.pdf",
+    "metadata": {
+      "bankCode": null,
+      "visibility": "PUBLIC",
+      "originalName": "Vishnu Vishwakarma.pdf"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-12T07:56:01.905Z"
+  },
+  {
+    "id": "cmhvqdsie0001l7049fmbsymm",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in",
+    "metadata": null,
+    "ipAddress": "114.143.164.18",
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Mobile Safari/537.36",
+    "createdAt": "2025-11-12T08:21:14.775Z"
+  },
+  {
+    "id": "cmhvtkb7j000tb27s4ux734lu",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-12T09:50:17.791Z"
+  },
+  {
+    "id": "cmhvuar1w000vb27spgdbam8x",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-12T10:10:51.381Z"
+  },
+  {
+    "id": "cmhvumjve0003b2zcpjv9xgih",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "SUPER_DOCUMENT_UPLOAD",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": "super-document:cmhvumjcj0001b2zc4yz7j2n2",
+    "message": "Super user uploaded income-tax-act-1961-amended-by-finance-no.-2-act-2024.pdf",
+    "metadata": {
+      "title": "Income tax amend",
+      "category": "INCOME_TAX",
+      "originalName": "income-tax-act-1961-amended-by-finance-no.-2-act-2024.pdf"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-12T10:20:01.947Z"
+  },
+  {
+    "id": "cmhvv2wvl01q3b2zc01punp4a",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-12T10:32:45.298Z"
+  },
+  {
+    "id": "cmhvv35qw01rpb2zcqnbqtzqi",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_LOGOUT",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com logged out",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-12T10:32:56.792Z"
+  },
+  {
+    "id": "cmhvv36iq01rxb2zc439opn8m",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_LOGOUT",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com logged out",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-12T10:32:57.794Z"
+  },
+  {
+    "id": "cmhvv3e0c01tpb2zcdqqikz9d",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-12T10:33:07.500Z"
+  },
+  {
+    "id": "cmhvv87av02trb2zcce1e4fxt",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "TRANSACTION_IMPORT",
+    "severity": "INFO",
+    "targetUserId": "cmhtx05it000gb2rg2l3qn7u3",
+    "targetResource": "document:cmhvury4u0005b2zcshxnrw25",
+    "message": "vishun@finance.com imported 1734 transactions",
+    "metadata": {
+      "bankCode": "IDIB",
+      "inserted": 1734,
+      "duplicates": 0,
+      "accountNumber": null,
+      "debitInserted": 1535,
+      "creditInserted": 199
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-12T10:36:52.088Z"
+  },
+  {
+    "id": "cmhvvnpky02ubb2zcee5tbzbz",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-12T10:48:55.619Z"
+  },
+  {
+    "id": "cmhvwemag02utb2zchyf7ooe8",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-12T11:09:51.065Z"
+  },
+  {
+    "id": "cmhvxyd9k02v3b2zc0576ekyp",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-12T11:53:12.104Z"
+  },
+  {
+    "id": "cmhvyismi02vpb2zccyedzzar",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-12T12:09:05.130Z"
+  },
+  {
+    "id": "cmhwsrwz902wdb2zcxbmyefpr",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-13T02:15:59.157Z"
+  },
+  {
+    "id": "cmhx65ytb02wfb2zcxncx6s7a",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-13T08:30:49.727Z"
+  },
+  {
+    "id": "cmhx6uwnj02wrb2zcikgp2tx7",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-13T08:50:13.327Z"
+  },
+  {
+    "id": "cmhx7llhz02x9b2zckbmd2bmp",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-13T09:10:58.583Z"
+  },
+  {
+    "id": "cmhx96n8f02xpb2zcec14giog",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-13T09:55:20.223Z"
+  },
+  {
+    "id": "cmhxam38u0007b22kav82xclt",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-13T10:35:20.430Z"
+  },
+  {
+    "id": "cmhxankl10009b22kj3rpzspk",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "DOCUMENT_STATUS_CHANGE",
+    "severity": "WARN",
+    "targetUserId": "cmhtx05it000gb2rg2l3qn7u3",
+    "targetResource": "document:cmhvury4u0005b2zcshxnrw25",
+    "message": "vishun@finance.com soft-deleted AccountStatement_28-10-2025 11_00_46.pdf",
+    "metadata": {
+      "mode": "document-and-transactions",
+      "originalName": "AccountStatement_28-10-2025 11_00_46.pdf",
+      "transactionsAffected": 1734
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-13T10:36:29.557Z"
+  },
+  {
+    "id": "cmhxaovpj001zb22kyfhnlzcf",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "TRANSACTION_IMPORT",
+    "severity": "INFO",
+    "targetUserId": "cmhtx05it000gb2rg2l3qn7u3",
+    "targetResource": "document:cmhxaog6d000bb22kh1m6ovu7",
+    "message": "vishun@finance.com imported 29 transactions",
+    "metadata": {
+      "bankCode": "IDIB",
+      "inserted": 29,
+      "duplicates": 0,
+      "accountNumber": null,
+      "debitInserted": 27,
+      "creditInserted": 2
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-13T10:37:30.632Z"
+  },
+  {
+    "id": "cmhxbqtxq0021b22knwk3fu5k",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-13T11:07:01.262Z"
+  },
+  {
+    "id": "cmhxbtfbj0023b22kvttbyyev",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "DOCUMENT_STATUS_CHANGE",
+    "severity": "WARN",
+    "targetUserId": "cmhtx05it000gb2rg2l3qn7u3",
+    "targetResource": "document:cmhxaog6d000bb22kh1m6ovu7",
+    "message": "vishun@finance.com soft-deleted AccountStatement_02-11-2025 14_35_36.pdf",
+    "metadata": {
+      "mode": "document-and-transactions",
+      "originalName": "AccountStatement_02-11-2025 14_35_36.pdf",
+      "transactionsAffected": 29
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-13T11:09:02.287Z"
+  },
+  {
+    "id": "cmhxc4dgy003tb22k3n4ea4xd",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "TRANSACTION_IMPORT",
+    "severity": "INFO",
+    "targetUserId": "cmhtx05it000gb2rg2l3qn7u3",
+    "targetResource": "document:cmhxc3ffp0025b22ked67qpy8",
+    "message": "vishun@finance.com imported 29 transactions",
+    "metadata": {
+      "bankCode": "IDIB",
+      "inserted": 29,
+      "duplicates": 0,
+      "accountNumber": null,
+      "debitInserted": 27,
+      "creditInserted": 2
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-13T11:17:33.106Z"
+  },
+  {
+    "id": "cmhxcbzd8003vb22km8md8rwq",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-13T11:23:28.075Z"
+  },
+  {
+    "id": "cmhxccp15003xb22kh81994hv",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "DOCUMENT_DOWNLOAD",
+    "severity": "INFO",
+    "targetUserId": "cmhtx05it000gb2rg2l3qn7u3",
+    "targetResource": "document:cmhxc3ffp0025b22ked67qpy8",
+    "message": "vishun@finance.com downloaded AccountStatement_02-11-2025 14_35_36.pdf",
+    "metadata": {
+      "isDeleted": false,
+      "originalName": "AccountStatement_02-11-2025 14_35_36.pdf"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-13T11:24:01.338Z"
+  },
+  {
+    "id": "cmhxddd9l0041b22k6rkjj1g3",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-13T11:52:32.361Z"
+  },
+  {
+    "id": "cmhxdpflw0001l2040rz11762",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "114.143.164.18",
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Mobile Safari/537.36",
+    "createdAt": "2025-11-13T12:01:55.269Z"
+  },
+  {
+    "id": "cmhxdxw6d0001b2ngkoeqefue",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-13T12:08:29.982Z"
+  },
+  {
+    "id": "cmhxeymql02vpb2ng4h1dijkp",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "TRANSACTION_IMPORT",
+    "severity": "INFO",
+    "targetUserId": "cmhtx05it000gb2rg2l3qn7u3",
+    "targetResource": "document:cmhxec4rv0003b2ng48n855on",
+    "message": "vishun@finance.com imported 1736 transactions",
+    "metadata": {
+      "bankCode": "IDIB",
+      "inserted": 1736,
+      "duplicates": 0,
+      "accountNumber": null,
+      "debitInserted": 1537,
+      "creditInserted": 199
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-13T12:37:04.029Z"
+  },
+  {
+    "id": "cmhxez13b02vrb2ngjckg8gem",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-13T12:37:22.631Z"
+  },
+  {
+    "id": "cmhxfk6a202vtb2ngj8bqpgna",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-13T12:53:49.130Z"
+  },
+  {
+    "id": "cmhxgi9k80713b2ngfqnaq36i",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "TRANSACTION_IMPORT",
+    "severity": "INFO",
+    "targetUserId": "cmhtx05it000gb2rg2l3qn7u3",
+    "targetResource": "document:cmhxfs7ld02vvb2ngzu95aya8",
+    "message": "vishun@finance.com imported 1814 transactions",
+    "metadata": {
+      "bankCode": "IDIB",
+      "inserted": 1814,
+      "duplicates": 0,
+      "accountNumber": null,
+      "debitInserted": 1603,
+      "creditInserted": 211
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-13T13:20:19.688Z"
+  },
+  {
+    "id": "cmhxgnn7m0715b2ngj56uyrnu",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-13T13:24:30.658Z"
+  },
+  {
+    "id": "cmhxhdcz70717b2ngjwjm24ov",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-13T13:44:30.451Z"
+  },
+  {
+    "id": "cmhxhy0k00719b2ngl0t0hc1z",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-13T14:00:34.128Z"
+  },
+  {
+    "id": "cmhxiexsx08dlb2ng2ab8nxmq",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "TRANSACTION_IMPORT",
+    "severity": "INFO",
+    "targetUserId": "cmhtx05it000gb2rg2l3qn7u3",
+    "targetResource": "document:cmhxi5fl0071bb2ngpp67ii94",
+    "message": "vishun@finance.com imported 1736 transactions",
+    "metadata": {
+      "bankCode": "IDIB",
+      "inserted": 1736,
+      "duplicates": 0,
+      "accountNumber": null,
+      "debitInserted": 1537,
+      "creditInserted": 199
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-13T14:13:43.641Z"
+  },
+  {
+    "id": "cmhxilvmg08dnb2ngxbbpyn0l",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-13T14:19:07.480Z"
+  },
+  {
+    "id": "cmhxjf4rc08dpb2nge15fam7r",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-13T14:41:52.344Z"
+  },
+  {
+    "id": "cmhxjp8uv09q1b2ngqxvpe510",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "TRANSACTION_IMPORT",
+    "severity": "INFO",
+    "targetUserId": "cmhtx05it000gb2rg2l3qn7u3",
+    "targetResource": "document:cmhxji8mu08drb2ngqu74mypb",
+    "message": "vishun@finance.com imported 1736 transactions",
+    "metadata": {
+      "bankCode": "IDIB",
+      "inserted": 1736,
+      "duplicates": 0,
+      "accountNumber": null,
+      "debitInserted": 1537,
+      "creditInserted": 199
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-13T14:49:44.215Z"
+  },
+  {
+    "id": "cmhxjz1dz09q3b2ngl6zomzfy",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-13T14:57:21.095Z"
+  },
+  {
+    "id": "cmhxkj0zw0b2fb2ngm07m3jvl",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "TRANSACTION_IMPORT",
+    "severity": "INFO",
+    "targetUserId": "cmhtx05it000gb2rg2l3qn7u3",
+    "targetResource": "document:cmhxkdxfv09q5b2ngigwxyfhk",
+    "message": "vishun@finance.com imported 1736 transactions",
+    "metadata": {
+      "bankCode": "IDIB",
+      "inserted": 1736,
+      "duplicates": 0,
+      "accountNumber": null,
+      "debitInserted": 1537,
+      "creditInserted": 199
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-13T15:12:53.708Z"
+  },
+  {
+    "id": "cmhxkk2vh0b2hb2ng0r7qnait",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-13T15:13:42.798Z"
+  },
+  {
+    "id": "cmhxl8i8e0b2jb2ng37m3y7wd",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-13T15:32:42.447Z"
+  },
+  {
+    "id": "cmhybb4ns0b2lb2ngpnoz2plr",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-14T03:42:34.840Z"
+  },
+  {
+    "id": "cmhyc8oxy0b2nb2ngzh0v5j4p",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-14T04:08:40.774Z"
+  },
+  {
+    "id": "cmhyceth50cffb2ng9s08ub0q",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "TRANSACTION_IMPORT",
+    "severity": "INFO",
+    "targetUserId": "cmhtx05it000gb2rg2l3qn7u3",
+    "targetResource": "document:cmhycav3z0b2pb2ngprzk8mro",
+    "message": "vishun@finance.com imported 1736 transactions",
+    "metadata": {
+      "bankCode": "IDIB",
+      "inserted": 1736,
+      "duplicates": 0,
+      "accountNumber": null,
+      "debitInserted": 1537,
+      "creditInserted": 199
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-14T04:13:26.586Z"
+  },
+  {
+    "id": "cmhycvzem0ds7b2ng4ukmw75m",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "TRANSACTION_IMPORT",
+    "severity": "INFO",
+    "targetUserId": "cmhtx05it000gb2rg2l3qn7u3",
+    "targetResource": "document:cmhycrxba0cfhb2ng0zchbzrj",
+    "message": "vishun@finance.com imported 1736 transactions",
+    "metadata": {
+      "bankCode": "IDIB",
+      "inserted": 1736,
+      "duplicates": 0,
+      "accountNumber": null,
+      "debitInserted": 1537,
+      "creditInserted": 199
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-14T04:26:47.423Z"
+  },
+  {
+    "id": "cmhycwu4c0ds9b2ngxq5t41tc",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-14T04:27:27.229Z"
+  },
+  {
+    "id": "cmhyh2okq0dsbb2ng3x9vtd6r",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-14T06:23:58.442Z"
+  },
+  {
+    "id": "cmhynxrv00001b2hw07ffc619",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-14T09:36:06.725Z"
+  },
+  {
+    "id": "cmhynyi980003b2hw86izvkqd",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_LOGOUT",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com logged out",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-14T09:36:40.940Z"
+  },
+  {
+    "id": "cmhynyidb0005b2hwde6sdalc",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_LOGOUT",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com logged out",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-14T09:36:41.088Z"
+  },
+  {
+    "id": "cmhynyv3m0007b2hws0ndi8c6",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-14T09:36:57.586Z"
+  },
+  {
+    "id": "cmhynz4ye0009b2hwos080gnq",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_LOGOUT",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com logged out",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-14T09:37:10.358Z"
+  },
+  {
+    "id": "cmhynzi81000cb2hwh8nmrnyl",
+    "actorId": "cmhynzhmu000ab2hw8ctqoi9m",
+    "event": "USER_OAUTH_REGISTER",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishunvishwakarma90211@gmail.com registered with Google OAuth",
+    "metadata": {
+      "oauthId": "102683284072340805850",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-14T09:37:27.553Z"
+  },
+  {
+    "id": "cmhyojbnf0001b2mk6qif88kq",
+    "actorId": "cmhynzhmu000ab2hw8ctqoi9m",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishunvishwakarma90211@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "102683284072340805850",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-14T09:52:52.155Z"
+  },
+  {
+    "id": "cmhyp34wu0001b2eou91od21n",
+    "actorId": "cmhynzhmu000ab2hw8ctqoi9m",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishunvishwakarma90211@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "102683284072340805850",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-14T10:08:16.535Z"
+  },
+  {
+    "id": "cmhyufu4n0001b2v48hs7ft83",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-14T12:38:07.173Z"
+  },
+  {
+    "id": "cmhyunssr0001aviwufo1lbs6",
+    "actorId": "cmhynzhmu000ab2hw8ctqoi9m",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishunvishwakarma90211@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "102683284072340805850",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-14T12:44:18.697Z"
+  },
+  {
+    "id": "cmhyzg8l10001l804qrkik5mh",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "42.111.110.12",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-14T14:58:23.990Z"
+  },
+  {
+    "id": "cmhyzo8bo0001jx04rjs1p3yl",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_LOGOUT",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com logged out",
+    "metadata": null,
+    "ipAddress": "42.111.110.12",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-14T15:04:36.901Z"
+  },
+  {
+    "id": "cmhyzoagk0003jx04nvw2dsg9",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_LOGOUT",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com logged out",
+    "metadata": null,
+    "ipAddress": "42.111.110.12",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-14T15:04:38.680Z"
+  },
+  {
+    "id": "cmhyzoahj0005jx04jdysijlj",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_LOGOUT",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com logged out",
+    "metadata": null,
+    "ipAddress": "42.111.110.12",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-14T15:04:39.189Z"
+  },
+  {
+    "id": "cmhyzoax20007jx048y7dja7q",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_LOGOUT",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com logged out",
+    "metadata": null,
+    "ipAddress": "42.111.110.12",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-14T15:04:39.704Z"
+  },
+  {
+    "id": "cmhyzobml0009jx04a18nogmg",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_LOGOUT",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com logged out",
+    "metadata": null,
+    "ipAddress": "42.111.110.12",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-14T15:04:41.182Z"
+  },
+  {
+    "id": "cmhyzzd2t0001lc040islizb8",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "42.111.110.12",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-14T15:13:16.278Z"
+  },
+  {
+    "id": "cmhz07si50001b2o4evfvwzz5",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-14T15:19:49.515Z"
+  },
+  {
+    "id": "cmhzru7hc0001l504hfv6o8kg",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "114.143.164.18",
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Mobile Safari/537.36",
+    "createdAt": "2025-11-15T04:13:04.992Z"
+  },
+  {
+    "id": "cmhzruiu20003l504jdipp4vj",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_LOGOUT",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com logged out",
+    "metadata": null,
+    "ipAddress": "114.143.164.18",
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Mobile Safari/537.36",
+    "createdAt": "2025-11-15T04:13:19.707Z"
+  },
+  {
+    "id": "cmhzruxu60005l504a6v2li15",
+    "actorId": "cmhynzhmu000ab2hw8ctqoi9m",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishunvishwakarma90211@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "102683284072340805850",
+      "provider": "google"
+    },
+    "ipAddress": "114.143.164.18",
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Mobile Safari/537.36",
+    "createdAt": "2025-11-15T04:13:39.151Z"
+  },
+  {
+    "id": "cmhzsmowy0001l704qpughbsq",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "114.143.164.18",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-15T04:35:13.954Z"
+  },
+  {
+    "id": "cmhzte4fn0001l504a4c3sdb6",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "114.143.164.18",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-15T04:56:33.780Z"
+  },
+  {
+    "id": "cmhztjwgk0001l804rhuiwcq5",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "114.143.164.18",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-15T05:01:03.380Z"
+  },
+  {
+    "id": "cmhzuf0130001avq0ykxg32sd",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-15T05:25:14.342Z"
+  },
+  {
+    "id": "cmhzvi5wx0001av3ssptffi3e",
+    "actorId": "cmhynzhmu000ab2hw8ctqoi9m",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishunvishwakarma90211@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "102683284072340805850",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-15T05:55:41.553Z"
+  },
+  {
+    "id": "cmhzvovgg0007avgcb84w9m8h",
+    "actorId": "cmhynzhmu000ab2hw8ctqoi9m",
+    "event": "TRANSACTION_IMPORT",
+    "severity": "INFO",
+    "targetUserId": "cmhynzhmu000ab2hw8ctqoi9m",
+    "targetResource": "document:cmhzvmu2l0001avgc4vd3uwlp",
+    "message": "vishunvishwakarma90211@gmail.com imported 1259 transactions",
+    "metadata": {
+      "bankCode": null,
+      "inserted": 1259,
+      "duplicates": 0,
+      "accountNumber": null,
+      "debitInserted": 1063,
+      "creditInserted": 196
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-15T06:00:54.592Z"
+  },
+  {
+    "id": "cmhzwfk450009avgc61o6r10k",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-15T06:21:39.605Z"
+  },
+  {
+    "id": "cmhzwiru4000havgclmim60n5",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "TRANSACTION_IMPORT",
+    "severity": "INFO",
+    "targetUserId": "cmhtbqk6t0000ju04hxwu08x2",
+    "targetResource": "document:cmhzwgqy1000bavgcfmd06u33",
+    "message": "vishun.orv@gmail.com imported 1259 transactions",
+    "metadata": {
+      "bankCode": null,
+      "inserted": 1259,
+      "duplicates": 0,
+      "accountNumber": null,
+      "debitInserted": 1063,
+      "creditInserted": 196
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-15T06:24:09.580Z"
+  },
+  {
+    "id": "cmhzx6q230001k204xmuzf5ba",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "114.143.164.18",
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Mobile Safari/537.36",
+    "createdAt": "2025-11-15T06:42:47.020Z"
+  },
+  {
+    "id": "cmhzx7w0i0001jv04wwgtzbsv",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_LOGOUT",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com logged out",
+    "metadata": null,
+    "ipAddress": "114.143.164.18",
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Mobile Safari/537.36",
+    "createdAt": "2025-11-15T06:43:41.394Z"
+  },
+  {
+    "id": "cmhzx85ge0003jv04jfqaxl3l",
+    "actorId": "cmhynzhmu000ab2hw8ctqoi9m",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishunvishwakarma90211@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "102683284072340805850",
+      "provider": "google"
+    },
+    "ipAddress": "114.143.164.18",
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Mobile Safari/537.36",
+    "createdAt": "2025-11-15T06:43:53.630Z"
+  },
+  {
+    "id": "cmhzx92700005jv04va41pvhi",
+    "actorId": "cmhynzhmu000ab2hw8ctqoi9m",
+    "event": "USER_LOGOUT",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishunvishwakarma90211@gmail.com logged out",
+    "metadata": null,
+    "ipAddress": "114.143.164.18",
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Mobile Safari/537.36",
+    "createdAt": "2025-11-15T06:44:36.060Z"
+  },
+  {
+    "id": "cmhzx93ri0007jv04v10jq78f",
+    "actorId": "cmhynzhmu000ab2hw8ctqoi9m",
+    "event": "USER_LOGOUT",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishunvishwakarma90211@gmail.com logged out",
+    "metadata": null,
+    "ipAddress": "114.143.164.18",
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Mobile Safari/537.36",
+    "createdAt": "2025-11-15T06:44:38.095Z"
+  },
+  {
+    "id": "cmhzx9bti0009jv04l6xznqtt",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "114.143.164.18",
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Mobile Safari/537.36",
+    "createdAt": "2025-11-15T06:44:48.534Z"
+  },
+  {
+    "id": "cmhzxrrqb0001avqs76ipnp7l",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-15T06:59:08.961Z"
+  },
+  {
+    "id": "cmhzxsmjj0005avqsaim4cxyp",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "TRANSACTION_IMPORT",
+    "severity": "INFO",
+    "targetUserId": "cmhtbqk6t0000ju04hxwu08x2",
+    "targetResource": "document:cmhzxsi9r0003avqs7xuxlu3h",
+    "message": "vishun.orv@gmail.com imported 10 transactions",
+    "metadata": {
+      "bankCode": null,
+      "inserted": 10,
+      "duplicates": 0,
+      "accountNumber": null,
+      "debitInserted": 10,
+      "creditInserted": 0
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-15T06:59:48.895Z"
+  },
+  {
+    "id": "cmhzy0kdn0009avqs1yixu9o3",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "TRANSACTION_IMPORT",
+    "severity": "INFO",
+    "targetUserId": "cmhtbqk6t0000ju04hxwu08x2",
+    "targetResource": "document:cmhzxyiqc0007avqsiw6eaefi",
+    "message": "vishun.orv@gmail.com imported 1259 transactions",
+    "metadata": {
+      "bankCode": null,
+      "inserted": 1259,
+      "duplicates": 0,
+      "accountNumber": null,
+      "debitInserted": 1063,
+      "creditInserted": 196
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-15T07:05:59.340Z"
+  },
+  {
+    "id": "cmhzygzd3000bavqs646h0bqh",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-15T07:18:45.255Z"
+  },
+  {
+    "id": "cmhzyk6tx000javqscthpvpsz",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "TRANSACTION_IMPORT",
+    "severity": "INFO",
+    "targetUserId": "cmhtbqk6t0000ju04hxwu08x2",
+    "targetResource": "document:cmhzyi5al000davqsjgsq92ez",
+    "message": "vishun.orv@gmail.com imported 1259 transactions",
+    "metadata": {
+      "bankCode": null,
+      "inserted": 1259,
+      "duplicates": 0,
+      "accountNumber": null,
+      "debitInserted": 1063,
+      "creditInserted": 196
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-15T07:21:14.902Z"
+  },
+  {
+    "id": "cmhzyv9wc0001l204tpi2izur",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "1.38.144.235",
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Mobile Safari/537.36",
+    "createdAt": "2025-11-15T07:29:52.092Z"
+  },
+  {
+    "id": "cmi00f3dh000lavqsny2b69kx",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-15T08:13:16.374Z"
+  },
+  {
+    "id": "cmi00iaea000pavqs9xwo4qjf",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "TRANSACTION_IMPORT",
+    "severity": "INFO",
+    "targetUserId": "cmhtbqk6t0000ju04hxwu08x2",
+    "targetResource": "document:cmi00g97u000navqs9zyt5knn",
+    "message": "vishun.orv@gmail.com imported 1259 transactions",
+    "metadata": {
+      "bankCode": null,
+      "inserted": 1259,
+      "duplicates": 0,
+      "accountNumber": null,
+      "debitInserted": 1063,
+      "creditInserted": 196
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-15T08:15:45.442Z"
+  },
+  {
+    "id": "cmi00s7ow000xavqs4rden1rn",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "TRANSACTION_IMPORT",
+    "severity": "INFO",
+    "targetUserId": "cmhtbqk6t0000ju04hxwu08x2",
+    "targetResource": "document:cmi00q6m4000ravqsc5mypyc9",
+    "message": "vishun.orv@gmail.com imported 1259 transactions",
+    "metadata": {
+      "bankCode": null,
+      "inserted": 1259,
+      "duplicates": 0,
+      "accountNumber": null,
+      "debitInserted": 1063,
+      "creditInserted": 196
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-15T08:23:28.496Z"
+  },
+  {
+    "id": "cmi01idqi000zavqs6d8mxy1g",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-15T08:43:49.387Z"
+  },
+  {
+    "id": "cmi01o61r0017avqsc8onp1p2",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "TRANSACTION_IMPORT",
+    "severity": "INFO",
+    "targetUserId": "cmhtbqk6t0000ju04hxwu08x2",
+    "targetResource": "document:cmi01m4yo0011avqszxdc6yy5",
+    "message": "vishun.orv@gmail.com imported 1259 transactions",
+    "metadata": {
+      "bankCode": null,
+      "inserted": 1259,
+      "duplicates": 0,
+      "accountNumber": null,
+      "debitInserted": 1063,
+      "creditInserted": 196
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-15T08:48:19.359Z"
+  },
+  {
+    "id": "cmi020jwe0019avqsduoup3tx",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_LOGOUT",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com logged out",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-15T08:57:57.182Z"
+  },
+  {
+    "id": "cmi021gi2001bavqsp61ff1lj",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-15T08:58:39.435Z"
+  },
+  {
+    "id": "cmi024zur001javqspfq6hviw",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "TRANSACTION_IMPORT",
+    "severity": "INFO",
+    "targetUserId": "cmhtbqk6t0000ju04hxwu08x2",
+    "targetResource": "document:cmi022yw3001davqs9h578kyz",
+    "message": "vishun.orv@gmail.com imported 1259 transactions",
+    "metadata": {
+      "bankCode": null,
+      "inserted": 1259,
+      "duplicates": 0,
+      "accountNumber": null,
+      "debitInserted": 1063,
+      "creditInserted": 196
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-15T09:01:24.483Z"
+  },
+  {
+    "id": "cmi03hlgw001lavqsj7uq68kx",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-15T09:39:11.984Z"
+  },
+  {
+    "id": "cmi03x87w001tavqs9b2a5nnc",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "TRANSACTION_IMPORT",
+    "severity": "INFO",
+    "targetUserId": "cmhtbqk6t0000ju04hxwu08x2",
+    "targetResource": "document:cmi03n7zt001navqs8i98zibw",
+    "message": "vishun.orv@gmail.com imported 1259 transactions",
+    "metadata": {
+      "bankCode": null,
+      "inserted": 1259,
+      "duplicates": 0,
+      "accountNumber": null,
+      "debitInserted": 1063,
+      "creditInserted": 196
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-15T09:51:20.962Z"
+  },
+  {
+    "id": "cmi04v54p001vavqsyg3qkbrn",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-15T10:17:43.610Z"
+  },
+  {
+    "id": "cmi05w789001xavqsmncrhnx3",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-15T10:46:32.601Z"
+  },
+  {
+    "id": "cmi06037p0027avqsdn1oa4t7",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "TRANSACTION_IMPORT",
+    "severity": "WARN",
+    "targetUserId": "cmhtbqk6t0000ju04hxwu08x2",
+    "targetResource": "document:cmi05xqqr001zavqs6hyrvrv7",
+    "message": "vishun.orv@gmail.com imported 0 transactions (1259 duplicates)",
+    "metadata": {
+      "bankCode": null,
+      "inserted": 0,
+      "duplicates": 1259,
+      "accountNumber": null,
+      "debitInserted": 0,
+      "creditInserted": 0
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-15T10:49:34.021Z"
+  },
+  {
+    "id": "cmi068e79002bavqscvo19zpy",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_LOGOUT",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com logged out",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-15T10:56:01.509Z"
+  },
+  {
+    "id": "cmi0apglg0001l404xrfbtepc",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "114.143.164.18",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-15T13:01:16.228Z"
+  },
+  {
+    "id": "cmi0b5rss0001avo8hf5sdeid",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-15T13:13:57.244Z"
+  },
+  {
+    "id": "cmi0b6wtk0005avo8o70gyoft",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "TRANSACTION_IMPORT",
+    "severity": "INFO",
+    "targetUserId": "cmhtbqk6t0000ju04hxwu08x2",
+    "targetResource": "document:cmi0b6mtm0003avo8g8uc25cf",
+    "message": "vishun.orv@gmail.com imported 10 transactions",
+    "metadata": {
+      "bankCode": null,
+      "inserted": 10,
+      "duplicates": 0,
+      "accountNumber": null,
+      "debitInserted": 10,
+      "creditInserted": 0
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-15T13:14:50.409Z"
+  },
+  {
+    "id": "cmi0bejal000davo8q6mt8cvy",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "TRANSACTION_IMPORT",
+    "severity": "INFO",
+    "targetUserId": "cmhtbqk6t0000ju04hxwu08x2",
+    "targetResource": "document:cmi0bcgxg0007avo8kiaea5vc",
+    "message": "vishun.orv@gmail.com imported 1259 transactions",
+    "metadata": {
+      "bankCode": null,
+      "inserted": 1259,
+      "duplicates": 0,
+      "accountNumber": null,
+      "debitInserted": 1063,
+      "creditInserted": 196
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-15T13:20:46.125Z"
+  },
+  {
+    "id": "cmi0bi51u0001jv04xkkszp2i",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "114.143.164.18",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-15T13:23:34.290Z"
+  },
+  {
+    "id": "cmi0bjt790001jy04lvv0c9il",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in",
+    "metadata": null,
+    "ipAddress": "114.143.164.18",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-15T13:24:52.246Z"
+  },
+  {
+    "id": "cmi0cprwq0001le044lfygm5b",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "114.143.164.18",
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Mobile Safari/537.36",
+    "createdAt": "2025-11-15T13:57:30.123Z"
+  },
+  {
+    "id": "cmi17lybm0001ju04a6ofnv72",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "1.38.127.52",
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Mobile Safari/537.36",
+    "createdAt": "2025-11-16T04:22:19.906Z"
+  },
+  {
+    "id": "cmi18lmov0001b2age024l7wm",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-16T04:50:04.446Z"
+  },
+  {
+    "id": "cmi19s7ld0001b2dsvt27lvlb",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-16T05:23:11.089Z"
+  },
+  {
+    "id": "cmi1bp1sr0001b2mob7i4rhpf",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-16T06:16:42.843Z"
+  },
+  {
+    "id": "cmi1co0wp0001b2kkce32gdqy",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-16T06:43:54.650Z"
+  },
+  {
+    "id": "cmi1cpz3n0003b2kkli361ftq",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGOUT",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com logged out",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-16T06:45:25.620Z"
+  },
+  {
+    "id": "cmi1cq15t0005b2kkh3i1s4tc",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGOUT",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com logged out",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-16T06:45:28.289Z"
+  },
+  {
+    "id": "cmi1cq3440007b2kkzkw4wcmd",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGOUT",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com logged out",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-16T06:45:30.206Z"
+  },
+  {
+    "id": "cmi1cqfcq0009b2kktktd60je",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-16T06:45:46.310Z"
+  },
+  {
+    "id": "cmi1dhk2v000bb2kkyvhpgdvz",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-16T07:06:52.520Z"
+  },
+  {
+    "id": "cmi1dn74r0001b2v0ign7addw",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-16T07:11:15.674Z"
+  },
+  {
+    "id": "cmi1dqgec0003b2v0c21qjrw7",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "TRANSACTION_IMPORT",
+    "severity": "WARN",
+    "targetUserId": "cmhtbqk6t0000ju04hxwu08x2",
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com imported 0 transactions (10 duplicates)",
+    "metadata": {
+      "bankCode": null,
+      "inserted": 0,
+      "duplicates": 10,
+      "accountNumber": null,
+      "debitInserted": 0,
+      "creditInserted": 0
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-16T07:13:47.653Z"
+  },
+  {
+    "id": "cmi1e3qo30005b2v072n047aa",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "TRANSACTION_IMPORT",
+    "severity": "INFO",
+    "targetUserId": "cmhtbqk6t0000ju04hxwu08x2",
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com imported 515 transactions",
+    "metadata": {
+      "bankCode": "KKBK",
+      "inserted": 515,
+      "duplicates": 0,
+      "accountNumber": null,
+      "debitInserted": 380,
+      "creditInserted": 135
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-16T07:24:07.137Z"
+  },
+  {
+    "id": "cmi1e94j60007b2v0ziibz1l7",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-16T07:28:18.738Z"
+  },
+  {
+    "id": "cmi1ecksg000bb2v0ef4kug4f",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "TRANSACTION_IMPORT",
+    "severity": "INFO",
+    "targetUserId": "cmhtbqk6t0000ju04hxwu08x2",
+    "targetResource": "document:cmi1ea9xb0009b2v0gjb5nbz8",
+    "message": "vishun.orv@gmail.com imported 128 transactions",
+    "metadata": {
+      "bankCode": "KKBK",
+      "inserted": 128,
+      "duplicates": 0,
+      "accountNumber": null,
+      "debitInserted": 101,
+      "creditInserted": 27
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-16T07:30:59.776Z"
+  },
+  {
+    "id": "cmi1f3jjv000db2v0oinxikqr",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-16T07:51:57.884Z"
+  },
+  {
+    "id": "cmi1g69t0000fb2v0rp9wckrv",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-16T08:22:04.837Z"
+  },
+  {
+    "id": "cmi1hdz960001ky04r3wzv71t",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "112.79.67.27",
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Mobile Safari/537.36",
+    "createdAt": "2025-11-16T08:56:04.026Z"
+  },
+  {
+    "id": "cmi1o8wfd000hb2v0putzssvi",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-16T12:08:04.394Z"
+  },
+  {
+    "id": "cmi1oj9n6000lb2v086qqv4oa",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "TRANSACTION_IMPORT",
+    "severity": "WARN",
+    "targetUserId": "cmhtbqk6t0000ju04hxwu08x2",
+    "targetResource": "document:cmi1of78q000jb2v073qoog8u",
+    "message": "vishun.orv@gmail.com imported 0 transactions (1259 duplicates)",
+    "metadata": {
+      "bankCode": null,
+      "inserted": 0,
+      "duplicates": 1259,
+      "accountNumber": null,
+      "debitInserted": 0,
+      "creditInserted": 0
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-16T12:16:08.082Z"
+  },
+  {
+    "id": "cmi1q2m3n0001ky0417ber9q9",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "152.58.2.182",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-16T12:59:10.307Z"
+  },
+  {
+    "id": "cmi1qb4t30003ky04d14gombl",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_LOGOUT",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com logged out",
+    "metadata": null,
+    "ipAddress": "152.58.2.182",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-16T13:05:47.800Z"
+  },
+  {
+    "id": "cmi1wddok0001b2cobrxlgvia",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-16T15:55:30.301Z"
+  },
+  {
+    "id": "cmi2wqg0j0001b24kv3px6vjh",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-17T08:53:26.034Z"
+  },
+  {
+    "id": "cmi9wak8r0001b22kwjrub5ds",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-22T06:15:28.249Z"
+  },
+  {
+    "id": "cmi9wd3lq0003b22kkvmbyvft",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-22T06:17:26.654Z"
+  },
+  {
+    "id": "cmi9ybi0s0005b22ko5d1uvfy",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-22T07:12:11.258Z"
+  },
+  {
+    "id": "cmiag6fls0007b22kke5ip6s3",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-22T15:32:07.893Z"
+  },
+  {
+    "id": "cmid7bjxn0001ju04xu4ew86h",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "114.143.164.18",
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Mobile Safari/537.36",
+    "createdAt": "2025-11-24T13:47:28.811Z"
+  },
+  {
+    "id": "cmiiqdhoh0001b2m8eb7jiswe",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    "createdAt": "2025-11-28T10:39:42.783Z"
+  },
+  {
+    "id": "cmj1akak50001l404hk9z120i",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "114.143.164.18",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+    "createdAt": "2025-12-11T10:24:43.637Z"
+  },
+  {
+    "id": "cmj1al2fn0003l404xtyki2fy",
+    "actorId": "cmhynzhmu000ab2hw8ctqoi9m",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishunvishwakarma90211@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "102683284072340805850",
+      "provider": "google"
+    },
+    "ipAddress": "114.143.164.18",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+    "createdAt": "2025-12-11T10:25:19.763Z"
+  },
+  {
+    "id": "cmj1alyjh0005l404mmr31ykj",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_LOGOUT",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com logged out",
+    "metadata": null,
+    "ipAddress": "114.143.164.18",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+    "createdAt": "2025-12-11T10:26:01.373Z"
+  },
+  {
+    "id": "cmj1am5ly0007l404ehq15er3",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "114.143.164.18",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+    "createdAt": "2025-12-11T10:26:10.296Z"
+  },
+  {
+    "id": "cmj1aq9k60001l804fln3qge5",
+    "actorId": "cmhynzhmu000ab2hw8ctqoi9m",
+    "event": "USER_LOGOUT",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishunvishwakarma90211@gmail.com logged out",
+    "metadata": null,
+    "ipAddress": "114.143.164.18",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+    "createdAt": "2025-12-11T10:29:22.278Z"
+  },
+  {
+    "id": "cmj1aqmvu0003l804hsju623y",
+    "actorId": "cmhynzhmu000ab2hw8ctqoi9m",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishunvishwakarma90211@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "102683284072340805850",
+      "provider": "google"
+    },
+    "ipAddress": "114.143.164.18",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+    "createdAt": "2025-12-11T10:29:39.546Z"
+  },
+  {
+    "id": "cmj1aqqt50005l804pzlvuwpv",
+    "actorId": "cmhynzhmu000ab2hw8ctqoi9m",
+    "event": "USER_LOGOUT",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishunvishwakarma90211@gmail.com logged out",
+    "metadata": null,
+    "ipAddress": "114.143.164.18",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+    "createdAt": "2025-12-11T10:29:44.633Z"
+  },
+  {
+    "id": "cmj1aqthe0007l804j0hhvnun",
+    "actorId": "cmhynzhmu000ab2hw8ctqoi9m",
+    "event": "USER_LOGOUT",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishunvishwakarma90211@gmail.com logged out",
+    "metadata": null,
+    "ipAddress": "114.143.164.18",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+    "createdAt": "2025-12-11T10:29:48.099Z"
+  },
+  {
+    "id": "cmj1aqtqv0009l804pi1p98xs",
+    "actorId": "cmhynzhmu000ab2hw8ctqoi9m",
+    "event": "USER_LOGOUT",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishunvishwakarma90211@gmail.com logged out",
+    "metadata": null,
+    "ipAddress": "114.143.164.18",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+    "createdAt": "2025-12-11T10:29:48.439Z"
+  },
+  {
+    "id": "cmj1aqttu000bl804xds0g5a1",
+    "actorId": "cmhynzhmu000ab2hw8ctqoi9m",
+    "event": "USER_LOGOUT",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishunvishwakarma90211@gmail.com logged out",
+    "metadata": null,
+    "ipAddress": "114.143.164.18",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+    "createdAt": "2025-12-11T10:29:48.546Z"
+  },
+  {
+    "id": "cmj1aqtv8000dl804le2crlyt",
+    "actorId": "cmhynzhmu000ab2hw8ctqoi9m",
+    "event": "USER_LOGOUT",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishunvishwakarma90211@gmail.com logged out",
+    "metadata": null,
+    "ipAddress": "114.143.164.18",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+    "createdAt": "2025-12-11T10:29:48.596Z"
+  },
+  {
+    "id": "cmj1arcsd000fl804uyq2kc96",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in",
+    "metadata": null,
+    "ipAddress": "114.143.164.18",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+    "createdAt": "2025-12-11T10:30:13.117Z"
+  },
+  {
+    "id": "cmjp3vrks0001jr04ctuyj6c3",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "42.106.204.200",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+    "createdAt": "2025-12-28T02:24:09.820Z"
+  },
+  {
+    "id": "cmjp3vu1s0003jr0495eo3tey",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "42.106.204.200",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+    "createdAt": "2025-12-28T02:24:13.024Z"
+  },
+  {
+    "id": "cmjp545vo0001ju046korqwul",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "152.58.45.120",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+    "createdAt": "2025-12-28T02:58:41.220Z"
+  },
+  {
+    "id": "cmjp5te1s0001b2f8w3e1b30w",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+    "createdAt": "2025-12-28T03:18:18.205Z"
+  },
+  {
+    "id": "cmjp5wl5b0007b2f8cbfhsvo7",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "TRANSACTION_IMPORT",
+    "severity": "WARN",
+    "targetUserId": "cmhtbqk6t0000ju04hxwu08x2",
+    "targetResource": "document:cmjp5vyef0003b2f8kk52nbv4",
+    "message": "vishun.orv@gmail.com imported 17 transactions (5 duplicates)",
+    "metadata": {
+      "bankCode": null,
+      "inserted": 17,
+      "duplicates": 5,
+      "accountNumber": null,
+      "debitInserted": 15,
+      "creditInserted": 2
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+    "createdAt": "2025-12-28T03:20:47.375Z"
+  },
+  {
+    "id": "cmjp6hi340001b2g8ji5i294f",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+    "createdAt": "2025-12-28T03:37:03.184Z"
+  },
+  {
+    "id": "cmjp7sa9k0001b2f8mfnj5otu",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+    "createdAt": "2025-12-28T04:13:25.880Z"
+  },
+  {
+    "id": "cmjp8dobu0003b2f8vv4e6udd",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Mobile Safari/537.36",
+    "createdAt": "2025-12-28T04:30:03.882Z"
+  },
+  {
+    "id": "cmjpknze00005b2f8gs1rpihj",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+    "createdAt": "2025-12-28T10:14:00.162Z"
+  },
+  {
+    "id": "cmjplq7ye0007b2f8qddn35yf",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+    "createdAt": "2025-12-28T10:43:44.198Z"
+  },
+  {
+    "id": "cmk0yh1nu0001kz04oob2u99m",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in",
+    "metadata": null,
+    "ipAddress": "114.143.164.18",
+    "userAgent": "Mozilla/5.0 (Linux; Android 15; 2409FPCC4I Build/AP3A.240905.015.A2; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/144.0.7559.31 Mobile Safari/537.36",
+    "createdAt": "2026-01-05T09:25:58.562Z"
+  },
+  {
+    "id": "cmk0z9e0z0001ic04kf3hghrn",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in",
+    "metadata": null,
+    "ipAddress": "114.143.164.18",
+    "userAgent": "Mozilla/5.0 (Linux; Android 15; 2409FPCC4I Build/AP3A.240905.015.A2; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/144.0.7559.31 Mobile Safari/537.36",
+    "createdAt": "2026-01-05T09:48:01.475Z"
+  },
+  {
+    "id": "cmk0zes8b0001jp04giul2lor",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_LOGOUT",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com logged out",
+    "metadata": null,
+    "ipAddress": "114.143.164.18",
+    "userAgent": "Mozilla/5.0 (Linux; Android 15; 2409FPCC4I Build/AP3A.240905.015.A2; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/144.0.7559.31 Mobile Safari/537.36",
+    "createdAt": "2026-01-05T09:52:13.163Z"
+  },
+  {
+    "id": "cmk0zetqr0003jp04j2ix1p4j",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_LOGOUT",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com logged out",
+    "metadata": null,
+    "ipAddress": "114.143.164.18",
+    "userAgent": "Mozilla/5.0 (Linux; Android 15; 2409FPCC4I Build/AP3A.240905.015.A2; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/144.0.7559.31 Mobile Safari/537.36",
+    "createdAt": "2026-01-05T09:52:15.124Z"
+  },
+  {
+    "id": "cmk12d7o70001l804bqqy9nes",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "114.143.164.18",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-05T11:14:58.712Z"
+  },
+  {
+    "id": "cmk12dgs30003l804bwwzroy5",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in",
+    "metadata": null,
+    "ipAddress": "114.143.164.18",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-05T11:15:10.516Z"
+  },
+  {
+    "id": "cmk131smc0001l204wi1w5cml",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in",
+    "metadata": null,
+    "ipAddress": "114.143.164.18",
+    "userAgent": "Mozilla/5.0 (Linux; Android 15; 2409FPCC4I Build/AP3A.240905.015.A2; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/144.0.7559.31 Mobile Safari/537.36",
+    "createdAt": "2026-01-05T11:34:05.604Z"
+  },
+  {
+    "id": "cmk1396h00001l704jhgjbcyx",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in",
+    "metadata": null,
+    "ipAddress": "114.143.164.18",
+    "userAgent": "Mozilla/5.0 (Linux; Android 15; 2409FPCC4I Build/AP3A.240905.015.A2; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/144.0.7559.31 Mobile Safari/537.36",
+    "createdAt": "2026-01-05T11:39:50.148Z"
+  },
+  {
+    "id": "cmk147vlu0001jr049la8echm",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in",
+    "metadata": null,
+    "ipAddress": "114.143.164.18",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-05T12:06:49.026Z"
+  },
+  {
+    "id": "cmk14vo4i0001b2uo2aebnnk9",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-05T12:25:19.070Z"
+  },
+  {
+    "id": "cmk15iqxz0001b29w2xfoxyqw",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-05T12:43:15.815Z"
+  },
+  {
+    "id": "cmk2fmryh0001b2j8c304x94y",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-06T10:14:06.087Z"
+  },
+  {
+    "id": "cmk2l0if70001l10464zgcb5g",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "114.143.164.18",
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Mobile Safari/537.36",
+    "createdAt": "2026-01-06T12:44:44.996Z"
+  },
+  {
+    "id": "cmk2l15sr0003l10449a1lan8",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in",
+    "metadata": null,
+    "ipAddress": "114.143.164.18",
+    "userAgent": "Mozilla/5.0 (Linux; Android 15; 2409FPCC4I Build/AP3A.240905.015.A2; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/144.0.7559.31 Mobile Safari/537.36",
+    "createdAt": "2026-01-06T12:45:15.292Z"
+  },
+  {
+    "id": "cmkgvc1zs0001l4042cjy9fi4",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "114.143.164.18",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-16T12:42:26.200Z"
+  },
+  {
+    "id": "cmki1ynkl0001la04706lwcti",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "42.106.249.157",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-17T08:35:44.470Z"
+  },
+  {
+    "id": "cmki1ytbh0003la0461fpmc97",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in",
+    "metadata": null,
+    "ipAddress": "42.106.249.157",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-17T08:35:51.917Z"
+  },
+  {
+    "id": "cmki20yhx0001l20466d34h0a",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "42.106.249.157",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-17T08:37:31.941Z"
+  },
+  {
+    "id": "cmkja0x3i0001l4046skt8aje",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "152.58.3.45",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-18T05:09:13.231Z"
+  },
+  {
+    "id": "cmkjh5q6a0001b2xckqr7fxjl",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-18T08:28:54.848Z"
+  },
+  {
+    "id": "cmkjhywdz0001b2e4s7hgd54o",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-18T08:51:35.912Z"
+  },
+  {
+    "id": "cmkji7c5d0003b2e4s6i2gsgr",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-18T08:58:09.602Z"
+  },
+  {
+    "id": "cmkjicjdl0005b2e4ueg8xh19",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_STATUS_CHANGE",
+    "severity": "INFO",
+    "targetUserId": "cmhtx02vj000fb2rgtymrcw79",
+    "targetResource": "user:cmhtx02vj000fb2rgtymrcw79",
+    "message": "User demo@vishnufinance.com updated by vishun@finance.com",
+    "metadata": {
+      "next": {
+        "role": "USER",
+        "status": "ACTIVE",
+        "isActive": false
+      },
+      "previous": {
+        "role": "USER",
+        "status": "ACTIVE",
+        "isActive": true
+      }
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-18T09:02:11.977Z"
+  },
+  {
+    "id": "cmkjicqlw0007b2e4sz1epse3",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_STATUS_CHANGE",
+    "severity": "INFO",
+    "targetUserId": "cmhtx02vj000fb2rgtymrcw79",
+    "targetResource": "user:cmhtx02vj000fb2rgtymrcw79",
+    "message": "User demo@vishnufinance.com updated by vishun@finance.com",
+    "metadata": {
+      "next": {
+        "role": "USER",
+        "status": "ACTIVE",
+        "isActive": true
+      },
+      "previous": {
+        "role": "USER",
+        "status": "ACTIVE",
+        "isActive": false
+      }
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-18T09:02:21.621Z"
+  },
+  {
+    "id": "cmkjicxhf0009b2e4o5dwjnz3",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_STATUS_CHANGE",
+    "severity": "INFO",
+    "targetUserId": "cmhtx02vj000fb2rgtymrcw79",
+    "targetResource": "user:cmhtx02vj000fb2rgtymrcw79",
+    "message": "User demo@vishnufinance.com updated by vishun@finance.com",
+    "metadata": {
+      "next": {
+        "role": "USER",
+        "status": "FROZEN",
+        "isActive": true
+      },
+      "previous": {
+        "role": "USER",
+        "status": "ACTIVE",
+        "isActive": true
+      }
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-18T09:02:30.531Z"
+  },
+  {
+    "id": "cmkjid3b4000bb2e4n78z9mu5",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_STATUS_CHANGE",
+    "severity": "INFO",
+    "targetUserId": "cmhtx02vj000fb2rgtymrcw79",
+    "targetResource": "user:cmhtx02vj000fb2rgtymrcw79",
+    "message": "User demo@vishnufinance.com updated by vishun@finance.com",
+    "metadata": {
+      "next": {
+        "role": "USER",
+        "status": "ACTIVE",
+        "isActive": true
+      },
+      "previous": {
+        "role": "USER",
+        "status": "FROZEN",
+        "isActive": true
+      }
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-18T09:02:38.081Z"
+  },
+  {
+    "id": "cmkjirvph000db2e4jgwwfcyk",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-18T09:14:08.069Z"
+  },
+  {
+    "id": "cmkjnoawe0001b2mg3waiycof",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-18T11:31:19.209Z"
+  },
+  {
+    "id": "cmkjobtud0003b2mg26jcin1i",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-18T11:49:36.853Z"
+  },
+  {
+    "id": "cmkjozqwg0009b2mgr8023mva",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-18T12:08:12.784Z"
+  },
+  {
+    "id": "cmkjp23vg000bb2mgoms1w13b",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "TRANSACTION_IMPORT",
+    "severity": "INFO",
+    "targetUserId": "cmhtx05it000gb2rg2l3qn7u3",
+    "targetResource": null,
+    "message": "vishun@finance.com imported 30 transactions",
+    "metadata": {
+      "bankCode": null,
+      "inserted": 30,
+      "duplicates": 0,
+      "accountNumber": null,
+      "debitInserted": 27,
+      "creditInserted": 3
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-18T12:10:02.909Z"
+  },
+  {
+    "id": "cmkko6y450015b2mg4ypksaxp",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-19T04:33:35.286Z"
+  },
+  {
+    "id": "cmkkqyoi1001lb2mgppsqlu71",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-19T05:51:08.425Z"
+  },
+  {
+    "id": "cmkks1r17001tb2mgpgta101s",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-19T06:21:31.292Z"
+  },
+  {
+    "id": "cmkksqyby0023b2mg1jun418h",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-19T06:41:07.151Z"
+  },
+  {
+    "id": "cmkkvavbk002hb2mg8dzgcuxu",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-19T07:52:35.600Z"
+  },
+  {
+    "id": "cmkkvigdc002jb2mgk6nmyyx4",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Mobile/15E148 Safari/604.1",
+    "createdAt": "2026-01-19T07:58:29.473Z"
+  },
+  {
+    "id": "cmkkw7oyn002lb2mgp7gxha3o",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-19T08:18:07.007Z"
+  },
+  {
+    "id": "cmkkwawji002nb2mgg0kf8yx9",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-19T08:20:36.798Z"
+  },
+  {
+    "id": "cmkkx2okm002pb2mg4uhtnjcm",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-19T08:42:12.838Z"
+  },
+  {
+    "id": "cmkkxrek3002rb2mg3s1koxig",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-19T09:01:26.259Z"
+  },
+  {
+    "id": "cmkkymtl3002tb2mgtnakbtof",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-19T09:25:52.072Z"
+  },
+  {
+    "id": "cmkkze31c002vb2mglumjw98p",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-19T09:47:04.032Z"
+  },
+  {
+    "id": "cmknj7rzd0001b2n083kaghfh",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-21T04:37:34.434Z"
+  },
+  {
+    "id": "cmkuqg70p0001b2tgtvc753oc",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-26T05:34:27.716Z"
+  },
+  {
+    "id": "cmkur7ikq000lb2tg36hwkltg",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-26T05:55:42.410Z"
+  },
+  {
+    "id": "cmkursm2l000nb2tgm99tyxgi",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-26T06:12:06.717Z"
+  },
+  {
+    "id": "cmkusdkga000xb2tgi55wkb3n",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "TRANSACTION_IMPORT",
+    "severity": "WARN",
+    "targetUserId": "cmhtbqk6t0000ju04hxwu08x2",
+    "targetResource": "document:cmkus6bnf000pb2tgvp53e2pt",
+    "message": "vishun.orv@gmail.com imported 611 transactions (119 duplicates)",
+    "metadata": {
+      "bankCode": "IDIB",
+      "inserted": 611,
+      "duplicates": 119,
+      "accountNumber": null,
+      "debitInserted": 510,
+      "creditInserted": 101
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-26T06:28:24.394Z"
+  },
+  {
+    "id": "cmkusjr9l000zb2tg4fj3m7r5",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-26T06:33:13.162Z"
+  },
+  {
+    "id": "cmkut3z290011b2tgq2i54cnv",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-26T06:48:56.386Z"
+  },
+  {
+    "id": "cmkut7miy0013b2tgnvbumm7g",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "DOCUMENT_STATUS_CHANGE",
+    "severity": "WARN",
+    "targetUserId": "cmhtbqk6t0000ju04hxwu08x2",
+    "targetResource": "document:cmhz0cns60003b2o4bj4ae570",
+    "message": "vishun.orv@gmail.com soft-deleted AccountStatement_28-10-2025 11_00_46.pdf",
+    "metadata": {
+      "mode": "document-and-transactions",
+      "originalName": "AccountStatement_28-10-2025 11_00_46.pdf",
+      "transactionsAffected": 0
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-26T06:51:46.762Z"
+  },
+  {
+    "id": "cmkut7xrf0015b2tgoj62evo0",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "DOCUMENT_STATUS_CHANGE",
+    "severity": "WARN",
+    "targetUserId": "cmhtbqk6t0000ju04hxwu08x2",
+    "targetResource": "document:cmhzupgtd0001avsoj4upwplk",
+    "message": "vishun.orv@gmail.com soft-deleted AccountStatement_28-10-2025 11_00_46.pdf",
+    "metadata": {
+      "mode": "document-and-transactions",
+      "originalName": "AccountStatement_28-10-2025 11_00_46.pdf",
+      "transactionsAffected": 0
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-26T06:52:01.324Z"
+  },
+  {
+    "id": "cmkut8gp50017b2tg11ml2lbe",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "DOCUMENT_STATUS_CHANGE",
+    "severity": "WARN",
+    "targetUserId": "cmhtbqk6t0000ju04hxwu08x2",
+    "targetResource": "document:cmkus6bnf000pb2tgvp53e2pt",
+    "message": "vishun.orv@gmail.com soft-deleted AccountStatement_26-01-2026 11_30_19.pdf",
+    "metadata": {
+      "mode": "document-and-transactions",
+      "originalName": "AccountStatement_26-01-2026 11_30_19.pdf",
+      "transactionsAffected": 611
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-26T06:52:25.866Z"
+  },
+  {
+    "id": "cmkut8nn00019b2tg3nhoudwp",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "DOCUMENT_STATUS_CHANGE",
+    "severity": "WARN",
+    "targetUserId": "cmhtbqk6t0000ju04hxwu08x2",
+    "targetResource": "document:cmjp5vyef0003b2f8kk52nbv4",
+    "message": "vishun.orv@gmail.com soft-deleted AccountStatement_02-11-2025 14_35_36.pdf",
+    "metadata": {
+      "mode": "document-and-transactions",
+      "originalName": "AccountStatement_02-11-2025 14_35_36.pdf",
+      "transactionsAffected": 17
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-26T06:52:34.861Z"
+  },
+  {
+    "id": "cmkut8vb6001bb2tgnz4x46lm",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "DOCUMENT_STATUS_CHANGE",
+    "severity": "WARN",
+    "targetUserId": "cmhtbqk6t0000ju04hxwu08x2",
+    "targetResource": "document:cmi1of78q000jb2v073qoog8u",
+    "message": "vishun.orv@gmail.com soft-deleted AccountStatement_28-10-2025 11_00_46.pdf",
+    "metadata": {
+      "mode": "document-and-transactions",
+      "originalName": "AccountStatement_28-10-2025 11_00_46.pdf",
+      "transactionsAffected": 0
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-26T06:52:44.802Z"
+  },
+  {
+    "id": "cmkut91nj001db2tg0giby4w8",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "DOCUMENT_STATUS_CHANGE",
+    "severity": "WARN",
+    "targetUserId": "cmhtbqk6t0000ju04hxwu08x2",
+    "targetResource": "document:cmi1ea9xb0009b2v0gjb5nbz8",
+    "message": "vishun.orv@gmail.com soft-deleted 2025-11-02-12-56-59Sep-25_400081.pdf",
+    "metadata": {
+      "mode": "document-and-transactions",
+      "originalName": "2025-11-02-12-56-59Sep-25_400081.pdf",
+      "transactionsAffected": 128
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-26T06:52:53.023Z"
+  },
+  {
+    "id": "cmkut98f4001fb2tgu3lvg9fj",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "DOCUMENT_STATUS_CHANGE",
+    "severity": "WARN",
+    "targetUserId": "cmhtbqk6t0000ju04hxwu08x2",
+    "targetResource": "document:cmi0bcgxg0007avo8kiaea5vc",
+    "message": "vishun.orv@gmail.com soft-deleted AccountStatement_28-10-2025 11_00_46.pdf",
+    "metadata": {
+      "mode": "document-and-transactions",
+      "originalName": "AccountStatement_28-10-2025 11_00_46.pdf",
+      "transactionsAffected": 1259
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-26T06:53:01.792Z"
+  },
+  {
+    "id": "cmkut9elw001hb2tgv6xjxr3c",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "DOCUMENT_STATUS_CHANGE",
+    "severity": "WARN",
+    "targetUserId": "cmhtbqk6t0000ju04hxwu08x2",
+    "targetResource": "document:cmi0b6mtm0003avo8g8uc25cf",
+    "message": "vishun.orv@gmail.com soft-deleted AccountStatement_04-11-2025 20_05_13.pdf",
+    "metadata": {
+      "mode": "document-and-transactions",
+      "originalName": "AccountStatement_04-11-2025 20_05_13.pdf",
+      "transactionsAffected": 10
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-26T06:53:09.812Z"
+  },
+  {
+    "id": "cmkutqx5n0001b2bkgcuebov2",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-26T07:06:47.003Z"
+  },
+  {
+    "id": "cmkutsxnx000bb2bkkm0dptm9",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "TRANSACTION_IMPORT",
+    "severity": "INFO",
+    "targetUserId": "cmhtbqk6t0000ju04hxwu08x2",
+    "targetResource": "document:cmkutsi8p0003b2bkishlebck",
+    "message": "vishun.orv@gmail.com imported 1734 transactions",
+    "metadata": {
+      "bankCode": "IDIB",
+      "inserted": 1734,
+      "duplicates": 0,
+      "accountNumber": null,
+      "debitInserted": 1535,
+      "creditInserted": 199
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Mobile/15E148 Safari/604.1",
+    "createdAt": "2026-01-26T07:08:20.639Z"
+  },
+  {
+    "id": "cmkutuu8u000jb2bk6c9xojox",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "TRANSACTION_IMPORT",
+    "severity": "WARN",
+    "targetUserId": "cmhtbqk6t0000ju04hxwu08x2",
+    "targetResource": "document:cmkutuink000db2bk1ue4yf1z",
+    "message": "vishun.orv@gmail.com imported 571 transactions (159 duplicates)",
+    "metadata": {
+      "bankCode": "IDIB",
+      "inserted": 571,
+      "duplicates": 159,
+      "accountNumber": null,
+      "debitInserted": 476,
+      "creditInserted": 95
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-26T07:09:49.854Z"
+  },
+  {
+    "id": "cmkuucdac000lb2bk6z7pioyg",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-26T07:23:27.684Z"
+  },
+  {
+    "id": "cmkuv2s2j000zb2bkdcbd7v43",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-26T07:43:59.899Z"
+  },
+  {
+    "id": "cmkuw7ac10011b2bk4lxwzr8x",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-26T08:15:29.809Z"
+  },
+  {
+    "id": "cmkuwubxy001pb2bkm9u6myqu",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-26T08:33:24.982Z"
+  },
+  {
+    "id": "cmkux6k2a0029b2bkwtnvrvfr",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-26T08:42:55.378Z"
+  },
+  {
+    "id": "cmkuxqd5a002hb2bkpm5uo9ou",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-26T08:58:19.535Z"
+  },
+  {
+    "id": "cmkuyk4te002nb2bkcu8qmf1l",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-26T09:21:28.418Z"
+  },
+  {
+    "id": "cmkuzv76b002tb2bklxyi9hwn",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-26T09:58:04.302Z"
+  },
+  {
+    "id": "cmkv0fpnc002zb2bkz3hwvg0d",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-26T10:14:01.368Z"
+  },
+  {
+    "id": "cmkv14f5w0033b2bkrh9xa5pv",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-26T10:33:14.180Z"
+  },
+  {
+    "id": "cmkv1soj00035b2bk9riokmv3",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-26T10:52:06.060Z"
+  },
+  {
+    "id": "cmkv1x83f0001la04kzroao8w",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in",
+    "metadata": null,
+    "ipAddress": "152.58.29.70",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-26T10:55:38.043Z"
+  },
+  {
+    "id": "cmkv28dtt0037b2bk3wxs15jr",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-26T11:04:18.689Z"
+  },
+  {
+    "id": "cmkv2lr6l0001jr04kikbh2f7",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in",
+    "metadata": null,
+    "ipAddress": "152.58.47.215",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-26T11:14:42.526Z"
+  },
+  {
+    "id": "cmkv3240e0039b2bk7bn1k7q7",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-26T11:27:25.646Z"
+  },
+  {
+    "id": "cmkv3tsc5003bb2bkyrq9vrw4",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-26T11:48:56.885Z"
+  },
+  {
+    "id": "cmkv4f3bk003db2bkuxeuo0gz",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-26T12:05:30.897Z"
+  },
+  {
+    "id": "cmkv4y4dq003gb2bkkz2nxahm",
+    "actorId": "cmkv4y0ws003eb2bkpq0zek87",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "test@example.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-26T12:20:18.734Z"
+  },
+  {
+    "id": "cmkv56snf003ib2bkkg1wx2mj",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-26T12:27:03.435Z"
+  },
+  {
+    "id": "cmkv6y4o1003kb2bkuq5o36md",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-26T13:16:18.337Z"
+  },
+  {
+    "id": "cmkv7k33o003mb2bkfi3cv0qm",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-26T13:33:22.740Z"
+  },
+  {
+    "id": "cmkv8clfq0040b2bk9c6t9rdj",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-26T13:55:32.870Z"
+  },
+  {
+    "id": "cmkv9w8k60042b2bkcxgznuu9",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-26T14:38:48.919Z"
+  },
+  {
+    "id": "cmkvayytn0044b2bkq7bf28ns",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-26T15:08:55.883Z"
+  },
+  {
+    "id": "cmkvbsxvf0046b2bkt0vmvaij",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-26T15:32:14.331Z"
+  },
+  {
+    "id": "cmkvcdhz90048b2bku63p4zck",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-26T15:48:13.509Z"
+  },
+  {
+    "id": "cmkvd0jkp0001b2d41wxf73i7",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-26T16:06:08.660Z"
+  },
+  {
+    "id": "cmkw2eojy0003b2d44uluxkba",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-27T03:56:58.702Z"
+  },
+  {
+    "id": "cmkw2twoa000lb2d431j0ruc1",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-27T04:08:49.067Z"
+  },
+  {
+    "id": "cmkw3iq8o000pb2d4irylb9gp",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-27T04:28:07.128Z"
+  },
+  {
+    "id": "cmkw3kjlb0001jv043h1lmd3r",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in",
+    "metadata": null,
+    "ipAddress": "114.143.164.18",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-27T04:29:31.824Z"
+  },
+  {
+    "id": "cmkw703if000xb2d4gog3h51r",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-27T06:05:36.328Z"
+  },
+  {
+    "id": "cmkw7twqj000zb2d42al9u79r",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-27T06:28:47.227Z"
+  },
+  {
+    "id": "cmkw8gkkw0011b2d4yx8zt91l",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-27T06:46:24.560Z"
+  },
+  {
+    "id": "cmkwd552y0013b2d4jlix97wd",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-27T08:57:29.338Z"
+  },
+  {
+    "id": "cmkwdpxwl0015b2d4gz7ofjt6",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-27T09:13:39.813Z"
+  },
+  {
+    "id": "cmkweekyq0017b2d4ha05h3os",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-27T09:32:49.443Z"
+  },
+  {
+    "id": "cmkwf3ixm0019b2d4jqse20lz",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-27T09:52:13.210Z"
+  },
+  {
+    "id": "cmkwfy04j001bb2d4sdiycvtl",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-27T10:15:55.172Z"
+  },
+  {
+    "id": "cmkwgj8zn001db2d40dgduame",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-27T10:32:26.436Z"
+  },
+  {
+    "id": "cmkxmkyoh0001b2wk0xl4jmd7",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-28T06:09:30.257Z"
+  },
+  {
+    "id": "cmkxn0t0s000db2wkbhu0w9m6",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-28T06:21:49.421Z"
+  },
+  {
+    "id": "cmkxpknzq0001b28k18922qjl",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-28T07:33:15.254Z"
+  },
+  {
+    "id": "cmkxq5f3i000ob28kkyw6ci9n",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-28T07:49:23.502Z"
+  },
+  {
+    "id": "cmkxq5vxz000qb28klxr9cix6",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-28T07:49:45.335Z"
+  },
+  {
+    "id": "cmkxqsixs0003b2ukr69sg2vo",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-28T08:07:21.568Z"
+  },
+  {
+    "id": "cmkxstyca000bb2ukz6hhg2g3",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-28T09:04:27.418Z"
+  },
+  {
+    "id": "cmkxtgr66000pb2uka1kejjnp",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-28T09:22:11.214Z"
+  },
+  {
+    "id": "cmkxu0c01000vb2uk10de4g8n",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-28T09:37:24.674Z"
+  },
+  {
+    "id": "cmkxu13gx000xb2uk8fb1mid7",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-28T09:38:00.273Z"
+  },
+  {
+    "id": "cmkxucjw30013b2uktb1k67jh",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-28T09:46:54.771Z"
+  },
+  {
+    "id": "cmkxudio20015b2ukj9gwllep",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-28T09:47:39.842Z"
+  },
+  {
+    "id": "cmkxuppvo0019b2ukqp9ox5ze",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-28T09:57:09.061Z"
+  },
+  {
+    "id": "cmkxuqrqn001bb2uk69lzcuyl",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-28T09:57:58.128Z"
+  },
+  {
+    "id": "cmkxuybab001hb2uk6l6v9ft7",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-28T10:03:50.051Z"
+  },
+  {
+    "id": "cmkxuzgi2001jb2uktasnvg9i",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-28T10:04:43.466Z"
+  },
+  {
+    "id": "cmkxx2kmc001nb2uk7djav16d",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-28T11:03:08.004Z"
+  },
+  {
+    "id": "cmkxx64jv001pb2ukrd7gfalh",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-28T11:05:53.803Z"
+  },
+  {
+    "id": "cmkxxbgdi001vb2ukwndetgil",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-28T11:10:02.406Z"
+  },
+  {
+    "id": "cmkz62f3l0023b2ukvha7nj5u",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-29T08:02:43.569Z"
+  },
+  {
+    "id": "cml0f6w7h0001b2n42j69dk7b",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-30T05:05:55.080Z"
+  },
+  {
+    "id": "cml0fq9tb0003b2n4ay6fvmak",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-30T05:20:59.183Z"
+  },
+  {
+    "id": "cml0fr1my0005b2n415xhkdvs",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-30T05:21:35.243Z"
+  },
+  {
+    "id": "cml0frwi50007b2n422qc0bwl",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-30T05:22:15.245Z"
+  },
+  {
+    "id": "cml0fue8e0009b2n4quwsu7e1",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-30T05:24:11.535Z"
+  },
+  {
+    "id": "cml0oqx4s000hb2n4522v6zyo",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-30T09:33:25.948Z"
+  },
+  {
+    "id": "cml0po9p8000rb2n4xg932qlg",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-30T09:59:21.884Z"
+  },
+  {
+    "id": "cml0qbiz90017b2n4mapzym2h",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-30T10:17:26.997Z"
+  },
+  {
+    "id": "cml0qxnee0001b25carv5n0o3",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-30T10:34:39.158Z"
+  },
+  {
+    "id": "cml0qysrq0005b25cpuy7rmy9",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-30T10:35:32.774Z"
+  },
+  {
+    "id": "cml0qze2r000bb25cumwvlipt",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-30T10:36:00.388Z"
+  },
+  {
+    "id": "cml0r45ia001nb25cybbwlaek",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-30T10:39:42.562Z"
+  },
+  {
+    "id": "cml0r53vf001vb25chf1br0sd",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-30T10:40:27.100Z"
+  },
+  {
+    "id": "cml0r71j4003bb25cp64hozd9",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-30T10:41:57.376Z"
+  },
+  {
+    "id": "cml0snuag003vb25cnc6qlivh",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-30T11:23:00.761Z"
+  },
+  {
+    "id": "cml0sovrv003zb25c662wk37c",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-30T11:23:49.339Z"
+  },
+  {
+    "id": "cml0ss3ou004tb25c5ego115v",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-30T11:26:19.474Z"
+  },
+  {
+    "id": "cml0ssmgu004xb25cg5pl2o4k",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-30T11:26:43.902Z"
+  },
+  {
+    "id": "cml1vw0810059b25cidot9eus",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-31T05:41:06.722Z"
+  },
+  {
+    "id": "cml1w5jtu0005b2h0raxq4d9d",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-31T05:48:32.034Z"
+  },
+  {
+    "id": "cml1w955c0017b2h0jwtowhbg",
+    "actorId": "cmkv4y0ws003eb2bkpq0zek87",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "test@example.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-31T05:51:19.632Z"
+  },
+  {
+    "id": "cml1wjx90001vb2h03nfd5w5y",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-31T05:59:42.612Z"
+  },
+  {
+    "id": "cml1wmhla002jb2h0vujm0zqf",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-31T06:01:42.287Z"
+  },
+  {
+    "id": "cml1wn670002xb2h0pdmoyggm",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-31T06:02:14.173Z"
+  },
+  {
+    "id": "cml1x0lsr0005b21omesoxib7",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-31T06:12:40.924Z"
+  },
+  {
+    "id": "cml1x5poe0019b21o8kaeo4jq",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-31T06:16:39.231Z"
+  },
+  {
+    "id": "cml1xjebt0003b2woyruethf9",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-31T06:27:17.705Z"
+  },
+  {
+    "id": "cml1ycc8z000db2woeq5v00bo",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-31T06:49:48.035Z"
+  },
+  {
+    "id": "cml1yz2d20007b2eg94mw9yuc",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-31T07:07:28.310Z"
+  },
+  {
+    "id": "cml20j7r70007b28smy031gtv",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-31T07:51:08.035Z"
+  },
+  {
+    "id": "cml21akwg0001b2e8p4tdvvdp",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-31T08:12:24.784Z"
+  },
+  {
+    "id": "cml23voan000hb2e8hepwuqwh",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-31T09:24:48.191Z"
+  },
+  {
+    "id": "cml24sv2o0001b25gblzcd2n6",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-31T09:50:36.624Z"
+  },
+  {
+    "id": "cml25q8mx0009b25g2yvjzkmf",
+    "actorId": "cmhtx05it000gb2rg2l3qn7u3",
+    "event": "USER_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun@finance.com signed in",
+    "metadata": null,
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-31T10:16:33.849Z"
+  },
+  {
+    "id": "cml25ufvq000db25gk7ywpr0k",
+    "actorId": "cmhtbqk6t0000ju04hxwu08x2",
+    "event": "USER_OAUTH_LOGIN",
+    "severity": "INFO",
+    "targetUserId": null,
+    "targetResource": null,
+    "message": "vishun.orv@gmail.com signed in with Google OAuth",
+    "metadata": {
+      "oauthId": "113417175265119216311",
+      "provider": "google"
+    },
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "createdAt": "2026-01-31T10:19:49.863Z"
+  }
+]

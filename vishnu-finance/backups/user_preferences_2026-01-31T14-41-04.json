@@ -1,0 +1,41 @@
+[
+  {
+    "id": "cmhte5v500003jy04gnmaxbjs",
+    "userId": "cmhtbqk6t0000ju04hxwu08x2",
+    "navigationLayout": "top",
+    "theme": "dark",
+    "colorScheme": "default",
+    "createdAt": "2025-11-10T17:03:37.188Z",
+    "updatedAt": "2026-01-31T10:25:17.618Z",
+    "currency": "INR",
+    "dateFormat": "DD/MM/YYYY",
+    "language": "en",
+    "timezone": "Asia/Kolkata"
+  },
+  {
+    "id": "cmhvpydp4000lb27svdrryd74",
+    "userId": "cmhtx05it000gb2rg2l3qn7u3",
+    "navigationLayout": "top",
+    "theme": "dark",
+    "colorScheme": "default",
+    "createdAt": "2025-11-12T08:09:15.663Z",
+    "updatedAt": "2026-01-31T10:16:34.534Z",
+    "currency": "INR",
+    "dateFormat": "DD/MM/YYYY",
+    "language": "en",
+    "timezone": "Asia/Kolkata"
+  },
+  {
+    "id": "cml1w95ym0019b2h0wgjrcmn5",
+    "userId": "cmkv4y0ws003eb2bkpq0zek87",
+    "navigationLayout": "top",
+    "theme": "system",
+    "colorScheme": "default",
+    "createdAt": "2026-01-31T05:51:20.261Z",
+    "updatedAt": "2026-01-31T06:05:26.499Z",
+    "currency": "INR",
+    "dateFormat": "DD/MM/YYYY",
+    "language": "en",
+    "timezone": "Asia/Kolkata"
+  }
+]

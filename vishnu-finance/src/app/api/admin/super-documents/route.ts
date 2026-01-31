@@ -5,6 +5,7 @@ import { randomUUID } from 'crypto';
 import { Buffer } from 'buffer';
 import { tmpdir } from 'os';
 import { prisma } from '@/lib/db';
+import { supabase } from '@/lib/supabase';
 import { AuthService } from '@/lib/auth';
 import { writeAuditLog, extractRequestMeta } from '@/lib/audit';
 import { processSuperDocument } from '@/lib/document-processor';
@@ -39,7 +40,7 @@ export async function GET(request: NextRequest) {
     const documents = await prisma.superDocument.findMany({
       where: {
         ...(category ? { category } : {}),
-        ...(search ? { 
+        ...(search ? {
           OR: [
             { title: { contains: search } },
             { description: { contains: search } },
@@ -130,14 +131,27 @@ export async function POST(request: NextRequest) {
 
     await mkdir(SUPER_DOCS_UPLOAD_DIR, { recursive: true });
     const filename = `${Date.now()}_${randomUUID()}_${file.name}`;
-    await writeFile(join(SUPER_DOCS_UPLOAD_DIR, filename), Buffer.from(await file.arrayBuffer()));
+    const buffer = Buffer.from(await file.arrayBuffer());
+
+    // Upload to Supabase Storage
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('super-docs')
+      .upload(filename, buffer, {
+        contentType: file.type,
+        upsert: false
+      });
+
+    if (uploadError) {
+      console.error('Supabase upload error:', uploadError);
+      throw new Error(`Supabase upload failed: ${uploadError.message}`);
+    }
 
     const document = await prisma.superDocument.create({
       data: {
         title: title.trim(),
         description: description?.trim() || null,
         category,
-        storageKey: ['uploads', 'super-docs', filename].join('/'),
+        storageKey: uploadData.path, // Store the Supabase path
         originalName: file.name,
         mimeType: file.type || 'application/pdf',
         fileSize: file.size ?? null,

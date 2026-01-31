@@ -172,6 +172,34 @@ export async function POST(request: NextRequest) {
     await writeFile(filepath, buffer);
     console.log('✅ PDF API: File saved successfully');
 
+    // Upload to Supabase Storage (bank-statements bucket)
+    // We upload even for local dev to ensure consistent storage migration
+    let remoteFilePath = '';
+    try {
+      const { createClient } = await import('@supabase/supabase-js');
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+      const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+      if (supabaseUrl && supabaseKey) {
+        const supabase = createClient(supabaseUrl, supabaseKey);
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('bank-statements')
+          .upload(filename, buffer, {
+            contentType: file.type,
+            upsert: false
+          });
+
+        if (!uploadError && uploadData) {
+          remoteFilePath = uploadData.path;
+          console.log('✅ PDF API: Uploaded to Supabase:', remoteFilePath);
+        } else {
+          console.warn('⚠️ PDF API: Supabase upload failed:', uploadError);
+        }
+      }
+    } catch (supaError) {
+      console.warn('⚠️ PDF API: Supabase upload error:', supaError);
+    }
+
     // Strategy 1: Try Python serverless function first (production)
     // Skip in local development if VERCEL_URL is not set
     const isProduction = !!process.env.VERCEL_URL || !!process.env.VERCEL;
@@ -194,6 +222,7 @@ export async function POST(request: NextRequest) {
             transactions: result.transactions || [],
             count: result.count || 0,
             metadata: result.metadata || {},
+            remoteFile: remoteFilePath,
           });
         } else {
           console.log('⚠️ PDF API: Python serverless parser failed:', pythonResult.error);
@@ -695,6 +724,7 @@ if __name__ == "__main__":
         transactions,
         count: transactionCount || transactions.length,
         metadata: finalMetadata,  // Always include metadata (even if empty)
+        remoteFile: remoteFilePath,
         tempFiles: [filepath, csvOutput, tempScriptPath].filter(Boolean),
         debug: {
           method: 'local_python',
@@ -738,6 +768,7 @@ if __name__ == "__main__":
             success: true,
             transactions: nodeResult.transactions,
             count: nodeResult.count,
+            remoteFile: remoteFilePath,
             metadata: nodeResult.metadata || {},
             warning: 'Parsed using fallback parser. Results may be less accurate than Python parser.',
             debug: {

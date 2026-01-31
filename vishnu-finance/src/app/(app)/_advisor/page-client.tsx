@@ -153,7 +153,7 @@ export default function AdvisorPageClient() {
 
   const deleteConversation = async (conversationId: string) => {
     if (!confirm('Are you sure you want to delete this conversation?')) return;
-    
+
     try {
       const response = await fetch(`/api/advisor/conversations/${conversationId}`, {
         method: 'DELETE',
@@ -171,7 +171,7 @@ export default function AdvisorPageClient() {
 
   const renameConversation = async (conversationId: string, newTitle: string) => {
     if (!newTitle.trim()) return;
-    
+
     try {
       const response = await fetch(`/api/advisor/conversations/${conversationId}`, {
         method: 'PUT',
@@ -205,7 +205,7 @@ export default function AdvisorPageClient() {
 
   const updateMessage = async (messageId: string, newContent: string) => {
     if (!newContent.trim()) return;
-    
+
     try {
       const response = await fetch(`/api/advisor/messages/${messageId}`, {
         method: 'PUT',
@@ -213,17 +213,17 @@ export default function AdvisorPageClient() {
         body: JSON.stringify({ content: newContent.trim() }),
       });
       if (!response.ok) throw new Error('Failed to update message');
-      
+
       const data = await response.json();
-      
+
       // Find the message index
       const messageIndex = messages.findIndex((m) => m.id === messageId);
       if (messageIndex === -1) return;
-      
+
       // Update the message in state
       const updatedMessages = [...messages];
       updatedMessages[messageIndex] = { ...updatedMessages[messageIndex], content: data.message.content };
-      
+
       // Find and remove the assistant's response that follows this user message
       // (if it exists and is the next message)
       if (messageIndex + 1 < updatedMessages.length && updatedMessages[messageIndex + 1].role === 'ASSISTANT') {
@@ -239,17 +239,17 @@ export default function AdvisorPageClient() {
         // Remove from state
         updatedMessages.splice(messageIndex + 1, 1);
       }
-      
+
       setMessages(updatedMessages);
       setEditingMessageId(null);
       setEditingMessageContent('');
-      
+
       // Regenerate AI response with the updated message
       // Refresh the conversation first to get the updated message from database
       if (currentConversationId) {
         await fetchConversation(currentConversationId);
       }
-      
+
       // Regenerate the assistant's response using the regenerate endpoint
       setLoading(true);
       try {
@@ -275,17 +275,17 @@ export default function AdvisorPageClient() {
         setMessages((prev) => {
           const userMsgIndex = prev.findIndex((m) => m.id === messageId);
           if (userMsgIndex === -1) return prev;
-          
+
           const newMessages = [...prev];
           const assistantMessage = regenerateData.message;
-          
+
           // Replace or insert the assistant message
           if (userMsgIndex + 1 < newMessages.length && newMessages[userMsgIndex + 1].role === 'ASSISTANT') {
             newMessages[userMsgIndex + 1] = assistantMessage;
           } else {
             newMessages.splice(userMsgIndex + 1, 0, assistantMessage);
           }
-          
+
           return newMessages;
         });
       } catch (error) {
@@ -303,13 +303,13 @@ export default function AdvisorPageClient() {
 
   const deleteMessage = async (messageId: string) => {
     if (!confirm('Are you sure you want to delete this message?')) return;
-    
+
     try {
       const response = await fetch(`/api/advisor/messages/${messageId}`, {
         method: 'DELETE',
       });
       if (!response.ok) throw new Error('Failed to delete message');
-      
+
       setMessages((prev) => prev.filter((m) => m.id !== messageId));
       await fetchConversations();
     } catch (error) {
@@ -339,7 +339,7 @@ export default function AdvisorPageClient() {
     // Find the assistant message and its corresponding user message
     const messageIndex = messages.findIndex((m) => m.id === messageId);
     if (messageIndex === -1 || messages[messageIndex].role !== 'ASSISTANT') return;
-    
+
     // Find the previous user message
     let userMessageIndex = -1;
     for (let i = messageIndex - 1; i >= 0; i--) {
@@ -348,11 +348,11 @@ export default function AdvisorPageClient() {
         break;
       }
     }
-    
+
     if (userMessageIndex === -1 || !currentConversationId) return;
-    
+
     const userMessage = messages[userMessageIndex];
-    
+
     // Delete the assistant message and regenerate using the regenerate endpoint
     setLoading(true);
     try {
@@ -378,7 +378,7 @@ export default function AdvisorPageClient() {
       setMessages((prev) => {
         const msgIndex = prev.findIndex((m) => m.id === messageId);
         if (msgIndex === -1) return prev;
-        
+
         const newMessages = [...prev];
         newMessages[msgIndex] = regenerateData.message;
         return newMessages;
@@ -425,7 +425,7 @@ export default function AdvisorPageClient() {
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: 'Failed to send message' }));
         const errorMessage = errorData.error || `Failed to send message (${response.status})`;
-        
+
         // Create an error message to display in chat
         const errorAssistantMessage: Message = {
           id: `error-${Date.now()}`,
@@ -434,13 +434,13 @@ export default function AdvisorPageClient() {
           createdAt: new Date().toISOString(),
           sources: [],
         };
-        
+
         // Replace temp message and add error message
         setMessages((prev) => {
           const filtered = prev.filter((m) => m.id !== tempUserMessage.id);
           return [...filtered, errorAssistantMessage];
         });
-        
+
         throw new Error(errorMessage);
       }
 
@@ -457,7 +457,7 @@ export default function AdvisorPageClient() {
         const filtered = prev.filter((m) => m.id !== tempUserMessage.id);
         return [...filtered, ...data.messages];
       });
-      
+
     } catch (error) {
       console.error('Error sending message:', error);
       // Only remove temp message if we haven't already added an error message
@@ -509,19 +509,8 @@ export default function AdvisorPageClient() {
     }
   };
 
-  const downloadDocument = async (documentId: string) => {
-    try {
-      const response = await fetch(`/api/admin/super-documents/${documentId}`);
-      if (!response.ok) throw new Error('Failed to fetch document');
-      const data = await response.json();
-      
-      // Create download link
-      const filePath = `/api/files/${data.document.storageKey}`;
-      window.open(filePath, '_blank');
-    } catch (error) {
-      console.error('Error downloading document:', error);
-      alert('Failed to download document');
-    }
+  const downloadDocument = (documentId: string) => {
+    window.open(`/api/admin/super-documents/${documentId}/download`, '_blank');
   };
 
   if (authLoading) {
@@ -568,11 +557,10 @@ export default function AdvisorPageClient() {
             conversations.map((conv) => (
               <Card
                 key={conv.id}
-                className={`p-3 cursor-pointer transition-colors ${
-                  currentConversationId === conv.id
+                className={`p-3 cursor-pointer transition-colors ${currentConversationId === conv.id
                     ? 'bg-primary text-primary-foreground'
                     : 'hover:bg-muted'
-                }`}
+                  }`}
                 onClick={() => {
                   if (editingConversationId !== conv.id) {
                     setCurrentConversationId(conv.id);
@@ -750,11 +738,10 @@ export default function AdvisorPageClient() {
                           </div>
                         ) : (
                           <div
-                            className={`rounded-lg p-4 relative group ${
-                              message.role === 'USER'
+                            className={`rounded-lg p-4 relative group ${message.role === 'USER'
                                 ? 'bg-primary text-primary-foreground'
                                 : 'bg-muted text-foreground'
-                            }`}
+                              }`}
                           >
                             {message.role === 'ASSISTANT' ? (
                               <div className="break-words">
@@ -801,9 +788,8 @@ export default function AdvisorPageClient() {
                               </div>
                             )}
                             {/* Message Actions */}
-                            <div className={`absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity ${
-                              message.role === 'USER' ? 'text-primary-foreground' : 'text-foreground'
-                            }`}>
+                            <div className={`absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity ${message.role === 'USER' ? 'text-primary-foreground' : 'text-foreground'
+                              }`}>
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
                                   <Button
@@ -881,8 +867,8 @@ export default function AdvisorPageClient() {
                 disabled={loading}
                 className="flex-1"
               />
-              <Button 
-                onClick={() => sendMessage()} 
+              <Button
+                onClick={() => sendMessage()}
                 disabled={loading || !inputMessage.trim()}
               >
                 {loading ? (

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Plus, Search, Filter, X, RefreshCw, CheckSquare, Square, Trash2, RotateCw, Tag, Layers, ChevronLeft, ChevronRight, Sparkles, Check, Calendar as CalendarIcon, FileText, Upload, AlertCircle, TrendingUp, ChevronDown, Edit, Download, ArrowUp, ShoppingCart, Utensils, Zap, ShoppingBag } from 'lucide-react';
+import { Plus, Search, Filter, X, RefreshCw, CheckSquare, Square, Trash2, RotateCw, Tag, Layers, ChevronLeft, ChevronRight, Sparkles, Check, Calendar as CalendarIcon, FileText, Upload, AlertCircle, TrendingUp, ChevronDown, Edit, Download, ArrowUp, ShoppingCart, Utensils, Zap, ShoppingBag, BrainCircuit } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from 'recharts';
 import { useSearchParams, useRouter } from 'next/navigation';
@@ -132,6 +132,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
   const [parseProgress, setParseProgress] = useState<number>(0);
   const [importProgress, setImportProgress] = useState<number>(0);
   const [tempFiles, setTempFiles] = useState<string[]>([]);
+  const [remoteFile, setRemoteFile] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [categorizationProgress, setCategorizationProgress] = useState<{
@@ -1379,6 +1380,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
       setParsedTransactions(transactionsToSet);
       setStatementMetadata(data.metadata || null);
       setTempFiles(data.tempFiles || []);
+      setRemoteFile(data.remoteFile || null);
       setShowCsvPreview(true);
       setShowFileDialog(false);
 
@@ -1591,7 +1593,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
 
       // Use bank statement import API which handles bank-specific fields
       // Note: type is optional, API will infer from credit/debit amounts
-      const primaryTempFile = tempFiles[0];
+      const primaryTempFile = remoteFile || tempFiles[0];
       const documentMeta = selectedFile && primaryTempFile ? {
         storageKey: primaryTempFile,
         originalName: selectedFile.name,
@@ -1723,7 +1725,10 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
         // Close preview dialog
         setShowCsvPreview(false);
         setParsedTransactions([]);
+        setShowCsvPreview(false);
+        setParsedTransactions([]);
         setSelectedFile(null);
+        setRemoteFile(null);
       }
     } catch (e) {
       console.error('Batch import error', e);
@@ -2714,7 +2719,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                       const data = await res.json();
                       success('AI Categorization', `Processed ${data.processed}, Updated ${data.updated} transactions.`);
                       // Refresh data
-                      loadTransactions();
+                      fetchTransactions();
                     } catch (e) {
                       showError('Error', 'Auto-categorization failed');
                     } finally {

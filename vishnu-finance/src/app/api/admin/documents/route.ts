@@ -6,6 +6,7 @@ import { Buffer } from 'buffer';
 import { tmpdir } from 'os';
 import type { DocumentVisibility } from '@prisma/client';
 import { prisma } from '@/lib/db';
+import { supabase } from '@/lib/supabase';
 import { AuthService } from '@/lib/auth';
 import { writeAuditLog, extractRequestMeta } from '@/lib/audit';
 
@@ -43,17 +44,17 @@ const transformDocument = (doc: any) => ({
   transactionCount: doc._count?.transactions ?? 0,
   owner: doc.owner
     ? {
-        id: doc.owner.id,
-        email: doc.owner.email,
-        name: doc.owner.name,
-      }
+      id: doc.owner.id,
+      email: doc.owner.email,
+      name: doc.owner.name,
+    }
     : null,
   deletedBy: doc.deletedBy
     ? {
-        id: doc.deletedBy.id,
-        email: doc.deletedBy.email,
-        name: doc.deletedBy.name,
-      }
+      id: doc.deletedBy.id,
+      email: doc.deletedBy.email,
+      name: doc.deletedBy.name,
+    }
     : null,
 });
 
@@ -141,13 +142,26 @@ export async function POST(request: NextRequest) {
 
     await mkdir(ADMIN_UPLOAD_DIR, { recursive: true });
     const filename = `${Date.now()}_${randomUUID()}_${file.name}`;
-    await writeFile(join(ADMIN_UPLOAD_DIR, filename), Buffer.from(await file.arrayBuffer()));
+    const buffer = Buffer.from(await file.arrayBuffer());
+
+    // Upload to Supabase Storage
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('admin-docs')
+      .upload(filename, buffer, {
+        contentType: file.type,
+        upsert: false
+      });
+
+    if (uploadError) {
+      console.error('Supabase upload error:', uploadError);
+      throw new Error(`Supabase upload failed: ${uploadError.message}`);
+    }
 
     const document = await prisma.document.create({
       data: {
         ownerId,
         uploadedById: superuser.id,
-        storageKey: ['uploads', 'admin-docs', filename].join('/'),
+        storageKey: uploadData.path, // Store the Supabase path
         originalName: file.name,
         mimeType: file.type || 'application/octet-stream',
         fileSize: file.size ?? null,

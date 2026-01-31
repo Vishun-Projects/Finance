@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { join } from 'path';
 import { readFile, stat } from 'fs/promises';
 import { prisma } from '@/lib/db';
+import { supabase } from '@/lib/supabase';
 import { AuthService } from '@/lib/auth';
 import { writeAuditLog, extractRequestMeta } from '@/lib/audit';
 
@@ -41,6 +42,7 @@ export async function GET(
         originalName: true,
         mimeType: true,
         isDeleted: true,
+        sourceType: true,
       },
     });
 
@@ -48,16 +50,80 @@ export async function GET(
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
-    const filePath = join(process.cwd(), document.storageKey);
-    await stat(filePath);
-    const fileBuffer = await readFile(filePath);
-    const fileBytes = Buffer.isBuffer(fileBuffer)
-      ? new Uint8Array(fileBuffer)
-      : new Uint8Array(fileBuffer);
-    const arrayBuffer = fileBytes.buffer.slice(
-      fileBytes.byteOffset,
-      fileBytes.byteOffset + fileBytes.byteLength,
-    );
+    // Check if it's a legacy local file
+    if (document.storageKey.startsWith('uploads/') || document.storageKey.includes('\\')) {
+      try {
+        const filePath = join(process.cwd(), document.storageKey);
+        await stat(filePath);
+        const fileBuffer = await readFile(filePath);
+        // ... existing buffer logic simplified or kep
+
+        const headers = new Headers();
+        headers.set('Content-Type', document.mimeType || 'application/octet-stream');
+        headers.set(
+          'Content-Disposition',
+          `attachment; filename="${encodeURIComponent(document.originalName)}"`,
+        );
+        return new NextResponse(new Uint8Array(fileBuffer), { status: 200, headers });
+      } catch (e: any) {
+        if (e.code === 'ENOENT') {
+          return NextResponse.json({ error: 'File not found locally' }, { status: 404 });
+        }
+        throw e;
+      }
+    }
+
+    // Supabase Download
+    let bucketName = 'documents'; // fallback for generic docs
+
+    // Priority: Explicit path prefix > Source Type
+    if (document.storageKey.startsWith('super-docs/')) {
+      bucketName = 'super-docs';
+    } else if (document.storageKey.startsWith('user-docs/')) {
+      bucketName = 'user-docs';
+    } else if (document.storageKey.startsWith('admin-docs/')) {
+      bucketName = 'admin-docs';
+    } else if (document.storageKey.startsWith('bank-statements/')) {
+      bucketName = 'bank-statements';
+    } else {
+      // No prefix in key, deduce from sourceType
+      if (document.sourceType === 'BANK_STATEMENT') {
+        bucketName = 'bank-statements';
+      } else if (document.sourceType === 'PORTAL_RESOURCE') {
+        bucketName = 'admin-docs';
+      } else if (document.sourceType === 'USER_UPLOAD') {
+        bucketName = 'user-docs';
+      } else if (document.sourceType === 'SYSTEM' || (document as any).category) {
+        // SuperDocs have category but typed locally as any... 
+        // Better to rely on folder if possible.
+        // If sourceType is null or other, assume 'documents' or 'super-docs' if generic?
+        // Actually super documents usually have 'super-docs' bucket.
+        bucketName = 'super-docs';
+      }
+    }
+
+    // Cleanup key if it contains bucket prefix and we use .from(bucket) which might double it?
+    // Supabase .from('bucket').download('path') expects 'path' relative to bucket.
+    // If key is 'bucket/file', and we use .from('bucket'), we should strip prefix.
+    // However, if we uploaded as 'file' to 'bucket', key is 'file'.
+    // If we uploaded as 'bucket/file' to 'bucket', key is 'bucket/file'.
+    // Our upload logic usually puts it at root of bucket.
+
+    // BUT checking for 'bucket/' prefix:
+    // If key has 'super-docs/foo', we strip it if we use 'super-docs' bucket.
+    let downloadPath = document.storageKey;
+    if (downloadPath.startsWith(bucketName + '/')) {
+      downloadPath = downloadPath.substring(bucketName.length + 1);
+    }
+
+    const { data, error } = await supabase.storage
+      .from(bucketName)
+      .createSignedUrl(downloadPath, 3600); // 1 hour expiry
+
+    if (error || !data) {
+      console.error('Failed to generate Supabase signed URL:', error);
+      return NextResponse.json({ error: 'Failed to generate download URL' }, { status: 500 });
+    }
 
     const meta = extractRequestMeta(request);
 
@@ -67,30 +133,15 @@ export async function GET(
       severity: document.isDeleted ? 'WARN' : 'INFO',
       targetUserId: document.ownerId ?? document.uploadedById,
       targetResource: `document:${document.id}`,
-      metadata: { originalName: document.originalName, isDeleted: document.isDeleted },
-      message: `${user.email} downloaded ${document.originalName}${document.isDeleted ? ' (soft-deleted)' : ''}`,
+      metadata: { originalName: document.originalName, isDeleted: document.isDeleted, provider: 'supabase' },
+      message: `${user.email} downloaded ${document.originalName} via Supabase`,
       ipAddress: meta.ipAddress,
       userAgent: meta.userAgent,
     });
 
-    const headers = new Headers();
-    headers.set('Content-Type', document.mimeType || 'application/octet-stream');
-    headers.set(
-      'Content-Disposition',
-      `attachment; filename="${encodeURIComponent(document.originalName)}"`,
-    );
+    return NextResponse.redirect(data.signedUrl);
 
-    return new NextResponse(arrayBuffer, {
-      status: 200,
-      headers,
-    });
   } catch (error: any) {
-    if (error?.code === 'ENOENT') {
-      return NextResponse.json(
-        { error: 'File not found or has been removed' },
-        { status: 404 },
-      );
-    }
     console.error('Failed to download document:', error);
     return NextResponse.json(
       { error: 'Failed to download document' },

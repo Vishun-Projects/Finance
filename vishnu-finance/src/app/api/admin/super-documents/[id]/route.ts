@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { join } from 'path';
 import { unlink } from 'fs/promises';
 import { prisma } from '@/lib/db';
+import { supabase } from '@/lib/supabase';
 import { AuthService } from '@/lib/auth';
 import { writeAuditLog, extractRequestMeta } from '@/lib/audit';
 import type { SuperDocumentCategory } from '@prisma/client';
@@ -173,13 +174,22 @@ export async function DELETE(
       return NextResponse.json({ error: 'Document not found' }, { status: 404 });
     }
 
-    // Delete file from filesystem
+    // Delete file
     try {
-      const filePath = join(process.cwd(), document.storageKey);
-      await unlink(filePath);
+      if (document.storageKey.startsWith('uploads/') || document.storageKey.includes('\\')) {
+        // Legacy local file
+        const filePath = join(process.cwd(), document.storageKey);
+        await unlink(filePath);
+      } else {
+        // Supabase file
+        const { error } = await supabase.storage.from('super-docs').remove([document.storageKey]);
+        if (error) {
+          console.warn('Failed to delete file from Supabase:', error);
+        }
+      }
     } catch (fileError) {
-      console.warn('Failed to delete file from filesystem:', fileError);
-      // Continue with database deletion even if file deletion fails
+      console.warn('Failed to delete file:', fileError);
+      // Continue with database deletion
     }
 
     await prisma.superDocument.delete({

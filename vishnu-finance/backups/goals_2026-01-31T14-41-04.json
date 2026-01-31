@@ -1,0 +1,32 @@
+[
+  {
+    "id": "cmkux1mi70025b2bkv6x482ns",
+    "title": "Banaras Trip",
+    "targetAmount": "50000",
+    "currentAmount": "0",
+    "targetDate": "2026-09-01T00:00:00.000Z",
+    "priority": "MEDIUM",
+    "category": "Trip",
+    "description": "Go for peace",
+    "imageUrl": null,
+    "isActive": 1,
+    "userId": "cmhtbqk6t0000ju04hxwu08x2",
+    "createdAt": "2026-01-26T08:39:04.752Z",
+    "updatedAt": "2026-01-26T08:39:04.752Z"
+  },
+  {
+    "id": "cmkxu3mdq000zb2ukrqxpzl75",
+    "title": "Buy a washing machine",
+    "targetAmount": "10000",
+    "currentAmount": "0",
+    "targetDate": "2026-04-01T00:00:00.000Z",
+    "priority": "MEDIUM",
+    "category": "Asset",
+    "description": "Buy washing machine for my mother.",
+    "imageUrl": null,
+    "isActive": 1,
+    "userId": "cmhtbqk6t0000ju04hxwu08x2",
+    "createdAt": "2026-01-28T09:39:58.088Z",
+    "updatedAt": "2026-01-31T09:52:12.296Z"
+  }
+]

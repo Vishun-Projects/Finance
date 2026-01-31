@@ -1,0 +1,117 @@
+{
+  "timestamp": "2026-01-31T14-41-04",
+  "tables": {
+    "account_statements": {
+      "file": null,
+      "count": 0
+    },
+    "advisor_conversations": {
+      "file": "advisor_conversations_2026-01-31T14-41-04.json",
+      "count": 18
+    },
+    "advisor_messages": {
+      "file": "advisor_messages_2026-01-31T14-41-04.json",
+      "count": 88
+    },
+    "audit_logs": {
+      "file": "audit_logs_2026-01-31T14-41-04.json",
+      "count": 355
+    },
+    "bank_field_mappings": {
+      "file": null,
+      "count": 0
+    },
+    "categories": {
+      "file": "categories_2026-01-31T14-41-04.json",
+      "count": 28
+    },
+    "deadlines": {
+      "file": "deadlines_2026-01-31T14-41-04.json",
+      "count": 8
+    },
+    "documents": {
+      "file": "documents_2026-01-31T14-41-04.json",
+      "count": 34
+    },
+    "entity_mappings": {
+      "file": null,
+      "count": 0
+    },
+    "expenses": {
+      "file": null,
+      "count": 0
+    },
+    "financial_reports": {
+      "file": null,
+      "count": 0
+    },
+    "global_design_settings": {
+      "file": "global_design_settings_2026-01-31T14-41-04.json",
+      "count": 1
+    },
+    "goal_contributions": {
+      "file": null,
+      "count": 0
+    },
+    "goals": {
+      "file": "goals_2026-01-31T14-41-04.json",
+      "count": 2
+    },
+    "income_sources": {
+      "file": null,
+      "count": 0
+    },
+    "merchant_categories": {
+      "file": null,
+      "count": 0
+    },
+    "news_cache": {
+      "file": null,
+      "count": 0
+    },
+    "news_preferences": {
+      "file": null,
+      "count": 0
+    },
+    "recurring_items": {
+      "file": null,
+      "count": 0
+    },
+    "refresh_tokens": {
+      "file": null,
+      "count": 0
+    },
+    "salary_history": {
+      "file": "salary_history_2026-01-31T14-41-04.json",
+      "count": 2
+    },
+    "salary_structures": {
+      "file": "salary_structures_2026-01-31T14-41-04.json",
+      "count": 2
+    },
+    "super_documents": {
+      "file": "super_documents_2026-01-31T14-41-04.json",
+      "count": 1
+    },
+    "transactions": {
+      "file": "transactions_2026-01-31T14-41-04.json",
+      "count": 2305
+    },
+    "upi_field_mappings": {
+      "file": null,
+      "count": 0
+    },
+    "user_preferences": {
+      "file": "user_preferences_2026-01-31T14-41-04.json",
+      "count": 3
+    },
+    "users": {
+      "file": "users_2026-01-31T14-41-04.json",
+      "count": 7
+    },
+    "wishlist_items": {
+      "file": null,
+      "count": 0
+    }
+  }
+}

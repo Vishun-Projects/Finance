@@ -1,0 +1,42 @@
+[
+  {
+    "id": "cml1y3srm0009b2wohsageqv7",
+    "jobTitle": "Web Developer",
+    "company": "Word Publishing",
+    "baseSalary": "78000",
+    "allowances": "{\"HRA\":1300,\"Fixed\":5200}",
+    "deductions": "{}",
+    "effectiveDate": "2024-07-26T00:00:00.000Z",
+    "endDate": null,
+    "isActive": 1,
+    "currency": "INR",
+    "location": "Mahape, Navi Mumbai",
+    "department": "Development",
+    "grade": "Web Developer",
+    "notes": null,
+    "userId": "cmhtbqk6t0000ju04hxwu08x2",
+    "createdAt": "2026-01-31T06:43:08.978Z",
+    "updatedAt": "2026-01-31T07:01:58.987Z",
+    "employerContributions": "{}"
+  },
+  {
+    "id": "cml1y85p0000bb2wokhtjkv91",
+    "jobTitle": "Web Developer",
+    "company": "Word Publishing",
+    "baseSalary": "180000",
+    "allowances": "{\"HRA\":1500,\"Fixed Allowance\":6625}",
+    "deductions": "{\"PF (Employee - Fixed)\":1800,\"Professional Tax (PT)\":200,\"MLWF\":25}",
+    "effectiveDate": "2025-07-01T00:00:00.000Z",
+    "endDate": null,
+    "isActive": 1,
+    "currency": "INR",
+    "location": "Mahape, Navi Mumbai",
+    "department": "Development",
+    "grade": "Web Developer",
+    "notes": null,
+    "userId": "cmhtbqk6t0000ju04hxwu08x2",
+    "createdAt": "2026-01-31T06:46:32.804Z",
+    "updatedAt": "2026-01-31T07:07:57.332Z",
+    "employerContributions": "{\"PF (Employer - Fixed)\":1800,\"MLWF\":75}"
+  }
+]

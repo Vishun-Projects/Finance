@@ -32,7 +32,7 @@ export function ProfileSettingsSection({ mode = 'embedded', initialProfile = nul
   const [saving, setSaving] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [fetchingLocation, setFetchingLocation] = useState(false);
- 
+
   const hasBootstrapProfileRef = useRef(Boolean(initialProfile));
 
   const initialPincodeRef = useRef<string>('');
@@ -63,7 +63,7 @@ export function ProfileSettingsSection({ mode = 'embedded', initialProfile = nul
       return;
     }
 
-      const nextFormData = {
+    const nextFormData = {
       name: profile.name || '',
       gender: profile.gender || '',
       phone: profile.phone || '',
@@ -76,60 +76,60 @@ export function ProfileSettingsSection({ mode = 'embedded', initialProfile = nul
       pincode: profile.pincode || '',
       occupation: profile.occupation || '',
       bio: profile.bio || '',
-      };
-      setFormData(nextFormData);
+    };
+    setFormData(nextFormData);
     setAvatarUrl(profile.avatarUrl || null);
 
     initialPincodeRef.current = profile.pincode || '';
     hasInitialLocationRef.current = Boolean(profile.city && profile.state);
-      if (nextFormData.pincode) {
-        lastLookupPincodeRef.current = nextFormData.pincode;
-      }
+    if (nextFormData.pincode) {
+      lastLookupPincodeRef.current = nextFormData.pincode;
+    }
   }, [initialProfile, user]);
 
   const fetchProfile = useCallback(
     async ({ showSpinner = true }: { showSpinner?: boolean } = {}) => {
-    if (!user?.id) return;
+      if (!user?.id) return;
 
       if (showSpinner) {
-    setLoading(true);
+        setLoading(true);
       }
 
-    try {
-      const response = await fetch('/api/user/profile');
-      if (response.ok) {
-        const data = await response.json();
-        const profile = data.user;
+      try {
+        const response = await fetch('/api/user/profile');
+        if (response.ok) {
+          const data = await response.json();
+          const profile = data.user;
 
-        const nextFormData = {
-          name: profile.name || '',
-          gender: profile.gender || '',
-          phone: profile.phone || '',
-          dateOfBirth: profile.dateOfBirth ? new Date(profile.dateOfBirth) : undefined,
-          addressLine1: profile.addressLine1 || '',
-          addressLine2: profile.addressLine2 || '',
-          city: profile.city || '',
-          state: profile.state || '',
-          country: profile.country || 'India',
-          pincode: profile.pincode || '',
-          occupation: profile.occupation || '',
-          bio: profile.bio || '',
-        };
-        setFormData(nextFormData);
-        setAvatarUrl(profile.avatarUrl || null);
+          const nextFormData = {
+            name: profile.name || '',
+            gender: profile.gender || '',
+            phone: profile.phone || '',
+            dateOfBirth: profile.dateOfBirth ? new Date(profile.dateOfBirth) : undefined,
+            addressLine1: profile.addressLine1 || '',
+            addressLine2: profile.addressLine2 || '',
+            city: profile.city || '',
+            state: profile.state || '',
+            country: profile.country || 'India',
+            pincode: profile.pincode || '',
+            occupation: profile.occupation || '',
+            bio: profile.bio || '',
+          };
+          setFormData(nextFormData);
+          setAvatarUrl(profile.avatarUrl || null);
 
-        initialPincodeRef.current = profile.pincode || '';
-        hasInitialLocationRef.current = Boolean(profile.city && profile.state);
-        if (nextFormData.pincode) {
-          lastLookupPincodeRef.current = nextFormData.pincode;
+          initialPincodeRef.current = profile.pincode || '';
+          hasInitialLocationRef.current = Boolean(profile.city && profile.state);
+          if (nextFormData.pincode) {
+            lastLookupPincodeRef.current = nextFormData.pincode;
+          }
         }
-      }
-    } catch (error) {
-      console.error('Error fetching profile:', error);
-    } finally {
+      } catch (error) {
+        console.error('Error fetching profile:', error);
+      } finally {
         if (showSpinner) {
-      setLoading(false);
-    }
+          setLoading(false);
+        }
       }
     },
     [user?.id],
@@ -315,7 +315,7 @@ export function ProfileSettingsSection({ mode = 'embedded', initialProfile = nul
 
   const profileContent = (
     <div className="space-y-6">
-      <Card>
+      <Card className="bg-card border border-border/60 rounded-xl shadow-sm">
         <CardContent className="pt-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
             <div className="relative">
@@ -378,13 +378,17 @@ export function ProfileSettingsSection({ mode = 'embedded', initialProfile = nul
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="bg-card border border-border/60 rounded-xl shadow-sm">
         <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <User className="w-5 h-5" />
-            <span>Personal Information</span>
-          </CardTitle>
-          <CardDescription>Update your personal details</CardDescription>
+          <div className="flex items-center gap-3">
+            <div className="size-10 rounded-lg bg-primary/10 flex items-center justify-center">
+              <User className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <CardTitle className="text-base font-bold uppercase tracking-wide text-foreground">Personal Information</CardTitle>
+              <CardDescription>Update your personal details</CardDescription>
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -447,13 +451,17 @@ export function ProfileSettingsSection({ mode = 'embedded', initialProfile = nul
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="bg-card border border-border/60 rounded-xl shadow-sm">
         <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Phone className="w-5 h-5" />
-            <span>Contact Information</span>
-          </CardTitle>
-          <CardDescription>Update your contact details</CardDescription>
+          <div className="flex items-center gap-3">
+            <div className="size-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
+              <Phone className="w-5 h-5 text-blue-500" />
+            </div>
+            <div>
+              <CardTitle className="text-base font-bold uppercase tracking-wide text-foreground">Contact Information</CardTitle>
+              <CardDescription>Update your contact details</CardDescription>
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
@@ -482,13 +490,17 @@ export function ProfileSettingsSection({ mode = 'embedded', initialProfile = nul
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="bg-card border border-border/60 rounded-xl shadow-sm">
         <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <MapPin className="w-5 h-5" />
-            <span>Location Information</span>
-          </CardTitle>
-          <CardDescription>Your address and location details</CardDescription>
+          <div className="flex items-center gap-3">
+            <div className="size-10 rounded-lg bg-indigo-500/10 flex items-center justify-center">
+              <MapPin className="w-5 h-5 text-indigo-500" />
+            </div>
+            <div>
+              <CardTitle className="text-base font-bold uppercase tracking-wide text-foreground">Location Details</CardTitle>
+              <CardDescription>Your address and location details</CardDescription>
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
@@ -509,27 +521,27 @@ export function ProfileSettingsSection({ mode = 'embedded', initialProfile = nul
               placeholder="Apartment, suite, unit, building, floor, etc."
             />
           </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
               <Label htmlFor="pincode" className="flex items-center gap-2">
                 <span>Pincode</span>
                 {fetchingLocation && (
                   <Loader2 className="w-3 h-3 animate-spin text-primary" />
                 )}
               </Label>
-                <Input
-                  id="pincode"
-                  value={formData.pincode}
-                  onChange={(e) => {
-                    const value = e.target.value.replace(/\D/g, '').slice(0, 6);
-                    handleInputChange('pincode', value);
-                    if (value !== formData.pincode) {
-                      lastLookupPincodeRef.current = null;
-                    }
-                  }}
-                  placeholder="Enter 6-digit pincode"
-                  maxLength={6}
-                />
+              <Input
+                id="pincode"
+                value={formData.pincode}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/\D/g, '').slice(0, 6);
+                  handleInputChange('pincode', value);
+                  if (value !== formData.pincode) {
+                    lastLookupPincodeRef.current = null;
+                  }
+                }}
+                placeholder="Enter 6-digit pincode"
+                maxLength={6}
+              />
               <p className="text-xs text-gray-500">Enter pincode to auto-fill city and state</p>
             </div>
             <div className="space-y-2">
@@ -569,16 +581,16 @@ export function ProfileSettingsSection({ mode = 'embedded', initialProfile = nul
         <Button
           onClick={handleSave}
           disabled={saving}
-          className="min-w-[120px]"
+          className="min-w-[140px] h-10 px-6 text-xs font-bold uppercase tracking-widest bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg transition-all"
         >
           {saving ? (
             <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              <Loader2 className="size-4 mr-2 animate-spin" />
               Saving...
             </>
           ) : (
             <>
-              <Save className="w-4 h-4 mr-2" />
+              <Save className="size-4 mr-2" />
               Save Changes
             </>
           )}

@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { prisma } from '../../../lib/db';
 
 // Configure route caching - user-specific dynamic data
 export const dynamic = 'force-dynamic';
-export const revalidate = 120; // Revalidate every 2 minutes
+export const revalidate = 0; // Disable cache for now
 
 export async function GET(request: NextRequest) {
   console.log('🔍 GOALS GET - Starting request');
@@ -21,25 +22,29 @@ export async function GET(request: NextRequest) {
     // Fetch goals from database
     const goals = await prisma.goal.findMany({
       where: { userId },
+      include: { contributions: { orderBy: { date: 'desc' } } },
       orderBy: { createdAt: 'desc' }
     });
 
     console.log('✅ GOALS GET - Found goals:', goals.length, 'records');
-    console.log('📊 GOALS GET - Goals data:', JSON.stringify(goals, null, 2));
+    // console.log('📊 GOALS GET - Goals data:', JSON.stringify(goals, null, 2));
     return NextResponse.json(goals);
   } catch (error) {
     console.error('❌ GOALS GET - Error:', error);
-    console.error('❌ GOALS GET - Error details:', JSON.stringify(error, null, 2));
+    // console.error('❌ GOALS GET - Error details:', JSON.stringify(error, null, 2));
     return NextResponse.json({ error: 'Failed to fetch goals' }, { status: 500 });
   }
 }
 
 export async function POST(request: NextRequest) {
+  // ... (POST remains largely the same, usually we don't add contributions on create but we could if needed)
+  // For brevity, keeping POST as is, mainly focused on updates.
   console.log('➕ GOALS POST - Starting request');
   try {
     const body = await request.json();
     console.log('➕ GOALS POST - Request body:', JSON.stringify(body, null, 2));
-    
+
+    // ... (rest of POST implementation unchanged)
     const {
       title,
       targetAmount,
@@ -51,25 +56,10 @@ export async function POST(request: NextRequest) {
       userId
     } = body;
 
-    console.log('➕ GOALS POST - Extracted data:', {
-      title,
-      targetAmount,
-      currentAmount,
-      targetDate,
-      priority,
-      category,
-      description,
-      userId
-    });
-
-    // Validate required fields
     if (!title || !targetAmount || !userId) {
-      console.log('❌ GOALS POST - Missing required fields');
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    console.log('➕ GOALS POST - Creating goal in database...');
-    // Create new goal in database
     const newGoal = await prisma.goal.create({
       data: {
         title,
@@ -84,11 +74,11 @@ export async function POST(request: NextRequest) {
       }
     });
 
-    console.log('✅ GOALS POST - Successfully created goal:', JSON.stringify(newGoal, null, 2));
+    revalidatePath('/');
+    revalidatePath('/plans');
     return NextResponse.json(newGoal);
   } catch (error) {
     console.error('❌ GOALS POST - Error:', error);
-    console.error('❌ GOALS POST - Error details:', JSON.stringify(error, null, 2));
     return NextResponse.json({ error: 'Failed to create goal' }, { status: 500 });
   }
 }
@@ -97,32 +87,78 @@ export async function PUT(request: NextRequest) {
   console.log('✏️ GOALS PUT - Starting request');
   try {
     const body = await request.json();
-    const { id, ...updateData } = body;
-    console.log('✏️ GOALS PUT - Update data:', JSON.stringify({ id, ...updateData }, null, 2));
+    const { id, contributionAmount, contributionSource, contributionNote, ...updateData } = body;
+    console.log('✏️ GOALS PUT - Update data:', JSON.stringify({ id, contributionAmount, ...updateData }, null, 2));
 
     if (!id) {
-      console.log('❌ GOALS PUT - No ID provided');
       return NextResponse.json({ error: 'ID is required' }, { status: 400 });
     }
 
-    console.log('✏️ GOALS PUT - Updating goal in database...');
-    // Update goal in database
-    const updatedGoal = await prisma.goal.update({
-      where: { id },
-      data: {
-        ...updateData,
-        targetAmount: updateData.targetAmount ? parseFloat(updateData.targetAmount) : undefined,
-        currentAmount: updateData.currentAmount ? parseFloat(updateData.currentAmount) : undefined,
-        targetDate: updateData.targetDate ? new Date(updateData.targetDate) : undefined,
-        updatedAt: new Date()
-      }
-    });
+    let updatedGoal;
 
-    console.log('✅ GOALS PUT - Successfully updated goal:', JSON.stringify(updatedGoal, null, 2));
+    // specific handling for adding funds with source tracking
+    if (contributionAmount) {
+      console.log('✏️ GOALS PUT - processing contribution:', contributionAmount);
+      const amount = parseFloat(contributionAmount);
+
+      // Transaction to ensure both contribution record and balance update happen
+      updatedGoal = await prisma.$transaction(async (tx) => {
+        // 1. Create contribution record
+        await tx.goalContribution.create({
+          data: {
+            goalId: id,
+            amount: amount,
+            source: contributionSource || 'Other',
+            note: contributionNote,
+            date: new Date()
+          }
+        });
+
+        // 2. Update goal balance
+        // We use the passed currentAmount as the NEW total if provided, or calculate it.
+        // Ideally, we should increment atomically, but since we receive currentAmount usually, let's respect the logic.
+        // If currentAmount is provided in updateData, we use that. 
+        // If NOT provided, we increment the existing (but that needs a fetch).
+        // The frontend logic (MatteGoalCard) currently calculates new total and sends it as currentAmount.
+        // Let's defer to the frontend's explicit new total if present, or just use the contribution amount.
+
+        // Actually, safest is to use the explicit currentAmount from body if present
+        const newTotal = updateData.currentAmount ? parseFloat(updateData.currentAmount) : undefined;
+
+        return await tx.goal.update({
+          where: { id },
+          data: {
+            ...updateData,
+            // If currentAmount is passed, use it. Otherwise increment (feature enhancement) -> but for now standard update
+            currentAmount: newTotal,
+            targetAmount: updateData.targetAmount ? parseFloat(updateData.targetAmount) : undefined,
+            targetDate: updateData.targetDate ? new Date(updateData.targetDate) : undefined,
+            updatedAt: new Date()
+          },
+          include: { contributions: { orderBy: { date: 'desc' } } }
+        });
+      });
+    } else {
+      // Standard update without contribution record
+      updatedGoal = await prisma.goal.update({
+        where: { id },
+        data: {
+          ...updateData,
+          targetAmount: updateData.targetAmount ? parseFloat(updateData.targetAmount) : undefined,
+          currentAmount: updateData.currentAmount ? parseFloat(updateData.currentAmount) : undefined,
+          targetDate: updateData.targetDate ? new Date(updateData.targetDate) : undefined,
+          updatedAt: new Date()
+        },
+        include: { contributions: { orderBy: { date: 'desc' } } }
+      });
+    }
+
+    console.log('✅ GOALS PUT - Successfully updated goal:', { id: updatedGoal.id, currentAmount: updatedGoal.currentAmount });
+    revalidatePath('/');
+    revalidatePath('/plans');
     return NextResponse.json(updatedGoal);
   } catch (error) {
     console.error('❌ GOALS PUT - Error:', error);
-    console.error('❌ GOALS PUT - Error details:', JSON.stringify(error, null, 2));
     return NextResponse.json({ error: 'Failed to update goal' }, { status: 500 });
   }
 }
@@ -146,6 +182,8 @@ export async function DELETE(request: NextRequest) {
     });
 
     console.log('✅ GOALS DELETE - Successfully deleted goal');
+    revalidatePath('/');
+    revalidatePath('/plans');
     return NextResponse.json({ message: 'Goal deleted successfully' });
   } catch (error) {
     console.error('❌ GOALS DELETE - Error:', error);

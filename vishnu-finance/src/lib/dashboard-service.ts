@@ -40,6 +40,30 @@ export interface SimpleDashboardData {
     }>;
     financialHealthScore: number;
     categoryStats: Record<string, { credits: number; debits: number }>;
+    // NEW: Additional KPI data
+    salaryInfo: {
+        takeHome: number;
+        ctc: number;
+        jobTitle: string;
+        company: string;
+    } | null;
+    plansInfo: {
+        activePlans: number;
+        totalCommitted: number;
+        topPlan: string | null;
+        items: Array<{ name: string; targetAmount: number; currentAmount: number; priority?: number }>;
+    };
+    wishlistInfo: {
+        totalItems: number;
+        totalCost: number;
+        topItem: string | null;
+        items: Array<{ name: string; estimatedPrice: number; priority?: number }>;
+    };
+    deadlinesInfo: {
+        upcoming: number;
+        nextDeadline: { title: string; dueDate: string } | null;
+        items: Array<{ title: string; dueDate: string }>;
+    };
 }
 
 export class DashboardService {
@@ -55,7 +79,7 @@ export class DashboardService {
         }
 
         // Direct Database Aggregations
-        const [transactionStats, legacyExpenseStats, legacyIncomeStats, activeGoalsCount, upcomingDeadlinesCount, recentTransactions] = await Promise.all([
+        const [transactionStats, legacyExpenseStats, legacyIncomeStats, activeGoalsCount, deadlinesData, recentTransactions, salaryInfo, plansInfo, wishlistInfo] = await Promise.all([
             // ... (keep same) ...
             // 1. Transaction Stats
             (async () => {
@@ -91,8 +115,22 @@ export class DashboardService {
             // 4. Goals
             prisma.goal.count({ where: { userId, isActive: true } }).catch(() => 0),
 
-            // 5. Deadlines
-            prisma.deadline.count({ where: { userId, isCompleted: false, dueDate: { gt: new Date() } } }).catch(() => 0),
+            // 5. Deadlines with top items
+            (async () => {
+                try {
+                    const deadlines = await prisma.deadline.findMany({
+                        where: { userId, isCompleted: false, dueDate: { gt: new Date() } },
+                        orderBy: { dueDate: 'asc' },
+                        select: { title: true, dueDate: true },
+                        take: 5
+                    });
+                    return {
+                        count: deadlines.length,
+                        next: deadlines[0] || null,
+                        items: deadlines.map((d: any) => ({ title: d.title, dueDate: d.dueDate.toISOString() }))
+                    };
+                } catch { return { count: 0, next: null, items: [] }; }
+            })(),
 
             // 6. Recent Transactions
             (async () => {
@@ -109,6 +147,74 @@ export class DashboardService {
                         take: 10
                     });
                 } catch { return []; }
+            })(),
+
+            // 7. Active Salary Structure
+            (async () => {
+                try {
+                    const salary = await (prisma as any).salaryStructure.findFirst({
+                        where: { userId, isActive: true },
+                        select: {
+                            baseSalary: true, jobTitle: true, company: true,
+                            allowances: true, deductions: true, employerContributions: true
+                        }
+                    });
+                    if (!salary) return null;
+                    const allowances = typeof salary.allowances === 'string' ? JSON.parse(salary.allowances || '{}') : (salary.allowances || {});
+                    const deductions = typeof salary.deductions === 'string' ? JSON.parse(salary.deductions || '{}') : (salary.deductions || {});
+                    const contributions = typeof salary.employerContributions === 'string' ? JSON.parse(salary.employerContributions || '{}') : (salary.employerContributions || {});
+                    const totalAllowances = Object.values(allowances).reduce((sum: number, val: any) => sum + (Number(val) || 0), 0);
+                    const totalDeductions = Object.values(deductions).reduce((sum: number, val: any) => sum + (Number(val) || 0), 0);
+                    const totalContributions = Object.values(contributions).reduce((sum: number, val: any) => sum + (Number(val) || 0), 0);
+                    const monthlyBase = Number(salary.baseSalary) / 12;
+                    const grossMonthly = monthlyBase + totalAllowances;
+                    const netMonthly = grossMonthly - totalDeductions;
+                    const ctc = (grossMonthly + totalContributions) * 12;
+                    return { takeHome: netMonthly, ctc, jobTitle: salary.jobTitle, company: salary.company };
+                } catch { return null; }
+            })(),
+
+            // 8. Active Plans with details
+            (async () => {
+                try {
+                    const plans = await (prisma as any).plan.findMany({
+                        where: { userId, isActive: true },
+                        select: { name: true, targetAmount: true, currentAmount: true, priority: true },
+                        orderBy: { priority: 'asc' },
+                        take: 5
+                    });
+                    const totalCommitted = plans.reduce((sum: number, p: any) => sum + (Number(p.targetAmount) || 0), 0);
+                    return {
+                        activePlans: plans.length,
+                        totalCommitted,
+                        topPlan: plans[0]?.name || null,
+                        items: plans.map((p: any) => ({
+                            name: p.name,
+                            targetAmount: Number(p.targetAmount) || 0,
+                            currentAmount: Number(p.currentAmount) || 0,
+                            priority: p.priority
+                        }))
+                    };
+                } catch { return { activePlans: 0, totalCommitted: 0, topPlan: null, items: [] }; }
+            })(),
+
+            // 9. Wishlist Summary with details
+            (async () => {
+                try {
+                    const items = await (prisma as any).wishlistItem.findMany({
+                        where: { userId },
+                        select: { name: true, estimatedPrice: true, priority: true },
+                        orderBy: { priority: 'asc' },
+                        take: 5
+                    });
+                    const totalCost = items.reduce((sum: number, i: any) => sum + (Number(i.estimatedPrice) || 0), 0);
+                    return {
+                        totalItems: items.length,
+                        totalCost,
+                        topItem: items[0]?.name || null,
+                        items: items.map((i: any) => ({ name: i.name, estimatedPrice: Number(i.estimatedPrice) || 0, priority: i.priority }))
+                    };
+                } catch { return { totalItems: 0, totalCost: 0, topItem: null, items: [] }; }
             })()
         ]);
 
@@ -310,13 +416,25 @@ export class DashboardService {
             netSavings,
             totalNetWorth,
             savingsRate: Math.round(savingsRate * 100) / 100,
-            upcomingDeadlines: upcomingDeadlinesCount,
+            upcomingDeadlines: deadlinesData?.count || 0,
             activeGoals: activeGoalsCount,
             recentTransactions: allTransactions,
             monthlyTrends,
             categoryBreakdown,
             financialHealthScore: Math.min(financialHealthScore, 100),
             categoryStats: Object.fromEntries(financialCategoryStatsMap),
+            // NEW KPI data
+            salaryInfo: salaryInfo || null,
+            plansInfo: plansInfo || { activePlans: 0, totalCommitted: 0, topPlan: null, items: [] },
+            wishlistInfo: wishlistInfo || { totalItems: 0, totalCost: 0, topItem: null, items: [] },
+            deadlinesInfo: {
+                upcoming: deadlinesData?.count || 0,
+                nextDeadline: deadlinesData?.next ? {
+                    title: deadlinesData.next.title,
+                    dueDate: typeof deadlinesData.next.dueDate === 'string' ? deadlinesData.next.dueDate : deadlinesData.next.dueDate.toISOString()
+                } : null,
+                items: deadlinesData?.items || []
+            }
         };
 
         await setCachedData(cacheKey, result, CACHE_TTL.DASHBOARD);

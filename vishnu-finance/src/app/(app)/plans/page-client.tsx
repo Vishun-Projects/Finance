@@ -19,7 +19,12 @@ import {
   Plus,
   ShoppingBag,
   Sparkles,
+  History,
+  PieChart,
+  Wallet
 } from "lucide-react";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { normalizeGoals } from "@/lib/utils/goal-normalize";
 import {
   formatCurrency,
@@ -319,10 +324,26 @@ function MatteGoalCard({ goal, onUpdate }: { goal: Goal, onUpdate?: (updatedGoal
   const [bgImage, setBgImage] = useState<string | null>(goal.imageUrl || null);
   const [isAddingFunds, setIsAddingFunds] = useState(false);
   const [fundsAmount, setFundsAmount] = useState("");
+  const [fundsSource, setFundsSource] = useState("Salary");
+  const [fundsNote, setFundsNote] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
 
   const progress = Math.min(100, Math.max(0, (goal.currentAmount / goal.targetAmount) * 100));
+
+  // Calculate breakdown from contributions if available
+  const contributions = (goal as any).contributions || [];
+  const hasHistory = contributions.length > 0;
+
+  const sourcesBreakdown = useMemo(() => {
+    if (!hasHistory) return null;
+    const breakdown: Record<string, number> = {};
+    contributions.forEach((c: any) => {
+      breakdown[c.source] = (breakdown[c.source] || 0) + Number(c.amount);
+    });
+    return Object.entries(breakdown).map(([name, amount]) => ({ name, amount: Number(amount) }));
+  }, [contributions, hasHistory]);
 
   // Auto-fetch image if missing
   useEffect(() => {
@@ -341,6 +362,7 @@ function MatteGoalCard({ goal, onUpdate }: { goal: Goal, onUpdate?: (updatedGoal
     setIsSaving(true);
     try {
       const addedAmount = parseFloat(fundsAmount);
+      // We calculate new amount locally for optimistic UI
       const newAmount = (goal.currentAmount || 0) + addedAmount;
 
       const response = await fetch('/api/goals', {
@@ -349,6 +371,9 @@ function MatteGoalCard({ goal, onUpdate }: { goal: Goal, onUpdate?: (updatedGoal
         body: JSON.stringify({
           id: goal.id,
           currentAmount: newAmount,
+          contributionAmount: addedAmount,
+          contributionSource: fundsSource,
+          contributionNote: fundsNote
         }),
       });
 
@@ -356,14 +381,13 @@ function MatteGoalCard({ goal, onUpdate }: { goal: Goal, onUpdate?: (updatedGoal
         throw new Error('Failed to update goal');
       }
 
-      const navigateRes = await fetch(`/api/goals?id=${goal.id}`); // Fetch single or just construct updated
-      // Since we don't have single fetch easily exposed or standardized, we construct the updated object optimistically or if API returns it.
-      // Assuming naive update for now or trigger parent refresh
+      const updatedGoalData = await response.json();
+      onUpdate?.(updatedGoalData);
 
-      const updatedGoal = { ...goal, currentAmount: newAmount };
-      onUpdate?.(updatedGoal);
       setDialogOpen(false);
       setFundsAmount("");
+      setFundsNote("");
+      setFundsSource("Salary");
     } catch (error) {
       console.error("Failed to add funds", error);
     } finally {
@@ -403,6 +427,7 @@ function MatteGoalCard({ goal, onUpdate }: { goal: Goal, onUpdate?: (updatedGoal
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Add Funds Dialog */}
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
               <DialogTrigger asChild>
                 <Button variant="secondary" className="h-8 border border-border bg-muted text-foreground hover:bg-muted/80 text-[10px] font-bold uppercase tracking-widest">
@@ -414,7 +439,7 @@ function MatteGoalCard({ goal, onUpdate }: { goal: Goal, onUpdate?: (updatedGoal
                 <DialogHeader>
                   <DialogTitle className="text-foreground">Add to Savings</DialogTitle>
                   <DialogDescription className="text-muted-foreground">
-                    Add a manual contribution to <strong>{goal.title}</strong>.
+                    Record a contribution to <strong>{goal.title}</strong>.
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
@@ -430,6 +455,32 @@ function MatteGoalCard({ goal, onUpdate }: { goal: Goal, onUpdate?: (updatedGoal
                       autoFocus
                     />
                   </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="source" className="text-muted-foreground">Source</Label>
+                    <Select value={fundsSource} onValueChange={setFundsSource}>
+                      <SelectTrigger className="bg-muted border-border text-foreground">
+                        <SelectValue placeholder="Select source" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Salary">Salary</SelectItem>
+                        <SelectItem value="Bonus">Bonus</SelectItem>
+                        <SelectItem value="Savings">General Savings</SelectItem>
+                        <SelectItem value="Business">Business Profit</SelectItem>
+                        <SelectItem value="Gift">Gift</SelectItem>
+                        <SelectItem value="Other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="note" className="text-muted-foreground">Note (Optional)</Label>
+                    <Input
+                      id="note"
+                      placeholder="e.g. November saving"
+                      value={fundsNote}
+                      onChange={(e) => setFundsNote(e.target.value)}
+                      className="bg-muted border-border text-foreground placeholder:text-muted-foreground/40"
+                    />
+                  </div>
                 </div>
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setDialogOpen(false)} className="border-border text-muted-foreground hover:bg-muted hover:text-foreground">Cancel</Button>
@@ -440,9 +491,77 @@ function MatteGoalCard({ goal, onUpdate }: { goal: Goal, onUpdate?: (updatedGoal
               </DialogContent>
             </Dialog>
 
-            <Button variant="secondary" className="h-8 border border-border bg-muted text-foreground hover:bg-muted/80 text-[10px] font-bold uppercase tracking-widest">
-              History
-            </Button>
+            {/* History Sheet */}
+            <Sheet open={showHistory} onOpenChange={setShowHistory}>
+              <SheetTrigger asChild>
+                <Button variant="secondary" className="h-8 border border-border bg-muted text-foreground hover:bg-muted/80 text-[10px] font-bold uppercase tracking-widest">
+                  History
+                </Button>
+              </SheetTrigger>
+              <SheetContent className="w-full sm:max-w-md overflow-y-auto">
+                <SheetHeader className="mb-6">
+                  <SheetTitle className="flex items-center gap-2">
+                    <History className="w-5 h-5" /> Savings History
+                  </SheetTitle>
+                  <SheetDescription>
+                    Track how you funded <strong>{goal.title}</strong>
+                  </SheetDescription>
+                </SheetHeader>
+
+                <div className="space-y-8">
+                  {/* Sources Breakdown */}
+                  {sourcesBreakdown && sourcesBreakdown.length > 0 && (
+                    <div className="bg-muted/30 p-4 rounded-lg border border-border">
+                      <h4 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-4 flex items-center gap-2">
+                        <PieChart className="w-4 h-4" /> Source Breakdown
+                      </h4>
+                      <div className="space-y-3">
+                        {sourcesBreakdown.map(source => (
+                          <div key={source.name}>
+                            <div className="flex justify-between text-xs mb-1">
+                              <span className="font-medium text-foreground">{source.name}</span>
+                              <span className="tabular-nums text-muted-foreground">{formatCurrency(source.amount)}</span>
+                            </div>
+                            <div className="h-1.5 w-full bg-background rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-primary/80 rounded-full"
+                                style={{ width: `${Math.min(100, (source.amount / goal.currentAmount) * 100)}%` }}
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Transaction List */}
+                  <div>
+                    <h4 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-4 flex items-center gap-2">
+                      <Wallet className="w-4 h-4" /> Recent Contributions
+                    </h4>
+                    {hasHistory ? (
+                      <div className="space-y-3 relative border-l border-border ml-2 pl-4">
+                        {contributions.map((c: any, i: number) => (
+                          <div key={c.id || i} className="relative">
+                            <div className="absolute -left-[21px] top-1.5 w-2.5 h-2.5 rounded-full bg-muted border border-border" />
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <p className="text-sm font-bold text-foreground">{c.source}</p>
+                                <p className="text-[10px] text-muted-foreground">{formatDateLabel(new Date(c.date))}</p>
+                                {c.note && <p className="text-xs text-muted-foreground mt-0.5 italic">"{c.note}"</p>}
+                              </div>
+                              <p className="text-sm font-bold text-primary tabular-nums">+{formatCurrency(Number(c.amount))}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground italic text-center py-4">No history available yet.</p>
+                    )}
+                  </div>
+                </div>
+              </SheetContent>
+            </Sheet>
           </div>
         </div>
 

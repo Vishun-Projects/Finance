@@ -276,9 +276,23 @@ model Goal {
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
   user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contributions GoalContribution[]
 
   @@index([userId], map: "goals_userId_fkey")
   @@map("goals")
+}
+
+model GoalContribution {
+  id        String   @id @default(cuid())
+  goalId    String
+  amount    Decimal  @db.Decimal(10, 2)
+  date      DateTime @default(now())
+  source    String   // "Salary", "Bonus", "Savings", "Other"
+  note      String?
+  goal      Goal     @relation(fields: [goalId], references: [id], onDelete: Cascade)
+
+  @@index([goalId])
+  @@map("goal_contributions")
 }
 
 model WishlistItem {

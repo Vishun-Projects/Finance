@@ -195,24 +195,24 @@ function DocumentManagement({ initialDocuments }: DocumentManagementProps) {
   };
 
   return (
-    <Card>
+    <Card className="bg-card border border-border/60 rounded-xl shadow-sm">
       <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <CardTitle className="flex items-center space-x-2">
-            <FileText className="w-5 h-5" />
-            <span>Your Documents</span>
-          </CardTitle>
-          <CardDescription>
-            Manage statements and personal uploads. Download originals or remove them when no longer needed.
-          </CardDescription>
+        <div className="flex items-center gap-3">
+          <div className="size-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
+            <FileText className="w-5 h-5 text-blue-500" />
+          </div>
+          <div>
+            <CardTitle className="text-base font-bold uppercase tracking-wide text-foreground">Documents</CardTitle>
+            <CardDescription>Manage statements and personal uploads</CardDescription>
+          </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => fetchDocuments({ showSpinner: true })} disabled={loading}>
-            <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+          <Button variant="outline" size="sm" onClick={() => fetchDocuments({ showSpinner: true })} disabled={loading} className="h-8 text-xs font-medium">
+            <RefreshCw className={`w-3.5 h-3.5 mr-2 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
-          <Button size="sm" onClick={handleFilePick} disabled={uploading}>
-            <Upload className="w-4 h-4 mr-2" />
+          <Button size="sm" onClick={handleFilePick} disabled={uploading} className="h-8 text-xs font-bold uppercase tracking-wider bg-primary text-primary-foreground hover:bg-primary/90">
+            <Upload className="w-3.5 h-3.5 mr-2" />
             {uploading ? 'Uploading...' : 'Upload PDF'}
           </Button>
           <input
@@ -268,7 +268,8 @@ function DocumentManagement({ initialDocuments }: DocumentManagementProps) {
                 doc.visibility === 'PRIVATE';
 
               return (
-                <Card key={doc.id} className="border border-border/70">
+
+                <Card key={doc.id} className="bg-card border border-border/60 rounded-lg shadow-sm hover:border-border/80 transition-all">
                   <CardContent className="p-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
@@ -501,20 +502,20 @@ function CategoryManagement() {
 
   return (
     <>
-      <Card>
+      <Card className="bg-card border border-border/60 rounded-xl shadow-sm">
         <CardHeader>
           <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center space-x-2">
-                <Tag className="w-5 h-5" />
-                <span>Transaction Categories</span>
-              </CardTitle>
-              <CardDescription>
-                Manage your income and expense categories. Default categories cannot be modified or deleted.
-              </CardDescription>
+            <div className="flex items-center gap-3">
+              <div className="size-10 rounded-lg bg-pink-500/10 flex items-center justify-center">
+                <Tag className="w-5 h-5 text-pink-500" />
+              </div>
+              <div>
+                <CardTitle className="text-base font-bold uppercase tracking-wide text-foreground">Categories</CardTitle>
+                <CardDescription>Manage your income and expense categories</CardDescription>
+              </div>
             </div>
-            <Button onClick={() => { setShowForm(true); setEditingCategory(null); setFormData({ name: '', type: 'EXPENSE', color: '#3B82F6' }); }}>
-              <Plus className="w-4 h-4 mr-2" />
+            <Button onClick={() => { setShowForm(true); setEditingCategory(null); setFormData({ name: '', type: 'EXPENSE', color: '#3B82F6' }); }} className="h-8 text-xs font-bold uppercase tracking-wider">
+              <Plus className="w-3.5 h-3.5 mr-2" />
               Add Category
             </Button>
           </div>
@@ -534,7 +535,7 @@ function CategoryManagement() {
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                 {incomeCategories.map((category) => (
-                  <div key={category.id} className="flex items-center justify-between p-3 border rounded-lg">
+                  <div key={category.id} className="flex items-center justify-between p-3 border border-border/60 rounded-lg bg-card/50 hover:bg-accent/40 transition-colors">
                     <div className="flex items-center gap-2 flex-1">
                       <div className="w-4 h-4 rounded-full" style={{ backgroundColor: category.color ?? '#3B82F6' }} />
                       <span className="font-medium">{category.name}</span>
@@ -572,7 +573,7 @@ function CategoryManagement() {
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                 {expenseCategories.map((category) => (
-                  <div key={category.id} className="flex items-center justify-between p-3 border rounded-lg">
+                  <div key={category.id} className="flex items-center justify-between p-3 border border-border/60 rounded-lg bg-card/50 hover:bg-accent/40 transition-colors">
                     <div className="flex items-center gap-2 flex-1">
                       <div className="w-4 h-4 rounded-full" style={{ backgroundColor: category.color ?? '#3B82F6' }} />
                       <span className="font-medium">{category.name}</span>
@@ -797,60 +798,72 @@ export default function SettingsPageClient({ initialDocuments, initialPreference
   }
 
   return (
-    <div className="min-h-screen bg-background px-3 sm:px-6 py-6">
-      <div className="max-w-4xl mx-auto space-y-6">
+    <div className="min-h-screen bg-background">
+      <div className="max-w-[1440px] mx-auto px-6 py-8 space-y-8">
         {/* Header */}
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Settings</h1>
-          <p className="text-muted-foreground mt-2">Configure your account and preferences</p>
+          <h4 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-1">Configuration</h4>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">Settings</h1>
         </div>
 
 
         {/* Settings Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <div className="w-full overflow-x-auto border-b border-border">
-            <TabsList className="inline-flex h-10 items-center justify-start rounded-none bg-transparent p-0 w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full space-y-8">
+          <div className="w-full overflow-x-auto border-b border-border/40 scrollbar-hide">
+            <TabsList className="inline-flex h-auto items-center justify-start rounded-none bg-transparent p-0 w-full gap-6">
               <TabsTrigger
                 value="profile"
-                className="rounded-none border-b-2 border-transparent bg-transparent px-4 py-2 text-sm font-medium text-muted-foreground transition-all hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:shadow-none"
+                className="rounded-none border-b-2 border-transparent bg-transparent px-2 py-3 text-sm font-medium text-muted-foreground transition-all hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:shadow-none"
               >
-                <User className="w-4 h-4 mr-2" />
-                <span>Profile</span>
+                <div className="flex items-center gap-2">
+                  <User className="w-4 h-4" />
+                  <span>Profile</span>
+                </div>
               </TabsTrigger>
               <TabsTrigger
                 value="appearance"
-                className="rounded-none border-b-2 border-transparent bg-transparent px-4 py-2 text-sm font-medium text-muted-foreground transition-all hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:shadow-none"
+                className="rounded-none border-b-2 border-transparent bg-transparent px-2 py-3 text-sm font-medium text-muted-foreground transition-all hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:shadow-none"
               >
-                <Palette className="w-4 h-4 mr-2" />
-                <span>Appearance</span>
+                <div className="flex items-center gap-2">
+                  <Palette className="w-4 h-4" />
+                  <span>Appearance</span>
+                </div>
               </TabsTrigger>
               <TabsTrigger
                 value="notifications"
-                className="rounded-none border-b-2 border-transparent bg-transparent px-4 py-2 text-sm font-medium text-muted-foreground transition-all hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:shadow-none"
+                className="rounded-none border-b-2 border-transparent bg-transparent px-2 py-3 text-sm font-medium text-muted-foreground transition-all hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:shadow-none"
               >
-                <Bell className="w-4 h-4 mr-2" />
-                <span>Notifications</span>
+                <div className="flex items-center gap-2">
+                  <Bell className="w-4 h-4" />
+                  <span>Notifications</span>
+                </div>
               </TabsTrigger>
               <TabsTrigger
                 value="security"
-                className="rounded-none border-b-2 border-transparent bg-transparent px-4 py-2 text-sm font-medium text-muted-foreground transition-all hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:shadow-none"
+                className="rounded-none border-b-2 border-transparent bg-transparent px-2 py-3 text-sm font-medium text-muted-foreground transition-all hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:shadow-none"
               >
-                <Shield className="w-4 h-4 mr-2" />
-                <span>Security</span>
+                <div className="flex items-center gap-2">
+                  <Shield className="w-4 h-4" />
+                  <span>Security</span>
+                </div>
               </TabsTrigger>
               <TabsTrigger
                 value="categories"
-                className="rounded-none border-b-2 border-transparent bg-transparent px-4 py-2 text-sm font-medium text-muted-foreground transition-all hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:shadow-none"
+                className="rounded-none border-b-2 border-transparent bg-transparent px-2 py-3 text-sm font-medium text-muted-foreground transition-all hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:shadow-none"
               >
-                <Tag className="w-4 h-4 mr-2" />
-                <span>Categories</span>
+                <div className="flex items-center gap-2">
+                  <Tag className="w-4 h-4" />
+                  <span>Categories</span>
+                </div>
               </TabsTrigger>
               <TabsTrigger
                 value="documentation"
-                className="rounded-none border-b-2 border-transparent bg-transparent px-4 py-2 text-sm font-medium text-muted-foreground transition-all hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:shadow-none"
+                className="rounded-none border-b-2 border-transparent bg-transparent px-2 py-3 text-sm font-medium text-muted-foreground transition-all hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:shadow-none"
               >
-                <FileText className="w-4 h-4 mr-2" />
-                <span>Docs</span>
+                <div className="flex items-center gap-2">
+                  <FileText className="w-4 h-4" />
+                  <span>Docs</span>
+                </div>
               </TabsTrigger>
             </TabsList>
           </div>
@@ -867,14 +880,17 @@ export default function SettingsPageClient({ initialDocuments, initialPreference
               <ProfileSettingsSection />
 
               {/* Razorpay Test Section */}
-              <Card>
+              <Card className="bg-card border border-border/60 rounded-xl shadow-sm">
                 <CardHeader>
-                  <CardTitle className="flex items-center space-x-2">
-                    <span>Payments – Razorpay Test</span>
-                  </CardTitle>
-                  <CardDescription>
-                    Run a ₹1.00 test payment via Razorpay Checkout to verify integration.
-                  </CardDescription>
+                  <div className="flex items-center gap-3">
+                    <div className="size-10 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                      <span className="text-emerald-500 font-bold text-lg">₹</span>
+                    </div>
+                    <div>
+                      <CardTitle className="text-base font-bold uppercase tracking-wide text-foreground">Payments Integration</CardTitle>
+                      <CardDescription>Run a ₹1.00 test payment via Razorpay Checkout to verify integration.</CardDescription>
+                    </div>
+                  </div>
                 </CardHeader>
                 <CardContent>
                   <RazorpayTest />
@@ -885,59 +901,62 @@ export default function SettingsPageClient({ initialDocuments, initialPreference
 
           <TabsContent value="appearance" className="space-y-6">
             {/* Theme Selection */}
-            <Card>
+            {/* Theme Selection */}
+            <Card className="bg-card border border-border/60 rounded-xl shadow-sm">
               <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Palette className="w-5 h-5" />
-                  <span>Theme</span>
-                </CardTitle>
-                <CardDescription>
-                  Choose your preferred color theme for the application
-                </CardDescription>
+                <div className="flex items-center gap-3">
+                  <div className="size-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <Palette className="w-5 h-5 text-primary" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base font-bold uppercase tracking-wide text-foreground">Theme Preference</CardTitle>
+                    <CardDescription>Choose your preferred color theme for the application</CardDescription>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {/* Light Theme */}
-                  <Card
-                    className={`cursor-pointer transition-all ${theme === 'light'
-                      ? 'ring-2 ring-primary bg-primary/5'
-                      : 'hover:ring-1 hover:ring-primary/50'
+                  <div
+                    className={`cursor-pointer transition-all duration-300 rounded-xl border ${theme === 'light'
+                      ? 'border-primary ring-1 ring-primary bg-primary/5'
+                      : 'border-border/60 hover:border-primary/50 hover:bg-accent/50'
                       }`}
                     onClick={() => setTheme('light')}
                   >
-                    <CardContent className="p-4">
+                    <div className="p-4">
                       <div className="flex items-center space-x-3 mb-3">
                         <Sun className="w-5 h-5 text-foreground" />
                         <span className="font-medium text-foreground">Light</span>
                         {theme === 'light' && <Badge variant="secondary">Active</Badge>}
                       </div>
-                      <div className="w-full h-16 bg-card border border-border rounded flex items-center justify-center">
-                        <div className="w-8 h-8 bg-muted rounded"></div>
+                      <div className="w-full h-16 bg-card border border-border rounded-lg flex items-center justify-center shadow-sm">
+                        <div className="w-8 h-8 bg-muted rounded-md"></div>
                       </div>
-                      <p className="text-xs text-muted-foreground mt-2">Clean and bright interface</p>
-                    </CardContent>
-                  </Card>
+                      <p className="text-xs text-muted-foreground mt-3 font-medium">Clean and bright interface</p>
+                    </div>
+                  </div>
 
                   {/* Dark Theme */}
-                  <Card
-                    className={`cursor-pointer transition-all ${theme === 'dark'
-                      ? 'ring-2 ring-primary bg-primary/5'
-                      : 'hover:ring-1 hover:ring-primary/50'
+                  <div
+                    className={`cursor-pointer transition-all duration-300 rounded-xl border ${theme === 'dark'
+                      ? 'border-primary ring-1 ring-primary bg-primary/5'
+                      : 'border-border/60 hover:border-primary/50 hover:bg-accent/50'
                       }`}
                     onClick={() => setTheme('dark')}
                   >
-                    <CardContent className="p-4">
+                    <div className="p-4">
                       <div className="flex items-center space-x-3 mb-3">
                         <Moon className="w-5 h-5 text-foreground" />
                         <span className="font-medium text-foreground">Dark</span>
                         {theme === 'dark' && <Badge variant="secondary">Active</Badge>}
                       </div>
-                      <div className="w-full h-16 bg-muted border border-border rounded flex items-center justify-center">
-                        <div className="w-8 h-8 bg-card rounded"></div>
+                      <div className="w-full h-16 bg-muted border border-border rounded-lg flex items-center justify-center shadow-sm">
+                        <div className="w-8 h-8 bg-card rounded-md"></div>
                       </div>
-                      <p className="text-xs text-muted-foreground mt-2">Easy on the eyes</p>
-                    </CardContent>
-                  </Card>
+                      <p className="text-xs text-muted-foreground mt-3 font-medium">Easy on the eyes</p>
+                    </div>
+                  </div>
 
 
                 </div>
@@ -945,15 +964,17 @@ export default function SettingsPageClient({ initialDocuments, initialPreference
             </Card>
 
             {/* Language & Region */}
-            <Card>
+            <Card className="bg-card border border-border/60 rounded-xl shadow-sm">
               <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Globe className="w-5 h-5" />
-                  <span>Language & Region</span>
-                </CardTitle>
-                <CardDescription>
-                  Configure your language and currency preferences
-                </CardDescription>
+                <div className="flex items-center gap-3">
+                  <div className="size-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                    <Globe className="w-5 h-5 text-blue-500" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base font-bold uppercase tracking-wide text-foreground">Localization</CardTitle>
+                    <CardDescription>Configure your language and currency preferences</CardDescription>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1093,16 +1114,16 @@ export default function SettingsPageClient({ initialDocuments, initialPreference
               <Button
                 onClick={() => handleSave('Appearance')}
                 disabled={loading}
-                className="flex items-center space-x-2 btn-touch"
+                className="h-10 px-6 text-xs font-bold uppercase tracking-widest bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg transition-all flex items-center gap-2"
               >
                 {loading ? (
                   <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <div className="size-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                     <span>Saving...</span>
                   </>
                 ) : (
                   <>
-                    <Save className="w-4 h-4" />
+                    <Save className="size-4" />
                     <span>Save Changes</span>
                   </>
                 )}
@@ -1120,15 +1141,17 @@ export default function SettingsPageClient({ initialDocuments, initialPreference
 
           <TabsContent value="notifications" className="space-y-6">
             {/* Email Notifications */}
-            <Card>
+            <Card className="bg-card border border-border/60 rounded-xl shadow-sm">
               <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Mail className="w-5 h-5" />
-                  <span>Email Notifications</span>
-                </CardTitle>
-                <CardDescription>
-                  Configure your email notification preferences
-                </CardDescription>
+                <div className="flex items-center gap-3">
+                  <div className="size-10 rounded-lg bg-orange-500/10 flex items-center justify-center">
+                    <Mail className="w-5 h-5 text-orange-500" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base font-bold uppercase tracking-wide text-foreground">Email Alerts</CardTitle>
+                    <CardDescription>Configure your email notification preferences</CardDescription>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center justify-between">
@@ -1158,15 +1181,17 @@ export default function SettingsPageClient({ initialDocuments, initialPreference
             </Card>
 
             {/* Push Notifications */}
-            <Card>
+            <Card className="bg-card border border-border/60 rounded-xl shadow-sm">
               <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Smartphone className="w-5 h-5" />
-                  <span>Push Notifications</span>
-                </CardTitle>
-                <CardDescription>
-                  Configure browser and mobile notifications
-                </CardDescription>
+                <div className="flex items-center gap-3">
+                  <div className="size-10 rounded-lg bg-indigo-500/10 flex items-center justify-center">
+                    <Smartphone className="w-5 h-5 text-indigo-500" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base font-bold uppercase tracking-wide text-foreground">Push Notifications</CardTitle>
+                    <CardDescription>Configure browser and mobile notifications</CardDescription>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -1215,16 +1240,16 @@ export default function SettingsPageClient({ initialDocuments, initialPreference
               <Button
                 onClick={() => handleSave('Notifications')}
                 disabled={loading}
-                className="flex items-center space-x-2 btn-touch"
+                className="h-10 px-6 text-xs font-bold uppercase tracking-widest bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg transition-all flex items-center gap-2"
               >
                 {loading ? (
                   <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <div className="size-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                     <span>Saving...</span>
                   </>
                 ) : (
                   <>
-                    <Save className="w-4 h-4" />
+                    <Save className="size-4" />
                     <span>Save Changes</span>
                   </>
                 )}
@@ -1234,15 +1259,17 @@ export default function SettingsPageClient({ initialDocuments, initialPreference
 
           <TabsContent value="security" className="space-y-6">
             {/* Password */}
-            <Card>
+            <Card className="bg-card border border-border/60 rounded-xl shadow-sm">
               <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Lock className="w-5 h-5" />
-                  <span>Password</span>
-                </CardTitle>
-                <CardDescription>
-                  Change your account password
-                </CardDescription>
+                <div className="flex items-center gap-3">
+                  <div className="size-10 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                    <Lock className="w-5 h-5 text-emerald-500" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base font-bold uppercase tracking-wide text-foreground">Security</CardTitle>
+                    <CardDescription>Change your account password</CardDescription>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
@@ -1265,15 +1292,17 @@ export default function SettingsPageClient({ initialDocuments, initialPreference
             </Card>
 
             {/* Privacy Settings */}
-            <Card>
+            <Card className="bg-card border border-border/60 rounded-xl shadow-sm">
               <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Shield className="w-5 h-5" />
-                  <span>Privacy</span>
-                </CardTitle>
-                <CardDescription>
-                  Control your privacy and data sharing preferences
-                </CardDescription>
+                <div className="flex items-center gap-3">
+                  <div className="size-10 rounded-lg bg-amber-500/10 flex items-center justify-center">
+                    <Shield className="w-5 h-5 text-amber-500" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base font-bold uppercase tracking-wide text-foreground">Privacy</CardTitle>
+                    <CardDescription>Control your privacy and data sharing preferences</CardDescription>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center justify-between">
@@ -1303,15 +1332,17 @@ export default function SettingsPageClient({ initialDocuments, initialPreference
             </Card>
 
             {/* Danger Zone */}
-            <Card className="border-red-200">
+            <Card className="border border-red-500/20 bg-red-500/5 rounded-xl shadow-sm">
               <CardHeader>
-                <CardTitle className="flex items-center space-x-2 text-destructive">
-                  <Trash2 className="w-5 h-5" />
-                  <span>Danger Zone</span>
-                </CardTitle>
-                <CardDescription>
-                  Irreversible and destructive actions
-                </CardDescription>
+                <div className="flex items-center gap-3">
+                  <div className="size-10 rounded-lg bg-red-500/10 flex items-center justify-center">
+                    <Trash2 className="w-5 h-5 text-red-500" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base font-bold uppercase tracking-wide text-red-500">Danger Zone</CardTitle>
+                    <CardDescription className="text-red-500/80">Irreversible and destructive actions</CardDescription>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">

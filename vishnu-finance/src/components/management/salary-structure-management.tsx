@@ -63,6 +63,7 @@ export default function SalaryStructureManagement() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingStructure, setEditingStructure] = useState<SalaryStructure | null>(null);
+  const [selectedHistoryItem, setSelectedHistoryItem] = useState<SalaryHistory | null>(null);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -811,30 +812,55 @@ export default function SalaryStructureManagement() {
               <CardContent className="p-6">
                 {salaryHistory.length > 0 ? (
                   <div className="relative border-l border-border ml-3 space-y-8 py-2">
-                    {salaryHistory.map((item, i) => (
-                      <div key={item.id} className="ml-6 relative">
-                        <span className="absolute -left-[31px] top-1 h-4 w-4 rounded-full border-2 border-background bg-primary ring-4 ring-background" />
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-1">
-                          <p className="text-sm font-medium text-muted-foreground">
-                            {new Date(item.effectiveDate).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
-                          </p>
-                          <Badge variant="outline" className="w-fit text-xs">{getChangeTypeLabel(item.changeType)}</Badge>
-                        </div>
-                        <h3 className="font-semibold text-lg">{item.jobTitle} at {item.company}</h3>
-                        <div className="mt-2 p-3 bg-muted/40 rounded-lg text-sm grid grid-cols-2 gap-4 max-w-md">
-                          <div>
-                            <p className="text-muted-foreground text-xs uppercase">Base</p>
-                            <p className="font-medium">{formatRupees(Number(item.baseSalary))}</p>
-                          </div>
-                          {item.changeReason && (
-                            <div className="col-span-2">
-                              <p className="text-muted-foreground text-xs uppercase">Reason</p>
-                              <p>{item.changeReason}</p>
+                    {salaryHistory.map((item, i) => {
+                      const prevItem = salaryHistory[i + 1]; // Previous entry (older)
+                      const allowances = typeof item.allowances === 'string' ? JSON.parse(item.allowances || '{}') : (item.allowances || {});
+                      const deductions = typeof item.deductions === 'string' ? JSON.parse(item.deductions || '{}') : (item.deductions || {});
+                      const contributions = typeof item.employerContributions === 'string' ? JSON.parse(item.employerContributions || '{}') : (item.employerContributions || {});
+                      const totalAllowances = Object.values(allowances).reduce((sum: number, val: any) => sum + (Number(val) || 0), 0);
+                      const totalDeductions = Object.values(deductions).reduce((sum: number, val: any) => sum + (Number(val) || 0), 0);
+                      const totalContributions = Object.values(contributions).reduce((sum: number, val: any) => sum + (Number(val) || 0), 0);
+                      const monthlyBase = Number(item.baseSalary) / 12;
+                      const grossMonthly = monthlyBase + totalAllowances;
+                      const netMonthly = grossMonthly - totalDeductions;
+                      const ctc = grossMonthly + totalContributions;
+
+                      return (
+                        <div
+                          key={item.id}
+                          className="ml-6 relative cursor-pointer group"
+                          onClick={() => setSelectedHistoryItem(item)}
+                        >
+                          <span className="absolute -left-[31px] top-1 h-4 w-4 rounded-full border-2 border-background bg-primary ring-4 ring-background group-hover:ring-primary/20 transition-all" />
+                          <div className="p-4 -m-4 rounded-lg hover:bg-accent/50 transition-colors">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-1">
+                              <p className="text-sm font-medium text-muted-foreground">
+                                {new Date(item.effectiveDate).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
+                              </p>
+                              <Badge variant="outline" className="w-fit text-xs">{getChangeTypeLabel(item.changeType)}</Badge>
                             </div>
-                          )}
+                            <h3 className="font-semibold text-lg group-hover:text-primary transition-colors">{item.jobTitle} at {item.company}</h3>
+                            <div className="mt-2 p-3 bg-muted/40 rounded-lg text-sm grid grid-cols-3 gap-4 max-w-lg">
+                              <div>
+                                <p className="text-muted-foreground text-xs uppercase">Base (Annual)</p>
+                                <p className="font-medium">{formatRupees(Number(item.baseSalary))}</p>
+                              </div>
+                              <div>
+                                <p className="text-muted-foreground text-xs uppercase">Take Home</p>
+                                <p className="font-medium text-green-600 dark:text-green-400">{formatRupees(netMonthly)}/mo</p>
+                              </div>
+                              <div>
+                                <p className="text-muted-foreground text-xs uppercase">CTC</p>
+                                <p className="font-medium text-primary">{formatRupees(ctc * 12)}</p>
+                              </div>
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
+                              <ChevronRight className="w-3 h-3" /> Click to view full breakdown
+                            </p>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 ) : (
                   <p className="text-center text-muted-foreground py-8">No history available yet.</p>
@@ -874,6 +900,163 @@ export default function SalaryStructureManagement() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* History Detail Sheet */}
+      <Sheet open={!!selectedHistoryItem} onOpenChange={(open) => !open && setSelectedHistoryItem(null)}>
+        <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
+          {selectedHistoryItem && (() => {
+            const item = selectedHistoryItem;
+            const allowances = typeof item.allowances === 'string' ? JSON.parse(item.allowances || '{}') : (item.allowances || {});
+            const deductions = typeof item.deductions === 'string' ? JSON.parse(item.deductions || '{}') : (item.deductions || {});
+            const contributions = typeof item.employerContributions === 'string' ? JSON.parse(item.employerContributions || '{}') : (item.employerContributions || {});
+            const totalAllowances = Object.values(allowances).reduce((sum: number, val: any) => sum + (Number(val) || 0), 0);
+            const totalDeductions = Object.values(deductions).reduce((sum: number, val: any) => sum + (Number(val) || 0), 0);
+            const totalContributions = Object.values(contributions).reduce((sum: number, val: any) => sum + (Number(val) || 0), 0);
+            const monthlyBase = Number(item.baseSalary) / 12;
+            const grossMonthly = monthlyBase + totalAllowances;
+            const netMonthly = grossMonthly - totalDeductions;
+            const ctc = grossMonthly + totalContributions;
+
+            return (
+              <>
+                <SheetHeader className="pb-4 border-b">
+                  <div className="flex items-center justify-between">
+                    <Badge variant="outline">{getChangeTypeLabel(item.changeType)}</Badge>
+                    <span className="text-sm text-muted-foreground">
+                      {new Date(item.effectiveDate).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
+                    </span>
+                  </div>
+                  <SheetTitle className="text-2xl">{item.jobTitle}</SheetTitle>
+                  <SheetDescription className="flex items-center gap-2">
+                    <Building className="w-4 h-4" /> {item.company}
+                    {item.location && <><MapPin className="w-4 h-4 ml-2" /> {item.location}</>}
+                  </SheetDescription>
+                </SheetHeader>
+
+                <div className="py-6 space-y-6">
+                  {/* Key Metrics */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <Card className="bg-gradient-to-br from-green-500/10 to-emerald-500/10 border-green-500/20">
+                      <CardContent className="p-4 text-center">
+                        <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Take Home (Monthly)</p>
+                        <p className="text-2xl font-bold text-green-600 dark:text-green-400">{formatRupees(netMonthly)}</p>
+                      </CardContent>
+                    </Card>
+                    <Card className="bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
+                      <CardContent className="p-4 text-center">
+                        <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">CTC (Annual)</p>
+                        <p className="text-2xl font-bold text-primary">{formatRupees(ctc * 12)}</p>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Base Salary */}
+                  <div className="bg-muted/40 rounded-lg p-4">
+                    <div className="flex justify-between items-center">
+                      <span className="font-medium">Base Salary (Annual)</span>
+                      <span className="font-bold">{formatRupees(Number(item.baseSalary))}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-sm text-muted-foreground mt-1">
+                      <span>Monthly</span>
+                      <span>{formatRupees(monthlyBase)}</span>
+                    </div>
+                  </div>
+
+                  {/* Allowances */}
+                  {Object.keys(allowances).length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
+                        <TrendingUp className="w-4 h-4 text-green-500" /> Allowances
+                      </h4>
+                      <div className="space-y-2 bg-green-500/5 rounded-lg p-3">
+                        {Object.entries(allowances).map(([name, amount]) => (
+                          <div key={name} className="flex justify-between text-sm">
+                            <span>{name}</span>
+                            <span className="text-green-600 dark:text-green-400">+{formatRupees(Number(amount))}</span>
+                          </div>
+                        ))}
+                        <Separator />
+                        <div className="flex justify-between font-semibold">
+                          <span>Total Allowances</span>
+                          <span className="text-green-600 dark:text-green-400">+{formatRupees(totalAllowances)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Deductions */}
+                  {Object.keys(deductions).length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
+                        <ArrowDown className="w-4 h-4 text-red-500" /> Deductions
+                      </h4>
+                      <div className="space-y-2 bg-red-500/5 rounded-lg p-3">
+                        {Object.entries(deductions).map(([name, amount]) => (
+                          <div key={name} className="flex justify-between text-sm">
+                            <span>{name}</span>
+                            <span className="text-red-500">-{formatRupees(Number(amount))}</span>
+                          </div>
+                        ))}
+                        <Separator />
+                        <div className="flex justify-between font-semibold">
+                          <span>Total Deductions</span>
+                          <span className="text-red-500">-{formatRupees(totalDeductions)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Employer Contributions */}
+                  {Object.keys(contributions).length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
+                        <Users className="w-4 h-4 text-blue-500" /> Employer Contributions
+                      </h4>
+                      <div className="space-y-2 bg-blue-500/5 rounded-lg p-3">
+                        {Object.entries(contributions).map(([name, amount]) => (
+                          <div key={name} className="flex justify-between text-sm">
+                            <span>{name}</span>
+                            <span className="text-blue-500">+{formatRupees(Number(amount))}</span>
+                          </div>
+                        ))}
+                        <Separator />
+                        <div className="flex justify-between font-semibold">
+                          <span>Total Employer Contributions</span>
+                          <span className="text-blue-500">+{formatRupees(totalContributions)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Additional Info */}
+                  <div className="grid grid-cols-2 gap-4 pt-4 border-t">
+                    {item.department && (
+                      <div>
+                        <p className="text-xs text-muted-foreground uppercase">Department</p>
+                        <p className="font-medium">{item.department}</p>
+                      </div>
+                    )}
+                    {item.grade && (
+                      <div>
+                        <p className="text-xs text-muted-foreground uppercase">Grade / Level</p>
+                        <p className="font-medium">{item.grade}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Change Reason */}
+                  {item.changeReason && (
+                    <div className="bg-muted/40 rounded-lg p-4">
+                      <p className="text-xs text-muted-foreground uppercase mb-1">Change Reason</p>
+                      <p className="font-medium">{item.changeReason}</p>
+                    </div>
+                  )}
+                </div>
+              </>
+            );
+          })()}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

@@ -231,21 +231,20 @@ export function usePlansInsights({
         ],
         highlight: highlightedGoal
           ? {
-              title: highlightedGoal.title,
-              description: `${formatCurrency(
-                highlightedGoal.currentAmount,
-              )} of ${formatCurrency(
-                highlightedGoal.targetAmount,
-              )} • ${
-                highlightedGoal.targetDate
-                  ? formatDateLabel(highlightedGoal.targetDate)
-                  : "No date set"
+            title: highlightedGoal.title,
+            description: `${formatCurrency(
+              highlightedGoal.currentAmount,
+            )} of ${formatCurrency(
+              highlightedGoal.targetAmount,
+            )} • ${highlightedGoal.targetDate
+                ? formatDateLabel(highlightedGoal.targetDate)
+                : "No date set"
               }`,
-            }
+          }
           : {
-              title: "No active goals yet",
-              description: "Create a goal to start tracking your savings target.",
-            },
+            title: "No active goals yet",
+            description: "Create a goal to start tracking your savings target.",
+          },
       },
       {
         value: "deadlines",
@@ -266,13 +265,13 @@ export function usePlansInsights({
         ],
         highlight: nextDeadline
           ? {
-              title: nextDeadline.title,
-              description: buildDeadlineSecondary(nextDeadline),
-            }
+            title: nextDeadline.title,
+            description: buildDeadlineSecondary(nextDeadline),
+          }
           : {
-              title: "All clear",
-              description: "Add a reminder so you never miss an important payment.",
-            },
+            title: "All clear",
+            description: "Add a reminder so you never miss an important payment.",
+          },
       },
       {
         value: "wishlist",
@@ -295,15 +294,15 @@ export function usePlansInsights({
         ],
         highlight: nextWishlist
           ? {
-              title: nextWishlist.title,
-              description: `${formatCurrency(
-                nextWishlist.estimatedCost,
-              )} • ${formatPriorityLabel(nextWishlist.priority)} priority`,
-            }
+            title: nextWishlist.title,
+            description: `${formatCurrency(
+              nextWishlist.estimatedCost,
+            )} • ${formatPriorityLabel(nextWishlist.priority)} priority`,
+          }
           : {
-              title: "Nothing queued",
-              description: "Add something you are planning to invest in next.",
-            },
+            title: "Nothing queued",
+            description: "Add something you are planning to invest in next.",
+          },
       },
     ],
     [
@@ -346,7 +345,7 @@ export function formatCurrency(value?: number | null) {
   }).format(amount);
 }
 
-export function formatDateLabel(value?: string | null) {
+export function formatDateLabel(value?: string | Date | null) {
   const parsed = toComparableDate(value);
   if (!parsed) {
     return "No date set";
@@ -369,8 +368,8 @@ export function formatPriorityLabel(priority?: WishlistItem["priority"]) {
 export function buildDeadlineSecondary(deadline: Deadline) {
   const amount =
     typeof deadline.amount === "number" &&
-    Number.isFinite(deadline.amount) &&
-    deadline.amount > 0
+      Number.isFinite(deadline.amount) &&
+      deadline.amount > 0
       ? `${formatCurrency(deadline.amount)} • `
       : "";
   const dueLabel = formatDateLabel(deadline.dueDate);
@@ -393,7 +392,7 @@ function priorityRank(priority?: WishlistItem["priority"]) {
   }
 }
 
-function toComparableDate(value?: string | null) {
+function toComparableDate(value?: string | Date | null) {
   if (!value) {
     return null;
   }
@@ -404,7 +403,7 @@ function toComparableDate(value?: string | null) {
   return parsed;
 }
 
-function isDatePast(value?: string | null) {
+function isDatePast(value?: string | Date | null) {
   const parsed = toComparableDate(value);
   if (!parsed) {
     return false;

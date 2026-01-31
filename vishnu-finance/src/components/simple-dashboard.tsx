@@ -10,7 +10,12 @@ import {
   ShoppingBag,
   Plus,
   Sun,
-  Moon
+  Moon,
+  Wallet,
+  CalendarClock,
+  Star,
+  Target,
+  Briefcase
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -32,7 +37,7 @@ export interface SimpleDashboardData {
   totalDebits?: number;
   netSavings: number;
   savingsRate: number;
-  totalNetWorth: number; // Added field
+  totalNetWorth: number;
   upcomingDeadlines: number;
   activeGoals: number;
   recentTransactions: Array<{
@@ -58,6 +63,30 @@ export interface SimpleDashboardData {
     name: string;
     amount: number;
   }>;
+  // NEW: Additional KPI data
+  salaryInfo?: {
+    takeHome: number;
+    ctc: number;
+    jobTitle: string;
+    company: string;
+  } | null;
+  plansInfo?: {
+    activePlans: number;
+    totalCommitted: number;
+    topPlan: string | null;
+    items?: Array<{ name: string; targetAmount: number; priority?: number }>;
+  };
+  wishlistInfo?: {
+    totalItems: number;
+    totalCost: number;
+    topItem: string | null;
+    items?: Array<{ name: string; estimatedPrice: number; priority?: number }>;
+  };
+  deadlinesInfo?: {
+    upcoming: number;
+    nextDeadline: { title: string; dueDate: string } | null;
+    items?: Array<{ title: string; dueDate: string }>;
+  };
 }
 
 // Offline cache helpers (omit implementation for brevity as it is unchanged)
@@ -227,6 +256,173 @@ export default function SimpleDashboard({
           <div className="flex gap-4 relative z-10">
             <button className="border border-border text-foreground px-6 py-2.5 rounded-lg text-sm font-bold hover:bg-foreground/5 transition-all">Export Report</button>
           </div>
+        </section>
+
+        {/* KPI Cards Grid */}
+        <section className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          {/* Salary Card */}
+          <Link href="/salary" className="group">
+            <div className="bg-card border border-border rounded-xl p-4 hover:border-primary/50 hover:bg-accent/30 transition-all duration-300 h-full">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="size-8 rounded-lg bg-green-500/10 flex items-center justify-center">
+                  <Wallet className="w-4 h-4 text-green-500" />
+                </div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Salary</span>
+              </div>
+              {dashboardData.salaryInfo ? (
+                <>
+                  <p className="text-xl font-bold text-green-600 dark:text-green-400 tabular-nums">
+                    {formatRupees(dashboardData.salaryInfo.takeHome)}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    CTC: {formatRupees(dashboardData.salaryInfo.ctc)}
+                  </p>
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground">No salary set</p>
+              )}
+            </div>
+          </Link>
+
+          {/* Transactions Card */}
+          <Link href="/transactions" className="group">
+            <div className="bg-card border border-border rounded-xl p-4 hover:border-primary/50 hover:bg-accent/30 transition-all duration-300 h-full">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="size-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                  <ArrowDown className="w-4 h-4 text-blue-500" />
+                </div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Transactions</span>
+              </div>
+              <p className="text-xl font-bold tabular-nums">
+                {formatRupees(dashboardData.totalDebits || dashboardData.totalExpenses)}
+              </p>
+              <p className="text-[10px] text-muted-foreground mt-1">
+                In: {formatRupees(dashboardData.totalCredits || dashboardData.totalIncome)}
+              </p>
+            </div>
+          </Link>
+
+          {/* Savings Rate Card */}
+          <div className="bg-card border border-border rounded-xl p-4 h-full">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="size-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                <TrendingUp className="w-4 h-4 text-emerald-500" />
+              </div>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Savings</span>
+            </div>
+            <p className={`text-xl font-bold tabular-nums ${dashboardData.savingsRate >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+              {dashboardData.savingsRate.toFixed(1)}%
+            </p>
+            <p className="text-[10px] text-muted-foreground mt-1">
+              {formatRupees(dashboardData.netSavings)} saved
+            </p>
+          </div>
+
+          {/* Plans Card - Enhanced */}
+          <Link href="/plans" className="group">
+            <div className="bg-card border border-border rounded-xl p-4 hover:border-primary/50 hover:bg-accent/30 transition-all duration-300 h-full">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="size-8 rounded-lg bg-purple-500/10 flex items-center justify-center">
+                    <Target className="w-4 h-4 text-purple-500" />
+                  </div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Plans</span>
+                </div>
+                <span className="text-lg font-bold text-purple-500">{dashboardData.plansInfo?.activePlans || 0}</span>
+              </div>
+              {dashboardData.plansInfo?.items && dashboardData.plansInfo.items.length > 0 ? (
+                (() => {
+                  const topPlan = dashboardData.plansInfo.items[0];
+                  const progress = topPlan.targetAmount > 0
+                    ? Math.min(100, Math.round((topPlan.currentAmount / topPlan.targetAmount) * 100))
+                    : 0;
+                  const otherCount = (dashboardData.plansInfo.activePlans || 0) - 1;
+
+                  return (
+                    <div className="space-y-3 mt-1">
+                      <div className="flex justify-between items-end">
+                        <div>
+                          <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-0.5">Immediate Goal</div>
+                          <div className="font-bold text-sm truncate max-w-[120px]">{topPlan.name}</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-xs font-bold text-purple-500">{progress}%</div>
+                        </div>
+                      </div>
+                      <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+                        <div className="h-full bg-purple-500 rounded-full transition-all" style={{ width: `${progress}%` }} />
+                      </div>
+                      <div className="flex justify-between text-[10px] text-muted-foreground">
+                        <span>{formatRupees(topPlan.currentAmount)}</span>
+                        <span>{formatRupees(topPlan.targetAmount)}</span>
+                      </div>
+                      {otherCount > 0 && (
+                        <p className="text-[10px] text-muted-foreground text-right pt-1 border-t border-border/50">
+                          +{otherCount} other plan{otherCount !== 1 ? 's' : ''} active
+                        </p>
+                      )}
+                    </div>
+                  );
+                })()
+              ) : (
+                <p className="text-[11px] text-muted-foreground">No active plans</p>
+              )}
+            </div>
+          </Link>
+
+          {/* Deadlines Card - Enhanced */}
+          <Link href="/deadlines" className="group">
+            <div className="bg-card border border-border rounded-xl p-4 hover:border-primary/50 hover:bg-accent/30 transition-all duration-300 h-full">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="size-8 rounded-lg bg-orange-500/10 flex items-center justify-center">
+                    <CalendarClock className="w-4 h-4 text-orange-500" />
+                  </div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Deadlines</span>
+                </div>
+                <span className="text-lg font-bold text-orange-500">{dashboardData.deadlinesInfo?.upcoming || dashboardData.upcomingDeadlines}</span>
+              </div>
+              {dashboardData.deadlinesInfo?.items && dashboardData.deadlinesInfo.items.length > 0 ? (
+                <ul className="space-y-1.5 text-[11px]">
+                  {dashboardData.deadlinesInfo.items.slice(0, 3).map((deadline, i) => (
+                    <li key={i} className="flex justify-between items-center">
+                      <span className="truncate max-w-[90px] text-foreground">{deadline.title}</span>
+                      <span className="text-muted-foreground tabular-nums">{new Date(deadline.dueDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-[11px] text-muted-foreground">No upcoming</p>
+              )}
+            </div>
+          </Link>
+
+          {/* Wishlist Card - Enhanced */}
+          <Link href="/wishlist" className="group">
+            <div className="bg-card border border-border rounded-xl p-4 hover:border-primary/50 hover:bg-accent/30 transition-all duration-300 h-full">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="size-8 rounded-lg bg-yellow-500/10 flex items-center justify-center">
+                    <Star className="w-4 h-4 text-yellow-500" />
+                  </div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Wishlist</span>
+                </div>
+                <span className="text-lg font-bold text-yellow-500">{dashboardData.wishlistInfo?.totalItems || 0}</span>
+              </div>
+              {dashboardData.wishlistInfo?.items && dashboardData.wishlistInfo.items.length > 0 ? (
+                <ul className="space-y-1.5 text-[11px]">
+                  {dashboardData.wishlistInfo.items.slice(0, 3).map((item, i) => (
+                    <li key={i} className="flex justify-between items-center">
+                      <span className="truncate max-w-[90px] text-foreground">{item.name}</span>
+                      <span className="text-muted-foreground tabular-nums">{formatRupees(item.estimatedPrice)}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-[11px] text-muted-foreground">No items</p>
+              )}
+            </div>
+          </Link>
         </section>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">

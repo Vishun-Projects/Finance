@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
     // Fetch salary history from database using type assertion
     const salaryHistory = await (prisma as any).salaryHistory.findMany({
       where: { userId },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { effectiveDate: 'desc' },
       include: {
         salaryStructure: true
       }

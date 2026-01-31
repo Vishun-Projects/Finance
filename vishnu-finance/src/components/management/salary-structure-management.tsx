@@ -79,7 +79,7 @@ export default function SalaryStructureManagement() {
     department: '',
     grade: '',
     notes: '',
-    changeType: 'OTHER' as SalaryHistory['changeType'],
+    changeType: 'NEW_JOB' as SalaryHistory['changeType'],
     changeReason: ''
   });
 
@@ -577,6 +577,67 @@ export default function SalaryStructureManagement() {
                   </div>
                 </div>
 
+                {/* Grade & Department */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Grade / Level</label>
+                    <input
+                      name="grade"
+                      value={formData.grade}
+                      onChange={handleInputChange}
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      placeholder="e.g. L4, Senior"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Department</label>
+                    <input
+                      name="department"
+                      value={formData.department}
+                      onChange={handleInputChange}
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      placeholder="e.g. Engineering"
+                    />
+                  </div>
+                </div>
+
+                {/* Change Type & Reason (for timeline) */}
+                <div className="space-y-2 p-4 border rounded-lg bg-muted/30">
+                  <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
+                    <History className="h-4 w-4 text-purple-500" /> Change Details (for Timeline)
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Change Type</label>
+                      <select
+                        name="changeType"
+                        value={formData.changeType}
+                        onChange={handleInputChange}
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      >
+                        <option value="NEW_JOB">New Job</option>
+                        <option value="PROMOTION">Promotion</option>
+                        <option value="SALARY_REVISION">Salary Revision</option>
+                        <option value="TRANSFER">Transfer</option>
+                        <option value="COMPANY_CHANGE">Company Change</option>
+                        <option value="LOCATION_CHANGE">Location Change</option>
+                        <option value="DEPARTMENT_CHANGE">Department Change</option>
+                        <option value="OTHER">Other</option>
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Change Reason</label>
+                      <input
+                        name="changeReason"
+                        value={formData.changeReason}
+                        onChange={handleInputChange}
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                        placeholder="e.g. Annual appraisal"
+                      />
+                    </div>
+                  </div>
+                </div>
+
                 <Button onClick={handleSubmit} className="w-full" size="lg">Save Structure</Button>
               </div>
             </div>
@@ -757,7 +818,7 @@ export default function SalaryStructureManagement() {
                           <p className="text-sm font-medium text-muted-foreground">
                             {new Date(item.effectiveDate).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
                           </p>
-                          <Badge variant="outline" className="w-fit text-xs">{item.changeType}</Badge>
+                          <Badge variant="outline" className="w-fit text-xs">{getChangeTypeLabel(item.changeType)}</Badge>
                         </div>
                         <h3 className="font-semibold text-lg">{item.jobTitle} at {item.company}</h3>
                         <div className="mt-2 p-3 bg-muted/40 rounded-lg text-sm grid grid-cols-2 gap-4 max-w-md">

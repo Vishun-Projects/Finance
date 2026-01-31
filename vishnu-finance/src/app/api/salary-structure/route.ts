@@ -85,6 +85,14 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('➕ SALARY STRUCTURE POST - Creating salary structure in database...');
+
+    // First, deactivate all existing salary structures for this user
+    await (prisma as any).salaryStructure.updateMany({
+      where: { userId: userId, isActive: true },
+      data: { isActive: false }
+    });
+    console.log('➕ SALARY STRUCTURE POST - Deactivated previous structures');
+
     // Create new salary structure in database using type assertion
     const newSalaryStructure = await (prisma as any).salaryStructure.create({
       data: {
@@ -108,31 +116,29 @@ export async function POST(request: NextRequest) {
 
     console.log('✅ SALARY STRUCTURE POST - Successfully created salary structure:', JSON.stringify(newSalaryStructure, null, 2));
 
-    // Create salary history entry if change type and reason provided
-    if (changeType && changeReason) {
-      console.log('➕ SALARY STRUCTURE POST - Creating salary history entry...');
-      await (prisma as any).salaryHistory.create({
-        data: {
-          salaryStructureId: newSalaryStructure.id,
-          jobTitle: newSalaryStructure.jobTitle,
-          company: newSalaryStructure.company,
-          baseSalary: newSalaryStructure.baseSalary,
-          allowances: newSalaryStructure.allowances,
-          deductions: newSalaryStructure.deductions,
-          employerContributions: newSalaryStructure.employerContributions,
-          effectiveDate: newSalaryStructure.effectiveDate,
-          endDate: newSalaryStructure.endDate,
-          currency: newSalaryStructure.currency,
-          location: newSalaryStructure.location,
-          department: newSalaryStructure.department,
-          grade: newSalaryStructure.grade,
-          changeType: changeType,
-          changeReason: changeReason,
-          userId: userId
-        }
-      });
-      console.log('✅ SALARY STRUCTURE POST - Successfully created salary history entry');
-    }
+    // Always create salary history entry for timeline tracking
+    console.log('➕ SALARY STRUCTURE POST - Creating salary history entry...');
+    await (prisma as any).salaryHistory.create({
+      data: {
+        salaryStructureId: newSalaryStructure.id,
+        jobTitle: newSalaryStructure.jobTitle,
+        company: newSalaryStructure.company,
+        baseSalary: newSalaryStructure.baseSalary,
+        allowances: newSalaryStructure.allowances,
+        deductions: newSalaryStructure.deductions,
+        employerContributions: newSalaryStructure.employerContributions,
+        effectiveDate: newSalaryStructure.effectiveDate,
+        endDate: newSalaryStructure.endDate,
+        currency: newSalaryStructure.currency,
+        location: newSalaryStructure.location,
+        department: newSalaryStructure.department,
+        grade: newSalaryStructure.grade,
+        changeType: changeType || 'NEW_JOB',
+        changeReason: changeReason || 'Initial setup',
+        userId: userId
+      }
+    });
+    console.log('✅ SALARY STRUCTURE POST - Successfully created salary history entry');
 
     return NextResponse.json(newSalaryStructure);
   } catch (error) {
@@ -146,7 +152,8 @@ export async function PUT(request: NextRequest) {
   console.log('✏️ SALARY STRUCTURE PUT - Starting request');
   try {
     const body = await request.json();
-    const { id, ...updateData } = body;
+    // Extract changeType and changeReason separately - they go to SalaryHistory, not SalaryStructure
+    const { id, changeType, changeReason, userId, ...updateData } = body;
     console.log('✏️ SALARY STRUCTURE PUT - Update data:', JSON.stringify({ id, ...updateData }, null, 2));
 
     if (!id) {
@@ -159,18 +166,58 @@ export async function PUT(request: NextRequest) {
     const updatedSalaryStructure = await (prisma as any).salaryStructure.update({
       where: { id },
       data: {
-        ...updateData,
+        jobTitle: updateData.jobTitle,
+        company: updateData.company,
         baseSalary: updateData.baseSalary ? parseFloat(updateData.baseSalary) : undefined,
         allowances: updateData.allowances ? JSON.stringify(updateData.allowances) : undefined,
         deductions: updateData.deductions ? JSON.stringify(updateData.deductions) : undefined,
         employerContributions: updateData.employerContributions ? JSON.stringify(updateData.employerContributions) : undefined,
         effectiveDate: updateData.effectiveDate ? new Date(updateData.effectiveDate) : undefined,
         endDate: updateData.endDate ? new Date(updateData.endDate) : undefined,
+        currency: updateData.currency,
+        location: updateData.location || null,
+        department: updateData.department || null,
+        grade: updateData.grade || null,
+        notes: updateData.notes || null,
         updatedAt: new Date()
       }
     });
 
     console.log('✅ SALARY STRUCTURE PUT - Successfully updated salary structure:', JSON.stringify(updatedSalaryStructure, null, 2));
+
+    // Update the existing history entry for this salary structure instead of creating duplicates
+    if (userId) {
+      console.log('✏️ SALARY STRUCTURE PUT - Updating existing salary history entry...');
+      // Find the most recent history entry for this structure and update it
+      const existingHistory = await (prisma as any).salaryHistory.findFirst({
+        where: { salaryStructureId: id },
+        orderBy: { createdAt: 'desc' }
+      });
+
+      if (existingHistory) {
+        await (prisma as any).salaryHistory.update({
+          where: { id: existingHistory.id },
+          data: {
+            jobTitle: updatedSalaryStructure.jobTitle,
+            company: updatedSalaryStructure.company,
+            baseSalary: updatedSalaryStructure.baseSalary,
+            allowances: updatedSalaryStructure.allowances,
+            deductions: updatedSalaryStructure.deductions,
+            employerContributions: updatedSalaryStructure.employerContributions,
+            effectiveDate: updatedSalaryStructure.effectiveDate,
+            endDate: updatedSalaryStructure.endDate,
+            currency: updatedSalaryStructure.currency,
+            location: updatedSalaryStructure.location,
+            department: updatedSalaryStructure.department,
+            grade: updatedSalaryStructure.grade,
+            changeType: changeType || existingHistory.changeType,
+            changeReason: changeReason || existingHistory.changeReason
+          }
+        });
+        console.log('✅ SALARY STRUCTURE PUT - Successfully updated salary history entry');
+      }
+    }
+
     return NextResponse.json(updatedSalaryStructure);
   } catch (error) {
     console.error('❌ SALARY STRUCTURE PUT - Error:', error);

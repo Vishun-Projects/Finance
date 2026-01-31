@@ -553,6 +553,7 @@ enum WishlistPriority {
 }
 
 enum SalaryChangeType {
+  NEW_JOB
   PROMOTION
   TRANSFER
   COMPANY_CHANGE

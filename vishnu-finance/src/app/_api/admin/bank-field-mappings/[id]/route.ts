@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import type { Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import { AuthService } from '@/lib/auth';
 import { writeAuditLog, extractRequestMeta } from '@/lib/audit';
@@ -26,20 +26,16 @@ type MappingUpdatePayload = Partial<{
   description: string | null;
   isActive: boolean;
   version: number;
-  mappingConfig: Record<string, unknown> | null;
+  mappingConfig: Prisma.InputJsonObject | null;
 }>;
 
 const parseMappingConfig = (
-  value: string | null | undefined,
-): Record<string, unknown> | null => {
-  if (!value) {
-    return null;
+  value: unknown,
+): Prisma.InputJsonObject | null => {
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    return value as Prisma.InputJsonObject;
   }
-  try {
-    return JSON.parse(value) as Record<string, unknown>;
-  } catch {
-    return null;
-  }
+  return null;
 };
 
 const requireSuperuser = async (
@@ -76,10 +72,10 @@ const transformMapping = (mapping: MappingWithAuthor) => ({
   updatedAt: mapping.updatedAt,
   createdBy: mapping.createdBy
     ? {
-        id: mapping.createdBy.id,
-        email: mapping.createdBy.email,
-        name: mapping.createdBy.name,
-      }
+      id: mapping.createdBy.id,
+      email: mapping.createdBy.email,
+      name: mapping.createdBy.name,
+    }
     : null,
 });
 
@@ -113,8 +109,8 @@ export async function PATCH(
           mappingConfig === undefined
             ? undefined
             : mappingConfig === null
-              ? null
-              : JSON.stringify(mappingConfig),
+              ? Prisma.DbNull
+              : mappingConfig,
       },
       include: {
         createdBy: {
@@ -141,7 +137,7 @@ export async function PATCH(
     });
 
     return NextResponse.json({
-      mapping: transformMapping(updated),
+      mapping: transformMapping(updated as any),
     });
   } catch (error) {
     console.error('Failed to update bank field mapping:', error);

@@ -112,10 +112,10 @@ export class DashboardService {
             (async () => {
                 try {
                     const deadlines = await prisma.deadline.findMany({
-                        where: { userId, isCompleted: false, dueDate: { gt: new Date() } },
+                        where: { userId, isCompleted: false },
                         orderBy: { dueDate: 'asc' },
                         select: { title: true, dueDate: true },
-                        take: 5
+                        take: 20
                     });
                     return {
                         count: deadlines.length,
@@ -167,25 +167,25 @@ export class DashboardService {
                 } catch { return null; }
             })(),
 
-            // 8. Active Plans with details
+            // 8. Active Plans (Goals) with details
             (async () => {
                 try {
-                    const plans = await (prisma as any).plan.findMany({
+                    const goals = await prisma.goal.findMany({
                         where: { userId, isActive: true },
-                        select: { name: true, targetAmount: true, currentAmount: true, priority: true },
+                        select: { title: true, targetAmount: true, currentAmount: true, priority: true },
                         orderBy: { priority: 'asc' },
-                        take: 5
+                        take: 20
                     });
-                    const totalCommitted = plans.reduce((sum: number, p: any) => sum + (Number(p.targetAmount) || 0), 0);
+                    const totalCommitted = goals.reduce((sum: number, p: any) => sum + (Number(p.targetAmount) || 0), 0);
                     return {
-                        activePlans: plans.length,
+                        activePlans: goals.length,
                         totalCommitted,
-                        topPlan: plans[0]?.name || null,
-                        items: plans.map((p: any) => ({
-                            name: p.name,
+                        topPlan: goals[0]?.title || null,
+                        items: goals.map((p: any) => ({
+                            name: p.title,
                             targetAmount: Number(p.targetAmount) || 0,
                             currentAmount: Number(p.currentAmount) || 0,
-                            priority: p.priority
+                            priority: p.priority === 'CRITICAL' ? 1 : p.priority === 'HIGH' ? 2 : p.priority === 'MEDIUM' ? 3 : 4
                         }))
                     };
                 } catch { return { activePlans: 0, totalCommitted: 0, topPlan: null, items: [] }; }
@@ -196,16 +196,20 @@ export class DashboardService {
                 try {
                     const items = await (prisma as any).wishlistItem.findMany({
                         where: { userId },
-                        select: { name: true, estimatedPrice: true, priority: true },
+                        select: { title: true, estimatedCost: true, priority: true },
                         orderBy: { priority: 'asc' },
-                        take: 5
+                        take: 20
                     });
-                    const totalCost = items.reduce((sum: number, i: any) => sum + (Number(i.estimatedPrice) || 0), 0);
+                    const totalCost = items.reduce((sum: number, i: any) => sum + (Number(i.estimatedCost) || 0), 0);
                     return {
                         totalItems: items.length,
                         totalCost,
-                        topItem: items[0]?.name || null,
-                        items: items.map((i: any) => ({ name: i.name, estimatedPrice: Number(i.estimatedPrice) || 0, priority: i.priority }))
+                        topItem: items[0]?.title || null,
+                        items: items.map((i: any) => ({
+                            name: i.title,
+                            estimatedPrice: Number(i.estimatedCost) || 0,
+                            priority: i.priority === 'HIGH' ? 1 : i.priority === 'MEDIUM' ? 2 : 3
+                        }))
                     };
                 } catch { return { totalItems: 0, totalCost: 0, topItem: null, items: [] }; }
             })()

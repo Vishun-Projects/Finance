@@ -313,10 +313,29 @@ export default function SalaryStructureManagement() {
       const response = await fetch(`/api/salary-structure?id=${id}`, { method: 'DELETE' });
       if (response.ok) {
         fetchSalaryStructures();
-        fetchSalaryHistory(); // Update history as well if needed
+        fetchSalaryHistory();
       }
     } catch (error) {
       console.error('Error deleting salary structure:', error);
+    }
+  };
+
+  const handleSetActive = async (id: string) => {
+    if (!user) return;
+    try {
+      const response = await fetch(`/api/salary-structure`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, userId: user.id, action: 'ACTIVATE' })
+      });
+
+      if (response.ok) {
+        fetchSalaryStructures();
+      } else {
+        console.error('Failed to set active structure');
+      }
+    } catch (error) {
+      console.error('Error setting active structure:', error);
     }
   };
 
@@ -886,6 +905,17 @@ export default function SalaryStructureManagement() {
                       <p className="text-xs text-muted-foreground">Annual Base</p>
                     </div>
                     <div className="flex gap-2">
+                      {!structure.isActive && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-green-600 border-green-200 hover:bg-green-50 dark:hover:bg-green-900/20"
+                          onClick={() => handleSetActive(structure.id)}
+                        >
+                          <CheckCircle className="w-4 h-4 mr-2" />
+                          Make Active
+                        </Button>
+                      )}
                       <Button variant="ghost" size="icon" onClick={() => handleEdit(structure)}>
                         <Edit className="w-4 h-4 text-muted-foreground hover:text-foreground" />
                       </Button>

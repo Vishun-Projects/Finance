@@ -379,58 +379,38 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
     });
   }, []);
 
-  // Handle period changes to update date range (synced with Expense Management)
-  useEffect(() => {
-    if (!period || period === 'custom') return;
+  /**
+   * Period Synchronization: 
+   * Instead of a useEffect that can cause infinite loops, we define a callback 
+   * to handle period changes and update the URL explicitly.
+   */
+  const handlePeriodChange = useCallback((p: 'daily' | 'weekly' | 'monthly' | 'custom') => {
+    setPeriod(p);
+    if (!p || p === 'custom') return;
 
     // Calculate target dates based on period
     const end = new Date();
     let start = new Date();
 
-    if (period === 'daily') {
+    if (p === 'daily') {
       start = startOfMonth(end);
-    } else if (period === 'weekly') {
+    } else if (p === 'weekly') {
       start = subDays(end, 7);
-    } else if (period === 'monthly') {
-      start = startOfMonth(subDays(end, 30));
+    } else if (p === 'monthly') {
+      start = startOfMonth(end); // Current month start
     }
 
     const newStart = format(start, 'yyyy-MM-dd');
     const newEnd = format(end, 'yyyy-MM-dd');
 
-    // Only update if we are NOT already in this range
-    // This prevents the effect from firing when we navigate to "Overall" (which changes startDate/endDate)
-    // and resetting us back to "Monthly" because period is still 'monthly'.
-    if (newStart !== startDate || newEnd !== endDate) {
-      // Safe guard: Only update if the current range doesn't match 'all' or other specific quick ranges
-      // If the user selected 'all', startDate will be 2020...
-      // We shouldn't overwrite it unless the user *explicitly* clicked a Period toggle (which updates 'period').
-      // However, we don't know if the user clicked or it's default.
-      // The issue is 'period' state is 'monthly' by default.
+    updateURLParams({
+      range: 'custom',
+      startDate: newStart,
+      endDate: newEnd,
+      page: '1'
+    });
+  }, [updateURLParams]);
 
-      // Fix: We only want this to run when 'period' CHANGES. 
-      // But React runs it on mount too.
-      // We can check if quickRange is 'custom' or 'all', in which case we ignore 'period' default.
-      if (quickRange !== 'custom' && quickRange !== 'month' && quickRange !== 'lastMonth') {
-        // If we are in 'all' mode, ignore the 'monthly' default period
-        return;
-      }
-
-      // Actually, the best fix is to simply NOT update if the period is just the default and hasn't changed.
-      // But we can't easily track "changed".
-
-      // Let's rely on the fact that QuickRange chips update 'quickRange'.
-      // If quickRange is 'all', 'year', 'quarter', we should ignore 'period=monthly'.
-      const isCompatibleRange = quickRange === 'month' || quickRange === 'custom';
-      if (period === 'monthly' && !isCompatibleRange) return;
-
-      updateURLParams({
-        range: 'custom',
-        startDate: newStart,
-        endDate: newEnd,
-      });
-    }
-  }, [period]); // REMOVED startDate, endDate, updateURLParams, quickRange from dependency to avoid loop/conflict
 
   // Apply quick range
   const applyQuickRange = useCallback((range: QuickRange) => {
@@ -638,12 +618,54 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
     });
   }, [transactions, currentSearchTerm, financialCategory, selectedCategoryId, amountPreset, showDeleted]);
 
-  // Calculate totals - ALWAYS calculate from filtered transactions for dynamic updates
-  // Only use API totals as a fallback if no transactions are loaded yet (rare)
-  const totals = useMemo(() => {
-    // If we have filtered transactions, calculate locally to reflect filters instantly
-    return calculateTotalsByCategory(filteredTransactions);
+  // Performance Optimization: Combine totals and analytics calculations into a single pass
+  const analytics = useMemo(() => {
+    let income = 0;
+    let expense = 0;
+    const byCategory: Record<string, { income: number, expense: number }> = {};
+    const catMap = new Map<string, number>();
+    const progressMap = new Map<string, { amount: number, count: number }>();
+
+    filteredTransactions.forEach(t => {
+      const amount = t.creditAmount > 0 ? t.creditAmount : (t.debitAmount || 0);
+      const isInc = t.financialCategory === 'INCOME';
+      const catName = (t.category as any)?.name || 'Uncategorized';
+
+      // Totals
+      if (isInc) income += amount;
+      else expense += amount;
+
+      // By Category (for standard totals)
+      if (!byCategory[catName]) byCategory[catName] = { income: 0, expense: 0 };
+      if (isInc) byCategory[catName].income += amount;
+      else byCategory[catName].expense += amount;
+
+      // Sidebar Charts (specifically for Expenses)
+      if (!isInc) {
+        catMap.set(catName, (catMap.get(catName) || 0) + amount);
+        const curr = progressMap.get(catName) || { amount: 0, count: 0 };
+        progressMap.set(catName, { amount: curr.amount + amount, count: curr.count + 1 });
+      }
+    });
+
+    const barChartData = Array.from(catMap.entries())
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 5);
+
+    const topCategories = Array.from(progressMap.entries())
+      .sort((a, b) => b[1].amount - a[1].amount)
+      .slice(0, 5);
+
+    return {
+      totals: { income, expense, byCategory },
+      sidebar: { barChartData, topCategories }
+    };
   }, [filteredTransactions]);
+
+  const totals = analytics.totals;
+  const sidebarAnalytics = analytics.sidebar;
+
 
   // Client-side pagination slice
   const visibleTransactions = useMemo(() => {
@@ -1349,34 +1371,35 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
     const file = fileToParse || selectedFile;
     if (!file || !user?.id) return;
 
-    setIsParsingFile(true);
-    setParseProgress(5);
-    setFileError(null);
-
-
+    let parseTimer: NodeJS.Timeout | null = null;
     try {
-      // Simulate progressive parse progress up to 90%
-      const parseTimer = setInterval(() => {
-        setParseProgress((p) => (p < 90 ? Math.min(90, p + 5) : p));
-      }, 400);
-      const lowerName = file.name.toLowerCase();
+      setIsParsingFile(true);
+      setParseProgress(10);
+      setFileError(null);
 
-      const fd = new FormData();
-      fd.append('pdf', file);
-      // Simple bank auto-detect from filename
-      const bank = ['sbi', 'hdfc', 'icici', 'axis', 'bob', 'kotak', 'yes'].find(b => lowerName.includes(b)) || '';
-      const bankToSend = (selectedBank || bank);
-      if (bankToSend) fd.append('bank', bankToSend);
+      // Simulate parsing progress
+      parseTimer = setInterval(() => {
+        setParseProgress((p) => (p < 90 ? p + 2 : p));
+      }, 300);
 
-      const res = await fetch('/api/parse-pdf', { method: 'POST', body: fd });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || 'Failed to parse PDF');
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('userId', user.id);
+      if (selectedBank) formData.append('bankCode', selectedBank);
+
+      const response = await fetch('/api/parse-statement', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to parse file');
       }
-      const data = await res.json();
 
-
+      const data = await response.json();
       const transactionsToSet = data.transactions || [];
+
       setParsedTransactions(transactionsToSet);
       setStatementMetadata(data.metadata || null);
       setTempFiles(data.tempFiles || []);
@@ -1386,11 +1409,11 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
 
       success('PDF Parsed', `Extracted ${data.count || transactionsToSet.length} transactions`);
       setParseProgress(100);
-      clearInterval(parseTimer);
     } catch (error) {
       console.error('Error parsing file:', error);
       setFileError(error instanceof Error ? error.message : 'Failed to parse file');
     } finally {
+      if (parseTimer) clearInterval(parseTimer);
       setIsParsingFile(false);
       setTimeout(() => setParseProgress(0), 1000);
     }
@@ -1485,142 +1508,143 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
     setImportProgress(5);
     setFileError(null);
 
-    try {
-      // Normalize to format expected by import-bank-statement API
-      const normalized = parsedTransactions
-        .map((t) => {
-          try {
-            // Extract only primitive values to avoid circular references
-            const debitAmount = typeof t.debit === 'number' ? t.debit : parseFloat(String(t.debit || '0'));
-            const creditAmount = typeof t.credit === 'number' ? t.credit : parseFloat(String(t.credit || '0'));
-            const description = String(t.description || t.narration || '').trim();
 
-            // Validate that we have either debit or credit, and a description
-            if ((debitAmount === 0 && creditAmount === 0) || !description) {
-              return null;
-            }
+    // Normalize to format expected by import-bank-statement API
+    const normalized = parsedTransactions
+      .map((t) => {
+        try {
+          // Extract only primitive values to avoid circular references
+          const debitAmount = typeof t.debit === 'number' ? t.debit : parseFloat(String(t.debit || '0'));
+          const creditAmount = typeof t.credit === 'number' ? t.credit : parseFloat(String(t.credit || '0'));
+          const description = String(t.description || t.narration || '').trim();
 
-            // Use date_iso if available (preferred), otherwise fall back to date
-            let dateStr = '';
-            let dateIsoStr = '';
+          // Validate that we have either debit or credit, and a description
+          if ((debitAmount === 0 && creditAmount === 0) || !description) {
+            return null;
+          }
 
-            if (t.date_iso) {
-              dateIsoStr = String(t.date_iso).slice(0, 10);
+          // Use date_iso if available (preferred), otherwise fall back to date
+          let dateStr = '';
+          let dateIsoStr = '';
+
+          if (t.date_iso) {
+            dateIsoStr = String(t.date_iso).slice(0, 10);
+            dateStr = dateIsoStr;
+          } else if (t.date) {
+            const dateInput = String(t.date);
+            // Check if already in ISO format
+            if (/^\d{4}-\d{2}-\d{2}$/.test(dateInput.slice(0, 10))) {
+              dateIsoStr = dateInput.slice(0, 10);
               dateStr = dateIsoStr;
-            } else if (t.date) {
-              const dateInput = String(t.date);
-              // Check if already in ISO format
-              if (/^\d{4}-\d{2}-\d{2}$/.test(dateInput.slice(0, 10))) {
-                dateIsoStr = dateInput.slice(0, 10);
-                dateStr = dateIsoStr;
-              } else {
-                // Try to parse the date
-                try {
-                  const parsedDate = new Date(dateInput);
-                  if (!isNaN(parsedDate.getTime())) {
-                    const year = parsedDate.getFullYear();
-                    if (year >= 2020 && year <= 2026) {
+            } else {
+              // Try to parse the date
+              try {
+                const parsedDate = new Date(dateInput);
+                if (!isNaN(parsedDate.getTime())) {
+                  const year = parsedDate.getFullYear();
+                  if (year >= 2020 && year <= 2026) {
+                    dateIsoStr = parsedDate.toISOString().slice(0, 10);
+                    dateStr = dateIsoStr;
+                  }
+                }
+              } catch {
+                // If parsing fails, try extracting date pattern
+                const dateMatch = dateInput.match(/(\d{4}-\d{2}-\d{2})/);
+                if (dateMatch) {
+                  try {
+                    const parsedDate = new Date(dateMatch[0]);
+                    if (!isNaN(parsedDate.getTime())) {
                       dateIsoStr = parsedDate.toISOString().slice(0, 10);
                       dateStr = dateIsoStr;
                     }
-                  }
-                } catch {
-                  // If parsing fails, try extracting date pattern
-                  const dateMatch = dateInput.match(/(\d{4}-\d{2}-\d{2})/);
-                  if (dateMatch) {
-                    try {
-                      const parsedDate = new Date(dateMatch[0]);
-                      if (!isNaN(parsedDate.getTime())) {
-                        dateIsoStr = parsedDate.toISOString().slice(0, 10);
-                        dateStr = dateIsoStr;
-                      }
-                    } catch { }
-                  }
+                  } catch { }
                 }
               }
             }
+          }
 
-            // Validate date format is correct (YYYY-MM-DD)
-            const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-            const isValidDate = dateStr && dateRegex.test(dateStr);
+          // Validate date format is correct (YYYY-MM-DD)
+          const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+          const isValidDate = dateStr && dateRegex.test(dateStr);
 
-            if (!isValidDate) {
-              console.warn('⚠️ Invalid date for transaction:', { date: t.date, date_iso: t.date_iso, dateStr });
-              return null;
-            }
-
-            // Return in format expected by import-bank-statement API
-            return {
-              debit: debitAmount,
-              credit: creditAmount,
-              description: description,
-              title: description, // API accepts either description or title
-              date: dateStr,
-              date_iso: dateIsoStr || dateStr, // Prefer date_iso for better parsing
-              category: t.category ? String(t.category) : '',
-              notes: t.commodity || '',
-              // Bank-specific fields
-              bankCode: t.bankCode || null,
-              transactionId: t.transactionId || null,
-              accountNumber: t.accountNumber || null,
-              transferType: t.transferType || null,
-              personName: t.personName || null,
-              upiId: t.upiId || null,
-              branch: t.branch || null,
-              store: t.store || null,
-              commodity: t.commodity || null,
-              raw: t.raw || t.rawData || null,
-              rawData: t.raw || t.rawData || null,
-              balance: t.balance ? (typeof t.balance === 'number' ? t.balance : parseFloat(String(t.balance))) : null,
-            };
-          } catch (error) {
-            console.warn('⚠️ Error normalizing transaction:', error);
+          if (!isValidDate) {
+            console.warn('⚠️ Invalid date for transaction:', { date: t.date, date_iso: t.date_iso, dateStr });
             return null;
           }
-        })
-        .filter(Boolean);
 
-      if (!normalized.length) {
-        showError('No valid records', 'No transactions to import');
-        setIsImporting(false);
-        return;
-      }
+          // Return in format expected by import-bank-statement API
+          return {
+            debit: debitAmount,
+            credit: creditAmount,
+            description: description,
+            title: description, // API accepts either description or title
+            date: dateStr,
+            date_iso: dateIsoStr || dateStr, // Prefer date_iso for better parsing
+            category: t.category ? String(t.category) : '',
+            notes: t.commodity || '',
+            // Bank-specific fields
+            bankCode: t.bankCode || null,
+            transactionId: t.transactionId || null,
+            accountNumber: t.accountNumber || null,
+            transferType: t.transferType || null,
+            personName: t.personName || null,
+            upiId: t.upiId || null,
+            branch: t.branch || null,
+            store: t.store || null,
+            commodity: t.commodity || null,
+            raw: t.raw || t.rawData || null,
+            rawData: t.raw || t.rawData || null,
+            balance: t.balance ? (typeof t.balance === 'number' ? t.balance : parseFloat(String(t.balance))) : null,
+          };
+        } catch (error) {
+          console.warn('⚠️ Error normalizing transaction:', error);
+          return null;
+        }
+      })
+      .filter(Boolean);
 
+    if (!normalized.length) {
+      showError('No valid records', 'No transactions to import');
+      setIsImporting(false);
+      return;
+    }
+
+    setImportProgress(10);
+    console.log('📤 Sending import request with AI categorization and balance validation...');
+
+    // Use bank statement import API which handles bank-specific fields
+    // Note: type is optional, API will infer from credit/debit amounts
+    const primaryTempFile = remoteFile || tempFiles[0];
+    const documentMeta = selectedFile && primaryTempFile ? {
+      storageKey: primaryTempFile,
+      originalName: selectedFile.name,
+      mimeType: selectedFile.type || 'application/pdf',
+      fileSize: selectedFile.size,
+    } : undefined;
+
+    // Use background categorization for large imports (>100 transactions) for better performance
+    const useBackgroundCategorization = normalized.length > 100;
+
+    const importPayload: any = {
+      userId: user.id,
+      records: normalized,
+      useAICategorization: true, // Enable AI categorization
+      categorizeInBackground: useBackgroundCategorization, // Use background for large imports
+      validateBalance: true, // Enable balance validation
+      ...(documentMeta ? { document: documentMeta } : {}),
+    };
+
+    // Add metadata if available
+    if (statementMetadata) {
+      importPayload.metadata = statementMetadata;
+    }
+
+    let importTimer: NodeJS.Timeout | null = null;
+    try {
       // Simulate import progress up to 90% while waiting for server
-      const importTimer = setInterval(() => {
+      importTimer = setInterval(() => {
         setImportProgress((p) => (p < 90 ? Math.min(90, p + 4) : p));
       }, 300);
-
-      // Use bank statement import API which handles bank-specific fields
-      // Note: type is optional, API will infer from credit/debit amounts
-      const primaryTempFile = remoteFile || tempFiles[0];
-      const documentMeta = selectedFile && primaryTempFile ? {
-        storageKey: primaryTempFile,
-        originalName: selectedFile.name,
-        mimeType: selectedFile.type || 'application/pdf',
-        fileSize: selectedFile.size,
-      } : undefined;
-
-      // Use background categorization for large imports (>100 transactions) for better performance
-      const useBackgroundCategorization = normalized.length > 100;
-
-      const importPayload: any = {
-        userId: user.id,
-        records: normalized,
-        useAICategorization: true, // Enable AI categorization
-        categorizeInBackground: useBackgroundCategorization, // Use background for large imports
-        validateBalance: true, // Enable balance validation
-        ...(documentMeta ? { document: documentMeta } : {}),
-      };
-
-      // Add metadata if available
-      if (statementMetadata) {
-        importPayload.metadata = statementMetadata;
-      }
-
-      // Update progress message
-      setImportProgress(10);
-      console.log('📤 Sending import request with AI categorization and balance validation...');
 
       const response = await fetch('/api/import-bank-statement', {
         method: 'POST',
@@ -1699,7 +1723,6 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
 
       success('Imported', message);
       setImportProgress(100);
-      clearInterval(importTimer);
       // Refetch transactions
       await fetchTransactions();
 
@@ -1725,16 +1748,13 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
         // Close preview dialog
         setShowCsvPreview(false);
         setParsedTransactions([]);
-        setShowCsvPreview(false);
-        setParsedTransactions([]);
-        setSelectedFile(null);
-        setRemoteFile(null);
       }
     } catch (e) {
       console.error('Batch import error', e);
       setFileError(e instanceof Error ? e.message : 'Batch import failed');
       showError('Import failed', e instanceof Error ? e.message : 'Batch import failed');
     } finally {
+      if (importTimer) clearInterval(importTimer);
       setIsImporting(false);
       setTimeout(() => setImportProgress(0), 1000);
     }
@@ -1950,7 +1970,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                 {(['daily', 'weekly', 'monthly'] as const).map((p) => (
                   <button
                     key={p}
-                    onClick={() => setPeriod(p)}
+                    onClick={() => handlePeriodChange(p)}
                     className={cn(
                       "p-1.5 px-3 text-[10px] font-black uppercase tracking-widest rounded transition-all",
                       period === p ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
@@ -2201,58 +2221,42 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
 
               {/* Pie Chart Visual */}
               <div className="h-64 w-full relative">
-                {(() => {
-                  const totalExp = totals.expense || 1;
-                  const catMap = new Map<string, number>();
-                  filteredTransactions.forEach(t => {
-                    if (t.financialCategory === 'EXPENSE') {
-                      const name = t.category?.name || 'Uncategorized';
-                      catMap.set(name, (catMap.get(name) || 0) + (t.debitAmount || 0));
-                    }
-                  });
-                  const data = Array.from(catMap.entries())
-                    .map(([name, value]) => ({ name, value }))
-                    .sort((a, b) => b.value - a.value)
-                    .slice(0, 5);
-
-                  const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#64748b'];
-
-                  if (data.length === 0) return <div className="flex h-full items-center justify-center text-xs text-muted-foreground">No data</div>;
-
-                  return (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" opacity={0.4} />
-                        <XAxis
-                          dataKey="name"
-                          axisLine={false}
-                          tickLine={false}
-                          tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10, fontWeight: 600 }}
-                          tickFormatter={(val) => val.length > 6 ? val.slice(0, 6) : val}
-                          dy={10}
-                        />
-                        <YAxis
-                          axisLine={false}
-                          tickLine={false}
-                          tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }}
-                          tickFormatter={(val) => `₹${(val / 1000).toFixed(0)}k`}
-                        />
-                        <RechartsTooltip
-                          cursor={{ fill: 'hsl(var(--muted)/0.3)' }}
-                          formatter={(value: number) => [formatAmount(value), 'Spent']}
-                          contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                          itemStyle={{ color: 'hsl(var(--foreground))', fontWeight: 'bold' }}
-                          labelStyle={{ color: 'hsl(var(--muted-foreground))' }}
-                        />
-                        <Bar dataKey="value" radius={[6, 6, 0, 0]} barSize={24}>
-                          {data.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                          ))}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
-                  );
-                })()}
+                {sidebarAnalytics.barChartData.length === 0 ? (
+                  <div className="flex h-full items-center justify-center text-xs text-muted-foreground">No data</div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={sidebarAnalytics.barChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" opacity={0.4} />
+                      <XAxis
+                        dataKey="name"
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10, fontWeight: 600 }}
+                        tickFormatter={(val) => val.length > 6 ? val.slice(0, 6) : val}
+                        dy={10}
+                      />
+                      <YAxis
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }}
+                        tickFormatter={(val) => `₹${(val / 1000).toFixed(0)}k`}
+                      />
+                      <RechartsTooltip
+                        cursor={{ fill: 'hsl(var(--muted)/0.3)' }}
+                        formatter={(value: number) => [formatAmount(value), 'Spent']}
+                        contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                        itemStyle={{ color: 'hsl(var(--foreground))', fontWeight: 'bold' }}
+                        labelStyle={{ color: 'hsl(var(--muted-foreground))' }}
+                      />
+                      <Bar dataKey="value" radius={[6, 6, 0, 0]} barSize={24}>
+                        {sidebarAnalytics.barChartData.map((entry, index) => {
+                          const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#64748b'];
+                          return <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />;
+                        })}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
               </div>
             </div>
 
@@ -2285,23 +2289,11 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                 </div>
 
                 <div className="space-y-5">
-                  {(() => {
-                    const totalExp = totals.expense || 1;
-                    const catMap = new Map<string, { amount: number, count: number }>();
-                    filteredTransactions.forEach(t => {
-                      if (t.financialCategory === 'EXPENSE') {
-                        const name = t.category?.name || 'Uncategorized';
-                        const curr = catMap.get(name) || { amount: 0, count: 0 };
-                        catMap.set(name, { amount: curr.amount + (t.debitAmount || 0), count: curr.count + 1 });
-                      }
-                    });
-                    const topCats = Array.from(catMap.entries())
-                      .sort((a, b) => b[1].amount - a[1].amount)
-                      .slice(0, 5);
-
-                    if (topCats.length === 0) return <p className="text-xs text-muted-foreground italic">No expense data</p>;
-
-                    return topCats.map(([name, stats], i) => {
+                  {sidebarAnalytics.topCategories.length === 0 ? (
+                    <p className="text-xs text-muted-foreground italic">No expense data</p>
+                  ) : (
+                    sidebarAnalytics.topCategories.map(([name, stats], i) => {
+                      const totalExp = totals.expense || 1;
                       const percent = Math.round((stats.amount / totalExp) * 100);
                       return (
                         <div key={i} className="group">
@@ -2317,8 +2309,8 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                           </div>
                         </div>
                       );
-                    });
-                  })()}
+                    })
+                  )}
                 </div>
               </div>
             </div>
@@ -3440,3 +3432,5 @@ function CategoryIcon({ category }: { category: string }) {
   if (cat.includes('utility') || cat.includes('bill') || cat.includes('con edison')) return <Zap className="size-4" />;
   return <ShoppingBag className="size-4" />;
 }
+
+

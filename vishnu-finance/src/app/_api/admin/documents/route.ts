@@ -4,7 +4,7 @@ import { mkdir, writeFile } from 'fs/promises';
 import { randomUUID } from 'crypto';
 import { Buffer } from 'buffer';
 import { tmpdir } from 'os';
-import type { DocumentVisibility } from '@prisma/client';
+import { Prisma, type DocumentVisibility } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import { AuthService } from '@/lib/auth';
 import { writeAuditLog, extractRequestMeta } from '@/lib/audit';
@@ -43,17 +43,17 @@ const transformDocument = (doc: any) => ({
   transactionCount: doc._count?.transactions ?? 0,
   owner: doc.owner
     ? {
-        id: doc.owner.id,
-        email: doc.owner.email,
-        name: doc.owner.name,
-      }
+      id: doc.owner.id,
+      email: doc.owner.email,
+      name: doc.owner.name,
+    }
     : null,
   deletedBy: doc.deletedBy
     ? {
-        id: doc.deletedBy.id,
-        email: doc.deletedBy.email,
-        name: doc.deletedBy.name,
-      }
+      id: doc.deletedBy.id,
+      email: doc.deletedBy.email,
+      name: doc.deletedBy.name,
+    }
     : null,
 });
 
@@ -154,7 +154,7 @@ export async function POST(request: NextRequest) {
         visibility: visibility as any,
         sourceType: sourceType as any,
         bankCode,
-        metadata: notes ? JSON.stringify({ notes }) : null,
+        metadata: notes ? { notes } : Prisma.DbNull,
       },
       include: {
         _count: {

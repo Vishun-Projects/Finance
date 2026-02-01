@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { Prisma } from '@prisma/client';
 import { AuthService } from '@/lib/auth';
 import { writeAuditLog, extractRequestMeta } from '@/lib/audit';
 
@@ -21,16 +22,16 @@ const transformMapping = (mapping: any) => ({
   description: mapping.description,
   version: mapping.version,
   isActive: mapping.isActive,
-  mappingConfig: mapping.mappingConfig ? JSON.parse(mapping.mappingConfig) : null,
+  mappingConfig: mapping.mappingConfig,
   createdById: mapping.createdById,
   createdAt: mapping.createdAt,
   updatedAt: mapping.updatedAt,
   createdBy: mapping.createdBy
     ? {
-        id: mapping.createdBy.id,
-        email: mapping.createdBy.email,
-        name: mapping.createdBy.name,
-      }
+      id: mapping.createdBy.id,
+      email: mapping.createdBy.email,
+      name: mapping.createdBy.name,
+    }
     : null,
 });
 
@@ -100,7 +101,7 @@ export async function POST(request: NextRequest) {
         description: description || null,
         version: Number.isFinite(version) ? version : 1,
         isActive: typeof isActive === 'boolean' ? isActive : true,
-        mappingConfig: mappingConfig ? JSON.stringify(mappingConfig) : null,
+        mappingConfig: mappingConfig ?? Prisma.DbNull,
         createdById: superuser.id,
       },
       include: {

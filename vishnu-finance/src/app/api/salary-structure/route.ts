@@ -252,3 +252,33 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to delete salary structure' }, { status: 500 });
   }
 }
+
+export async function PATCH(request: NextRequest) {
+  console.log('🔄 SALARY STRUCTURE PATCH - Starting request');
+  try {
+    const body = await request.json();
+    const { id, action, userId } = body;
+
+    if (!id || !userId || action !== 'ACTIVATE') {
+      return NextResponse.json({ error: 'Invalid request parameters' }, { status: 400 });
+    }
+
+    // 1. Deactivate all structures for this user
+    await (prisma as any).salaryStructure.updateMany({
+      where: { userId },
+      data: { isActive: false }
+    });
+
+    // 2. Activate the requested structure
+    const updatedStructure = await (prisma as any).salaryStructure.update({
+      where: { id },
+      data: { isActive: true }
+    });
+
+    console.log(`✅ Activated salary structure ${id}`);
+    return NextResponse.json(updatedStructure);
+  } catch (error) {
+    console.error('❌ SALARY STRUCTURE PATCH - Error:', error);
+    return NextResponse.json({ error: 'Failed to update status' }, { status: 500 });
+  }
+}

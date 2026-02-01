@@ -137,8 +137,26 @@ export async function POST(request: NextRequest) {
     const [goals, deadlines, incomes, expenses] = await Promise.all([
       prisma.goal.findMany({ where: { userId } }),
       prisma.deadline.findMany({ where: { userId } }),
-      prisma.incomeSource.findMany({ where: { userId } }),
-      prisma.expense.findMany({ where: { userId } })
+      prisma.transaction.findMany({
+        where: {
+          userId,
+          isDeleted: false,
+          creditAmount: { gt: 0 }
+        },
+        include: {
+          category: true
+        }
+      }),
+      prisma.transaction.findMany({
+        where: {
+          userId,
+          isDeleted: false,
+          debitAmount: { gt: 0 }
+        },
+        include: {
+          category: true
+        }
+      })
     ]);
 
     console.log('🔍 AI Analysis - Data fetched:', {
@@ -160,8 +178,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Calculate financial metrics
-    const totalIncome = incomes.reduce((sum: number, income: any) => sum + parseFloat(income.amount), 0);
-    const totalExpenses = expenses.reduce((sum: number, expense: any) => sum + parseFloat(expense.amount), 0);
+    const totalIncome = incomes.reduce((sum: number, income: any) => sum + Number(income.creditAmount || 0), 0);
+    const totalExpenses = expenses.reduce((sum: number, expense: any) => sum + Number(expense.debitAmount || 0), 0);
     const netSavings = totalIncome - totalExpenses;
     const savingsRate = totalIncome > 0 ? (netSavings / totalIncome) * 100 : 0;
 
@@ -176,17 +194,17 @@ export async function POST(request: NextRequest) {
 
       const monthIncome = incomes
         .filter((income: any) => {
-          const incomeDate = new Date(income.startDate);
+          const incomeDate = new Date(income.transactionDate);
           return incomeDate.getMonth() === monthIndex;
         })
-        .reduce((sum: number, income: any) => sum + parseFloat(income.amount), 0);
+        .reduce((sum: number, income: any) => sum + Number(income.creditAmount || 0), 0);
 
       const monthExpenses = expenses
         .filter((expense: any) => {
-          const expenseDate = new Date(expense.date);
+          const expenseDate = new Date(expense.transactionDate);
           return expenseDate.getMonth() === monthIndex;
         })
-        .reduce((sum: number, expense: any) => sum + parseFloat(expense.amount), 0);
+        .reduce((sum: number, expense: any) => sum + Number(expense.debitAmount || 0), 0);
 
       const monthSavings = monthIncome - monthExpenses;
 
@@ -203,9 +221,10 @@ export async function POST(request: NextRequest) {
 
     // Calculate expense categories
     const categoryBreakdown = expenses.reduce((acc: any, expense: any) => {
-      const category = expense.category || 'Uncategorized';
+      // Use category relation name if available, else financialCategory, else 'Uncategorized'
+      const category = expense.category?.name || expense.financialCategory || 'Uncategorized';
       if (!acc[category]) acc[category] = 0;
-      acc[category] += parseFloat(expense.amount);
+      acc[category] += Number(expense.debitAmount || 0);
       return acc;
     }, {});
 
@@ -220,20 +239,20 @@ export async function POST(request: NextRequest) {
 
     // Get income sources
     const incomeSources = incomes.map((income: any) => ({
-      name: income.name || 'Income',
-      amount: parseFloat(income.amount),
-      frequency: income.frequency || 'Monthly'
+      name: income.description || income.store || 'Income',
+      amount: Number(income.creditAmount || 0),
+      frequency: 'Irregular' // Transactions are individual records
     }));
 
     // Get recent transactions
     const recentTransactions = [...incomes, ...expenses]
       .map((item: any) => ({
-        type: ('income' in item ? 'income' : 'expense') as 'income' | 'expense',
-        title: (item.name || item.description || 'Transaction') as string,
-        amount: parseFloat(item.amount),
-        date: (item.startDate || item.date) as string
+        type: (item.creditAmount > 0 ? 'income' : 'expense') as 'income' | 'expense',
+        title: (item.description || item.store || 'Transaction') as string,
+        amount: Number(item.creditAmount > 0 ? item.creditAmount : item.debitAmount),
+        date: (item.transactionDate) as string
       }))
-      .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .sort((a: { date: string }, b: { date: string }) => new Date(b.date).getTime() - new Date(a.date).getTime())
       .slice(0, 10);
 
     // Calculate financial health score

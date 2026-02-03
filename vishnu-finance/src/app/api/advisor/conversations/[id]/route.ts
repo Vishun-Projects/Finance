@@ -52,7 +52,7 @@ export async function GET(
           id: msg.id,
           role: msg.role,
           content: msg.content,
-          sources: msg.sources ? JSON.parse(msg.sources) : [],
+          sources: (msg.sources as any) || [],
           createdAt: msg.createdAt,
         })),
       },

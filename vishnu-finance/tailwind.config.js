@@ -4,7 +4,10 @@ module.exports = {
 	content: [
 		'./src/pages/**/*.{js,ts,jsx,tsx,mdx}',
 		'./src/components/**/*.{js,ts,jsx,tsx,mdx}',
-		'./src/app/**/*.{js,ts,jsx,tsx,mdx}',
+		'./src/app/(app)/**/*.{js,ts,jsx,tsx,mdx}',
+		'./src/app/(auth)/**/*.{js,ts,jsx,tsx,mdx}',
+		'./src/app/admin/**/*.{js,ts,jsx,tsx,mdx}',
+		'./src/app/api/**/*.{js,ts,jsx,tsx,mdx}',
 	],
 	future: {
 		hoverOnlyWhenSupported: true,
@@ -83,7 +86,7 @@ module.exports = {
 				}
 			},
 			fontFamily: {
-				"display": ["var(--font-heading)", "Inter", "sans-serif"],
+				"display": ["var(--font-newsreader)", "Newsreader", "serif"],
 				"sans": ["var(--font-sans)", "Inter", "sans-serif"],
 				"mono": ["var(--font-mono)", "JetBrains Mono", "monospace"]
 			},

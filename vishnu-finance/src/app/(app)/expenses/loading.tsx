@@ -1,10 +1,6 @@
-import { LoadingSpinner } from '@/components/feedback/loading-spinner';
+import FinancialSkeleton from '@/components/feedback/financial-skeleton';
 
 export default function ExpensesLoading() {
-  return (
-    <div className="flex justify-center items-center min-h-[400px]">
-      <LoadingSpinner size="lg" text="Loading expenses..." />
-    </div>
-  );
+  return <FinancialSkeleton />;
 }
 

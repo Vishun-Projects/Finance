@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Search,
   Bell,
@@ -21,7 +21,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { formatRupees } from '../lib/utils';
 import Link from 'next/link';
-import PageSkeleton from './page-skeleton';
+import FinancialSkeleton from './feedback/financial-skeleton';
 import {
   AreaChart,
   Area,
@@ -167,27 +167,24 @@ export default function SimpleDashboard({
 
   // Loading State
   if (authLoading || (isLoading && !dashboardData)) {
-    return <PageSkeleton />;
+    return <FinancialSkeleton />;
   }
 
   if (!dashboardData) return null;
 
   // Derived Data
-  const netWorth = dashboardData.totalNetWorth ?? dashboardData.netSavings; // Use totalNetWorth if available
-  const monthlyIncome = dashboardData.totalIncome;
-  const monthlyExpenses = dashboardData.totalExpenses;
-  const netFlow = monthlyIncome - monthlyExpenses;
-
-  // ... rest of chart logic ...
+  const netWorth = useMemo(() => dashboardData.totalNetWorth ?? dashboardData.netSavings, [dashboardData.totalNetWorth, dashboardData.netSavings]);
+  const monthlyIncome = useMemo(() => dashboardData.totalIncome, [dashboardData.totalIncome]);
+  const monthlyExpenses = useMemo(() => dashboardData.totalExpenses, [dashboardData.totalExpenses]);
+  const netFlow = useMemo(() => monthlyIncome - monthlyExpenses, [monthlyIncome, monthlyExpenses]);
 
   // Chart Data Preparation
-  const chartData = dashboardData.monthlyTrends.map(item => ({
+  const chartData = useMemo(() => dashboardData.monthlyTrends.map(item => ({
     name: item.month,
     credits: item.credits || item.income,
     debits: item.debits || item.expenses
-  }));
+  })), [dashboardData.monthlyTrends]);
 
-  // Chart Colors using CSS Variables
   // Chart Colors using CSS Variables
   const creditsColor = 'hsl(var(--chart-1))'; // Primary (Gold/Blue/etc)
   const debitsColor = 'hsl(var(--chart-2))';  // Accent

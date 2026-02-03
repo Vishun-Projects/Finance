@@ -7,7 +7,7 @@ if (!GOOGLE_API_KEY) {
   throw new Error('GOOGLE_API_KEY is not set in environment variables');
 }
 
-const genAI = new GoogleGenerativeAI(GOOGLE_API_KEY);
+export const genAI = new GoogleGenerativeAI(GOOGLE_API_KEY);
 
 // Global flag to track if Gemini quota is exceeded (prevents unnecessary API calls)
 let globalGeminiQuotaExceeded = false;

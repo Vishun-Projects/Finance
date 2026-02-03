@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ReactNode, useState } from 'react';
-import { Shield, FileText, Map, Home, Users, ClipboardList, Menu, X, BookOpen, Palette } from 'lucide-react';
+import { Shield, FileText, Map, Home, Users, ClipboardList, Menu, X, BookOpen, Palette, GraduationCap } from 'lucide-react';
 
 const navItems = [
     { href: '/admin', label: 'Overview', icon: Home },
@@ -12,6 +12,7 @@ const navItems = [
     { href: '/admin/bank-mappings', label: 'Bank Mappings', icon: Map },
     { href: '/admin/users', label: 'Users', icon: Users },
     { href: '/admin/audit', label: 'Audit Logs', icon: ClipboardList },
+    { href: '/admin/education', label: 'Manage Hub', icon: GraduationCap },
     { href: '/admin/design', label: 'Design System', icon: Palette },
 ];
 
@@ -40,8 +41,8 @@ export function AdminClientLayout({ children }: { children: ReactNode }) {
                                 key={item.href}
                                 href={item.href}
                                 className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm transition ${active
-                                        ? 'bg-primary text-primary-foreground'
-                                        : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                                    ? 'bg-primary text-primary-foreground'
+                                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                                     }`}
                             >
                                 <Icon className="w-4 h-4" />
@@ -92,8 +93,8 @@ export function AdminClientLayout({ children }: { children: ReactNode }) {
                                     href={item.href}
                                     onClick={closeMobileNav}
                                     className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm transition ${active
-                                            ? 'bg-primary text-primary-foreground'
-                                            : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                                        ? 'bg-primary text-primary-foreground'
+                                        : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                                         }`}
                                 >
                                     <Icon className="w-4 h-4" />

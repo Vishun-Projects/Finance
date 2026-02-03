@@ -564,6 +564,9 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
     debouncedSearch(value);
   }, [debouncedSearch]);
 
+  // Use deferred value for the search term to keep the UI responsive during heavy filtering
+  const deferredSearchTerm = React.useDeferredValue(currentSearchTerm);
+
   // Client-Side Filtering
   const filteredTransactions = useMemo(() => {
     return transactions.filter(t => {
@@ -575,8 +578,8 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
       if (!showDeleted && t.isDeleted) return false;
 
       // 1. Search (Description, Store, Person, Amount)
-      if (currentSearchTerm) { // Use currentSearchTerm state
-        const query = currentSearchTerm.toLowerCase();
+      if (deferredSearchTerm) { // Use deferredSearchTerm for expensive filtering
+        const query = deferredSearchTerm.toLowerCase();
         const desc = (t.description || '').toLowerCase();
         const store = (t.store || '').toLowerCase();
         const person = (t.personName || '').toLowerCase();
@@ -1909,16 +1912,17 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                             continue;
                           }
                           // Warn but don't stop? Or stop?
-                          console.error("Batch error", data.error);
+                          // Removed console.error
                         }
 
                         const batchRules = data.rulesMatched || 0;
                         const batchAI = data.aiMatched || 0;
-                        const batchUpdated = data.updated || 0;
+                        // const batchUpdated = data.updated || 0; // Removed commented out code
 
                         totalRules += batchRules;
                         totalAI += batchAI;
 
+                        // Removed auto-pause logic as requested
                         /*
                         if (data.processed > 0 && batchUpdated === 0) {
                           consecutiveFiles++;
@@ -1955,7 +1959,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                     success('Completed', `Finished! Total Updated: ${totalRules + totalAI} (Rules: ${totalRules}, AI: ${totalAI}).`);
                     fetchTransactions();
                   } catch (e) {
-                    console.error(e);
+                    // Removed console.error
                     showError('Error', 'Auto-categorization process interrupted.');
                   } finally {
                     setIsBulkUpdating(false);

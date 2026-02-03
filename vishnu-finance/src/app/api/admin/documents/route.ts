@@ -168,7 +168,7 @@ export async function POST(request: NextRequest) {
         visibility: visibility as any,
         sourceType: sourceType as any,
         bankCode,
-        metadata: notes ? JSON.stringify({ notes }) : null,
+        metadata: (notes ? { notes } : null) as any,
       },
       include: {
         _count: {

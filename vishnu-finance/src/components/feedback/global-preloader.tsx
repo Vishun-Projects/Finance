@@ -2,32 +2,33 @@
 
 import React from 'react';
 import { useLoading } from '@/contexts/LoadingContext';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function GlobalPreloader() {
   const { isLoading, loadingMessage } = useLoading();
-  
+
   if (!isLoading) return null;
 
   return (
-    <div className="fixed inset-0 bg-white/80 backdrop-blur-sm z-50 flex items-center justify-center">
-      <div className="flex flex-col items-center space-y-4">
-        {/* Modern Spinner */}
-        <div className="relative">
-          <div className="w-12 h-12 border-4 border-gray-200 rounded-full"></div>
-          <div className="absolute top-0 left-0 w-12 h-12 border-4 border-gray-900 border-t-transparent rounded-full animate-spin"></div>
+    <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center animate-in fade-in duration-300">
+      <div className="flex flex-col items-center space-y-6 max-w-sm w-full p-8 p-12">
+        {/* Logo Placeholder Skeleton */}
+        <Skeleton className="w-16 h-16 rounded-full" />
+
+        <div className="space-y-3 w-full flex flex-col items-center">
+          {/* Title Skeleton */}
+          <Skeleton className="h-6 w-3/4 rounded-lg" />
+          {/* Subtext Skeleton */}
+          <Skeleton className="h-4 w-1/2 rounded-lg opacity-70" />
         </div>
-        
-        {/* Loading Text */}
-        <div className="text-center">
-          <p className="text-gray-900 font-medium text-lg">{loadingMessage}</p>
-          <p className="text-gray-600 text-sm mt-1">Please wait while we load your data</p>
-        </div>
-        
-        {/* Progress Dots */}
-        <div className="flex space-x-1">
-          <div className="w-2 h-2 bg-gray-900 rounded-full animate-bounce"></div>
-          <div className="w-2 h-2 bg-gray-900 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-          <div className="w-2 h-2 bg-gray-900 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+
+        {/* Loading Text Overlay (Visible) */}
+        <div className="text-center mt-4">
+          {loadingMessage && (
+            <p className="text-sm font-medium text-muted-foreground animate-pulse tracking-widest uppercase">
+              {loadingMessage}
+            </p>
+          )}
         </div>
       </div>
     </div>

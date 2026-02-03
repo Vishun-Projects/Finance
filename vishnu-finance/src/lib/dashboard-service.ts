@@ -79,12 +79,24 @@ export class DashboardService {
         }
 
         // Direct Database Aggregations
-        const [transactionStats, legacyExpenseStats, legacyIncomeStats, activeGoalsCount, deadlinesData, recentTransactions, salaryInfo, plansInfo, wishlistInfo] = await Promise.all([
-            // ... (keep same) ...
+        const [
+            transactionStats,
+            legacyExpenseStats,
+            legacyIncomeStats,
+            activeGoalsCount,
+            deadlinesData,
+            recentTransactions,
+            salaryInfo,
+            plansInfo,
+            wishlistInfo,
+            netWorthStats,
+            categoryStatsData,
+            transactionTotalsData,
+            categoryBreakdownRaw
+        ] = await Promise.all([
             // 1. Transaction Stats
             (async () => {
                 try {
-                    await (prisma as any).$queryRaw`SELECT 1 FROM transactions LIMIT 1`;
                     return await (prisma as any).transaction.aggregate({
                         where: {
                             userId,
@@ -128,7 +140,6 @@ export class DashboardService {
             // 6. Recent Transactions
             (async () => {
                 try {
-                    await (prisma as any).$queryRaw`SELECT 1 FROM transactions LIMIT 1`;
                     return await (prisma as any).transaction.findMany({
                         where: { userId, isDeleted: false, transactionDate: { gte: rangeStart, lte: rangeEnd } },
                         select: {
@@ -212,8 +223,52 @@ export class DashboardService {
                         }))
                     };
                 } catch { return { totalItems: 0, totalCost: 0, topItem: null, items: [] }; }
+            })(),
+
+            // 10. Total Net Worth (All Time)
+            (async () => {
+                try {
+                    return await (prisma as any).transaction.aggregate({
+                        where: { userId, isDeleted: false },
+                        _sum: { creditAmount: true, debitAmount: true }
+                    });
+                } catch { return { _sum: { creditAmount: 0, debitAmount: 0 } }; }
+            })(),
+
+            // 11. Category Stats
+            (async () => {
+                try {
+                    return await (prisma as any).transaction.groupBy({
+                        by: ['financialCategory'],
+                        where: { userId, isDeleted: false, transactionDate: { gte: rangeStart, lte: rangeEnd } },
+                        _sum: { creditAmount: true, debitAmount: true }
+                    });
+                } catch { return []; }
+            })(),
+
+            // 12. Transaction Totals (Trends)
+            (async () => {
+                try {
+                    return await (prisma as any).transaction.groupBy({
+                        by: ['transactionDate'],
+                        where: { userId, isDeleted: false, transactionDate: { gte: rangeStart, lte: rangeEnd } },
+                        _sum: { creditAmount: true, debitAmount: true }
+                    });
+                } catch { return []; }
+            })(),
+
+            // 13. Category Breakdown
+            (async () => {
+                try {
+                    return await (prisma as any).transaction.groupBy({
+                        by: ['categoryId'],
+                        where: { userId, isDeleted: false, transactionDate: { gte: rangeStart, lte: rangeEnd } },
+                        _sum: { debitAmount: true, creditAmount: true }
+                    });
+                } catch { return []; }
             })()
         ]);
+
 
         // Totals Calculation
         const totalCredits = Number(transactionStats._sum?.creditAmount || 0);
@@ -228,47 +283,18 @@ export class DashboardService {
         const netSavings = totalIncome - totalExpenses;
         const savingsRate = totalIncome > 0 ? (netSavings / totalIncome) * 100 : 0;
 
-        // Total Net Worth (All Time)
-        const netWorthStats = await (async () => {
-            try {
-                await (prisma as any).$queryRaw`SELECT 1 FROM transactions LIMIT 1`;
-                return await (prisma as any).transaction.aggregate({
-                    where: { userId, isDeleted: false },
-                    _sum: { creditAmount: true, debitAmount: true }
-                });
-            } catch { return { _sum: { creditAmount: 0, debitAmount: 0 } }; }
-        })();
         const totalNetWorth = (Number(netWorthStats._sum?.creditAmount || 0) + legacyIncome) - (Number(netWorthStats._sum?.debitAmount || 0) + legacyExpenses);
 
         // Category Stats
-        const categoryStats = await (async () => {
-            try {
-                await (prisma as any).$queryRaw`SELECT 1 FROM transactions LIMIT 1`;
-                return await (prisma as any).transaction.groupBy({
-                    by: ['financialCategory'],
-                    where: { userId, isDeleted: false, transactionDate: { gte: rangeStart, lte: rangeEnd } },
-                    _sum: { creditAmount: true, debitAmount: true }
-                });
-            } catch { return []; }
-        })();
         const financialCategoryStatsMap = new Map();
-        categoryStats.forEach((stat: any) => {
+        (categoryStatsData as any[]).forEach((stat: any) => {
             financialCategoryStatsMap.set(stat.financialCategory, {
                 credits: Number(stat._sum.creditAmount || 0),
                 debits: Number(stat._sum.debitAmount || 0),
             });
         });
 
-        const transactionTotals = await (async () => {
-            try {
-                await (prisma as any).$queryRaw`SELECT 1 FROM transactions LIMIT 1`;
-                return await (prisma as any).transaction.groupBy({
-                    by: ['transactionDate'],
-                    where: { userId, isDeleted: false, transactionDate: { gte: rangeStart, lte: rangeEnd } },
-                    _sum: { creditAmount: true, debitAmount: true }
-                });
-            } catch { return []; }
-        })();
+        const transactionTotals = transactionTotalsData;
 
         // Monthly Trends Logic
         const diffDays = Math.ceil(Math.abs(rangeEnd.getTime() - rangeStart.getTime()) / (1000 * 60 * 60 * 24));
@@ -324,19 +350,10 @@ export class DashboardService {
         });
 
         // Category Breakdown Logic
-        const categoryBreakdownData = await (async () => {
-            try {
-                await (prisma as any).$queryRaw`SELECT 1 FROM transactions LIMIT 1`;
-                return await (prisma as any).transaction.groupBy({
-                    by: ['categoryId'],
-                    where: { userId, isDeleted: false, transactionDate: { gte: rangeStart, lte: rangeEnd } },
-                    _sum: { debitAmount: true, creditAmount: true }
-                });
-            } catch { return []; }
-        })();
-
-        // Process categories... (Simplified)
-        const categoryBreakdown: SimpleDashboardData['categoryBreakdown'] = [];
+        const categoryBreakdown: SimpleDashboardData['categoryBreakdown'] = (categoryBreakdownRaw as any[]).map(item => ({
+            name: item.categoryId || 'Uncategorized',
+            amount: Number(item._sum.debitAmount || 0)
+        }));
 
         // Recent Transactions Formatting
         const recentTrans = (recentTransactions || []).map((t: { id: string, description: string | null, creditAmount: any, debitAmount: any, financialCategory: string | null, transactionDate: Date, store: string | null, category?: { name: string } | null }) => {
@@ -370,6 +387,7 @@ export class DashboardService {
         if ((transactionStats._count || 0) + (legacyExpenseStats._count || 0) >= 30) financialHealthScore += 20;
         else if ((transactionStats._count || 0) + (legacyExpenseStats._count || 0) >= 10) financialHealthScore += 10;
         if (totalIncome > 0) financialHealthScore += 15;
+
 
         const result = {
             totalIncome,

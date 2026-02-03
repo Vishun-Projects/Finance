@@ -111,8 +111,49 @@ model User {
   status               UserAccountStatus @default(ACTIVE)
   superDocuments       SuperDocument[]   @relation("SuperDocumentUploadedBy")
   wishlistItems        WishlistItem[]
+  educationPosts       EducationPost[]   @relation("EducationAuthor")
+  educationProgress    EducationProgress[]
 
   @@map("users")
+}
+
+model EducationPost {
+  id          String              @id @default(cuid())
+  slug        String              @unique
+  title       String
+  content     String              @db.Text
+  excerpt     String?             @db.Text
+  category    String              @default("General")
+  difficulty  String              @default("Beginner")
+  readTime    Int                 @default(5)
+  published   Boolean             @default(false)
+  authorId    String
+  coverImage  String?
+  imagePrompt String?             @db.Text
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  author      User                @relation("EducationAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  progress    EducationProgress[]
+
+  @@index([authorId])
+  @@index([category])
+  @@map("education_posts")
+}
+
+model EducationProgress {
+  id          String        @id @default(cuid())
+  userId      String
+  postId      String
+  isCompleted Boolean       @default(false)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post        EducationPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId])
+  @@index([userId])
+  @@index([postId])
+  @@map("education_progress")
 }
 
 model Category {
@@ -593,4 +634,30 @@ model AccountStatement {
   @@index([userId])
   @@index([accountNumber])
   @@map("account_statements")
+}
+
+model DailyBriefing {
+  id             String   @id @default(cuid())
+  date           DateTime @unique // One briefing per day
+  location       String   @default("India")
+  
+  // Quick Summary (JSON)
+  summary        Json     // Array of strings
+  
+  // Metrics
+  sentiment      String   // Bullish, Bearish, etc.
+  sentimentScore Int      @default(50)
+  
+  // Full Blog Content
+  heroImage      String?  // URL to local or remote image
+  title          String?
+  content        String?  @db.Text // Full markdown article
+  
+  // Metadata
+  sources        Json?    // Array of {title, link}
+  
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@map("daily_briefings")
 }

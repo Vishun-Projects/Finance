@@ -1,6 +1,6 @@
 import { Suspense } from 'react';
 import SimpleDashboard from '@/components/dashboard/simple-dashboard';
-import PageSkeleton from '@/components/page-skeleton';
+import FinancialSkeleton from '@/components/feedback/financial-skeleton';
 import { loadDashboardSummary } from '@/lib/loaders/dashboard';
 import { requireUser } from '@/lib/auth/server-auth';
 import type { SimpleDashboardData } from '@/components/simple-dashboard';
@@ -25,7 +25,7 @@ export default async function DashboardPage() {
   }
 
   return (
-    <Suspense fallback={<PageSkeleton />}>
+    <Suspense fallback={<FinancialSkeleton />}>
       <SimpleDashboard
         initialData={initialData}
         initialStartDate={startDate}

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import type { Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import { AuthService } from '@/lib/auth';
 import { writeAuditLog, extractRequestMeta } from '@/lib/audit';
@@ -30,9 +30,15 @@ type MappingUpdatePayload = Partial<{
 }>;
 
 const parseMappingConfig = (
-  value: string | null | undefined,
+  value: any,
 ): Record<string, unknown> | null => {
   if (!value) {
+    return null;
+  }
+  if (typeof value === 'object' && value !== null) {
+    return value as Record<string, unknown>;
+  }
+  if (typeof value !== 'string') {
     return null;
   }
   try {
@@ -76,10 +82,10 @@ const transformMapping = (mapping: MappingWithAuthor) => ({
   updatedAt: mapping.updatedAt,
   createdBy: mapping.createdBy
     ? {
-        id: mapping.createdBy.id,
-        email: mapping.createdBy.email,
-        name: mapping.createdBy.name,
-      }
+      id: mapping.createdBy.id,
+      email: mapping.createdBy.email,
+      name: mapping.createdBy.name,
+    }
     : null,
 });
 
@@ -112,9 +118,7 @@ export async function PATCH(
         mappingConfig:
           mappingConfig === undefined
             ? undefined
-            : mappingConfig === null
-              ? null
-              : JSON.stringify(mappingConfig),
+            : (mappingConfig as any),
       },
       include: {
         createdBy: {
@@ -141,7 +145,7 @@ export async function PATCH(
     });
 
     return NextResponse.json({
-      mapping: transformMapping(updated),
+      mapping: transformMapping(updated as any),
     });
   } catch (error) {
     console.error('Failed to update bank field mapping:', error);

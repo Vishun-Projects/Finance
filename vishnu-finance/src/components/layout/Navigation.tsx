@@ -13,7 +13,9 @@ import {
   Settings,
   Wallet,
   LogOut,
-  User as UserIcon
+  User as UserIcon,
+  BookOpen,
+  ShieldCheck
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -31,6 +33,7 @@ const primaryNavItemsConfig = [
   { href: '/transactions', label: 'Transactions', icon: ReceiptText },
   { href: '/plans', label: 'Plans', icon: Layers },
   { href: '/salary', label: 'Salary', icon: Wallet },
+  { href: '/education', label: 'Knowledge Hub', icon: BookOpen },
   { href: '/advisor', label: 'AI Advisor', icon: Brain },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
@@ -43,11 +46,13 @@ export default function Navigation() {
 
   const activeByHref = useMemo(() => {
     return new Set(
-      primaryNavItemsConfig.filter(item =>
-        pathname === item.href || pathname.startsWith(item.href + '/')
-      ).map(item => item.href)
+      primaryNavItemsConfig
+        .filter(item => pathname === item.href || pathname.startsWith(item.href + '/'))
+        .map(item => item.href)
     );
   }, [pathname]);
+
+  const isAdmin = user?.role === 'SUPERUSER';
 
   return (
     <>
@@ -80,7 +85,9 @@ export default function Navigation() {
               </Link>
             );
           })}
+
         </nav>
+
 
         {/* Profile Footer */}
         <div className="mt-auto pt-6 border-t border-border">

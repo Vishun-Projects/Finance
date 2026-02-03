@@ -1,7 +1,7 @@
 
 import { Suspense } from 'react';
 import ProfileSettingsSection from '@/components/settings/profile-section';
-import { RouteLoadingState } from '@/components/feedback/route-fallbacks';
+import PageSkeleton from '@/components/feedback/page-skeleton';
 import { requireUser } from '@/lib/auth/server-auth';
 import { loadUserProfile } from '@/lib/loaders/profile';
 import type { User } from '@/contexts/AuthContext';
@@ -56,18 +56,12 @@ export default async function ProfilePage() {
 
   return (
     <Suspense
-      fallback={
-        <RouteLoadingState
-          title="Loading your profile"
-          description="Fetching your latest account details…"
-          className="min-h-[40vh]"
-        />
-      }
+      fallback={<PageSkeleton />}
     >
       <ProfileSettingsSection
         mode="standalone"
         initialProfile={normalizeProfile(profile ?? user)}
       />
-    </Suspense>
+    </Suspense >
   );
 }

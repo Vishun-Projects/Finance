@@ -1,6 +1,6 @@
 import { Suspense } from 'react';
 import TransactionsPageClient from './page-client';
-import PageSkeleton from '@/components/page-skeleton';
+import TransactionSkeleton from '@/components/feedback/transaction-skeleton';
 import { requireUser } from '@/lib/auth/server-auth';
 import { getCurrentMonthRange } from '@/lib/date-range';
 import { loadTransactionsBootstrap, loadTransactionCategories } from '@/lib/loaders/transactions';
@@ -36,7 +36,7 @@ export default async function TransactionsPage() {
   };
 
   return (
-    <Suspense fallback={<PageSkeleton />}>
+    <Suspense fallback={<TransactionSkeleton />}>
       <TransactionsPageClient bootstrap={bootstrap} />
     </Suspense>
   );

@@ -385,52 +385,55 @@ export async function POST(request: NextRequest) {
         ];
       }
 
-      // Fetch transactions
-      let transactions: any[] = [];
-      let totalCount = 0;
-      let totals: { income: number; expense: number } | null = null;
-
-      transactions = await (prisma as any).transaction.findMany({
-        where,
-        include: {
-          category: true,
-          document: {
-            select: {
-              id: true,
-              originalName: true,
-              mimeType: true,
-              fileSize: true,
-              visibility: true,
-              sourceType: true,
-              uploadedById: true,
-              ownerId: true,
-              bankCode: true,
-              isDeleted: true,
-              deletedAt: true,
+      // Fetch data in parallel
+      const [transactionsData, totalCountData, totalsData] = await Promise.all([
+        (prisma as any).transaction.findMany({
+          where,
+          include: {
+            category: true,
+            document: {
+              select: {
+                id: true,
+                originalName: true,
+                mimeType: true,
+                fileSize: true,
+                visibility: true,
+                sourceType: true,
+                uploadedById: true,
+                ownerId: true,
+                bankCode: true,
+                isDeleted: true,
+                deletedAt: true,
+              },
             },
           },
-        },
-        orderBy,
-        skip,
-        take: pageSize,
-      });
+          orderBy,
+          skip,
+          take: pageSize,
+        }),
+        (prisma as any).transaction.count({ where }),
+        includeTotals ? (async () => {
+          const [incomeRes, expenseRes] = await Promise.all([
+            (prisma as any).transaction.aggregate({
+              where: { ...where, financialCategory: 'INCOME' },
+              _sum: { creditAmount: true },
+            }),
+            (prisma as any).transaction.aggregate({
+              where: { ...where, financialCategory: 'EXPENSE' },
+              _sum: { debitAmount: true },
+            }),
+          ]);
+          return {
+            income: Number(incomeRes?._sum?.creditAmount || 0),
+            expense: Number(expenseRes?._sum?.debitAmount || 0),
+          };
+        })() : Promise.resolve(null)
+      ]);
 
-      totalCount = await (prisma as any).transaction.count({ where });
+      let transactions = transactionsData as any[];
+      const totalCount = totalCountData;
+      const totals = totalsData;
 
-      if (includeTotals) {
-        const incomeResult = await (prisma as any).transaction.aggregate({
-          where: { ...where, financialCategory: 'INCOME' },
-          _sum: { creditAmount: true },
-        });
-        const expenseResult = await (prisma as any).transaction.aggregate({
-          where: { ...where, financialCategory: 'EXPENSE' },
-          _sum: { debitAmount: true },
-        });
-        totals = {
-          income: Number(incomeResult._sum.creditAmount || 0),
-          expense: Number(expenseResult._sum.debitAmount || 0),
-        };
-      }
 
       // No need for in-memory searchTerm filter here as it's now in 'where'
 
@@ -2095,7 +2098,7 @@ export async function POST(request: NextRequest) {
       });
       const parsed = mappings.map((m: any) => ({
         ...m,
-        mappedNames: JSON.parse(m.mappedNames || '[]'),
+        mappedNames: m.mappedNames as any,
       }));
       return NextResponse.json(parsed);
     }
@@ -2125,7 +2128,7 @@ export async function POST(request: NextRequest) {
         mapping = await (prisma as any).entityMapping.update({
           where: { id: existing.id },
           data: {
-            mappedNames: JSON.stringify(mergedNames),
+            mappedNames: mergedNames as any,
             updatedAt: new Date(),
           },
         });
@@ -2134,14 +2137,14 @@ export async function POST(request: NextRequest) {
           data: {
             userId,
             canonicalName: canonicalName.trim(),
-            mappedNames: JSON.stringify(namesArray),
+            mappedNames: namesArray as any,
             entityType,
           },
         });
       }
       return NextResponse.json({
         ...mapping,
-        mappedNames: JSON.parse(mapping.mappedNames || '[]'),
+        mappedNames: mapping.mappedNames as any,
       });
     }
 
@@ -2162,7 +2165,7 @@ export async function POST(request: NextRequest) {
       });
       return NextResponse.json({
         ...updated,
-        mappedNames: JSON.parse(updated.mappedNames || '[]'),
+        mappedNames: updated.mappedNames as any,
       });
     }
 

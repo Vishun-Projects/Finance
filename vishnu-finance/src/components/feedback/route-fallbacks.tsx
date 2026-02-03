@@ -1,6 +1,5 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
-import { LoadingSpinner } from './loading-spinner';
 
 interface RouteLoadingStateProps {
   title?: string;
@@ -8,6 +7,8 @@ interface RouteLoadingStateProps {
   className?: string;
   children?: React.ReactNode;
 }
+
+import { Skeleton } from "@/components/ui/skeleton";
 
 export function RouteLoadingState({
   title = 'Loading...',
@@ -18,19 +19,24 @@ export function RouteLoadingState({
   return (
     <div
       className={cn(
-        'flex min-h-[40vh] flex-col items-center justify-center gap-4 text-center',
+        'flex min-h-[40vh] flex-col items-center justify-center gap-6 text-center w-full max-w-md mx-auto p-6',
         className,
       )}
       role="status"
       aria-live="polite"
     >
-      <LoadingSpinner size="lg" />
-      <div className="space-y-1">
-        <p className="text-base font-semibold text-foreground">{title}</p>
-        {description ? (
-          <p className="text-sm text-muted-foreground">{description}</p>
-        ) : null}
+      <div className="space-y-4 w-full flex flex-col items-center">
+        <Skeleton className="h-12 w-12 rounded-full" />
+        <Skeleton className="h-6 w-3/4 rounded-lg" />
+        {description && <Skeleton className="h-4 w-1/2 rounded-lg opacity-70" />}
       </div>
+
+      {/* Real text for screen readers/fallback if needed, but visually skeleton is dominant */}
+      <div className="sr-only">
+        <p>{title}</p>
+        <p>{description}</p>
+      </div>
+
       {children}
     </div>
   );

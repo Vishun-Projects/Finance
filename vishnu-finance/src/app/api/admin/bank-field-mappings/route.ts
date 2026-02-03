@@ -27,10 +27,10 @@ const transformMapping = (mapping: any) => ({
   updatedAt: mapping.updatedAt,
   createdBy: mapping.createdBy
     ? {
-        id: mapping.createdBy.id,
-        email: mapping.createdBy.email,
-        name: mapping.createdBy.name,
-      }
+      id: mapping.createdBy.id,
+      email: mapping.createdBy.email,
+      name: mapping.createdBy.name,
+    }
     : null,
 });
 
@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
         description: description || null,
         version: Number.isFinite(version) ? version : 1,
         isActive: typeof isActive === 'boolean' ? isActive : true,
-        mappingConfig: mappingConfig ? JSON.stringify(mappingConfig) : null,
+        mappingConfig: (mappingConfig || null) as any,
         createdById: superuser.id,
       },
       include: {

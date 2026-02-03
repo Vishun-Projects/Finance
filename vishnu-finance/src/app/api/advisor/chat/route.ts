@@ -78,10 +78,10 @@ export async function POST(request: NextRequest) {
     } catch (error) {
       console.error('Error processing advisor query:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      
+
       // Save error message as assistant response so user can see what went wrong
       const errorResponse = `**Error:** ${errorMessage}\n\nThis could be due to:\n- API service temporarily unavailable\n- Model overload (please try again in a few moments)\n- Invalid query format\n- Missing required data\n\nPlease try rephrasing your question or try again later.`;
-      
+
       const assistantMessage = await (prisma as any).advisorMessage.create({
         data: {
           conversationId: conversation.id,
@@ -124,7 +124,7 @@ export async function POST(request: NextRequest) {
     // Validate that we got a response
     if (!advisorResponse || !advisorResponse.response || advisorResponse.response.trim().length === 0) {
       const errorMessage = 'The AI model did not generate a response. This could be due to:\n- Model overload (please try again in a few moments)\n- Empty response from the AI service\n- Timeout or connection issue\n\nPlease try rephrasing your question or try again later.';
-      
+
       const assistantMessage = await (prisma as any).advisorMessage.create({
         data: {
           conversationId: conversation.id,
@@ -170,7 +170,7 @@ export async function POST(request: NextRequest) {
         conversationId: conversation.id,
         role: 'ASSISTANT',
         content: advisorResponse.response,
-        sources: JSON.stringify(advisorResponse.sources),
+        sources: advisorResponse.sources as any,
       },
     });
 
@@ -205,7 +205,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Error processing chat message:', error);
     const errorMessage = error instanceof Error ? error.message : 'Failed to process message';
-    
+
     // Try to provide more detailed error information
     let detailedError = errorMessage;
     if (errorMessage.includes('503') || errorMessage.includes('overloaded')) {
@@ -217,9 +217,9 @@ export async function POST(request: NextRequest) {
     } else if (errorMessage.includes('timeout') || errorMessage.includes('ETIMEDOUT')) {
       detailedError = `Request timed out. The AI service may be slow. Please try again.\n\nError details: ${errorMessage}`;
     }
-    
+
     return NextResponse.json(
-      { 
+      {
         error: detailedError,
         details: error instanceof Error ? {
           message: error.message,

@@ -86,7 +86,7 @@ module.exports = {
 				}
 			},
 			fontFamily: {
-				"display": ["var(--font-newsreader)", "Newsreader", "serif"],
+				"display": ["var(--font-heading)", "Newsreader", "serif"],
 				"sans": ["var(--font-sans)", "Inter", "sans-serif"],
 				"mono": ["var(--font-mono)", "JetBrains Mono", "monospace"]
 			},

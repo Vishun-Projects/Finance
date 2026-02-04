@@ -8,7 +8,7 @@ import sys
 import os
 import pandas as pd
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List, Dict, Any
 
 # Add parsers directory to path for local imports
 parsers_dir = os.path.join(os.path.dirname(__file__), 'parsers')
@@ -52,13 +52,15 @@ except ImportError:
         BaseBankParser = None
 
 
-def parse_bank_statement(file_path: Path, bank_code: Optional[str] = None) -> tuple[pd.DataFrame, Optional[dict]]:
+def parse_bank_statement(file_path: Path, bank_code: Optional[str] = None, password: Optional[str] = None, bank_profiles: Optional[List[Dict]] = None) -> tuple[pd.DataFrame, Optional[dict]]:
     """
-    Parse bank statement with auto-detection.
+    Parse bank statement using the new 14-stage Pipeline Engine.
     
     Args:
         file_path: Path to PDF or Excel file
-        bank_code: Optional bank code override (SBIN, IDIB, KKBK, etc.)
+        bank_code: Optional bank code override
+        password: Optional password for encrypted PDFs
+        bank_profiles: Optional list of bank profiles from DB
         
     Returns:
         DataFrame with transactions and metadata
@@ -67,144 +69,52 @@ def parse_bank_statement(file_path: Path, bank_code: Optional[str] = None) -> tu
     
     if not file_path.exists():
         raise FileNotFoundError(f"File not found: {file_path}")
-    
-    # Auto-detect bank if not provided
-    if not bank_code and BankDetector:
-        try:
-            bank_code = BankDetector.detect_from_file(file_path)
-        except Exception as e:
-            print(f"Bank detection failed: {e}", file=sys.stderr)
-    
-    if not bank_code:
-        # Fallback: try to extract from filename or use generic parser
-        filename = file_path.stem.lower()
-        if 'sbi' in filename or 'sbin' in filename:
-            bank_code = 'SBIN'
-        elif 'indian' in filename or 'idib' in filename:
-            bank_code = 'IDIB'
-        elif 'kotak' in filename or 'kkbk' in filename:
-            bank_code = 'KKBK'
-        elif 'hdfc' in filename:
-            bank_code = 'HDFC'
-        elif 'yes' in filename:
-            bank_code = 'YESB'
-        elif 'axis' in filename or 'utib' in filename:
-            bank_code = 'UTIB'
-        elif 'jio' in filename:
-            bank_code = 'JIOP'
-        elif 'maharashtra' in filename or 'sbm' in filename or 'mahabank' in filename or 'mahb' in filename:
-            bank_code = 'MAHB'
-    
-    # Select appropriate parser
-    parser: BaseBankParser = None
-    if bank_code == 'SBIN' and SBIParser:
-        parser = SBIParser()
-    elif bank_code == 'IDIB' and IndianBankParser:
-        parser = IndianBankParser()
-    elif bank_code == 'KKBK' and KotakBankParser:
-        parser = KotakBankParser()
-    elif bank_code == 'KKBK_V2' and KotakBankParserV2:
-        parser = KotakBankParserV2()
-    elif bank_code == 'HDFC' and HDFCBankParser:
-        parser = HDFCBankParser()
-    elif bank_code == 'MAHB' and SBMParser:
-        parser = SBMParser()
-    elif MultiBankParser:
-        # Use generic multi-bank parser
-        parser = MultiBankParser(bank_code or 'UNKNOWN')
-    
-    if not parser:
-        raise ImportError("No parser available - all parser imports failed")
-    
-    # Parse based on file type
-    if file_path.suffix.lower() == '.pdf':
-        result = parser.parse_pdf(file_path)
-    elif file_path.suffix.lower() in ['.xls', '.xlsx']:
-        result = parser.parse_excel(file_path)
-    else:
-        raise ValueError(f"Unsupported file format: {file_path.suffix}")
-    
-    # Handle case where parser returns tuple (df, metadata) instead of just df
-    if isinstance(result, tuple) and len(result) >= 1:
-        df = result[0]
-    elif isinstance(result, pd.DataFrame):
-        df = result
-    else:
-        df = pd.DataFrame()
-    
-    # Ensure df is a DataFrame
-    if not isinstance(df, pd.DataFrame):
-        df = pd.DataFrame()
-    
-    # Additional deduplication at DataFrame level
-    if isinstance(df, pd.DataFrame) and not df.empty:
-        df = deduplicate_transactions(df)
-    
-    # Extract statement metadata (MANDATORY - always attempt extraction)
-    metadata = None
+
     try:
-        if file_path.suffix.lower() == '.pdf':
-            # Try to extract metadata from parser first
-            try:
-                metadata = parser.extract_statement_metadata(file_path, df if not df.empty else None)
-            except Exception as parser_meta_err:
-                print(f"Parser metadata extraction failed: {parser_meta_err}", file=sys.stderr)
-                metadata = None
+        # Import new Pipeline Manager
+        from pipeline.manager import PipelineManager
+        
+        manager = PipelineManager()
+        # Statement ID is arbitrary for local runs, or could be filename
+        statement_id = file_path.stem 
+        
+        # Run Pipeline
+        result = manager.run_pipeline(str(file_path), statement_id=statement_id, password=password, bank_profiles=bank_profiles)
+        
+        if result.get("status") == "failed":
+            print(f"Pipeline failed: {result.get('error')}", file=sys.stderr)
+            return pd.DataFrame(), {}
             
-            # If parser didn't return metadata, try direct extraction
-            if not metadata or (isinstance(metadata, dict) and not any(metadata.values())):
-                try:
-                    from parsers.statement_metadata import StatementMetadataExtractor
-                    metadata = StatementMetadataExtractor.extract_all_metadata(file_path, bank_code, df if not df.empty else None)
-                    print(f"Direct metadata extraction: openingBalance={metadata.get('openingBalance')}, accountNumber={metadata.get('accountNumber')}", file=sys.stderr)
-                except Exception as direct_meta_err:
-                    print(f"Direct metadata extraction failed: {direct_meta_err}", file=sys.stderr)
-                    metadata = {}
+        # Convert transactions list to DataFrame
+        transactions = result.get("transactions", [])
+        if not transactions:
+            return pd.DataFrame(), {}
             
-            # Convert datetime objects to ISO strings for JSON serialization
-            if metadata and isinstance(metadata, dict):
-                if metadata.get('statementStartDate') and hasattr(metadata['statementStartDate'], 'isoformat'):
-                    metadata['statementStartDate'] = metadata['statementStartDate'].isoformat()
-                elif metadata.get('statementStartDate'):
-                    # Already a string, keep as is
-                    pass
-                if metadata.get('statementEndDate') and hasattr(metadata['statementEndDate'], 'isoformat'):
-                    metadata['statementEndDate'] = metadata['statementEndDate'].isoformat()
-                elif metadata.get('statementEndDate'):
-                    # Already a string, keep as is
-                    pass
+        df = pd.DataFrame(transactions)
+        
+        # Normalize columns to match expected legacy output if needed
+        # Legacy columns often include: date, description, debit, credit, balance, bankCode
+        # Our new pipeline outputs these keys in lowercase.
+        
+        # Add bank code to DF
+        detected_bank = result.get("bank", "Unknown")
+        df["bankCode"] = detected_bank
+        
+        # Rename 'amount' to specific needs if legacy app expects signed/unsigned?
+        # Legacy often used debit/credit columns which we have.
+        
+        # Metadata extraction
+        metadata = result.get("metadata", {})
+        metadata["bank"] = detected_bank
+        
+        return df, metadata
+
     except Exception as e:
-        print(f"Metadata extraction error (non-critical): {e}", file=sys.stderr)
+        print(f"Critical Error in Partition Engine: {e}", file=sys.stderr)
         import traceback
-        traceback.print_exc(file=sys.stderr)
-        metadata = {}  # Return empty dict instead of None
-    
-    # Ensure metadata is always a dict
-    if metadata is None:
-        metadata = {}
-    elif not isinstance(metadata, dict):
-        metadata = {}
-    
-    # Post-parse validation (after metadata extraction)
-    if not df.empty:
-        try:
-            from parsers.data_validator import DataValidator
-            validation_result = DataValidator.validate_transactions(df, bank_code, metadata)
-            
-            # Print validation report if there are errors
-            if validation_result.get('errors') or validation_result.get('warnings'):
-                from parsers.data_validator import DataValidator
-                report = DataValidator.generate_validation_report(validation_result)
-                print("\n" + report)
-                
-                # If there are critical errors, log them
-                if validation_result.get('errors'):
-                    print(f"\n⚠️  WARNING: {len(validation_result['errors'])} validation errors found!")
-        except Exception as e:
-            # Don't fail parsing if validation fails
-            print(f"Validation error (non-critical): {e}")
-    
-    return df, metadata
+        traceback.print_exc()
+        return pd.DataFrame(), {}
+
 
 
 def deduplicate_transactions(df: pd.DataFrame) -> pd.DataFrame:
@@ -278,16 +188,17 @@ def get_parser_for_bank(bank_code: str) -> BaseBankParser:
 def main():
     """Test function for command-line usage."""
     import sys
+    import argparse
     
-    if len(sys.argv) < 2:
-        print("Usage: python bank_statement_parser.py <file_path> [bank_code]")
-        sys.exit(1)
+    parser = argparse.ArgumentParser(description='Parse bank statement')
+    parser.add_argument('file_path', type=Path, help='Path to file')
+    parser.add_argument('bank_code', nargs='?', default=None, help='Bank code')
+    parser.add_argument('--password', help='PDF Password')
     
-    file_path = Path(sys.argv[1])
-    bank_code = sys.argv[2] if len(sys.argv) > 2 else None
+    args = parser.parse_args()
     
     try:
-        df, metadata = parse_bank_statement(file_path, bank_code)
+        df, metadata = parse_bank_statement(args.file_path, args.bank_code, args.password)
         
         if df.empty:
             print("No transactions found")

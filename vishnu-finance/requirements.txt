@@ -9,4 +9,8 @@ openpyxl>=3.1.0
 xlrd>=2.0.0
 python-docx>=0.8.11
 chardet>=5.0.0
+camelot-py>=0.11.0
+opencv-python-headless>=4.8.0
+# ghostscript is a system dependency, not pip installable, but listing here for reference
+
 

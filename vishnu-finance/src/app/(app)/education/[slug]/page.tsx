@@ -88,7 +88,7 @@ export default function PostDetail() {
     };
 
     if (loading) return (
-        <div className="flex items-center justify-center min-h-screen bg-matte-black text-silver">
+        <div className="flex items-center justify-center min-h-screen bg-background text-muted-foreground">
             <div className="animate-pulse flex flex-col items-center">
                 <Sparkles className="w-8 h-8 text-primary mb-4 animate-spin-slow" />
                 <p className="text-xs font-sans uppercase tracking-widest">Loading Intelligence...</p>
@@ -99,7 +99,7 @@ export default function PostDetail() {
     if (!post) return null;
 
     return (
-        <div className="flex flex-col h-full bg-background text-muted-foreground font-display selection:bg-primary/30 selection:text-white overflow-y-auto custom-scrollbar">
+        <div className="flex flex-col h-full bg-background text-muted-foreground selection:bg-primary/30 selection:text-white overflow-y-auto custom-scrollbar">
 
             {/* Main Content Area */}
             <main className="flex-1 relative">
@@ -172,7 +172,7 @@ export default function PostDetail() {
                             {post.title}
                         </h1>
 
-                        <div className="flex items-center justify-center gap-6 text-muted-foreground font-sans text-[11px] uppercase tracking-wider">
+                        <div className="flex items-center justify-center gap-6 text-muted-foreground text-[11px] uppercase tracking-wider">
                             <span className="flex items-center gap-1.5 opacity-70"><User className="w-3.5 h-3.5" /> {post.author.name}</span>
                             <span className="flex items-center gap-1.5 opacity-70"><Clock className="w-3.5 h-3.5" /> {format(new Date(post.createdAt), 'MMM dd, yyyy')}</span>
                         </div>

@@ -136,7 +136,7 @@ export default function TransactionCard({
                 {transaction.description &&
                   transaction.description !== transaction.personName &&
                   transaction.description !== transaction.store && (
-                    <span className="text-[11px] text-muted-foreground truncate max-w-[200px]">
+                    <span className="text-[11px] text-muted-foreground truncate max-w-[180px] sm:max-w-[250px]">
                       {transaction.description}
                     </span>
                   )}
@@ -209,9 +209,9 @@ export default function TransactionCard({
           )}
 
           {transaction.notes && (
-            <div className="text-sm">
-              <span className="text-muted-foreground">Notes: </span>
-              <span>{transaction.notes}</span>
+            <div className="text-sm flex items-start gap-1">
+              <span className="text-muted-foreground shrink-0">Notes: </span>
+              <span className="truncate">{transaction.notes}</span>
             </div>
           )}
 

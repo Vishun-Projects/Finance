@@ -105,9 +105,11 @@ export default function FinancialHealthPageClient({
     <div className="flex flex-col h-full bg-background text-foreground overflow-y-auto custom-scrollbar">
 
       {/* Header */}
-      <header className="h-16 px-8 flex items-center justify-between border-b border-border shrink-0 bg-background/50 backdrop-blur sticky top-0 z-30">
+      <header className="h-20 px-8 flex items-center justify-between border-b border-border shrink-0 bg-background/50 backdrop-blur sticky top-0 z-30">
         <div>
-          <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground">Financial Health</h2>
+          <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+            Financial Health
+          </h1>
         </div>
         <div className="flex items-center gap-4">
           <button className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-1.5 rounded-full font-bold text-[10px] transition-transform hover:scale-[1.02] active:scale-95 uppercase tracking-wider mr-2">

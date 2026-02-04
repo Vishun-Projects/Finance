@@ -232,6 +232,18 @@ export default function SimpleDashboard({
       {/* Content */}
       {/* Content */}
       <div className="p-4 md:p-8 space-y-8 max-w-7xl mx-auto w-full">
+        {/* Header Section */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-2">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+              Financial Overview
+            </h1>
+            <p className="text-muted-foreground mt-1">
+              Track your net worth, expenses, and financial habits.
+            </p>
+          </div>
+        </div>
+
         {/* Net Worth Card */}
         <section className="glass-card rounded-2xl p-8 flex flex-col md:flex-row justify-between items-start md:items-end gap-6 relative overflow-hidden group">
           {/* Background Glow Effect - Visible mainly in dark mode */}

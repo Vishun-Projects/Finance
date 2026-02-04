@@ -138,7 +138,7 @@ export default function AdminEducationPage() {
                 <div>
                     <h1 className="text-3xl font-bold text-foreground mb-2 flex items-center gap-3">
                         <LayoutGrid className="w-8 h-8 text-primary" />
-                        Manage Knowledge Hub
+                        Manage Blogs and News.
                     </h1>
                     <p className="text-muted-foreground">Create, edit, and generate educational content for your users.</p>
                 </div>

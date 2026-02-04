@@ -7,31 +7,32 @@ import { useCurrency } from '../../../contexts/CurrencyContext';
 import { useToast } from '../../../contexts/ToastContext';
 import { useNotifications } from '../../../lib/notifications';
 import {
+  User,
   Bell,
-  Shield,
-  Save,
-  CheckCircle,
-  Palette,
-  Moon,
-  Sun,
-  Contrast,
+  Lock,
   Globe,
+  Tag,
+  Palette,
+  Shield,
+  CreditCard,
   Mail,
   Smartphone,
-  Lock,
-  Key,
-  Trash2,
-  Download,
-  Upload,
-  FileText,
-  Tag,
+  CheckCircle,
   Plus,
   Edit,
-  X,
-  TrendingUp,
+  Trash2,
   TrendingDown,
+  TrendingUp,
+  X,
+  Save,
+  Sun,
+  Moon,
+  Monitor,
+  FileText,
+  Key,
   RefreshCw,
-  User,
+  Upload,
+  Download
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -721,8 +722,6 @@ export default function SettingsPageClient({ initialDocuments, initialPreference
       console.log('Saving preferences:', {
         userId: user.id,
         navigationLayout: 'top',
-        theme: theme,
-        colorScheme: 'default',
         currency: selectedCurrency,
         language: preferences.language,
         timezone: preferences.timezone,
@@ -736,8 +735,6 @@ export default function SettingsPageClient({ initialDocuments, initialPreference
         body: JSON.stringify({
           userId: user.id,
           navigationLayout: 'top', // Fixed to top navbar
-          theme: theme,
-          colorScheme: 'default',
           currency: selectedCurrency,
           language: preferences.language,
           timezone: preferences.timezone,
@@ -958,6 +955,29 @@ export default function SettingsPageClient({ initialDocuments, initialPreference
                     </div>
                   </div>
 
+                  {/* System Theme */}
+                  <div
+                    className={`cursor-pointer transition-all duration-300 rounded-xl border ${theme === 'system'
+                      ? 'border-primary ring-1 ring-primary bg-primary/5'
+                      : 'border-border/60 hover:border-primary/50 hover:bg-accent/50'
+                      }`}
+                    onClick={() => setTheme('system')}
+                  >
+                    <div className="p-4">
+                      <div className="flex items-center space-x-3 mb-3">
+                        <Monitor className="w-5 h-5 text-foreground" />
+                        <span className="font-medium text-foreground">System</span>
+                        {theme === 'system' && <Badge variant="secondary">Active</Badge>}
+                      </div>
+                      <div className="w-full h-16 bg-gradient-to-br from-card to-muted border border-border rounded-lg flex items-center justify-center shadow-sm relative overflow-hidden">
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <div className="w-4 h-8 bg-card border-r border-border"></div>
+                          <div className="w-4 h-8 bg-muted"></div>
+                        </div>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-3 font-medium">Follows system settings</p>
+                    </div>
+                  </div>
 
                 </div>
               </CardContent>

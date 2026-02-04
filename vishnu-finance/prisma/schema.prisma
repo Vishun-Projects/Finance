@@ -469,6 +469,7 @@ model Transaction {
   parsingConfidence  Float?
   rawParsingData     Json?
   notes              String?
+  dedupHash          String?             @unique
   receiptUrl         String?
   isDeleted          Boolean             @default(false)
   deletedAt          DateTime?
@@ -658,6 +659,21 @@ model DailyBriefing {
   
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
-
+  
   @@map("daily_briefings")
+}
+
+model BankParserConfig {
+  id                String   @id @default(cuid())
+  bankCode          String   @unique
+  bankName          String
+  detectionKeywords String[] // Keywords to identify bank (e.g. "HDFC Bank")
+  parserType        String   @default("PDF_TEXT") 
+  headerKeywords    String[] // Keywords for header row
+  columns           Json     // { "DATE": ["Date"], "DEBIT": ["Debit"] }
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@map("bank_parser_configs")
 }

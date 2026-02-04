@@ -15,7 +15,6 @@ import {
   LogOut,
   User as UserIcon,
   BookOpen,
-  ShieldCheck
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -33,7 +32,7 @@ const primaryNavItemsConfig = [
   { href: '/transactions', label: 'Transactions', icon: ReceiptText },
   { href: '/plans', label: 'Plans', icon: Layers },
   { href: '/salary', label: 'Salary', icon: Wallet },
-  { href: '/education', label: 'Knowledge Hub', icon: BookOpen },
+  { href: '/education', label: 'Blogs and News', icon: BookOpen },
   { href: '/advisor', label: 'AI Advisor', icon: Brain },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
@@ -52,18 +51,18 @@ export default function Navigation() {
     );
   }, [pathname]);
 
-  const isAdmin = user?.role === 'SUPERUSER';
-
   return (
     <>
       {/* Desktop Sidebar - Matches User Design */}
       <aside className="hidden lg:flex w-64 border-r border-border flex-col py-8 px-6 bg-sidebar shrink-0 h-full z-50">
         {/* Brand */}
-        <div className="flex items-center gap-3 mb-12">
-          <div className="size-8 flex items-center justify-center shrink-0">
-            <img src="/icon-removebg-preview.png" alt="Logo" className="w-full h-full object-contain" />
+        <div className="flex items-center justify-between gap-3 mb-12">
+          <div className="flex items-center gap-3">
+            <div className="size-8 flex items-center justify-center shrink-0">
+              <img src="/icon-removebg-preview.png" alt="Logo" className="w-full h-full object-contain" />
+            </div>
+            <span className="font-bold text-lg tracking-tight text-foreground">Vishnu Finance</span>
           </div>
-          <span className="font-bold text-lg tracking-tight text-foreground">Vishnu Finance</span>
         </div>
 
         {/* Navigation */}
@@ -85,9 +84,7 @@ export default function Navigation() {
               </Link>
             );
           })}
-
         </nav>
-
 
         {/* Profile Footer */}
         <div className="mt-auto pt-6 border-t border-border">
@@ -149,11 +146,11 @@ export default function Navigation() {
       </nav>
 
       {/* Mobile Top Bar (Updated) */}
-      <div className="fixed top-0 left-0 right-0 z-40 border-b border-border bg-background/80 backdrop-blur lg:hidden px-4 h-14 flex items-center justify-center">
+      <div className="fixed top-0 left-0 right-0 z-40 border-b border-border bg-background/80 backdrop-blur lg:hidden px-4 h-14 flex items-center justify-between">
+        <div className="w-10"></div> {/* Spacer for symmetry */}
         <span className="text-sm font-bold tracking-widest uppercase text-foreground">Vishnu Finance</span>
+        <div className="w-10"></div> {/* Spacer for symmetry */}
       </div>
     </>
   );
 }
-
-

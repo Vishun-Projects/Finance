@@ -29,6 +29,8 @@ function ThemeSync() {
   const { theme, setTheme } = useNextTheme();
   const { user } = useAuth();
   const [mounted, setMounted] = React.useState(false);
+  const [isInitialized, setIsInitialized] = React.useState(false);
+  const lastSavedTheme = React.useRef<string | undefined>(undefined);
 
   React.useEffect(() => {
     setMounted(true);
@@ -36,52 +38,69 @@ function ThemeSync() {
 
   // Sync from Backend on Mount/User Change
   React.useEffect(() => {
-    const loadThemePreference = async () => {
-      if (!user?.id) return;
+    if (!user?.id || !mounted) return;
 
+    const loadThemePreference = async () => {
       try {
         const response = await fetch(`/api/user-preferences?userId=${user.id}`);
         if (response.ok) {
           const data = await response.json();
-          // specific check: 'light', 'dark', or 'system'
-          if (data.theme && ['light', 'dark', 'system'].includes(data.theme)) {
-            setTheme(data.theme);
+          const validThemes = ['light', 'dark', 'system'];
+          if (data.theme && validThemes.includes(data.theme)) {
+            // Only update if different to avoid redundant cycles
+            if (theme !== data.theme) {
+              setTheme(data.theme);
+            }
+            lastSavedTheme.current = data.theme;
           }
         }
       } catch (error) {
         console.error('Error loading theme preference:', error);
+      } finally {
+        setIsInitialized(true);
       }
     };
 
-    if (mounted) {
-      loadThemePreference();
-    }
-  }, [user?.id, mounted, setTheme]);
+    loadThemePreference();
+  }, [user?.id, mounted]);
 
   // Sync TO Backend when theme changes
   React.useEffect(() => {
-    if (!mounted || !user?.id) return;
+    // Only save if initialized, mounted, user present, theme is valid, and theme is different from last saved
+    const validThemes = ['light', 'dark', 'system'];
+    if (
+      !isInitialized ||
+      !mounted ||
+      !user?.id ||
+      !theme ||
+      !validThemes.includes(theme) ||
+      theme === lastSavedTheme.current
+    ) return;
 
     const saveTheme = async () => {
       try {
+        const themeToSave = theme;
         await fetch('/api/user-preferences', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             userId: user.id,
-            theme: theme,
+            theme: themeToSave,
             navigationLayout: 'top',
             colorScheme: 'default'
           })
         });
+        lastSavedTheme.current = themeToSave;
       } catch (error) {
         console.error('Error saving theme preference:', error);
       }
     };
 
-    saveTheme();
+    // Debounce slightly to avoid rapid updates
+    const timer = setTimeout(saveTheme, 800);
+    return () => clearTimeout(timer);
 
-  }, [theme, user?.id, mounted]);
+  }, [theme, user?.id, mounted, isInitialized]);
 
   return null;
 }

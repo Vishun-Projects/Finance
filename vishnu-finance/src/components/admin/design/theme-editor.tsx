@@ -127,6 +127,8 @@ export function ThemeEditor() {
                             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
                                 {[
                                     { name: 'Luxury', value: '45 90% 45%', hex: '#d4af37', accent: '0 0% 10%', accentHex: '#1a1a1a' }, // Gold + Black
+                                    { name: 'HarryP', value: '30 80% 45%', hex: '#b54d13', accent: '200 40% 20%', accentHex: '#1e293b' }, // Gryffindorish
+                                    { name: 'DBZ', value: '25 100% 50%', hex: '#ff6b00', accent: '210 100% 40%', accentHex: '#0047ff' }, // Goku colors
                                     { name: 'Nature', value: '100 40% 40%', hex: '#4d8f3d', accent: '75 85% 60%', accentHex: '#dfff4f' }, // Olive + Lime
                                     { name: 'Corporate', value: '250 85% 40%', hex: '#2c0fbd', accent: '30 90% 60%', accentHex: '#f97316' }, // Navy + Orange
                                     { name: 'Classic', value: '220 90% 30%', hex: '#082f91', accent: '40 90% 60%', accentHex: '#facc15' }, // Deep Blue + Gold
@@ -134,9 +136,8 @@ export function ThemeEditor() {
                                     { name: 'Sunset', value: '15 90% 55%', hex: '#f97316', accent: '280 60% 50%', accentHex: '#9333ea' }, // Orange + Purple
                                     { name: 'Bold', value: '0 90% 20%', hex: '#610505', accent: '10 90% 55%', accentHex: '#f97316' }, // Dark Red + Orange
                                     { name: 'Soft', value: '230 40% 60%', hex: '#8b9bd6', accent: '25 90% 75%', accentHex: '#fdba74' }, // Periwinkle + Peach
-                                    { name: 'Pastel', value: '140 20% 60%', hex: '#85bda0', accent: '30 80% 80%', accentHex: '#fde68a' }, // Sage + Cream
-                                    { name: 'Obsidian', value: '0 0% 0%', hex: '#000000', accent: '0 0% 50%', accentHex: '#808080' }, // Black + Grey
                                     { name: 'Emerald', value: '142 76% 36%', hex: '#16a34a', accent: '340 70% 60%', accentHex: '#f43f5e' }, // Green + Rose
+                                    { name: 'Royal', value: '270 70% 40%', hex: '#6b21a8', accent: '45 90% 50%', accentHex: '#eab308' }, // Purple + Gold
                                 ].map((scheme) => (
                                     <button
                                         key={scheme.name}
@@ -257,6 +258,13 @@ export function ThemeEditor() {
                                         <SelectContent>
                                             <SelectItem value="Inter">Inter (Default)</SelectItem>
                                             <SelectItem value="Manrope">Manrope</SelectItem>
+                                            <SelectItem value="Lexend">Lexend</SelectItem>
+                                            <SelectItem value="Montserrat">Montserrat</SelectItem>
+                                            <SelectItem value="Outfit">Outfit</SelectItem>
+                                            <SelectItem value="Roboto">Roboto</SelectItem>
+                                            <SelectItem value="Poppins">Poppins</SelectItem>
+                                            <SelectItem value="Public Sans">Public Sans</SelectItem>
+                                            <SelectItem value="Plus Jakarta Sans">Plus Jakarta Sans</SelectItem>
                                             <SelectItem value="System">System UI</SelectItem>
                                         </SelectContent>
                                     </Select>
@@ -273,8 +281,13 @@ export function ThemeEditor() {
                                         <SelectContent>
                                             <SelectItem value="Inter">Inter</SelectItem>
                                             <SelectItem value="Manrope">Manrope</SelectItem>
+                                            <SelectItem value="Lexend">Lexend</SelectItem>
+                                            <SelectItem value="Outfit">Outfit</SelectItem>
                                             <SelectItem value="Playfair Display">Playfair Display</SelectItem>
+                                            <SelectItem value="Newsreader">Newsreader</SelectItem>
                                             <SelectItem value="JetBrains Mono">JetBrains Mono</SelectItem>
+                                            <SelectItem value="Montserrat">Montserrat</SelectItem>
+                                            <SelectItem value="Poppins">Poppins</SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>

@@ -20,7 +20,7 @@ export default async function DailyBriefingHistoryPage() {
     const availableDates = allDates.map(b => b.date.toISOString());
 
     return (
-        <div className="flex flex-col h-full bg-background text-muted-foreground font-sans selection:bg-primary/30 selection:text-white overflow-y-auto custom-scrollbar">
+        <div className="flex flex-col h-full bg-background text-muted-foreground selection:bg-primary/30 selection:text-white overflow-y-auto custom-scrollbar">
             {/* Header */}
             <div className="h-16 border-b border-border flex items-center justify-between px-8 shrink-0 bg-background/50 backdrop-blur sticky top-0 z-30">
                 <div className="flex items-center gap-2">
@@ -76,7 +76,7 @@ export default async function DailyBriefingHistoryPage() {
                                             <div className="md:col-span-2 h-48 md:h-auto relative overflow-hidden">
                                                 <BriefingImage
                                                     src={briefing.heroImage}
-                                                    title={briefing.title}
+                                                    title={briefing.title || 'Market Briefing'}
                                                     sentiment={briefing.sentiment}
                                                     sentimentColor={sentimentColor}
                                                     score={briefing.sentimentScore}

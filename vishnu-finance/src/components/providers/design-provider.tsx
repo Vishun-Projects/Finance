@@ -125,11 +125,26 @@ export function DesignProvider({ children, initialSettings }: DesignProviderProp
         // Typography
         if (settings.fontFamilyBody && settings.fontFamilyBody !== 'System') {
             root.style.setProperty('--font-sans', settings.fontFamilyBody)
+            loadGoogleFont(settings.fontFamilyBody)
         }
         if (settings.fontFamilyHeading) {
             root.style.setProperty('--font-heading', settings.fontFamilyHeading)
+            loadGoogleFont(settings.fontFamilyHeading)
         }
     }, [settings, isDark])
+
+    const loadGoogleFont = (fontName: string) => {
+        if (!fontName || fontName === 'System' || fontName === 'Inter') return // Inter is built-in
+
+        const linkId = `google-font-${fontName.replace(/\s+/g, '-').toLowerCase()}`
+        if (document.getElementById(linkId)) return
+
+        const link = document.createElement('link')
+        link.id = linkId
+        link.rel = 'stylesheet'
+        link.href = `https://fonts.googleapis.com/css2?family=${fontName.replace(/\s+/g, '+')}:wght@300;400;500;600;700;800&display=swap`
+        document.head.appendChild(link)
+    }
 
     return (
         <DesignContext.Provider value={{ settings, updateSettings: (s) => setSettings(prev => ({ ...prev!, ...s })) }}>

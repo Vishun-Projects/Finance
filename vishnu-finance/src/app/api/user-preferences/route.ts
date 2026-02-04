@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
       // Return default preferences if none exist
       return NextResponse.json({
         navigationLayout: 'sidebar',
-        theme: 'light',
+        theme: 'system',
         colorScheme: 'default'
       });
     }
@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
       create: {
         userId,
         navigationLayout: navigationLayout || 'sidebar',
-        theme: theme || 'light',
+        theme: theme || 'system',
         colorScheme: colorScheme || 'default',
         currency: currency || 'INR',
         language: language || 'en',

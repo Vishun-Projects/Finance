@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Plus, Search, Filter, X, RefreshCw, CheckSquare, Square, Trash2, RotateCw, Tag, Layers, ChevronLeft, ChevronRight, Sparkles, Check, Calendar as CalendarIcon, FileText, Upload, AlertCircle, TrendingUp, ChevronDown, Edit, Download, ArrowUp, ShoppingCart, Utensils, Zap, ShoppingBag, BrainCircuit } from 'lucide-react';
+import { Plus, Search, Filter, X, RefreshCw, CheckSquare, Square, Trash2, RotateCw, Tag, Layers, ChevronLeft, ChevronRight, Sparkles, Check, Calendar as CalendarIcon, FileText, Upload, AlertCircle, TrendingUp, ChevronDown, Edit, Download, ArrowUp, ShoppingCart, Utensils, Zap, ShoppingBag, BrainCircuit, Sun, Moon } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from 'recharts';
 import { useSearchParams, useRouter } from 'next/navigation';
@@ -11,6 +11,7 @@ import { useToast } from '../contexts/ToastContext';
 import { Transaction, TransactionCategory } from '@/types';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { useTheme } from '@/contexts/ThemeContext';
 import { format, startOfMonth, subDays } from 'date-fns';
 import { DateRange } from 'react-day-picker';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -76,6 +77,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
   const { success, error: showError } = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { theme, setTheme, isDark } = useTheme();
 
   const resolvedUserId = user?.id ?? bootstrap?.userId ?? null;
   const bootstrapRange = bootstrap?.range;
@@ -97,6 +99,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
   // Selection state (always available, no separate mode)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showBulkCategorize, setShowBulkCategorize] = useState(false);
+  const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
   const [bulkCategoryId, setBulkCategoryId] = useState<string>('');
   const [isBulkUpdating, setIsBulkUpdating] = useState(false);
 
@@ -133,6 +136,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
   const [importProgress, setImportProgress] = useState<number>(0);
   const [tempFiles, setTempFiles] = useState<string[]>([]);
   const [remoteFile, setRemoteFile] = useState<string | null>(null);
+  const [pdfPassword, setPdfPassword] = useState('');
   const [isDragging, setIsDragging] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [categorizationProgress, setCategorizationProgress] = useState<{
@@ -141,6 +145,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
     progress: number;
     isActive: boolean;
   } | null>(null);
+  const [parsingViewMode, setParsingViewMode] = useState<'transactions' | 'raw' | 'json'>('transactions');
 
   const hasBootstrapTransactionsRef = useRef(Boolean(bootstrap?.transactions?.length));
   const hasBootstrapCategoriesRef = useRef(Boolean(bootstrap?.categories?.length));
@@ -890,6 +895,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
 
       const data = await response.json();
       success('Success', `Deleted ${data.deletedCount || selectedIds.size} transaction(s)`);
+      setShowBulkDeleteDialog(false);
       setSelectedIds(new Set());
       fetchTransactions();
     } catch (error) {
@@ -937,7 +943,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
   }, [selectedIds, transactions, fetchTransactions, success, showError]);
 
   // Auto-categorize using full categorization service (rules + AI + patterns)
-  const handleAutoCategorizeByUpiAccount = useCallback(async () => {
+  const handleAutoCategorizeSelected = useCallback(async () => {
     if (selectedIds.size === 0) {
       showError('Error', 'Please select transactions to categorize');
       return;
@@ -1311,13 +1317,20 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
   const handleMultiFormatFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const supportedTypes = ['application/pdf'];
-      const supportedExtensions = ['.pdf'];
+      const supportedTypes = [
+        'application/pdf',
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'text/plain',
+        'text/csv'
+      ];
+      const supportedExtensions = ['.pdf', '.xls', '.xlsx', '.txt', '.csv'];
+
       const hasValidType = supportedTypes.includes(file.type);
       const hasValidExtension = supportedExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
 
       if (!hasValidType && !hasValidExtension) {
-        setFileError('Please select a valid PDF file');
+        setFileError('Please select a valid PDF, Excel, or Text file');
         return;
       }
       setSelectedFile(file);
@@ -1353,8 +1366,15 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
     const files = e.dataTransfer.files;
     if (files && files.length > 0) {
       const file = files[0];
-      const supportedTypes = ['application/pdf'];
-      const supportedExtensions = ['.pdf'];
+      const supportedTypes = [
+        'application/pdf',
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'text/plain',
+        'text/csv'
+      ];
+      const supportedExtensions = ['.pdf', '.xls', '.xlsx', '.txt', '.csv'];
+
       const hasValidType = supportedTypes.includes(file.type);
       const hasValidExtension = supportedExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
 
@@ -1364,7 +1384,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
         // Auto-parse the file after drop
         setTimeout(() => handleParseFile(file), 100);
       } else {
-        setFileError('Please drop a valid PDF file');
+        setFileError('Please drop a valid PDF, Excel, or Text file');
       }
     }
   };
@@ -1389,13 +1409,18 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
       formData.append('file', file);
       formData.append('userId', user.id);
       if (selectedBank) formData.append('bankCode', selectedBank);
+      if (pdfPassword) formData.append('password', pdfPassword);
 
-      const response = await fetch('/api/parse-statement', {
+      const response = await fetch('/api/parse-pdf', {
         method: 'POST',
         body: formData,
       });
 
       if (!response.ok) {
+        if (response.status === 401) {
+          // Special handling for password required - we'll keep the dialog open but show the input
+          throw new Error('PASSWORD_REQUIRED');
+        }
         const err = await response.json().catch(() => ({}));
         throw new Error(err.error || 'Failed to parse file');
       }
@@ -1414,7 +1439,13 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
       setParseProgress(100);
     } catch (error) {
       console.error('Error parsing file:', error);
-      setFileError(error instanceof Error ? error.message : 'Failed to parse file');
+      const msg = error instanceof Error ? error.message : 'Failed to parse file';
+      if (msg === 'PASSWORD_REQUIRED') {
+        setFileError('The PDF is password protected. Please enter the password below.');
+        setShowFileDialog(true); // Ensure dialog stays open
+      } else {
+        setFileError(msg);
+      }
     } finally {
       if (parseTimer) clearInterval(parseTimer);
       setIsParsingFile(false);
@@ -1801,12 +1832,23 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
       </div>
 
       {/* Desktop Header */}
-      <header className="hidden md:flex h-16 border-b border-border items-center justify-between px-8 shrink-0 bg-background sticky top-0 z-30">
-        <div className="flex items-center gap-4">
-          <h1 className="text-xl font-bold tracking-tight">Transactions</h1>
-          <span className="text-muted-foreground text-sm">{totalRecords} total</span>
+      <header className="hidden md:flex h-20 border-b border-border items-center justify-between px-8 shrink-0 bg-background/50 backdrop-blur sticky top-0 z-30">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+            Transactions
+          </h1>
+          <p className="text-muted-foreground text-sm mt-0.5">
+            {totalRecords || 0} records found
+          </p>
         </div>
         <div className="flex items-center gap-3">
+          <button
+            onClick={() => setTheme(isDark ? 'light' : 'dark')}
+            className="p-2 text-muted-foreground hover:text-foreground transition-colors"
+            aria-label="Toggle Theme"
+          >
+            {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+          </button>
           <Button
             variant="outline"
             size="sm"
@@ -2069,7 +2111,22 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                 <table className="w-full text-left border-collapse min-w-[800px]">
                   <thead>
                     <tr className="border-b border-border bg-muted/20">
-                      {showSelectionMode && <th className="w-14 px-6 py-5"></th>}
+                      {showSelectionMode && (
+                        <th className="w-14 px-6 py-5">
+                          <button
+                            onClick={handleSelectAll}
+                            className={cn(
+                              "w-5 h-5 rounded-md border flex items-center justify-center transition-all",
+                              selectedIds.size > 0 && selectedIds.size === filteredTransactions.length
+                                ? "bg-foreground border-foreground text-background shadow-md"
+                                : "bg-background border-input hover:border-foreground"
+                            )}
+                          >
+                            {selectedIds.size > 0 && selectedIds.size === filteredTransactions.length && <Check className="w-3.5 h-3.5" />}
+                            {selectedIds.size > 0 && selectedIds.size < filteredTransactions.length && <div className="w-2.5 h-0.5 bg-foreground" />}
+                          </button>
+                        </th>
+                      )}
                       <th className="px-6 py-5 text-[10px] font-black text-muted-foreground uppercase tracking-widest">Date</th>
                       <th className="px-6 py-5 text-[10px] font-black text-muted-foreground uppercase tracking-widest">Merchant / Description</th>
                       <th className="px-6 py-5 text-[10px] font-black text-muted-foreground uppercase tracking-widest">Category</th>
@@ -2141,8 +2198,8 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                                   <CategoryIcon category={transaction.category?.name || ''} />
                                 </div>
                                 <div className="flex flex-col min-w-0">
-                                  <span className="text-sm font-bold text-foreground truncate max-w-[240px] tracking-tight">{transaction.store || transaction.description}</span>
-                                  {transaction.personName && <span className="text-[10px] text-muted-foreground font-black uppercase tracking-widest mt-0.5">By {transaction.personName}</span>}
+                                  <span className="text-sm font-bold text-foreground truncate max-w-[280px] tracking-tight">{transaction.store || transaction.description}</span>
+                                  {transaction.personName && <span className="text-[10px] text-muted-foreground font-black uppercase tracking-widest mt-0.5 truncate max-w-[320px] block">By {transaction.personName}</span>}
                                 </div>
                               </div>
                             </td>
@@ -2694,7 +2751,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                 <Button
                   variant="outline"
                   className="w-full"
-                  onClick={handleAutoCategorizeByUpiAccount}
+                  onClick={handleAutoCategorizeSelected}
                   disabled={isBulkUpdating}
                 >
                   <Sparkles className="w-4 h-4 mr-2" />
@@ -2703,29 +2760,11 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                 <Button
                   variant="default"
                   className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white border-0"
-                  onClick={async () => {
-                    setIsBulkUpdating(true);
-                    try {
-                      success('AI Categorization', 'Started categorizing transactions...');
-                      const res = await fetch('/api/app', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ action: 'transactions_auto_categorize' })
-                      });
-                      const data = await res.json();
-                      success('AI Categorization', `Processed ${data.processed}, Updated ${data.updated} transactions.`);
-                      // Refresh data
-                      fetchTransactions();
-                    } catch (e) {
-                      showError('Error', 'Auto-categorization failed');
-                    } finally {
-                      setIsBulkUpdating(false);
-                    }
-                  }}
+                  onClick={handleAutoCategorizeSelected}
                   disabled={isBulkUpdating}
                 >
                   <BrainCircuit className="w-4 h-4 mr-2" />
-                  Smart Auto-Categorize (AI)
+                  Auto-Categorize Selected (AI)
                 </Button>
                 <div className="flex gap-2">
                   <Button
@@ -2815,6 +2854,8 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                       <h4 className="font-semibold text-foreground mb-2">Supported File Formats:</h4>
                       <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
                         <li><strong>PDF:</strong> Bank statements, transaction reports</li>
+                        <li><strong>Excel:</strong> .xls, .xlsx transaction sheets</li>
+                        <li><strong>Text:</strong> .txt, .csv flat files</li>
                       </ul>
                       <p className="text-xs text-muted-foreground mt-2">
                         Duplicates will be automatically skipped during import
@@ -2844,7 +2885,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                     </p>
                     <input
                       type="file"
-                      accept=".pdf,application/pdf"
+                      accept=".pdf,.xls,.xlsx,.txt,.csv,application/pdf,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/plain,text/csv"
                       onChange={handleMultiFormatFileSelect}
                       className="hidden"
                       id="file-upload-transactions"
@@ -2872,8 +2913,20 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                   </div>
                 )}
 
-                {/* Bank selector and Parse Button */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Password, Bank selector and Parse Button */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-foreground mb-3">
+                      PDF Password (if any)
+                    </label>
+                    <Input
+                      type="password"
+                      placeholder="Enter password"
+                      value={pdfPassword}
+                      onChange={(e) => setPdfPassword(e.target.value)}
+                      className="bg-background"
+                    />
+                  </div>
                   <div>
                     <label className="block text-sm font-semibold text-foreground mb-3">
                       Bank (optional)
@@ -2956,431 +3009,513 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                 </button>
               </div>
 
+              <div className="flex border-b px-6 bg-muted/20">
+                <button
+                  onClick={() => setParsingViewMode('transactions')}
+                  className={cn("px-4 py-3 text-sm font-medium border-b-2 transition-colors",
+                    parsingViewMode === 'transactions' ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground")}
+                >
+                  Transactions
+                </button>
+                <button
+                  onClick={() => setParsingViewMode('raw')}
+                  className={cn("px-4 py-3 text-sm font-medium border-b-2 transition-colors",
+                    parsingViewMode === 'raw' ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground")}
+                >
+                  Raw Extraction
+                </button>
+                <button
+                  onClick={() => setParsingViewMode('json')}
+                  className={cn("px-4 py-3 text-sm font-medium border-b-2 transition-colors",
+                    parsingViewMode === 'json' ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground")}
+                >
+                  Processed JSON
+                </button>
+              </div>
+
               <div className="overflow-y-auto flex-1 p-4 md:p-6 space-y-6">
-                {/* Summary */}
-                <div className="bg-muted/50 rounded-lg p-4 border border-border">
-                  <div className="flex items-center space-x-3">
-                    <TrendingUp className="w-5 h-5 text-success flex-shrink-0" />
-                    <div>
-                      <p className="font-semibold text-foreground">Found {filteredParsed.length} transactions</p>
-                      <p className="text-sm text-muted-foreground">
-                        Credits will be added as Income, Debits as Expenses.
-                        Zero amounts will be skipped. Duplicates will be automatically skipped.
-                        Store and product information will be preserved.
-                      </p>
-                    </div>
-                  </div>
-                  {isParsingFile && (
-                    <div className="mt-3">
-                      <div className="w-full bg-muted rounded-full h-2">
-                        <div className="bg-primary h-2 rounded-full transition-all" style={{ width: `${parseProgress}%` }}></div>
-                      </div>
-                      <div className="text-xs text-muted-foreground mt-1">Parsing... {parseProgress}%</div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Credits & Debits Summary - Parser vs Actual */}
-                {parsedTransactions.length > 0 && (
-                  <div className="bg-gradient-to-br from-green-50 to-blue-50 dark:from-green-950/20 dark:to-blue-950/20 rounded-lg p-4 border border-green-200 dark:border-green-800">
-                    <div className="flex items-center space-x-3 mb-4">
-                      <Sparkles className="w-5 h-5 text-primary flex-shrink-0" />
-                      <h4 className="text-lg font-semibold text-foreground">Credits & Debits Summary</h4>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* Parser Found (from PDF metadata) */}
-                      <div className="bg-background rounded-lg p-4 border border-border">
-                        <div className="flex items-center space-x-2 mb-3">
-                          <FileText className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                          <h5 className="text-sm font-semibold text-foreground">Parser Found (from PDF)</h5>
+                {parsingViewMode === 'transactions' && (
+                  <>
+                    {/* Summary */}
+                    <div className="bg-muted/50 rounded-lg p-4 border border-border">
+                      <div className="flex items-center space-x-3">
+                        <TrendingUp className="w-5 h-5 text-success flex-shrink-0" />
+                        <div>
+                          <p className="font-semibold text-foreground">Found {filteredParsed.length} transactions</p>
+                          <p className="text-sm text-muted-foreground">
+                            Credits will be added as Income, Debits as Expenses.
+                            Zero amounts will be skipped. Duplicates will be automatically skipped.
+                            Store and product information will be preserved.
+                          </p>
                         </div>
-                        <div className="space-y-2">
-                          {statementMetadata?.totalCredits !== undefined ? (
+                      </div>
+                      {isParsingFile && (
+                        <div className="mt-3">
+                          <div className="w-full bg-muted rounded-full h-2">
+                            <div className="bg-primary h-2 rounded-full transition-all" style={{ width: `${parseProgress}%` }}></div>
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-1">Parsing... {parseProgress}%</div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Credits & Debits Summary - Parser vs Actual */}
+                    {parsedTransactions.length > 0 && (
+                      <div className="bg-gradient-to-br from-green-50 to-blue-50 dark:from-green-950/20 dark:to-blue-950/20 rounded-lg p-4 border border-green-200 dark:border-green-800">
+                        <div className="flex items-center space-x-3 mb-4">
+                          <Sparkles className="w-5 h-5 text-primary flex-shrink-0" />
+                          <h4 className="text-lg font-semibold text-foreground">Credits & Debits Summary</h4>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {/* Parser Found (from PDF metadata) */}
+                          <div className="bg-background rounded-lg p-4 border border-border">
+                            <div className="flex items-center space-x-2 mb-3">
+                              <FileText className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                              <h5 className="text-sm font-semibold text-foreground">Parser Found (from PDF)</h5>
+                            </div>
+                            <div className="space-y-2">
+                              {statementMetadata?.totalCredits !== undefined ? (
+                                <div>
+                                  <p className="text-xs font-medium text-muted-foreground mb-1">Total Credits</p>
+                                  <p className="text-base font-bold text-green-600 dark:text-green-400">
+                                    ₹{Number(statementMetadata.totalCredits).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </p>
+                                </div>
+                              ) : (
+                                <div>
+                                  <p className="text-xs font-medium text-muted-foreground mb-1">Total Credits</p>
+                                  <p className="text-sm text-muted-foreground">Not available in PDF</p>
+                                </div>
+                              )}
+                              {statementMetadata?.totalDebits !== undefined ? (
+                                <div>
+                                  <p className="text-xs font-medium text-muted-foreground mb-1">Total Debits</p>
+                                  <p className="text-base font-bold text-red-600 dark:text-red-400">
+                                    ₹{Number(statementMetadata.totalDebits).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </p>
+                                </div>
+                              ) : (
+                                <div>
+                                  <p className="text-xs font-medium text-muted-foreground mb-1">Total Debits</p>
+                                  <p className="text-sm text-muted-foreground">Not available in PDF</p>
+                                </div>
+                              )}
+                              {statementMetadata?.transactionCount !== undefined && (
+                                <div className="mt-2 pt-2 border-t border-border">
+                                  <p className="text-xs font-medium text-muted-foreground mb-1">Transaction Count</p>
+                                  <p className="text-sm font-semibold text-foreground">
+                                    {statementMetadata.transactionCount}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Actual Parsed (calculated from transactions) */}
+                          <div className="bg-background rounded-lg p-4 border border-border">
+                            <div className="flex items-center space-x-2 mb-3">
+                              <Check className="w-4 h-4 text-success" />
+                              <h5 className="text-sm font-semibold text-foreground">Actual Parsed (from transactions)</h5>
+                            </div>
+                            <div className="space-y-2">
+                              <div>
+                                <p className="text-xs font-medium text-muted-foreground mb-1">Total Credits</p>
+                                <p className="text-base font-bold text-green-600 dark:text-green-400">
+                                  ₹{actualTotals.totalCredits.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-xs font-medium text-muted-foreground mb-1">Total Debits</p>
+                                <p className="text-base font-bold text-red-600 dark:text-red-400">
+                                  ₹{actualTotals.totalDebits.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </p>
+                              </div>
+                              <div className="mt-2 pt-2 border-t border-border">
+                                <p className="text-xs font-medium text-muted-foreground mb-1">Transaction Count</p>
+                                <p className="text-sm font-semibold text-foreground">
+                                  {parsedTransactions.length}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Difference/Comparison */}
+                        {(statementMetadata?.totalCredits !== undefined || statementMetadata?.totalDebits !== undefined) && (
+                          <div className="mt-4 pt-4 border-t border-border">
+                            <h5 className="text-sm font-semibold text-foreground mb-3">Comparison</h5>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              {statementMetadata?.totalCredits !== undefined && (
+                                <div className="bg-muted/50 rounded p-3">
+                                  <p className="text-xs font-medium text-muted-foreground mb-1">Credit Difference</p>
+                                  <p className={`text-sm font-semibold ${Math.abs(actualTotals.totalCredits - Number(statementMetadata.totalCredits)) < 0.01
+                                    ? 'text-success'
+                                    : 'text-yellow-600 dark:text-yellow-400'
+                                    }`}>
+                                    {Math.abs(actualTotals.totalCredits - Number(statementMetadata.totalCredits)) < 0.01
+                                      ? '✓ Matches'
+                                      : `₹${Math.abs(actualTotals.totalCredits - Number(statementMetadata.totalCredits)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${actualTotals.totalCredits > Number(statementMetadata.totalCredits) ? 'more' : 'less'}`
+                                    }
+                                  </p>
+                                </div>
+                              )}
+                              {statementMetadata?.totalDebits !== undefined && (
+                                <div className="bg-muted/50 rounded p-3">
+                                  <p className="text-xs font-medium text-muted-foreground mb-1">Debit Difference</p>
+                                  <p className={`text-sm font-semibold ${Math.abs(actualTotals.totalDebits - Number(statementMetadata.totalDebits)) < 0.01
+                                    ? 'text-success'
+                                    : 'text-yellow-600 dark:text-yellow-400'
+                                    }`}>
+                                    {Math.abs(actualTotals.totalDebits - Number(statementMetadata.totalDebits)) < 0.01
+                                      ? '✓ Matches'
+                                      : `₹${Math.abs(actualTotals.totalDebits - Number(statementMetadata.totalDebits)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${actualTotals.totalDebits > Number(statementMetadata.totalDebits) ? 'more' : 'less'}`
+                                    }
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Account Details from PDF */}
+                    {statementMetadata && (
+                      <div className="bg-blue-50 dark:bg-blue-950/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
+                        <div className="flex items-center space-x-3 mb-4">
+                          <FileText className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+                          <h4 className="text-lg font-semibold text-foreground">Account Details from PDF</h4>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {statementMetadata.accountNumber && (
+                            <div>
+                              <p className="text-xs font-medium text-muted-foreground mb-1">Account Number</p>
+                              <p className="text-sm font-mono text-foreground bg-background px-2 py-1 rounded border">
+                                {statementMetadata.accountNumber}
+                              </p>
+                            </div>
+                          )}
+                          {statementMetadata.ifsc && (
+                            <div>
+                              <p className="text-xs font-medium text-muted-foreground mb-1">IFSC Code</p>
+                              <p className="text-sm font-mono text-foreground bg-background px-2 py-1 rounded border">
+                                {statementMetadata.ifsc}
+                              </p>
+                            </div>
+                          )}
+                          {statementMetadata.branch && (
+                            <div>
+                              <p className="text-xs font-medium text-muted-foreground mb-1">Branch</p>
+                              <p className="text-sm text-foreground bg-background px-2 py-1 rounded border">
+                                {statementMetadata.branch}
+                              </p>
+                            </div>
+                          )}
+                          {statementMetadata.accountHolderName && (
+                            <div>
+                              <p className="text-xs font-medium text-muted-foreground mb-1">Account Holder</p>
+                              <p className="text-sm text-foreground bg-background px-2 py-1 rounded border">
+                                {statementMetadata.accountHolderName}
+                              </p>
+                            </div>
+                          )}
+                          {statementMetadata.openingBalance !== null && statementMetadata.openingBalance !== undefined && (
+                            <div>
+                              <p className="text-xs font-medium text-muted-foreground mb-1">Opening Balance</p>
+                              <p className="text-sm font-semibold text-foreground bg-background px-2 py-1 rounded border">
+                                ₹{Number(statementMetadata.openingBalance).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </p>
+                            </div>
+                          )}
+                          {statementMetadata.closingBalance !== null && statementMetadata.closingBalance !== undefined && (
+                            <div>
+                              <p className="text-xs font-medium text-muted-foreground mb-1">Closing Balance</p>
+                              <p className="text-sm font-semibold text-foreground bg-background px-2 py-1 rounded border">
+                                ₹{Number(statementMetadata.closingBalance).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </p>
+                            </div>
+                          )}
+                          {statementMetadata.statementStartDate && (
+                            <div>
+                              <p className="text-xs font-medium text-muted-foreground mb-1">Statement Period (Start)</p>
+                              <p className="text-sm text-foreground bg-background px-2 py-1 rounded border">
+                                {new Date(statementMetadata.statementStartDate).toLocaleDateString('en-IN', {
+                                  year: 'numeric',
+                                  month: 'long',
+                                  day: 'numeric'
+                                })}
+                              </p>
+                            </div>
+                          )}
+                          {statementMetadata.statementEndDate && (
+                            <div>
+                              <p className="text-xs font-medium text-muted-foreground mb-1">Statement Period (End)</p>
+                              <p className="text-sm text-foreground bg-background px-2 py-1 rounded border">
+                                {new Date(statementMetadata.statementEndDate).toLocaleDateString('en-IN', {
+                                  year: 'numeric',
+                                  month: 'long',
+                                  day: 'numeric'
+                                })}
+                              </p>
+                            </div>
+                          )}
+                          {statementMetadata.totalCredits !== undefined && (
                             <div>
                               <p className="text-xs font-medium text-muted-foreground mb-1">Total Credits</p>
-                              <p className="text-base font-bold text-green-600 dark:text-green-400">
+                              <p className="text-sm font-semibold text-green-600 dark:text-green-400 bg-background px-2 py-1 rounded border">
                                 ₹{Number(statementMetadata.totalCredits).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                               </p>
                             </div>
-                          ) : (
-                            <div>
-                              <p className="text-xs font-medium text-muted-foreground mb-1">Total Credits</p>
-                              <p className="text-sm text-muted-foreground">Not available in PDF</p>
-                            </div>
                           )}
-                          {statementMetadata?.totalDebits !== undefined ? (
+                          {statementMetadata.totalDebits !== undefined && (
                             <div>
                               <p className="text-xs font-medium text-muted-foreground mb-1">Total Debits</p>
-                              <p className="text-base font-bold text-red-600 dark:text-red-400">
+                              <p className="text-sm font-semibold text-red-600 dark:text-red-400 bg-background px-2 py-1 rounded border">
                                 ₹{Number(statementMetadata.totalDebits).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                               </p>
                             </div>
-                          ) : (
-                            <div>
-                              <p className="text-xs font-medium text-muted-foreground mb-1">Total Debits</p>
-                              <p className="text-sm text-muted-foreground">Not available in PDF</p>
-                            </div>
                           )}
-                          {statementMetadata?.transactionCount !== undefined && (
-                            <div className="mt-2 pt-2 border-t border-border">
+                          {statementMetadata.transactionCount !== undefined && (
+                            <div>
                               <p className="text-xs font-medium text-muted-foreground mb-1">Transaction Count</p>
-                              <p className="text-sm font-semibold text-foreground">
+                              <p className="text-sm font-semibold text-foreground bg-background px-2 py-1 rounded border">
                                 {statementMetadata.transactionCount}
                               </p>
                             </div>
                           )}
                         </div>
-                      </div>
-
-                      {/* Actual Parsed (calculated from transactions) */}
-                      <div className="bg-background rounded-lg p-4 border border-border">
-                        <div className="flex items-center space-x-2 mb-3">
-                          <Check className="w-4 h-4 text-success" />
-                          <h5 className="text-sm font-semibold text-foreground">Actual Parsed (from transactions)</h5>
-                        </div>
-                        <div className="space-y-2">
-                          <div>
-                            <p className="text-xs font-medium text-muted-foreground mb-1">Total Credits</p>
-                            <p className="text-base font-bold text-green-600 dark:text-green-400">
-                              ₹{actualTotals.totalCredits.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        {(!statementMetadata.accountNumber && !statementMetadata.ifsc && !statementMetadata.branch && !statementMetadata.accountHolderName) && (
+                          <div className="mt-3 p-2 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800 rounded">
+                            <p className="text-xs text-yellow-800 dark:text-yellow-200">
+                              ⚠️ Account details could not be extracted from this PDF. The transactions will still be imported.
                             </p>
                           </div>
-                          <div>
-                            <p className="text-xs font-medium text-muted-foreground mb-1">Total Debits</p>
-                            <p className="text-base font-bold text-red-600 dark:text-red-400">
-                              ₹{actualTotals.totalDebits.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </p>
-                          </div>
-                          <div className="mt-2 pt-2 border-t border-border">
-                            <p className="text-xs font-medium text-muted-foreground mb-1">Transaction Count</p>
-                            <p className="text-sm font-semibold text-foreground">
-                              {parsedTransactions.length}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Difference/Comparison */}
-                    {(statementMetadata?.totalCredits !== undefined || statementMetadata?.totalDebits !== undefined) && (
-                      <div className="mt-4 pt-4 border-t border-border">
-                        <h5 className="text-sm font-semibold text-foreground mb-3">Comparison</h5>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          {statementMetadata?.totalCredits !== undefined && (
-                            <div className="bg-muted/50 rounded p-3">
-                              <p className="text-xs font-medium text-muted-foreground mb-1">Credit Difference</p>
-                              <p className={`text-sm font-semibold ${Math.abs(actualTotals.totalCredits - Number(statementMetadata.totalCredits)) < 0.01
-                                ? 'text-success'
-                                : 'text-yellow-600 dark:text-yellow-400'
-                                }`}>
-                                {Math.abs(actualTotals.totalCredits - Number(statementMetadata.totalCredits)) < 0.01
-                                  ? '✓ Matches'
-                                  : `₹${Math.abs(actualTotals.totalCredits - Number(statementMetadata.totalCredits)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${actualTotals.totalCredits > Number(statementMetadata.totalCredits) ? 'more' : 'less'}`
-                                }
-                              </p>
-                            </div>
-                          )}
-                          {statementMetadata?.totalDebits !== undefined && (
-                            <div className="bg-muted/50 rounded p-3">
-                              <p className="text-xs font-medium text-muted-foreground mb-1">Debit Difference</p>
-                              <p className={`text-sm font-semibold ${Math.abs(actualTotals.totalDebits - Number(statementMetadata.totalDebits)) < 0.01
-                                ? 'text-success'
-                                : 'text-yellow-600 dark:text-yellow-400'
-                                }`}>
-                                {Math.abs(actualTotals.totalDebits - Number(statementMetadata.totalDebits)) < 0.01
-                                  ? '✓ Matches'
-                                  : `₹${Math.abs(actualTotals.totalDebits - Number(statementMetadata.totalDebits)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${actualTotals.totalDebits > Number(statementMetadata.totalDebits) ? 'more' : 'less'}`
-                                }
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Account Details from PDF */}
-                {statementMetadata && (
-                  <div className="bg-blue-50 dark:bg-blue-950/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
-                    <div className="flex items-center space-x-3 mb-4">
-                      <FileText className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0" />
-                      <h4 className="text-lg font-semibold text-foreground">Account Details from PDF</h4>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {statementMetadata.accountNumber && (
-                        <div>
-                          <p className="text-xs font-medium text-muted-foreground mb-1">Account Number</p>
-                          <p className="text-sm font-mono text-foreground bg-background px-2 py-1 rounded border">
-                            {statementMetadata.accountNumber}
-                          </p>
-                        </div>
-                      )}
-                      {statementMetadata.ifsc && (
-                        <div>
-                          <p className="text-xs font-medium text-muted-foreground mb-1">IFSC Code</p>
-                          <p className="text-sm font-mono text-foreground bg-background px-2 py-1 rounded border">
-                            {statementMetadata.ifsc}
-                          </p>
-                        </div>
-                      )}
-                      {statementMetadata.branch && (
-                        <div>
-                          <p className="text-xs font-medium text-muted-foreground mb-1">Branch</p>
-                          <p className="text-sm text-foreground bg-background px-2 py-1 rounded border">
-                            {statementMetadata.branch}
-                          </p>
-                        </div>
-                      )}
-                      {statementMetadata.accountHolderName && (
-                        <div>
-                          <p className="text-xs font-medium text-muted-foreground mb-1">Account Holder</p>
-                          <p className="text-sm text-foreground bg-background px-2 py-1 rounded border">
-                            {statementMetadata.accountHolderName}
-                          </p>
-                        </div>
-                      )}
-                      {statementMetadata.openingBalance !== null && statementMetadata.openingBalance !== undefined && (
-                        <div>
-                          <p className="text-xs font-medium text-muted-foreground mb-1">Opening Balance</p>
-                          <p className="text-sm font-semibold text-foreground bg-background px-2 py-1 rounded border">
-                            ₹{Number(statementMetadata.openingBalance).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                          </p>
-                        </div>
-                      )}
-                      {statementMetadata.closingBalance !== null && statementMetadata.closingBalance !== undefined && (
-                        <div>
-                          <p className="text-xs font-medium text-muted-foreground mb-1">Closing Balance</p>
-                          <p className="text-sm font-semibold text-foreground bg-background px-2 py-1 rounded border">
-                            ₹{Number(statementMetadata.closingBalance).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                          </p>
-                        </div>
-                      )}
-                      {statementMetadata.statementStartDate && (
-                        <div>
-                          <p className="text-xs font-medium text-muted-foreground mb-1">Statement Period (Start)</p>
-                          <p className="text-sm text-foreground bg-background px-2 py-1 rounded border">
-                            {new Date(statementMetadata.statementStartDate).toLocaleDateString('en-IN', {
-                              year: 'numeric',
-                              month: 'long',
-                              day: 'numeric'
-                            })}
-                          </p>
-                        </div>
-                      )}
-                      {statementMetadata.statementEndDate && (
-                        <div>
-                          <p className="text-xs font-medium text-muted-foreground mb-1">Statement Period (End)</p>
-                          <p className="text-sm text-foreground bg-background px-2 py-1 rounded border">
-                            {new Date(statementMetadata.statementEndDate).toLocaleDateString('en-IN', {
-                              year: 'numeric',
-                              month: 'long',
-                              day: 'numeric'
-                            })}
-                          </p>
-                        </div>
-                      )}
-                      {statementMetadata.totalCredits !== undefined && (
-                        <div>
-                          <p className="text-xs font-medium text-muted-foreground mb-1">Total Credits</p>
-                          <p className="text-sm font-semibold text-green-600 dark:text-green-400 bg-background px-2 py-1 rounded border">
-                            ₹{Number(statementMetadata.totalCredits).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                          </p>
-                        </div>
-                      )}
-                      {statementMetadata.totalDebits !== undefined && (
-                        <div>
-                          <p className="text-xs font-medium text-muted-foreground mb-1">Total Debits</p>
-                          <p className="text-sm font-semibold text-red-600 dark:text-red-400 bg-background px-2 py-1 rounded border">
-                            ₹{Number(statementMetadata.totalDebits).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                          </p>
-                        </div>
-                      )}
-                      {statementMetadata.transactionCount !== undefined && (
-                        <div>
-                          <p className="text-xs font-medium text-muted-foreground mb-1">Transaction Count</p>
-                          <p className="text-sm font-semibold text-foreground bg-background px-2 py-1 rounded border">
-                            {statementMetadata.transactionCount}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                    {(!statementMetadata.accountNumber && !statementMetadata.ifsc && !statementMetadata.branch && !statementMetadata.accountHolderName) && (
-                      <div className="mt-3 p-2 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800 rounded">
-                        <p className="text-xs text-yellow-800 dark:text-yellow-200">
-                          ⚠️ Account details could not be extracted from this PDF. The transactions will still be imported.
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Split View: Raw Data (Left) and Processed Data (Right) */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* Left Half - Raw Data */}
-                  <div>
-                    <h4 className="text-lg font-semibold text-foreground mb-4 flex items-center">
-                      <FileText className="w-5 h-5 mr-2" />
-                      Raw Transaction Data
-                    </h4>
-                    <div className="max-h-96 overflow-y-auto border border-border rounded-lg">
-                      <div className="bg-muted px-4 py-2 border-b border-border sticky top-0">
-                        <p className="text-sm font-medium text-foreground">
-                          {filteredParsed.length} transactions found
-                        </p>
-                      </div>
-                      <div className="space-y-2 p-4">
-                        {visibleParsed.map((transaction: BankTransaction, index: number) => (
-                          <div key={index} className="bg-card p-3 rounded border border-border">
-                            <div className="text-xs text-muted-foreground mb-1">
-                              Transaction #{index + 1} (Raw Length: {(transaction.raw || transaction.description || '').length})
-                            </div>
-                            <div className="text-sm font-mono text-foreground break-all whitespace-pre-wrap overflow-x-auto">
-                              {transaction.raw || transaction.description || 'No raw data available'}
-                            </div>
-                            <div className="text-xs text-muted-foreground mt-1">
-                              Length: {(transaction.raw || transaction.description || '').length} chars
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Right Half - Processed Data */}
-                  <div>
-                    <h4 className="text-lg font-semibold text-foreground mb-4 flex items-center">
-                      <TrendingUp className="w-5 h-5 mr-2" />
-                      Processed Data
-                    </h4>
-                    <div className="max-h-96 overflow-y-auto">
-                      {/* Preview filters */}
-                      <div className="flex items-center justify-between mb-3">
-                        <label className="inline-flex items-center gap-2 text-sm">
-                          <input type="checkbox" checked={previewMonthOnly} onChange={(e) => { setPreviewMonthOnly(e.target.checked); setPreviewPage(1); }} />
-                          Current month only
-                        </label>
-                        <div className="flex items-center gap-2 text-xs">
-                          <span>Rows per page</span>
-                          <select value={previewPageSize} onChange={(e) => { setPreviewPageSize(parseInt(e.target.value || '200')); setPreviewPage(1); }} className="border rounded px-1 py-0.5 bg-background text-foreground">
-                            <option value={100}>100</option>
-                            <option value={200}>200</option>
-                            <option value={500}>500</option>
-                          </select>
-                        </div>
-                      </div>
-                      {/* Table (md+) */}
-                      <div className="hidden md:block overflow-x-auto">
-                        <table className="min-w-full bg-card border border-border rounded-lg">
-                          <thead className="bg-muted">
-                            <tr>
-                              <th className="px-3 py-2 text-left text-xs font-medium text-foreground uppercase tracking-wider">Date</th>
-                              <th className="px-3 py-2 text-left text-xs font-medium text-foreground uppercase tracking-wider">Store/Person</th>
-                              <th className="px-3 py-2 text-left text-xs font-medium text-foreground uppercase tracking-wider">Commodity</th>
-                              <th className="px-3 py-2 text-left text-xs font-medium text-foreground uppercase tracking-wider">Type</th>
-                              <th className="px-3 py-2 text-left text-xs font-medium text-foreground uppercase tracking-wider">Credit</th>
-                              <th className="px-3 py-2 text-left text-xs font-medium text-foreground uppercase tracking-wider">Debit</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-border">
-                            {visibleParsed.map((transaction: BankTransaction, index: number) => {
-                              const debitAmount = parseFloat(String(transaction.debit || '0'));
-                              const creditAmount = parseFloat(String(transaction.credit || '0'));
-                              const isIncome = creditAmount > 0;
-                              const storeOrPerson = transaction.store || transaction.personName || '';
-                              const commodity = transaction.commodity || '';
-
-                              return (
-                                <tr key={index} className="hover:bg-muted/50">
-                                  <td className="px-3 py-2 text-xs text-foreground">
-                                    {transaction.date_iso || transaction.date || new Date().toISOString().split('T')[0]}
-                                  </td>
-                                  <td className="px-3 py-2 text-xs text-foreground font-medium">
-                                    {storeOrPerson || '-'}
-                                  </td>
-                                  <td className="px-3 py-2 text-xs text-muted-foreground">
-                                    {commodity || '-'}
-                                  </td>
-                                  <td className="px-3 py-2">
-                                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${isIncome
-                                      ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                                      : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                                      }`}>
-                                      {isIncome ? 'Credit' : 'Debit'}
-                                    </span>
-                                  </td>
-                                  <td className="px-3 py-2 text-xs font-bold text-green-600 dark:text-green-400">
-                                    {creditAmount > 0 ? `₹${creditAmount.toFixed(2)}` : '-'}
-                                  </td>
-                                  <td className="px-3 py-2 text-xs font-bold text-red-600 dark:text-red-400">
-                                    {debitAmount > 0 ? `₹${debitAmount.toFixed(2)}` : '-'}
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
-
-                      {/* Mobile Card List */}
-                      <div className="md:hidden divide-y divide-border border border-border rounded-lg overflow-hidden">
-                        {visibleParsed.length === 0 ? (
-                          <div className="px-4 py-6 text-center text-sm text-muted-foreground">No records</div>
-                        ) : (
-                          visibleParsed.map((transaction: BankTransaction, index: number) => {
-                            const debitAmount = parseFloat(String(transaction.debit || '0'));
-                            const creditAmount = parseFloat(String(transaction.credit || '0'));
-                            const isIncome = creditAmount > 0;
-                            const storeOrPerson = transaction.store || transaction.personName || '';
-                            const commodity = transaction.commodity || '';
-                            return (
-                              <div key={index} className="p-4 bg-card">
-                                <div className="flex items-start justify-between gap-3">
-                                  <div className="flex-1">
-                                    <div className="text-xs text-muted-foreground">{transaction.date_iso || transaction.date || '-'}</div>
-                                    <div className="text-sm font-medium text-foreground mt-1" title={transaction.description || transaction.narration || ''}>
-                                      {transaction.description || transaction.narration || '—'}
-                                    </div>
-                                    <div className="mt-2 flex flex-wrap items-center gap-2">
-                                      <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${isIncome ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'}`}>
-                                        {isIncome ? 'Credit' : 'Debit'}
-                                      </span>
-                                      {storeOrPerson && (
-                                        <span className="px-2 py-0.5 rounded text-xs bg-muted text-foreground">{storeOrPerson}</span>
-                                      )}
-                                      {commodity && (
-                                        <span className="px-2 py-0.5 rounded text-xs bg-muted text-foreground">{commodity}</span>
-                                      )}
-                                    </div>
-                                  </div>
-                                  <div className="text-right">
-                                    {isIncome ? (
-                                      <div className="text-sm font-semibold text-green-600 dark:text-green-400">₹{creditAmount.toFixed(2)}</div>
-                                    ) : (
-                                      <div className="text-sm font-semibold text-red-600 dark:text-red-400">₹{debitAmount.toFixed(2)}</div>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })
                         )}
                       </div>
+                    )}
 
-                      {/* Pagination */}
-                      {totalPages > 1 && (
-                        <div className="flex items-center justify-between mt-3 text-sm">
-                          <span className="text-muted-foreground">Page {previewPage} of {totalPages}</span>
-                          <div className="flex items-center gap-2">
-                            <button className="px-2 py-1 border rounded disabled:opacity-50 bg-background text-foreground hover:bg-muted" onClick={() => setPreviewPage(p => Math.max(1, p - 1))} disabled={previewPage === 1}>Prev</button>
-                            <button className="px-2 py-1 border rounded disabled:opacity-50 bg-background text-foreground hover:bg-muted" onClick={() => setPreviewPage(p => Math.min(totalPages, p + 1))} disabled={previewPage === totalPages}>Next</button>
+                    {/* Split View: Raw Data (Left) and Processed Data (Right) */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      {/* Left Half - Raw Data */}
+                      <div>
+                        <h4 className="text-lg font-semibold text-foreground mb-4 flex items-center">
+                          <FileText className="w-5 h-5 mr-2" />
+                          Raw Transaction Data
+                        </h4>
+                        <div className="max-h-96 overflow-y-auto border border-border rounded-lg">
+                          <div className="bg-muted px-4 py-2 border-b border-border sticky top-0">
+                            <p className="text-sm font-medium text-foreground">
+                              {filteredParsed.length} transactions found
+                            </p>
+                          </div>
+                          <div className="space-y-2 p-4">
+                            {visibleParsed.map((transaction: BankTransaction, index: number) => (
+                              <div key={index} className="bg-card p-3 rounded border border-border">
+                                <div className="text-xs text-muted-foreground mb-1">
+                                  Transaction #{index + 1} (Raw Length: {(transaction.raw || transaction.description || '').length})
+                                </div>
+                                <div className="text-sm font-mono text-foreground break-all whitespace-pre-wrap overflow-x-auto">
+                                  {transaction.raw || transaction.description || 'No raw data available'}
+                                </div>
+                                <div className="text-xs text-muted-foreground mt-1">
+                                  Length: {(transaction.raw || transaction.description || '').length} chars
+                                </div>
+                              </div>
+                            ))}
                           </div>
                         </div>
-                      )}
+                      </div>
+
+                      {/* Right Half - Processed Data */}
+                      <div>
+                        <h4 className="text-lg font-semibold text-foreground mb-4 flex items-center">
+                          <TrendingUp className="w-5 h-5 mr-2" />
+                          Processed Data
+                        </h4>
+                        <div className="max-h-96 overflow-y-auto">
+                          {/* Preview filters */}
+                          <div className="flex items-center justify-between mb-3">
+                            <label className="inline-flex items-center gap-2 text-sm">
+                              <input type="checkbox" checked={previewMonthOnly} onChange={(e) => { setPreviewMonthOnly(e.target.checked); setPreviewPage(1); }} />
+                              Current month only
+                            </label>
+                            <div className="flex items-center gap-2 text-xs">
+                              <span>Rows per page</span>
+                              <select value={previewPageSize} onChange={(e) => { setPreviewPageSize(parseInt(e.target.value || '200')); setPreviewPage(1); }} className="border rounded px-1 py-0.5 bg-background text-foreground">
+                                <option value={100}>100</option>
+                                <option value={200}>200</option>
+                                <option value={500}>500</option>
+                              </select>
+                            </div>
+                          </div>
+                          {/* Table (md+) */}
+                          <div className="hidden md:block overflow-x-auto">
+                            <table className="min-w-full bg-card border border-border rounded-lg">
+                              <thead className="bg-muted">
+                                <tr>
+                                  <th className="px-3 py-2 text-left text-xs font-medium text-foreground uppercase tracking-wider">Date</th>
+                                  <th className="px-3 py-2 text-left text-xs font-medium text-foreground uppercase tracking-wider">Store/Person</th>
+                                  <th className="px-3 py-2 text-left text-xs font-medium text-foreground uppercase tracking-wider">Commodity</th>
+                                  <th className="px-3 py-2 text-left text-xs font-medium text-foreground uppercase tracking-wider">Type</th>
+                                  <th className="px-3 py-2 text-left text-xs font-medium text-foreground uppercase tracking-wider">Credit</th>
+                                  <th className="px-3 py-2 text-left text-xs font-medium text-foreground uppercase tracking-wider">Debit</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-border">
+                                {visibleParsed.map((transaction: BankTransaction, index: number) => {
+                                  const debitAmount = parseFloat(String(transaction.debit || '0'));
+                                  const creditAmount = parseFloat(String(transaction.credit || '0'));
+                                  const isIncome = creditAmount > 0;
+                                  const storeOrPerson = transaction.store || transaction.personName || '';
+                                  const commodity = transaction.commodity || '';
+
+                                  return (
+                                    <tr key={index} className="hover:bg-muted/50">
+                                      <td className="px-3 py-2 text-xs text-foreground">
+                                        {transaction.date_iso || transaction.date || new Date().toISOString().split('T')[0]}
+                                      </td>
+                                      <td className="px-3 py-2 text-xs text-foreground font-medium">
+                                        {storeOrPerson || '-'}
+                                      </td>
+                                      <td className="px-3 py-2 text-xs text-muted-foreground">
+                                        {commodity || '-'}
+                                      </td>
+                                      <td className="px-3 py-2">
+                                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${isIncome
+                                          ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                          : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                                          }`}>
+                                          {isIncome ? 'Credit' : 'Debit'}
+                                        </span>
+                                      </td>
+                                      <td className="px-3 py-2 text-xs font-bold text-green-600 dark:text-green-400">
+                                        {creditAmount > 0 ? `₹${creditAmount.toFixed(2)}` : '-'}
+                                      </td>
+                                      <td className="px-3 py-2 text-xs font-bold text-red-600 dark:text-red-400">
+                                        {debitAmount > 0 ? `₹${debitAmount.toFixed(2)}` : '-'}
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+
+                          {/* Mobile Card List */}
+                          <div className="md:hidden divide-y divide-border border border-border rounded-lg overflow-hidden">
+                            {visibleParsed.length === 0 ? (
+                              <div className="px-4 py-6 text-center text-sm text-muted-foreground">No records</div>
+                            ) : (
+                              visibleParsed.map((transaction: BankTransaction, index: number) => {
+                                const debitAmount = parseFloat(String(transaction.debit || '0'));
+                                const creditAmount = parseFloat(String(transaction.credit || '0'));
+                                const isIncome = creditAmount > 0;
+                                const storeOrPerson = transaction.store || transaction.personName || '';
+                                const commodity = transaction.commodity || '';
+                                return (
+                                  <div key={index} className="p-4 bg-card">
+                                    <div className="flex items-start justify-between gap-3">
+                                      <div className="flex-1">
+                                        <div className="text-xs text-muted-foreground">{transaction.date_iso || transaction.date || '-'}</div>
+                                        <div className="text-sm font-medium text-foreground mt-1" title={transaction.description || transaction.narration || ''}>
+                                          {transaction.description || transaction.narration || '—'}
+                                        </div>
+                                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                                          <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${isIncome ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'}`}>
+                                            {isIncome ? 'Credit' : 'Debit'}
+                                          </span>
+                                          {storeOrPerson && (
+                                            <span className="px-2 py-0.5 rounded text-xs bg-muted text-foreground">{storeOrPerson}</span>
+                                          )}
+                                          {commodity && (
+                                            <span className="px-2 py-0.5 rounded text-xs bg-muted text-foreground">{commodity}</span>
+                                          )}
+                                        </div>
+                                      </div>
+                                      <div className="text-right">
+                                        {isIncome ? (
+                                          <div className="text-sm font-semibold text-green-600 dark:text-green-400">₹{creditAmount.toFixed(2)}</div>
+                                        ) : (
+                                          <div className="text-sm font-semibold text-red-600 dark:text-red-400">₹{debitAmount.toFixed(2)}</div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })
+                            )}
+                          </div>
+
+                          {/* Pagination */}
+                          {totalPages > 1 && (
+                            <div className="flex items-center justify-between mt-3 text-sm">
+                              <span className="text-muted-foreground">Page {previewPage} of {totalPages}</span>
+                              <div className="flex items-center gap-2">
+                                <button className="px-2 py-1 border rounded disabled:opacity-50 bg-background text-foreground hover:bg-muted" onClick={() => setPreviewPage(p => Math.max(1, p - 1))} disabled={previewPage === 1}>Prev</button>
+                                <button className="px-2 py-1 border rounded disabled:opacity-50 bg-background text-foreground hover:bg-muted" onClick={() => setPreviewPage(p => Math.min(totalPages, p + 1))} disabled={previewPage === totalPages}>Next</button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                  </>
+                )}
+
+                {parsingViewMode === 'raw' && (
+                  <div className="space-y-6">
+                    <div className="bg-muted/50 rounded-lg p-6 border border-border">
+                      <h4 className="text-lg font-semibold mb-4 flex items-center">
+                        <FileText className="w-5 h-5 mr-2 text-primary" />
+                        Stage 5-8: Raw Extraction Samples
+                      </h4>
+                      <div className="space-y-6">
+                        <div>
+                          <h5 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-3">Sample Raw Rows (First 50)</h5>
+                          <div className="bg-background border rounded-md p-4 max-h-[300px] overflow-y-auto font-mono text-xs whitespace-pre">
+                            {statementMetadata?.raw_rows_sample?.map((row: string, i: number) => (
+                              <div key={i} className="py-1 border-b border-muted last:border-0 hover:bg-muted/30 transition-colors">
+                                <span className="text-muted-foreground mr-3 inline-block w-6">{i + 1}</span>
+                                {row}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                        <div>
+                          <h5 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-3">Identified Candidates (Top 100)</h5>
+                          <div className="bg-background border rounded-md p-4 max-h-[300px] overflow-y-auto font-mono text-xs">
+                            {statementMetadata?.raw_candidates?.map((can: any, i: number) => (
+                              <div key={i} className="mb-4 pb-4 border-b border-muted last:border-0 last:pb-0">
+                                <div className="font-bold text-primary mb-1">Candidate #{i + 1}</div>
+                                <pre className="whitespace-pre-wrap">{JSON.stringify(can, null, 2)}</pre>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
+
+                {parsingViewMode === 'json' && (
+                  <div className="space-y-6">
+                    <div className="bg-muted/50 rounded-lg p-6 border border-border">
+                      <h4 className="text-lg font-semibold mb-4 flex items-center">
+                        <BrainCircuit className="w-5 h-5 mr-2 text-primary" />
+                        Final Processed Pipeline Output
+                      </h4>
+                      <div className="bg-background border rounded-md p-4 max-h-[500px] overflow-auto font-mono text-xs">
+                        <pre>{JSON.stringify({
+                          metadata: statementMetadata,
+                          transactions: parsedTransactions,
+                          debug_logs: (statementMetadata as any)?.debug_logs
+                        }, null, 2)}</pre>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Import Button with progress */}
                 <div className="space-y-3">
@@ -3413,6 +3548,55 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
         )
       }
 
+      {/* Bulk Action Bar */}
+      {selectedIds.size > 0 && (
+        <div
+          ref={selectionToolbarRef}
+          className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-8 duration-300"
+        >
+          <div className="bg-foreground text-background shadow-2xl rounded-2xl px-6 py-4 flex items-center gap-6 border border-background/20 backdrop-blur-xl">
+            <div className="flex items-center gap-3 pr-6 border-r border-background/20">
+              <div className="size-8 rounded-full bg-background/10 flex items-center justify-center font-bold text-sm">
+                {selectedIds.size}
+              </div>
+              <p className="text-sm font-bold tracking-tight">Selected</p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="hover:bg-background/10 text-background font-bold text-[10px] uppercase tracking-widest h-9 px-4 gap-2"
+                onClick={() => setShowBulkCategorize(true)}
+              >
+                <Tag size={14} />
+                Categorize
+              </Button>
+
+              <Button
+                variant="ghost"
+                size="sm"
+                className="hover:bg-rose-500/20 text-rose-400 font-bold text-[10px] uppercase tracking-widest h-9 px-4 gap-2"
+                onClick={() => setShowBulkDeleteDialog(true)}
+              >
+                <Trash2 size={14} />
+                Delete
+              </Button>
+            </div>
+
+            <div className="pl-4">
+              <button
+                onClick={clearSelection}
+                className="p-2 rounded-full hover:bg-background/10 transition-colors"
+                title="Clear selection"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Delete Confirmation */}
       <DeleteConfirmationDialog
         open={showDeleteDialog}
@@ -3423,6 +3607,16 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
         onConfirm={handleDelete}
         deleting={isDeleting}
         count={1}
+        actionType="delete"
+      />
+
+      {/* Bulk Delete Confirmation */}
+      <DeleteConfirmationDialog
+        open={showBulkDeleteDialog}
+        onClose={() => setShowBulkDeleteDialog(false)}
+        onConfirm={handleBulkDelete}
+        deleting={isDeleting}
+        count={selectedIds.size}
         actionType="delete"
       />
     </div >

@@ -220,30 +220,31 @@ export async function POST(request: NextRequest) {
           date = dateInput;
         } else {
           const dateStr = dateInput.toString().trim();
-          // Try ISO format first (YYYY-MM-DD)
-          if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-            date = new Date(dateStr + 'T00:00:00');
+          // Try ISO format first (YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS)
+          if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) {
+            // Use T00:00:00 to ensure local date interpretation if only date provided
+            const isoStr = dateStr.includes('T') ? dateStr : `${dateStr.substring(0, 10)}T00:00:00`;
+            date = new Date(isoStr);
           } else {
-            // Try parsing as-is
+            // Try parsing as-is (handles DD/MM/YYYY if browser/node local config allows, but risky)
             date = new Date(dateStr);
           }
         }
 
         if (isNaN(date.getTime())) {
-          console.warn(`⚠️ Invalid date: ${dateInput}`);
+          console.warn(`⚠️ [parseDate] Invalid date object created from: "${dateInput}"`);
           return null;
         }
 
-        // More lenient year validation (allow 2010-2030 for historical and future transactions)
         const year = date.getFullYear();
-        if (year < 2010 || year > 2030) {
-          console.warn(`⚠️ Date year out of range: ${year} for date: ${dateInput}`);
+        if (year < 2000 || year > 2099) {
+          console.warn(`⚠️ [parseDate] Year out of range (${year}) for: "${dateInput}"`);
           return null;
         }
 
         return date;
       } catch (error) {
-        console.warn(`⚠️ Date parsing error for: ${dateInput}`, error);
+        console.warn(`⚠️ [parseDate] Exception parsing "${dateInput}":`, error);
         return null;
       }
     };
@@ -391,6 +392,14 @@ export async function POST(request: NextRequest) {
           hasZeroAmount: hasZeroAmount,
           parsingMethod: r.parsingMethod || 'standard',
           parsingConfidence: r.parsingConfidence || (isPartialData ? 0.5 : 1.0),
+          dedupHash: generateDedupHash({
+            userId,
+            transactionDate: parsedDate!,
+            description: description,
+            creditAmount: creditAmount,
+            debitAmount: debitAmount,
+            transactionId: r.transactionId || null,
+          })
         };
       })
       .filter((r, idx) => {
@@ -805,13 +814,17 @@ export async function POST(request: NextRequest) {
     });
 
     // Log deduplication statistics
-    const duplicateCount = normalized.length - unique.length - invalidDateCount;
-    if (duplicateCount > 0 || invalidDateCount > 0) {
-      console.log(`📊 Deduplication: ${normalized.length} normalized → ${unique.length} unique (${duplicateCount} duplicates in file, ${invalidDateCount} invalid dates)`);
+    const internalDuplicateCount = normalized.length - unique.length - invalidDateCount;
+    if (internalDuplicateCount > 0 || invalidDateCount > 0) {
+      console.log(`📊 Deduplication: ${normalized.length} normalized → ${unique.length} unique (${internalDuplicateCount} duplicates in file, ${invalidDateCount} invalid dates)`);
+      if (invalidDateCount > 0) {
+        const sampleInvalid = normalized.filter(r => !r.transactionDate || isNaN(r.transactionDate.getTime())).slice(0, 3);
+        console.log(`🔍 Sample invalid dates in payload:`, sampleInvalid.map(r => (records[normalized.indexOf(r)] as any).date_iso || (records[normalized.indexOf(r)] as any).date));
+      }
     }
 
     let inserted = 0;
-    let duplicates = 0;
+    let duplicates = internalDuplicateCount; // Start with internal duplicates
     let creditInserted = 0;
     let debitInserted = 0;
 
@@ -1060,17 +1073,18 @@ export async function POST(request: NextRequest) {
             const isPartialData = (r as any).isPartialData ? 1 : 0;
             const hasInvalidDate = (r as any).hasInvalidDate ? 1 : 0;
             const hasZeroAmount = (r as any).hasZeroAmount ? 1 : 0;
+            const dedupHash = (r as any).dedupHash ? `'${(r as any).dedupHash}'` : 'NULL';
             const parsingMethod = (r as any).parsingMethod ? `'${String((r as any).parsingMethod).replace(/'/g, "''")}'` : 'NULL';
             const parsingConfidence = (r as any).parsingConfidence !== null && (r as any).parsingConfidence !== undefined ? Number((r as any).parsingConfidence) : 'NULL';
 
-            return `(${id},'${userId}',${date},'${desc}',${credit},${debit},'${r.financialCategory}',${categoryId},${accountStatementId},${bankCode},${transactionId},${accountNumber},${transferType},${personName},${upiId},${branch},${store},${rawData},${balance},${notes},${receiptUrl},0,${isPartialData},${hasInvalidDate},${hasZeroAmount},${parsingMethod},${parsingConfidence},'${now}','${now}',${documentId})`;
+            return `(${id},'${userId}',${date},'${desc}',${credit},${debit},'${r.financialCategory}',${categoryId},${accountStatementId},${bankCode},${transactionId},${accountNumber},${transferType},${personName},${upiId},${branch},${store},${rawData},${balance},${notes},${receiptUrl},0,${isPartialData},${hasInvalidDate},${hasZeroAmount},${parsingMethod},${parsingConfidence},${dedupHash},'${now}','${now}',${documentId})`;
           }).join(',');
 
-          // Execute raw SQL INSERT IGNORE (fastest method, handles duplicates automatically)
           await (prisma as any).$executeRawUnsafe(`
-            INSERT IGNORE INTO transactions 
-            (id, userId, transactionDate, description, creditAmount, debitAmount, financialCategory, categoryId, accountStatementId, bankCode, transactionId, accountNumber, transferType, personName, upiId, branch, store, rawData, balance, notes, receiptUrl, isDeleted, isPartialData, hasInvalidDate, hasZeroAmount, parsingMethod, parsingConfidence, createdAt, updatedAt, documentId)
+            INSERT INTO transactions 
+            (id, userId, transactionDate, description, creditAmount, debitAmount, financialCategory, categoryId, accountStatementId, bankCode, transactionId, accountNumber, transferType, personName, upiId, branch, store, rawData, balance, notes, receiptUrl, isDeleted, isPartialData, hasInvalidDate, hasZeroAmount, parsingMethod, parsingConfidence, dedupHash, createdAt, updatedAt, documentId)
             VALUES ${values}
+            ON CONFLICT (dedupHash) DO NOTHING
           `);
 
           // Count credits and debits
@@ -1087,7 +1101,6 @@ export async function POST(request: NextRequest) {
             debit: batchDebit,
           };
         } catch (error: any) {
-          console.error(`❌ Batch ${batchNum} error:`, error.message);
           // Fallback to Prisma createMany if raw SQL fails
           try {
             const data = chunk.map(r => ({
@@ -1118,6 +1131,7 @@ export async function POST(request: NextRequest) {
               hasZeroAmount: (r as any).hasZeroAmount || false,
               parsingMethod: (r as any).parsingMethod || null,
               parsingConfidence: (r as any).parsingConfidence || null,
+              dedupHash: (r as any).dedupHash || null,
             }));
 
             const result = await (prisma as any).transaction.createMany({
@@ -1378,5 +1392,41 @@ function formatNotes(record: any): string {
   }
 
   return '';
+}
+
+/**
+ * Generate a deterministic hash for a transaction to prevent duplicates.
+ * Fingerprint: userId + Date + Credit + Debit + Normalized Description
+ */
+function generateDedupHash(tx: {
+  userId: string;
+  transactionDate: Date;
+  description: string;
+  creditAmount: number;
+  debitAmount: number;
+  transactionId?: string | null;
+}): string {
+  // If we have a bank-provided transaction ID, that's the strongest fingerprint
+  if (tx.transactionId && tx.transactionId.trim().length > 5) {
+    return `id_${tx.userId}_${tx.transactionId.trim()}`;
+  }
+
+  const dateStr = tx.transactionDate.toISOString().slice(0, 10);
+  const credit = Number(tx.creditAmount || 0).toFixed(2);
+  const debit = Number(tx.debitAmount || 0).toFixed(2);
+
+  // Normalize description: lowercase, remove special chars, collapse spaces
+  const normDesc = tx.description
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '')
+    .trim()
+    .substring(0, 100);
+
+  const rawString = `${tx.userId}|${dateStr}|${credit}|${debit}|${normDesc}`;
+
+  // Simple hashing (djb2-like) or just a long string if DB column allows
+  // For PostgreSQL, a long unique string is fine, but let's use a basic buffer hash
+  const crypto = require('crypto');
+  return crypto.createHash('md5').update(rawString).digest('hex');
 }
 

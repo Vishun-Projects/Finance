@@ -2,33 +2,17 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 // Routes that don't require authentication
+import { jwtVerify } from 'jose';
+
+// Routes that don't require authentication
 const publicRoutes = ['/login', '/register', '/auth', '/api/auth/oauth/google', '/api/auth/oauth/google/callback'];
 const adminPrefix = '/admin';
 
-const decodeJwt = (token: string) => {
-  try {
-    const parts = token.split('.');
-    if (parts.length < 2) {
-      return null;
-    }
-    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-    const decoded = typeof atob === 'function'
-      ? atob(base64)
-      : Buffer.from(base64, 'base64').toString('binary');
-    const jsonPayload = decodeURIComponent(
-      decoded
-        .split('')
-        .map(c => `%${('00' + c.charCodeAt(0).toString(16)).slice(-2)}`)
-        .join('')
-    );
-    return JSON.parse(jsonPayload);
-  } catch (error) {
-    console.warn('Failed to decode JWT payload in middleware:', error);
-    return null;
-  }
-};
+const JWT_SECRET = new TextEncoder().encode(
+  process.env.JWT_SECRET || 'your-secret-key-here-change-in-production'
+);
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   
   // Skip middleware for static files (images, fonts, etc.)
@@ -46,16 +30,28 @@ export function middleware(request: NextRequest) {
 
   // Check for auth token in cookies
   const authToken = request.cookies.get('auth-token');
-  const decoded = authToken ? decodeJwt(authToken.value) : null;
-  const role = decoded?.role as 'USER' | 'SUPERUSER' | undefined;
+  
+  let role: 'USER' | 'SUPERUSER' | undefined;
+  let isValidToken = false;
+
+  if (authToken) {
+    try {
+      const { payload } = await jwtVerify(authToken.value, JWT_SECRET);
+      role = payload.role as 'USER' | 'SUPERUSER' | undefined;
+      isValidToken = true;
+    } catch (error) {
+      console.warn('Invalid JWT token in middleware:', error);
+      // Token is invalid, treat as unauthenticated
+    }
+  }
   
   // If no auth token and trying to access protected route, redirect to auth
-  if (!authToken && pathname !== '/') {
+  if (!isValidToken && pathname !== '/') {
     return NextResponse.redirect(new URL('/auth', request.url));
   }
 
   // If has auth token and trying to access login/register, redirect to dashboard
-  if (authToken && publicRoutes.includes(pathname)) {
+  if (isValidToken && publicRoutes.includes(pathname)) {
     if (role === 'SUPERUSER') {
       return NextResponse.redirect(new URL(adminPrefix, request.url));
     }
@@ -64,7 +60,7 @@ export function middleware(request: NextRequest) {
 
   // Protect admin routes for superusers only
   if (pathname.startsWith(adminPrefix)) {
-    if (!authToken) {
+    if (!isValidToken) {
       return NextResponse.redirect(new URL('/auth?tab=login', request.url));
     }
     if (role !== 'SUPERUSER') {

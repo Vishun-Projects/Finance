@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { AuthService } from '@/lib/auth';
-import { genAI, retryWithBackoff } from '@/lib/gemini';
+import { genAI, retryWithBackoff, generateImage } from '@/lib/gemini';
 import { searchInternet } from '@/lib/search';
-import { downloadAndSaveImage } from '@/lib/image-utils';
+import { downloadAndSaveImage, generatePollinationsImage } from '@/lib/image-utils';
 
 async function requireSuperuser(request: NextRequest) {
     const token = request.cookies.get('auth-token');
@@ -108,14 +108,8 @@ Rules:
 
         // 3. Generate a cover image URL based on the imagePrompt
         if (postData.imagePrompt) {
-            const encodedPrompt = encodeURIComponent(postData.imagePrompt);
-            const remoteImageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1920&height=640&nologo=true&seed=${Math.floor(Math.random() * 1000000)}`;
-
-            // Try to download and save locally
-            const localImagePath = await downloadAndSaveImage(remoteImageUrl, 'uploads/education');
-
-            // Use local path if successful, otherwise fallback to remote
-            postData.coverImage = localImagePath || remoteImageUrl;
+            console.log('Generating image with Multi-Model Pollinations...');
+            postData.coverImage = await generatePollinationsImage(postData.imagePrompt, 'uploads/education');
         }
 
         return NextResponse.json(postData);

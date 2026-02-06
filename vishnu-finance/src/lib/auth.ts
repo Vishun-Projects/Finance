@@ -2,8 +2,17 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { prisma } from './db';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-here-change-in-production';
-const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key-here-change-in-production';
+const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET;
+
+if (!JWT_SECRET) {
+  throw new Error('JWT_SECRET is not defined in environment variables');
+}
+
+if (!JWT_REFRESH_SECRET) {
+  throw new Error('JWT_REFRESH_SECRET is not defined in environment variables');
+}
+
 const JWT_EXPIRES_IN = '15m'; // 15 minutes for access token
 const JWT_REFRESH_EXPIRES_IN = '7d'; // 7 days for refresh token
 
@@ -30,7 +39,7 @@ export class AuthService {
     const saltRounds = 10; // Reduced from 12 to 10 for better performance (~100-200ms savings)
     const hashed = await bcrypt.hash(password, saltRounds);
     const duration = Date.now() - startTime;
-    console.log(`⏱️ HASH PASSWORD: ${duration}ms (saltRounds: ${saltRounds})`);
+    console.log(`⏱️ HASH PASSWORD: ${duration}ms`);
     return hashed;
   }
 
@@ -45,18 +54,18 @@ export class AuthService {
 
   // Generate access token
   static generateAccessToken(payload: JWTPayload): string {
-    return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+    return jwt.sign(payload, JWT_SECRET!, { expiresIn: JWT_EXPIRES_IN });
   }
 
   // Generate refresh token
   static generateRefreshToken(payload: RefreshTokenPayload): string {
-    return jwt.sign(payload, JWT_REFRESH_SECRET, { expiresIn: JWT_REFRESH_EXPIRES_IN });
+    return jwt.sign(payload, JWT_REFRESH_SECRET!, { expiresIn: JWT_REFRESH_EXPIRES_IN });
   }
 
   // Verify access token
   static verifyAccessToken(token: string): JWTPayload | null {
     try {
-      const decoded = jwt.verify(token, JWT_SECRET) as JWTPayload;
+      const decoded = jwt.verify(token, JWT_SECRET!) as JWTPayload;
       return decoded;
     } catch {
       return null;
@@ -66,7 +75,7 @@ export class AuthService {
   // Verify refresh token
   static verifyRefreshToken(token: string): RefreshTokenPayload | null {
     try {
-      const decoded = jwt.verify(token, JWT_REFRESH_SECRET) as RefreshTokenPayload;
+      const decoded = jwt.verify(token, JWT_REFRESH_SECRET!) as RefreshTokenPayload;
       return decoded;
     } catch {
       return null;
@@ -172,7 +181,7 @@ export class AuthService {
       throw new Error('Email does not exist');
     }
 
-    console.log('✅ LOGIN API - User found:', user.email, 'ID:', user.id);
+    console.log('✅ LOGIN API - User found');
 
     if (!user.isActive) {
       console.log('❌ LOGIN API - Account is deactivated');
@@ -187,20 +196,16 @@ export class AuthService {
 
     // Check if password is hashed (starts with $2b$)
     const isPasswordHashed = user.password.startsWith('$2b$');
-    console.log('🔍 LOGIN API - Password is hashed:', isPasswordHashed);
-    console.log('🔍 LOGIN API - Stored password format:', user.password.substring(0, 20) + '...');
-
     let isValidPassword = false;
 
     if (isPasswordHashed) {
       // Password is hashed, use bcrypt comparison
       isValidPassword = await this.comparePassword(password, user.password);
-      console.log('🔍 LOGIN API - Bcrypt comparison result:', isValidPassword);
     } else {
-      // Password is not hashed, do plain text comparison (for existing data)
-      isValidPassword = password === user.password;
-      console.log('🔍 LOGIN API - Plain text comparison result:', isValidPassword);
-      console.log('⚠️ LOGIN API - WARNING: Using plain text password comparison!');
+      // Password is not hashed - previously plain text fallback was here
+      // SECURITY: Disabling plain text password support
+      console.warn('⚠️ LOGIN API - Plain text password encountered. Failing login for security.');
+      isValidPassword = false;
     }
 
     if (!isValidPassword) {

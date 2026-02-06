@@ -12,16 +12,20 @@ export async function GET(
     const filePath = join(process.cwd(), ...pathArray);
 
     // Security: Only allow files from uploads directory
-    const normalizedPath = filePath.replace(/\\/g, '/');
-    if (!normalizedPath.includes('uploads/')) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
-    }
+    const uploadsDir = join(process.cwd(), 'uploads');
+    const resolvedPath = join(uploadsDir, ...pathArray);
 
-    if (!existsSync(filePath)) {
+    if (!resolvedPath.startsWith(uploadsDir)) {
+      return NextResponse.json({ error: 'Unauthorized path traversal detected' }, { status: 403 });
+    }
+    
+    // Check if file exists
+    // Note: We use resolvedPath which is strictly inside uploadsDir
+    if (!existsSync(resolvedPath)) {
       return NextResponse.json({ error: 'File not found' }, { status: 404 });
     }
 
-    const fileBuffer = await readFile(filePath);
+    const fileBuffer = await readFile(resolvedPath);
     const fileName = pathArray[pathArray.length - 1];
 
     // Determine content type

@@ -60,6 +60,31 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing action' }, { status: 400 });
     }
 
+    // --- CENTRAL AUTHENTICATION ---
+    const publicActions = ['auth_login', 'auth_register'];
+    const isPublicAction = publicActions.includes(action);
+
+    let user: any = null;
+    if (!isPublicAction) {
+      const { AuthService } = await import('@/lib/auth');
+      const authToken = request.cookies.get('auth-token');
+      if (!authToken) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+      user = await AuthService.getUserFromToken(authToken.value);
+      if (!user || !user.isActive) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+
+      // --- CENTRAL AUTHORIZATION (IDOR protection) ---
+      // If a userId is passed in the body, it must match the authenticated user
+      // unless the authenticated user is a SUPERUSER.
+      if (body.userId && body.userId !== user.id && user.role !== 'SUPERUSER') {
+        return NextResponse.json({ error: 'Forbidden: You can only access your own data' }, { status: 403 });
+      }
+    }
+    // ------------------------------
+
     switch (action) {
       case 'razorpay_create_order': {
         const amount = Number(body?.amount);
@@ -1730,7 +1755,7 @@ export async function POST(request: NextRequest) {
         }
       }
       const updated = await (prisma as any).wishlistItem.update({
-        where: { id },
+        where: { id, userId: user.id },
         data,
       });
       return NextResponse.json({
@@ -1744,7 +1769,7 @@ export async function POST(request: NextRequest) {
       const { id } = body || {};
       if (!id) return NextResponse.json({ error: 'Item id is required' }, { status: 400 });
       const { prisma } = await import('@/lib/db');
-      await (prisma as any).wishlistItem.delete({ where: { id } });
+      await (prisma as any).wishlistItem.delete({ where: { id, userId: user.id } });
       return NextResponse.json({ success: true });
     }
 
@@ -1796,7 +1821,7 @@ export async function POST(request: NextRequest) {
       if (updateData.category !== undefined) data.category = updateData.category;
       if (updateData.description !== undefined) data.description = updateData.description;
       const updated = await prisma.goal.update({
-        where: { id },
+        where: { id, userId: user.id },
         data,
       });
       return NextResponse.json(updated);
@@ -1807,7 +1832,7 @@ export async function POST(request: NextRequest) {
       const { id } = body || {};
       if (!id) return NextResponse.json({ error: 'Goal id is required' }, { status: 400 });
       const { prisma } = await import('@/lib/db');
-      await prisma.goal.delete({ where: { id } });
+      await prisma.goal.delete({ where: { id, userId: user.id } });
       return NextResponse.json({ success: true });
     }
 
@@ -1927,7 +1952,7 @@ export async function POST(request: NextRequest) {
         }
       }
       const updated = await (prisma as any).deadline.update({
-        where: { id },
+        where: { id, userId: user.id },
         data,
       });
       return NextResponse.json(updated);
@@ -1938,7 +1963,7 @@ export async function POST(request: NextRequest) {
       const { id } = body || {};
       if (!id) return NextResponse.json({ error: 'Deadline id is required' }, { status: 400 });
       const { prisma } = await import('@/lib/db');
-      await (prisma as any).deadline.delete({ where: { id } });
+      await (prisma as any).deadline.delete({ where: { id, userId: user.id } });
       return NextResponse.json({ success: true });
     }
 

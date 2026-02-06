@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/db';
 import { searchInternet } from '@/lib/search';
-import { genAI, retryWithBackoff } from '@/lib/gemini';
-import { downloadAndSaveImage } from '@/lib/image-utils';
+import { genAI, retryWithBackoff, generateImage } from '@/lib/gemini';
+import { downloadAndSaveImage, generatePollinationsImage } from '@/lib/image-utils';
 
 export class BriefingService {
 
@@ -113,11 +113,9 @@ Format: JSON only.`;
             // Image Gen
             let heroImage = null;
             if (newsData.imagePrompt) {
-                // Use Pollinations.ai (Same procedure as Education/Plans)
-                const encodedPrompt = encodeURIComponent(newsData.imagePrompt);
-                const remoteImageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1920&height=1080&nologo=true&seed=${Math.floor(Math.random() * 1000000)}`;
-                const savedPath = await downloadAndSaveImage(remoteImageUrl, 'uploads/daily-news');
-                heroImage = savedPath || remoteImageUrl;
+                // Use robust multi-model generation
+                // Imports: generatePollinationsImage should be imported at top
+                heroImage = await generatePollinationsImage(newsData.imagePrompt, 'uploads/daily-news');
             }
 
             // Save DB

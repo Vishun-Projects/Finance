@@ -7,8 +7,9 @@ export async function GET(request: NextRequest) {
         const locationParam = searchParams.get('location') || 'India';
         const normalizedLocation = locationParam.trim();
 
-        // Always fetch for "Today" (server time) as per original logic
-        const today = new Date();
+        // Parse date from query param or default to Today
+        const dateParam = searchParams.get('date');
+        const today = dateParam ? new Date(dateParam) : new Date();
 
         console.log(`[DailyNews API] Requesting briefing for ${today.toISOString()} in ${normalizedLocation}`);
 

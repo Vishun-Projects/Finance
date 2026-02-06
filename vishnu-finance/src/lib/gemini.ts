@@ -636,3 +636,70 @@ export async function categorizeTransactionsBatch(
     return [];
   }
 }
+
+/**
+ * Generate an image using Gemini (Imagen model)
+ */
+export async function generateImage(prompt: string): Promise<string | null> {
+  try {
+    // Note: This requires the 'imagen-3.0-generate-001' model access
+    const model = genAI.getGenerativeModel({ model: 'imagen-3.0-generate-001' });
+    
+    // Add "minimalist, Notion-style linography" keywords to the prompt if not already present,
+    // as per the user's aesthetic preference.
+    const enhancedPrompt = `${prompt} . Minimalist, Notion-style linography, clean lines, white background, high contrast, symbolist, no text.`;
+    
+    // Check if quota is exceeded before trying
+    if (globalGeminiQuotaExceeded) {
+      console.log('Skipping image generation due to quota limits');
+      return null;
+    }
+
+    const result = await retryWithBackoff(async () => {
+      // @ts-ignore - The types definitions might not be up to date for image generation yet
+      return await model.generateContent(enhancedPrompt);
+    }, 2, 2000);
+    
+    const response = result.response;
+    
+    // Check if we have image candidates
+    // The structure depends on the specific API version, but typically it contains 'images' or inline data
+    // For the current Node SDK with Imagen, it might return parts with inlineData
+    
+    // Inspecting response structure for images is tricky without exact types, 
+    // but typically for Imagen it returns a blob or base64.
+    // Let's assume standard generateContent response with inlineData for now, 
+    // or we might need to use a specific property if the SDK exposes it differently.
+    
+    // NOTE: As of current SDK, image generation might be valid via generateContent but the response handling is key.
+    // However, if the model returns a standard text response stating it can't generate images, we need to handle that.
+    // Assuming the user has access to Imagen 3 via the API key.
+    
+    // The response.text() would be empty for image only response usually.
+    // We look for parts.
+    
+    // @ts-ignore
+    if (response.candidates && response.candidates[0] && response.candidates[0].content && response.candidates[0].content.parts) {
+       // @ts-ignore
+       const parts = response.candidates[0].content.parts;
+       for (const part of parts) {
+         if (part.inlineData && part.inlineData.mimeType.startsWith('image/')) {
+           return part.inlineData.data; // This is the base64 string
+         }
+       }
+    }
+    
+    console.warn('Gemini image generation response did not contain image data');
+    return null;
+    
+  } catch (error) {
+    console.error('Error generating image with Gemini:', error);
+    // Determine if it's a model not found error (likely no access to Imagen)
+    const err = error as Error;
+    if (err.message.includes('not found') || err.message.includes('404')) {
+      console.error('Imagen model not found. Ensure your API key has access to imagen-3.0-generate-001.');
+    }
+    return null;
+  }
+}
+

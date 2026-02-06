@@ -5,6 +5,7 @@ A modern, responsive personal finance management application built with Next.js,
 ## 🚀 Features
 
 ### Core Functionality
+
 - **Dashboard**: Comprehensive financial overview with key metrics and trends
 - **Income Management**: Track multiple income sources with categorization
 - **Expense Management**: Monitor spending with detailed categorization and payment methods
@@ -15,6 +16,7 @@ A modern, responsive personal finance management application built with Next.js,
 - **Wishlist Management**: Track desired purchases with price monitoring
 
 ### Advanced Features
+
 - **Market Data Integration**: Real-time market trends and analysis
 - **Recurring Transactions**: Automated tracking of regular income/expenses
 - **Salary History Tracking**: Complete audit trail of salary changes
@@ -25,6 +27,7 @@ A modern, responsive personal finance management application built with Next.js,
 ## 🛠️ Technology Stack
 
 ### Frontend
+
 - **Next.js 14**: React framework with App Router
 - **TypeScript**: Type-safe development
 - **Tailwind CSS**: Utility-first CSS framework
@@ -32,12 +35,14 @@ A modern, responsive personal finance management application built with Next.js,
 - **React Hooks**: State management and side effects
 
 ### Backend
+
 - **Next.js API Routes**: Serverless API endpoints
 - **Prisma ORM**: Database abstraction layer
 - **SQLite/MySQL**: Database options
 - **TypeScript**: Full-stack type safety
 
 ### Design System
+
 - **Minimal Monotone Theme**: Clean, professional design
 - **Responsive Grid Layouts**: Mobile-first approach
 - **Custom Animations**: Smooth transitions and interactions
@@ -85,6 +90,7 @@ vishnu-finance/
 ## 🎨 Design System
 
 ### Color Palette
+
 - **Primary**: Deep blue (#1e40af)
 - **Secondary**: Light gray (#f8fafc)
 - **Success**: Green (#10b981)
@@ -93,11 +99,13 @@ vishnu-finance/
 - **Info**: Blue (#3b82f6)
 
 ### Typography
+
 - **Headings**: Inter font family
 - **Body**: System font stack
 - **Monospace**: For financial data
 
 ### Components
+
 - **Cards**: Minimal design with subtle shadows
 - **Buttons**: Consistent styling with hover states
 - **Forms**: Clean input fields with validation
@@ -107,11 +115,13 @@ vishnu-finance/
 ## 🔧 Installation & Setup
 
 ### Prerequisites
-- Node.js 18+ 
+
+- Node.js 18+
 - npm or yarn
 - Git
 
 ### Quick Start
+
 ```bash
 # Clone the repository
 git clone <repository-url>
@@ -137,6 +147,7 @@ npm run dev
 ```
 
 ### Environment Variables
+
 ```env
 # Database
 DATABASE_URL="file:./dev.db"
@@ -153,6 +164,7 @@ ALPHA_VANTAGE_API_KEY="your-alpha-vantage-key"
 ## 📊 Database Schema
 
 ### Core Models
+
 - **User**: User accounts and preferences
 - **Income**: Income sources and transactions
 - **Expense**: Expense tracking and categorization
@@ -163,24 +175,15 @@ ALPHA_VANTAGE_API_KEY="your-alpha-vantage-key"
 - **WishlistItem**: Desired purchases and tracking
 
 ### Advanced Models
+
 - **Category**: Transaction categorization
 - **RecurringItem**: Recurring transactions
 - **MarketData**: Market trends and data
 
-## 🧰 Superuser & Admin Portal
-
-The project ships with a dedicated admin console for managing organisation-wide documents and bank field mappings.
-
-- **Seed command:** `npm run seed:admin`
-- **Guide:** see [`docs/admin-setup.md`](docs/admin-setup.md) for migration/seed/test instructions.
-- **Login:** use the superuser credentials seeded via `npm run setup` (defaults: `vishun@finance.com` / `Vishun@8291`).
-- **Tests:** run `npm run test` to execute the shared document utility checks.
-
-Once authenticated, visit `/admin` to access the dashboard, document library, and bank mapping manager.
-
 ## 🚀 API Endpoints
 
 ### Core APIs
+
 - `GET /api/income` - Fetch user income data
 - `POST /api/income` - Create new income record
 - `DELETE /api/income` - Delete income record
@@ -189,6 +192,7 @@ Once authenticated, visit `/admin` to access the dashboard, document library, an
 - `DELETE /api/expenses` - Delete expense
 
 ### Advanced APIs
+
 - `GET /api/analytics` - Financial analytics data
 - `GET /api/market-data` - Real-time market data
 - `GET /api/salary-structure` - Salary information
@@ -197,24 +201,29 @@ Once authenticated, visit `/admin` to access the dashboard, document library, an
 ## 🎯 Key Features Explained
 
 ### 1. Skeleton UI Approach
+
 The application implements a skeleton UI pattern for optimal user experience:
+
 - **Loading States**: Animated placeholders during data fetching
 - **Progressive Enhancement**: Basic functionality first, then advanced features
 - **Performance**: Fast initial load with lazy-loaded components
 
 ### 2. Responsive Design
+
 - **Mobile-First**: Optimized for mobile devices
 - **Breakpoints**: xs, sm, md, lg, xl, 2xl
 - **Flexible Layouts**: Grid and flexbox for adaptive layouts
 - **Touch-Friendly**: Optimized for touch interactions
 
 ### 3. Data Management
+
 - **Mock Data**: Development with realistic mock data
 - **API Integration**: Ready for backend integration
 - **Error Handling**: Comprehensive error states
 - **Validation**: Client and server-side validation
 
 ### 4. Financial Features
+
 - **Currency Support**: INR, USD, EUR support
 - **Categorization**: Detailed transaction categorization
 - **Recurring Items**: Automated recurring transaction handling
@@ -224,6 +233,7 @@ The application implements a skeleton UI pattern for optimal user experience:
 ## 🔮 Future Enhancements
 
 ### Phase 2: Advanced Features
+
 - [ ] Real-time notifications
 - [ ] Data import/export functionality
 - [ ] Advanced charting and analytics
@@ -231,8 +241,8 @@ The application implements a skeleton UI pattern for optimal user experience:
 - [ ] Investment portfolio tracking
 - [ ] Tax planning and optimization
 
-
 ### Phase 4: Social Features
+
 - [ ] Family account sharing
 - [ ] Financial advisor integration
 - [ ] Community features
@@ -241,16 +251,19 @@ The application implements a skeleton UI pattern for optimal user experience:
 ## 🧪 Testing
 
 ### Unit Tests
+
 ```bash
 npm run test
 ```
 
 ### Integration Tests
+
 ```bash
 npm run test:integration
 ```
 
 ### E2E Tests
+
 ```bash
 npm run test:e2e
 ```
@@ -258,12 +271,14 @@ npm run test:e2e
 ## 📈 Performance
 
 ### Optimization Strategies
+
 - **Code Splitting**: Automatic route-based splitting
 - **Image Optimization**: Next.js Image component
 - **Caching**: Strategic caching strategies
 - **Bundle Analysis**: Regular bundle size monitoring
 
 ### Performance Metrics
+
 - **Lighthouse Score**: 95+ across all metrics
 - **First Contentful Paint**: < 1.5s
 - **Largest Contentful Paint**: < 2.5s
@@ -272,6 +287,7 @@ npm run test:e2e
 ## 🤝 Contributing
 
 ### Development Workflow
+
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
@@ -279,6 +295,7 @@ npm run test:e2e
 5. Submit a pull request
 
 ### Code Standards
+
 - **TypeScript**: Strict type checking
 - **ESLint**: Code quality enforcement
 - **Prettier**: Code formatting
@@ -298,6 +315,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 📞 Support
 
 For support and questions:
+
 - **Email**: support@vishnufinance.com
 - **Documentation**: [docs.vishnufinance.com](https://docs.vishnufinance.com)
 - **Issues**: [GitHub Issues](https://github.com/your-repo/issues)

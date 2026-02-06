@@ -46,6 +46,16 @@ const nextConfig: NextConfig = {
         hostname: 'image.pollinations.ai',
         pathname: '/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'loremflickr.com',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'images.unsplash.com',
+        pathname: '/**',
+      },
     ],
   },
 

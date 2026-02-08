@@ -45,11 +45,19 @@ async function tryPythonParser(pdfBuffer: Buffer, bankHint: string, bankParserCo
     // Convert buffer to base64
     const pdfBase64 = pdfBuffer.toString('base64');
 
+    // Prepare headers
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+
+    // internal-request-bypass for Vercel
+    if (process.env.VERCEL_AUTOMATION_BYPASS_SECRET) {
+      headers['x-vercel-protection-bypass'] = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+    }
+
     const response = await fetch(pythonFunctionUrl, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify({
         type: 'pdf',
         args: {

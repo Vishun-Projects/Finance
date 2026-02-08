@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLoading } from '@/contexts/LoadingContext';
 import { cn } from '@/lib/utils';
+import { checkDatabaseConnection } from '@/app/actions/db-check';
 
 type AuthTab = 'login' | 'register';
 
@@ -65,6 +66,26 @@ function AuthPageInner({ initialTab }: AuthPageClientProps) {
       } catch (error) { console.error('OAuth check failed', error); }
     };
     checkOAuthProviders();
+  }, []);
+
+  // Database Connection Debugger (For User Verification)
+  useEffect(() => {
+    const verifyConnection = async () => {
+      console.log('🔍 [Debug] Initiating Database Connection Check...');
+      try {
+        const result = await checkDatabaseConnection();
+        console.log('🔍 [Debug] Database Connection Result:', result);
+        if (result.success) {
+          console.log('%c ✅ DATABASE CONNECTED SUCCESSFULLY ', 'background: #22c55e; color: #fff; font-size: 14px; padding: 4px; border-radius: 4px;');
+        } else {
+          console.error('%c ❌ DATABASE CONNECTION FAILED ', 'background: #ef4444; color: #fff; font-size: 14px; padding: 4px; border-radius: 4px;', result.message);
+        }
+      } catch (error) {
+        console.error('🔍 [Debug] Failed to invoke Server Action:', error);
+      }
+    };
+    // Small delay to ensure hydration
+    setTimeout(verifyConnection, 1000);
   }, []);
 
   // Handlers

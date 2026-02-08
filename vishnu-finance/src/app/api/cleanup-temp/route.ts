@@ -1,72 +1,83 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { unlink, readdir, stat } from 'fs/promises';
-import { join } from 'path';
-import { tmpdir } from 'os';
+import { unlink, readdir, stat } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { tmpdir } from 'node:os';
 
 export async function GET() {
   try {
     // Clean up files older than 24 hours from temp directories
-    // In serverless environments, /tmp is automatically cleaned, but we handle it gracefully
-    const uploadsDir = join(tmpdir());
-    
+    const uploadsDir = tmpdir();
+
     try {
-      // In serverless, /tmp is ephemeral and auto-cleaned, but we handle cleanup gracefully
-      // Check common temp subdirectories used by our APIs
       const tempSubdirs = ['pdf-uploads', 'multi-format-uploads', 'bank-statement-uploads', 'user-docs', 'super-docs', 'admin-docs'];
       const oldFiles: string[] = [];
       const now = Date.now();
       const maxAge = 24 * 60 * 60 * 1000; // 24 hours
-      
+
       // Try to clean up files in temp subdirectories
       for (const subdir of tempSubdirs) {
         try {
-          const subdirPath = join(uploadsDir, subdir);
-          const files = await readdir(subdirPath).catch(() => []);
-          
-          for (const file of files) {
-            const filepath = join(subdirPath, file);
+          const subdirPath = uploadsDir.endsWith('/') || uploadsDir.endsWith('\\')
+            ? `${uploadsDir}${subdir}`
+            : `${uploadsDir}/${subdir}`;
+
+          const entries = await readdir(subdirPath, { withFileTypes: true }).catch(() => []);
+
+          for (const entry of entries) {
+            if (!entry.isFile()) continue;
+
+            const name = entry.name;
+            const filepath = subdirPath.endsWith('/') || subdirPath.endsWith('\\')
+              ? `${subdirPath}${name}`
+              : `${subdirPath}/${name}`;
+
             try {
               const stats = await stat(filepath);
               if (now - stats.mtimeMs > maxAge) {
                 oldFiles.push(filepath);
               }
             } catch {
-              // File might have been deleted or doesn't exist, skip
+              // Ignore errors
             }
           }
         } catch {
-          // Subdirectory might not exist, skip
+          // Ignore errors
         }
       }
-      
+
       // Also check root temp directory for any orphaned files
       try {
-        const rootFiles = await readdir(uploadsDir).catch(() => []);
-        for (const file of rootFiles) {
-          // Skip directories
-          const filepath = join(uploadsDir, file);
+        const rootEntries = await readdir(uploadsDir, { withFileTypes: true }).catch(() => []);
+        for (const entry of rootEntries) {
+          if (!entry.isFile()) continue;
+
+          const file = entry.name;
+          const filepath = uploadsDir.endsWith('/') || uploadsDir.endsWith('\\')
+            ? `${uploadsDir}${file}`
+            : `${uploadsDir}/${file}`;
+
           try {
             const stats = await stat(filepath);
-            if (stats.isFile() && now - stats.mtimeMs > maxAge) {
+            if (now - stats.mtimeMs > maxAge) {
               // Only clean files that look like our temp files
               if (file.includes('statement_') || file.includes('extracted_') || file.includes('temp_parser_')) {
                 oldFiles.push(filepath);
               }
             }
           } catch {
-            // Skip if we can't stat
+            // Skip
           }
         }
       } catch {
-        // Root directory might not be readable, skip
+        // Skip
       }
-      
+
       // Delete old files
       const results = {
         deleted: [] as string[],
         failed: [] as Array<{ file: string; error: string }>,
       };
-      
+
       for (const filepath of oldFiles) {
         try {
           await unlink(filepath);
@@ -78,7 +89,7 @@ export async function GET() {
           console.warn('⚠️ Failed to delete old file:', filepath, errorMsg);
         }
       }
-      
+
       return NextResponse.json({
         success: true,
         ...results,
@@ -104,7 +115,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const { files } = await request.json();
-    
+
     if (!files || !Array.isArray(files)) {
       return NextResponse.json({ error: 'Files array required' }, { status: 400 });
     }
@@ -126,17 +137,16 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ 
-      success: true, 
+    return NextResponse.json({
+      success: true,
       ...results,
       message: `Deleted ${results.deleted.length} files, ${results.failed.length} failed`
     });
   } catch (error) {
     console.error('❌ Cleanup error:', error);
-    return NextResponse.json({ 
+    return NextResponse.json({
       error: 'Cleanup failed',
       details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 });
   }
 }
-

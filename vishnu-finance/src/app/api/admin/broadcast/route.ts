@@ -24,7 +24,8 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Message is required' }, { status: 400 });
         }
 
-        await N8nService.broadcastNotification(message);
+        const { NotificationService } = await import('@/lib/notification-service');
+        await NotificationService.broadcast(message, { subject: '📢 Finance App: Important Broadcast' });
 
         return NextResponse.json({ success: true, message: 'Broadcast initiated' });
     } catch (error) {

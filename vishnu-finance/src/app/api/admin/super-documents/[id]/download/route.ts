@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { join } from 'path';
-import { readFile, stat } from 'fs/promises';
+import { resolve, join } from 'node:path';
+export const dynamic = 'force-dynamic';
+import { readFile, stat } from 'node:fs/promises';
 import { prisma } from '@/lib/db';
 import { supabase } from '@/lib/supabase';
 import { AuthService } from '@/lib/auth';
@@ -35,7 +36,11 @@ export async function GET(
         if (document.storageKey.startsWith('uploads/') || document.storageKey.includes('\\')) {
             try {
                 // Legacy local file
-                const filePath = join(process.cwd(), document.storageKey);
+                const storageKey = document.storageKey;
+                const base = process.cwd();
+                const filePath = base.endsWith('/') || base.endsWith('\\')
+                    ? `${base}${storageKey}`
+                    : `${base}/${storageKey}`;
                 await stat(filePath);
                 const fileBuffer = await readFile(filePath);
 

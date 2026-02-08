@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { join } from 'path';
+export const dynamic = 'force-dynamic';
 import { mkdir, writeFile } from 'fs/promises';
 import { randomUUID } from 'crypto';
 import { Buffer } from 'buffer';

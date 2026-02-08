@@ -35,14 +35,15 @@ async function restore() {
 
     const finalVars = { ...env, ...envLocal };
 
-    // 1. Enforce DATABASE_URL from .env (Pooled 6543)
+    // 1. Enforce DATABASE_URL from .env (Pooled 6543) - DISABLED for troubleshooting
+    /*
     if (env.DATABASE_URL && env.DATABASE_URL.includes(':6543')) {
         finalVars.DATABASE_URL = env.DATABASE_URL;
         console.log('✅ Using Pooled DATABASE_URL from .env');
     } else {
         console.log('⚠️ Warning: Pooled DATABASE_URL not found in .env, checking structure...');
-        // specific fix if needed, but we expect .env to be correct
     }
+    */
 
     // 2. Filter out localhost or unused
     if (finalVars.N8N_WEBHOOK_URL && finalVars.N8N_WEBHOOK_URL.includes('localhost')) {

@@ -27,8 +27,8 @@ function parseDatabaseUrl(url) {
     throw new Error(`Unable to parse DATABASE_URL "${url}": ${error.message}`);
   }
 
-  if (parsed.protocol !== 'mysql:') {
-    throw new Error(`Unsupported protocol "${parsed.protocol}". Expected mysql:// connection string.`);
+  if (parsed.protocol !== 'mysql:' && parsed.protocol !== 'postgresql:') {
+    throw new Error(`Unsupported protocol "${parsed.protocol}". Expected mysql:// or postgresql:// connection string.`);
   }
 
   const database = decodeURIComponent(parsed.pathname.replace(/^\//, ''));
@@ -45,7 +45,11 @@ function parseDatabaseUrl(url) {
   };
 }
 
-async function ensureDatabaseExists(connectionConfig) {
+async function ensureDatabaseExists(connectionConfig, protocol) {
+  if (protocol === 'postgresql:') {
+    logSection('🔍 PostgreSQL detected - skipping raw existence check (Prisma will handle it)');
+    return;
+  }
   logSection('🔍 Checking database');
 
   const { host, port, user, password, database } = connectionConfig;
@@ -349,10 +353,23 @@ async function main() {
 
   loadEnvFiles();
 
-  const connectionConfig = parseDatabaseUrl(process.env.DATABASE_URL);
-  await ensureDatabaseExists(connectionConfig);
+  const url = process.env.DATABASE_URL;
+  const protocol = new URL(url).protocol;
+  const connectionConfig = protocol === 'mysql:' ? parseDatabaseUrl(url) : null;
+
+  await ensureDatabaseExists(connectionConfig, protocol);
   await applyMigrations();
-  await ensureColumns(connectionConfig);
+
+  if (protocol === 'mysql:') {
+    await ensureColumns(connectionConfig);
+  } else {
+    logSection('🧩 PostgreSQL detected - skipping raw column verification');
+  }
+
+  // GIVE DB A MOMENT TO BREATHE
+  console.log('\n⏳ Waiting 3s for database connections to settle...');
+  await new Promise(resolve => setTimeout(resolve, 3000));
+
   await runSeeders();
 
   console.log('\n🎉 Database is ready!');

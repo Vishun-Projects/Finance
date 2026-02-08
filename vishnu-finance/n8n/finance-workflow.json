@@ -1,0 +1,109 @@
+{
+    "name": "My workflow",
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "finance-webhook",
+                "options": {}
+            },
+            "id": "b41db3af-13fb-4de7-8493-d300e6ccc0ab",
+            "name": "Webhook",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 1,
+            "position": [
+                0,
+                0
+            ],
+            "webhookId": "finance-webhook"
+        },
+        {
+            "parameters": {
+                "requestMethod": "POST",
+                "url": "http://localhost:3000/api/n8n/webhook",
+                "options": {},
+                "bodyParametersUi": {
+                    "parameter": [
+                        {
+                            "name": "type",
+                            "value": "DAILY_QUOTE"
+                        },
+                        {
+                            "name": "data",
+                            "value": "={{ $json.body }}"
+                        }
+                    ]
+                },
+                "headerParametersUi": {
+                    "parameter": [
+                        {
+                            "name": "x-n8n-token",
+                            "value": "finance_secure_token_90211"
+                        }
+                    ]
+                }
+            },
+            "id": "dd1143ef-38b2-456a-b5aa-29a22c5859cf",
+            "name": "Push to App",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 2,
+            "position": [
+                208,
+                0
+            ]
+        },
+        {
+            "parameters": {
+                "chatId": "={{ $json.body.payload.telegramUserId }}",
+                "text": "={{ $json.body.payload.message }}",
+                "additionalFields": {}
+            },
+            "id": "dd57518b-41bc-4a05-9273-0ee41936f844",
+            "name": "Telegram",
+            "type": "n8n-nodes-base.telegram",
+            "typeVersion": 1,
+            "position": [
+                400,
+                0
+            ],
+            "webhookId": "d1accfd5-22fd-47f0-8f1e-394df1e68b81",
+            "retryOnFail": true,
+            "credentials": {
+                "telegramApi": {
+                    "id": "lExb5jWeErJ5hCyT",
+                    "name": "Telegram account"
+                }
+            }
+        }
+    ],
+    "pinData": {},
+    "connections": {
+        "Webhook": {
+            "main": [
+                [
+                    {
+                        "node": "Push to App",
+                        "type": "main",
+                        "index": 0
+                    },
+                    {
+                        "node": "Telegram",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "active": true,
+    "settings": {
+        "executionOrder": "v1"
+    },
+    "versionId": "cc2983c6-1ff9-482a-909d-811df404f253",
+    "meta": {
+        "templateCredsSetupCompleted": true,
+        "instanceId": "2b44a743fb3f76cab4d15bd9333917401e64251e18ab3fad77d71b5f89383d76"
+    },
+    "id": "07eEgS2EvbmXbdVz",
+    "tags": []
+}

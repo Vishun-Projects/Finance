@@ -5,6 +5,18 @@ const bcrypt = require('bcryptjs')
 
 const prisma = new PrismaClient()
 
+async function withRetry(fn, retries = 3, delay = 2000) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await fn();
+    } catch (error) {
+      if (i === retries - 1) throw error;
+      console.log(`⚠️ Database attempt ${i + 1} failed. Retrying in ${delay / 1000}s...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+}
+
 async function main() {
   console.log('🚀 Setting up Vishnu\'s Finance...')
 
@@ -31,17 +43,17 @@ async function main() {
   ]
 
   console.log('📝 Creating default categories...')
-  
+
   for (const category of defaultCategories) {
     try {
       // Check if category exists first
-      const existingCategory = await prisma.category.findFirst({
+      const existingCategory = await withRetry(() => prisma.category.findFirst({
         where: {
           name: category.name,
           type: category.type,
           isDefault: true
         }
-      })
+      }))
 
       if (!existingCategory) {
         await prisma.category.create({
@@ -60,14 +72,14 @@ async function main() {
   console.log('👤 Creating demo user...')
   try {
     // Check if demo user exists
-    const existingUser = await prisma.user.findUnique({
+    const existingUser = await withRetry(() => prisma.user.findUnique({
       where: { email: 'demo@vishnufinance.com' }
-    })
+    }))
 
     if (!existingUser) {
       // Hash password
       const hashedPassword = await bcrypt.hash('demo123', 12)
-      
+
       const user = await prisma.user.create({
         data: {
           email: 'demo@vishnufinance.com',
@@ -88,9 +100,9 @@ async function main() {
   console.log('🛡️  Ensuring superuser account exists...')
   try {
     const superEmail = 'vishun@finance.com'
-    const existingSuper = await prisma.user.findUnique({
+    const existingSuper = await withRetry(() => prisma.user.findUnique({
       where: { email: superEmail },
-    })
+    }))
 
     if (!existingSuper) {
       const hashedPassword = await bcrypt.hash('Vishun@8291', 12)
@@ -123,7 +135,7 @@ async function main() {
   console.log('2. Run: npm run dev')
   console.log('3. Open http://localhost:3000 in your browser')
   console.log('\n💡 For production deployment:')
-  console.log('- Set up a MySQL database')
+  console.log('- Set up a production database (MySQL or PostgreSQL)')
   console.log('- Update DATABASE_URL in your environment')
   console.log('- Run: npx prisma db push')
 }

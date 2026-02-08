@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db';
 import { AuthService } from '@/lib/auth';
 import { addImageGenerationJob } from '@/lib/services/image-queue';
 import { ImageJobType } from '@prisma/client';
+import { N8nService } from '@/lib/n8n-service';
 
 async function requireSuperuser(request: NextRequest) {
     const token = request.cookies.get('auth-token');
@@ -76,6 +77,13 @@ export async function POST(request: NextRequest) {
 
             // Trigger background processing immediately
             triggerImmediateProcessing();
+        }
+
+        // Notify n8n for Telegram alert (Non-blocking)
+        try {
+            await N8nService.notifyBlogCreated(post);
+        } catch (n8nError) {
+            console.warn('[n8n] Notification trigger failed:', n8nError);
         }
 
         return NextResponse.json(post, { status: 201 });

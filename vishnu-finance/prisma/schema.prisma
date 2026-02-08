@@ -25,18 +25,23 @@ model GlobalDesignSettings {
 }
 
 model UserPreferences {
-  id               String   @id @default(cuid())
-  userId           String   @unique
-  navigationLayout String   @default("sidebar")
-  theme            String   @default("light")
-  colorScheme      String   @default("default")
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-  currency         String   @default("INR")
-  dateFormat       String   @default("DD/MM/YYYY")
-  language         String   @default("en")
-  timezone         String   @default("Asia/Kolkata")
-  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                        String   @id @default(cuid())
+  userId                    String   @unique
+  navigationLayout          String   @default("sidebar")
+  theme                     String   @default("light")
+  colorScheme               String   @default("default")
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+  currency                  String   @default("INR")
+  dateFormat                String   @default("DD/MM/YYYY")
+  language                  String   @default("en")
+  timezone                  String   @default("Asia/Kolkata")
+  telegramUserId            String?  @unique
+  telegramEnabled           Boolean  @default(false)
+  dailyQuoteEnabled         Boolean  @default(false)
+  emailEnabled              Boolean  @default(false)
+  notificationEmail         String?
+  user                      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("user_preferences")
 }
@@ -664,6 +669,17 @@ model DailyBriefing {
   updatedAt      DateTime @updatedAt
   
   @@map("daily_briefings")
+}
+
+model DailyQuote {
+  id        String   @id @default(cuid())
+  text      String   @db.Text
+  author    String?
+  category  String?
+  date      DateTime @default(now())
+  createdAt DateTime @default(now())
+
+  @@map("daily_quotes")
 }
 
 model BankParserConfig {

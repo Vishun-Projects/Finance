@@ -29,6 +29,7 @@ import {
   Tooltip,
   XAxis
 } from 'recharts';
+import { DailyQuoteCard } from './dashboard/daily-quote';
 
 export interface SimpleDashboardData {
   totalIncome: number;
@@ -241,6 +242,9 @@ export default function SimpleDashboard({
             <p className="text-muted-foreground mt-1">
               Track your net worth, expenses, and financial habits.
             </p>
+          </div>
+          <div className="w-full md:w-auto md:min-w-[400px]">
+            <DailyQuoteCard />
           </div>
         </div>
 

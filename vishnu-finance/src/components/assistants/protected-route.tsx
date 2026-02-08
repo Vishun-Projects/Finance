@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import LoadingSpinner from '@/components/feedback/loading-spinner';
+import LoadingSpinner from '../feedback/loading-spinner';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 

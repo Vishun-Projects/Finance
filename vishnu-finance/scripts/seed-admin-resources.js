@@ -5,13 +5,25 @@ const path = require('node:path');
 
 const prisma = new PrismaClient();
 
+async function withRetry(fn, retries = 3, delay = 2000) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await fn();
+    } catch (error) {
+      if (i === retries - 1) throw error;
+      console.log(`⚠️ Database attempt ${i + 1} failed. Retrying in ${delay / 1000}s...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+}
+
 const SUPERUSER_EMAIL = 'vishun@finance.com';
 const ADMIN_DOC_STORAGE_KEY = path.join('docs', 'admin-setup.md').replace(/\\/g, '/');
 
 async function ensureSuperuser() {
-  const user = await prisma.user.findUnique({
+  const user = await withRetry(() => prisma.user.findUnique({
     where: { email: SUPERUSER_EMAIL },
-  });
+  }));
 
   if (!user) {
     throw new Error(
@@ -30,11 +42,11 @@ async function ensureSuperuser() {
 }
 
 async function seedPortalDocument(superuser) {
-  const existing = await prisma.document.findFirst({
+  const existing = await withRetry(() => prisma.document.findFirst({
     where: {
       storageKey: ADMIN_DOC_STORAGE_KEY,
     },
-  });
+  }));
 
   if (existing) {
     return existing;

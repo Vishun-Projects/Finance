@@ -1,4 +1,4 @@
-import { generateAndSaveImagenImage } from '../src/lib/imagen.ts';
+import { generateAndSaveImagenImage } from '../src/lib/imagen';
 import dotenv from 'dotenv';
 dotenv.config({ path: '.env.local' });
 

@@ -14,15 +14,15 @@ const JWT_SECRET = new TextEncoder().encode(
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  
+
   // Skip middleware for static files (images, fonts, etc.)
   const staticFileExtensions = ['.png', '.jpg', '.jpeg', '.svg', '.gif', '.webp', '.ico', '.json', '.xml', '.txt', '.woff', '.woff2', '.ttf', '.eot'];
   const isStaticFile = staticFileExtensions.some(ext => pathname.endsWith(ext));
-  
+
   if (isStaticFile) {
     return NextResponse.next();
   }
-  
+
   // Check if the route is public
   if (publicRoutes.includes(pathname)) {
     return NextResponse.next();
@@ -30,7 +30,7 @@ export async function middleware(request: NextRequest) {
 
   // Check for auth token in cookies
   const authToken = request.cookies.get('auth-token');
-  
+
   let role: 'USER' | 'SUPERUSER' | undefined;
   let isValidToken = false;
 
@@ -41,13 +41,23 @@ export async function middleware(request: NextRequest) {
       isValidToken = true;
     } catch (error) {
       console.warn('Invalid JWT token in middleware:', error);
-      // Token is invalid, treat as unauthenticated
+      // Clear token and redirect if not on a public route
+      if (!publicRoutes.includes(pathname) && pathname !== '/') {
+        const response = NextResponse.redirect(new URL('/auth', request.url));
+        response.cookies.delete('auth-token');
+        return response;
+      }
     }
   }
-  
+
   // If no auth token and trying to access protected route, redirect to auth
-  if (!isValidToken && pathname !== '/') {
-    return NextResponse.redirect(new URL('/auth', request.url));
+  if (!isValidToken && !publicRoutes.includes(pathname) && pathname !== '/') {
+    const response = NextResponse.redirect(new URL('/auth', request.url));
+    // Also delete any potentially stale token cookie
+    if (authToken) {
+      response.cookies.delete('auth-token');
+    }
+    return response;
   }
 
   // If has auth token and trying to access login/register, redirect to dashboard

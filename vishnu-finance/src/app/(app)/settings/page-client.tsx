@@ -683,7 +683,12 @@ export default function SettingsPageClient({ initialDocuments, initialPreference
     language: initialPreferences?.language ?? 'en',
     currency: initialPreferences?.currency ?? selectedCurrency,
     dateFormat: initialPreferences?.dateFormat ?? 'DD/MM/YYYY',
-    timezone: initialPreferences?.timezone ?? 'Asia/Kolkata'
+    timezone: initialPreferences?.timezone ?? 'Asia/Kolkata',
+    telegramUserId: initialPreferences?.telegramUserId ?? '',
+    telegramEnabled: initialPreferences?.telegramEnabled ?? false,
+    emailEnabled: initialPreferences?.emailEnabled ?? false,
+    notificationEmail: initialPreferences?.notificationEmail ?? '',
+    dailyQuoteEnabled: initialPreferences?.dailyQuoteEnabled ?? false
   });
   const [notifications, setNotifications] = useState({
     email: true,
@@ -738,7 +743,12 @@ export default function SettingsPageClient({ initialDocuments, initialPreference
           currency: selectedCurrency,
           language: preferences.language,
           timezone: preferences.timezone,
-          dateFormat: preferences.dateFormat
+          dateFormat: preferences.dateFormat,
+          telegramUserId: preferences.telegramUserId,
+          telegramEnabled: preferences.telegramEnabled,
+          emailEnabled: preferences.emailEnabled,
+          notificationEmail: preferences.notificationEmail,
+          dailyQuoteEnabled: preferences.dailyQuoteEnabled
         })
       });
 
@@ -1176,15 +1186,32 @@ export default function SettingsPageClient({ initialDocuments, initialPreference
               <CardContent className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="space-y-1">
-                    <Label htmlFor="transaction-alerts">Transaction Alerts</Label>
-                    <p className="text-sm text-muted-foreground">Get notified about new transactions</p>
+                    <Label htmlFor="email-notifications">Email Notifications</Label>
+                    <p className="text-sm text-muted-foreground">Receive professional alerts via email</p>
                   </div>
                   <Switch
-                    id="transaction-alerts"
-                    checked={notifications.email}
-                    onCheckedChange={(checked) => setNotifications(prev => ({ ...prev, email: checked }))}
+                    id="email-notifications"
+                    checked={preferences.emailEnabled}
+                    onCheckedChange={(checked) => setPreferences(prev => ({ ...prev, emailEnabled: checked }))}
                   />
                 </div>
+
+                {preferences.emailEnabled && (
+                  <div className="space-y-2 pt-2 pb-2">
+                    <Label htmlFor="notification-email">Delivery Email (e.g. Outlook)</Label>
+                    <Input
+                      id="notification-email"
+                      type="email"
+                      placeholder="e.g. vishnu.v@outlook.com"
+                      value={preferences.notificationEmail || ''}
+                      onChange={(e) => setPreferences(prev => ({ ...prev, notificationEmail: e.target.value }))}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      If left blank, notifications will be sent to your login email: <span className="font-medium">{user?.email}</span>
+                    </p>
+                  </div>
+                )}
+
                 <Separator />
                 <div className="flex items-center justify-between">
                   <div className="space-y-1">
@@ -1251,6 +1278,102 @@ export default function SettingsPageClient({ initialDocuments, initialPreference
                       disabled={!isSupported}
                     />
                   </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Telegram Notifications */}
+            <Card className="bg-card border border-border/60 rounded-xl shadow-sm">
+              <CardHeader>
+                <div className="flex items-center gap-3">
+                  <div className="size-10 rounded-lg bg-sky-500/10 flex items-center justify-center">
+                    <Mail className="w-5 h-5 text-sky-500" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base font-bold uppercase tracking-wide text-foreground">Telegram Notifications</CardTitle>
+                    <CardDescription>Receive instant alerts and quote briefings via Telegram</CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <Label htmlFor="telegram-enabled">Enable Telegram Alerts</Label>
+                    <p className="text-sm text-muted-foreground">Receive notifications directly on Telegram</p>
+                  </div>
+                  <Switch
+                    id="telegram-enabled"
+                    checked={preferences.telegramEnabled}
+                    onCheckedChange={(checked) => setPreferences(prev => ({ ...prev, telegramEnabled: checked }))}
+                  />
+                </div>
+                {preferences.telegramEnabled && (
+                  <div className="space-y-2 pt-2">
+                    <Label htmlFor="telegram-chat-id">Telegram Chat ID</Label>
+                    <Input
+                      id="telegram-chat-id"
+                      placeholder="Enter your Telegram Chat ID"
+                      value={preferences.telegramUserId || ''}
+                      onChange={(e) => setPreferences(prev => ({ ...prev, telegramUserId: e.target.value }))}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Tip: Use a bot like @userinfobot to find your ID, or message our notification bot.
+                    </p>
+                    <div className="pt-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="bg-sky-500/5 border-sky-500/20 text-sky-500 hover:bg-sky-500/10"
+                        onClick={async () => {
+                          try {
+                            const res = await fetch('/api/n8n/test-notification', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ message: "Hello! This is a test from your Finance Dashboard. Telegram is working! 🚀" })
+                            });
+                            if (res.ok) {
+                              success('Test Sent', 'Test notification triggered successfully!');
+                            } else {
+                              const err = await res.json();
+                              showError('Test Failed', err.error || 'Failed to send test notification');
+                            }
+                          } catch (e) {
+                            showError('Error', 'Failed to connect to notification service');
+                          }
+                        }}
+                      >
+                        Send Test Notification
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Daily Quotes & Briefings */}
+            <Card className="bg-card border border-border/60 rounded-xl shadow-sm">
+              <CardHeader>
+                <div className="flex items-center gap-3">
+                  <div className="size-10 rounded-lg bg-amber-500/10 flex items-center justify-center">
+                    <Sun className="w-5 h-5 text-amber-500" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base font-bold uppercase tracking-wide text-foreground">Daily Briefings</CardTitle>
+                    <CardDescription>Start your day with financial quotes and summaries</CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <Label htmlFor="daily-quote-enabled">Daily Financial Quotes</Label>
+                    <p className="text-sm text-muted-foreground">Show inspirational quotes on your dashboard</p>
+                  </div>
+                  <Switch
+                    id="daily-quote-enabled"
+                    checked={preferences.dailyQuoteEnabled}
+                    onCheckedChange={(checked) => setPreferences(prev => ({ ...prev, dailyQuoteEnabled: checked }))}
+                  />
                 </div>
               </CardContent>
             </Card>
@@ -1388,6 +1511,6 @@ export default function SettingsPageClient({ initialDocuments, initialPreference
           </TabsContent>
         </Tabs>
       </div>
-    </div>
+    </div >
   );
 }

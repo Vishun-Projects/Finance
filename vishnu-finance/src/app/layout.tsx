@@ -111,7 +111,7 @@ export default async function RootLayout({
   const normalizedUser = normalizeAuthUser(currentUser);
 
   return (
-    <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable} {/*${newsreader.variable}*/}`} suppressHydrationWarning>
+    <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable}`} suppressHydrationWarning>
       <body className="font-sans antialiased bg-background text-foreground">
         <FetchInterceptor />
         <AuthProvider initialUser={normalizedUser}>

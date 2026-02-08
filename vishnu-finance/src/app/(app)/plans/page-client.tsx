@@ -21,7 +21,8 @@ import {
   Sparkles,
   History,
   PieChart,
-  Wallet
+  Wallet,
+  RefreshCw
 } from "lucide-react";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -327,6 +328,7 @@ function MatteGoalCard({ goal, onUpdate }: { goal: Goal, onUpdate?: (updatedGoal
   const [fundsSource, setFundsSource] = useState("Salary");
   const [fundsNote, setFundsNote] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
 
@@ -345,16 +347,28 @@ function MatteGoalCard({ goal, onUpdate }: { goal: Goal, onUpdate?: (updatedGoal
     return Object.entries(breakdown).map(([name, amount]) => ({ name, amount: Number(amount) }));
   }, [contributions, hasHistory]);
 
+  const handleRegenerateImage = useCallback(async () => {
+    if (isGeneratingImage) return;
+    setIsGeneratingImage(true);
+    try {
+      const res = await fetchAndSaveGoalImage(goal.id, goal.title);
+      if (res.success && res.path) {
+        setBgImage(res.path);
+        onUpdate?.({ ...goal, imageUrl: res.path });
+      }
+    } catch (error) {
+      console.error("Failed to regenerate image", error);
+    } finally {
+      setIsGeneratingImage(false);
+    }
+  }, [goal, onUpdate, isGeneratingImage]);
+
   // Auto-fetch image if missing
   useEffect(() => {
-    if (!bgImage) {
-      fetchAndSaveGoalImage(goal.title).then(res => {
-        if (res.success && res.path) {
-          setBgImage(res.path);
-        }
-      });
+    if (!bgImage && !isGeneratingImage) {
+      handleRegenerateImage();
     }
-  }, [goal.title, bgImage]);
+  }, [bgImage, isGeneratingImage, handleRegenerateImage]);
 
   const handleAddFunds = async () => {
     if (!fundsAmount || isNaN(Number(fundsAmount))) return;
@@ -567,12 +581,44 @@ function MatteGoalCard({ goal, onUpdate }: { goal: Goal, onUpdate?: (updatedGoal
 
         {/* Image Section */}
         <div
-          className="md:w-64 h-32 md:h-auto bg-cover bg-center rounded-sm opacity-40 group-hover:opacity-100 transition-all duration-500 border border-border"
-          style={{ backgroundImage: bgImage ? `url(${bgImage})` : undefined }}
+          className="md:w-64 h-32 md:h-auto bg-cover bg-center rounded-sm group-hover:opacity-100 transition-all duration-500 border border-border relative overflow-hidden"
+          style={{
+            backgroundImage: bgImage ? `url(${bgImage})` : undefined,
+            opacity: bgImage ? (isGeneratingImage ? 0.4 : 0.6) : 0.4
+          }}
         >
-          {!bgImage && (
-            <div className="w-full h-full flex items-center justify-center bg-muted">
-              <Sparkles className="text-muted-foreground/30 animate-pulse" />
+          {isGeneratingImage ? (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/20 backdrop-blur-sm">
+              <div className="flex flex-col items-center gap-2">
+                <Sparkles className="h-6 w-6 text-primary animate-pulse" />
+                <span className="text-[10px] font-black text-white uppercase tracking-widest">AI Working...</span>
+              </div>
+            </div>
+          ) : !bgImage ? (
+            <div className="w-full h-full flex flex-col items-center justify-center bg-muted gap-3 p-4 text-center">
+              <div className="bg-background/50 p-2 rounded-full border border-border">
+                <Sparkles className="text-primary/40 h-5 w-5" />
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleRegenerateImage}
+                className="text-[9px] h-7 px-3 font-black uppercase tracking-widest border border-border hover:bg-foreground hover:text-background transition-all"
+              >
+                Generate AI
+              </Button>
+            </div>
+          ) : (
+            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center bg-black/40 backdrop-blur-[2px]">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleRegenerateImage}
+                className="text-[10px] h-9 px-4 font-black text-white uppercase tracking-widest border border-white/20 hover:bg-white hover:text-black transition-all"
+              >
+                <RefreshCw className={cn("mr-2 h-3.5 w-3.5", isGeneratingImage && "animate-spin")} />
+                Regenerate
+              </Button>
             </div>
           )}
         </div>

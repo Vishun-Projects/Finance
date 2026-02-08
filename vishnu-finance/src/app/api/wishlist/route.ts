@@ -18,12 +18,12 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
-    
+
     // PERFORMANCE: Add pagination support
     const page = parseInt(searchParams.get('page') || '1');
     const pageSize = Math.min(parseInt(searchParams.get('pageSize') || '100'), 200); // Max 200 per page
     const skip = (page - 1) * pageSize;
-    
+
     console.log('🔍 WISHLIST GET - User ID:', userId, 'Page:', page, 'PageSize:', pageSize);
 
     if (!userId) {
@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
     }
 
     console.log('🔍 WISHLIST GET - Fetching from database for user:', userId);
-    
+
     // PERFORMANCE: Get total count for pagination (only if needed)
     const getTotalCount = page === 1 || searchParams.get('includeTotal') === 'true';
     const [totalCount, wishlistItems] = await Promise.all([
@@ -72,7 +72,7 @@ export async function GET(request: NextRequest) {
     }));
 
     console.log('✅ WISHLIST GET - Found wishlist items:', processedItems.length, 'records');
-    
+
     // Return paginated response with metadata
     const response: any = {
       data: processedItems,
@@ -85,7 +85,7 @@ export async function GET(request: NextRequest) {
         hasPreviousPage: page > 1
       }
     };
-    
+
     return NextResponse.json(response);
   } catch (error) {
     console.error('❌ WISHLIST GET - Error:', error);
@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     console.log('➕ WISHLIST POST - Request body:', JSON.stringify(body, null, 2));
-    
+
     const {
       title,
       description,
@@ -148,6 +148,13 @@ export async function POST(request: NextRequest) {
     });
 
     console.log('✅ WISHLIST POST - Successfully created wishlist item:', JSON.stringify(newWishlistItem, null, 2));
+
+    // Trigger Image Generation
+    const { addImageGenerationJob, triggerImmediateProcessing } = await import('../../../lib/services/image-queue');
+    const { ImageJobType } = await import('@prisma/client');
+    await addImageGenerationJob(newWishlistItem.id, ImageJobType.WISHLIST_ITEM, title);
+    triggerImmediateProcessing();
+
     return NextResponse.json(newWishlistItem);
   } catch (error) {
     console.error('❌ WISHLIST POST - Error:', error);
@@ -182,6 +189,13 @@ export async function PUT(request: NextRequest) {
     });
 
     console.log('✅ WISHLIST PUT - Successfully updated wishlist item:', JSON.stringify(updatedWishlistItem, null, 2));
+
+    // Trigger Image Regeneration if title changed or image is missing
+    const { addImageGenerationJob, triggerImmediateProcessing } = await import('../../../lib/services/image-queue');
+    const { ImageJobType } = await import('@prisma/client');
+    await addImageGenerationJob(updatedWishlistItem.id, ImageJobType.WISHLIST_ITEM, updatedWishlistItem.title);
+    triggerImmediateProcessing();
+
     return NextResponse.json(updatedWishlistItem);
   } catch (error) {
     console.error('❌ WISHLIST PUT - Error:', error);

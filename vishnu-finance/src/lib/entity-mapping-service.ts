@@ -33,11 +33,7 @@ export async function getCanonicalNamesBatch(
   }
 
   try {
-    let mappings: Array<{
-      canonicalName: string;
-      mappedNames: string | null;
-      entityType: EntityType;
-    }> = [];
+    let mappings: any[] = [];
 
     try {
       mappings = await prisma.entityMapping.findMany({

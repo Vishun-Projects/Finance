@@ -1,5 +1,5 @@
 import { Suspense } from 'react';
-import BentoDashboard from '@/components/dashboard/bento-dashboard';
+import SimpleDashboard from '@/components/simple-dashboard';
 import FinancialSkeleton from '@/components/feedback/financial-skeleton';
 import { loadDashboardSummary } from '@/lib/loaders/dashboard';
 import { requireUser } from '@/lib/auth/server-auth';
@@ -26,7 +26,7 @@ export default async function DashboardPage() {
 
   return (
     <Suspense fallback={<FinancialSkeleton />}>
-      <BentoDashboard
+      <SimpleDashboard
         initialData={initialData}
         initialStartDate={startDate}
         initialEndDate={endDate}

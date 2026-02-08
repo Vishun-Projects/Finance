@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { AuthService } from '@/lib/auth';
+import { addImageGenerationJob } from '@/lib/services/image-queue';
+import { ImageJobType } from '@prisma/client';
 
 async function requireSuperuser(request: NextRequest) {
     const token = request.cookies.get('auth-token');
@@ -62,6 +64,20 @@ export async function POST(request: NextRequest) {
             }
         });
 
+        if (imagePrompt) {
+            const { addImageGenerationJob, triggerImmediateProcessing } = await import('@/lib/services/image-queue');
+            const { ImageJobType } = await import('@prisma/client');
+
+            await addImageGenerationJob(
+                post.id,
+                ImageJobType.EDUCATION_POST,
+                imagePrompt
+            );
+
+            // Trigger background processing immediately
+            triggerImmediateProcessing();
+        }
+
         return NextResponse.json(post, { status: 201 });
     } catch (error) {
         console.error('Failed to create post:', error);
@@ -77,7 +93,7 @@ export async function PUT(request: NextRequest) {
         }
 
         const body = await request.json();
-        const { id, title, slug, content, excerpt, category, difficulty, readTime, published, coverImage, imagePrompt } = body;
+        const { id, title, slug, content, excerpt, category, difficulty, readTime, published, coverImage, imagePrompt, regenerateImage } = body;
 
         if (!id) {
             return NextResponse.json({ error: 'Post ID is required' }, { status: 400 });
@@ -98,6 +114,21 @@ export async function PUT(request: NextRequest) {
                 imagePrompt,
             }
         });
+
+        // Trigger Image Generation Queue if prompt exists and user requested regeneration
+        if (imagePrompt && regenerateImage) {
+            const { addImageGenerationJob, triggerImmediateProcessing } = await import('@/lib/services/image-queue');
+            const { ImageJobType } = await import('@prisma/client');
+
+            await addImageGenerationJob(
+                post.id,
+                ImageJobType.EDUCATION_POST,
+                imagePrompt
+            );
+
+            // Trigger background processing immediately
+            triggerImmediateProcessing();
+        }
 
         return NextResponse.json(post);
     } catch (error) {

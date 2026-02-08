@@ -2,6 +2,8 @@ import { prisma } from '@/lib/db';
 import { searchInternet } from '@/lib/search';
 import { genAI, retryWithBackoff, generateImage } from '@/lib/gemini';
 import { downloadAndSaveImage, generatePollinationsImage } from '@/lib/image-utils';
+import { addImageGenerationJob } from '@/lib/services/image-queue';
+import { ImageJobType } from '@prisma/client';
 
 export class BriefingService {
 
@@ -90,7 +92,7 @@ Create a "Daily Financial Briefing" in JSON format with:
      - **Story 3**: Deep dive into the third summary point.
      - **Conclusion**: What to watch for tomorrow.
    - Use headers (##, ###), bold text.
-6. "imagePrompt": A detailed prompt for a minimalist, Notion-style linography illustration representing the financial news. Use clean lines, white background, high contrast, symbolist. No text.
+6. "imagePrompt": A high-quality, professional image prompt for a financial-themed illustration. Describe a scene with clean lines, sophisticated financial symbolism (charts, buildings, coins, or abstract growth), cinematic lighting, and a minimalist aesthetic. No text.
 
 Format: JSON only.`;
 
@@ -110,25 +112,29 @@ Format: JSON only.`;
                 newsData = newsData[keys[0]];
             }
 
-            // Image Gen
-            let heroImage = null;
+            // 3. Generate Hero Image immediately (Resilient)
+            let heroImageUrl = null;
             if (newsData.imagePrompt) {
-                // Use robust multi-model generation
-                // Imports: generatePollinationsImage should be imported at top
-                heroImage = await generatePollinationsImage(newsData.imagePrompt, 'uploads/daily-news');
+                console.log(`[BriefingService] Generating news image: ${newsData.imagePrompt}`);
+                try {
+                    const { generateAndSaveImagenImage } = await import('@/lib/imagen');
+                    heroImageUrl = await generateAndSaveImagenImage(newsData.imagePrompt, 'uploads/daily-briefing');
+                } catch (imgError) {
+                    console.error('[BriefingService] Immediate image generation failed:', imgError);
+                }
             }
 
-            // Save DB
+            // 4. Create record with image
             const newBriefing = await prisma.dailyBriefing.create({
                 data: {
-                    date: date, // Use the requested date
+                    date: date,
                     location: location,
                     summary: newsData.summary || [],
                     sentiment: newsData.sentiment || 'Neutral',
                     sentimentScore: newsData.sentimentScore || 50,
                     title: newsData.title || `Market Update - ${dateString}`,
                     content: newsData.content || '',
-                    heroImage: heroImage,
+                    heroImage: heroImageUrl,
                     sources: searchResults as any
                 }
             });
@@ -143,6 +149,7 @@ Format: JSON only.`;
 
     private static createFallback(date: Date, location: string, message: string) {
         return {
+            id: 'fallback-' + date.getTime(),
             date: date,
             location: location,
             title: "Data Unavailable",
@@ -151,7 +158,8 @@ Format: JSON only.`;
             sentimentScore: 50,
             summary: ["No data available"],
             source: 'fallback',
-            heroImage: null
+            heroImage: null,
+            sources: [] as any[]
         };
     }
 }

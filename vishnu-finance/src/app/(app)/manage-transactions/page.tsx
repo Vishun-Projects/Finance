@@ -1,6 +1,6 @@
 import { Suspense } from 'react';
 import { requireUser } from '@/lib/auth/server-auth';
-import PageSkeleton from '@/components/page-skeleton';
+import PageSkeleton from '@/components/feedback/page-skeleton';
 import { loadManagedTransactions } from '@/lib/loaders/manage-transactions';
 import { ManageTransactionsPageClient } from './page-client';
 

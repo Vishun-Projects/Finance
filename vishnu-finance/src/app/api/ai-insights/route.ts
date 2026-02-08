@@ -36,21 +36,21 @@ const saveChatHistory = (userId: string, message: string, response: string) => {
     if (fs.existsSync(CHAT_HISTORY_FILE)) {
       data = JSON.parse(fs.readFileSync(CHAT_HISTORY_FILE, 'utf8'));
     }
-    
+
     if (!data[userId]) data[userId] = [];
-    
+
     data[userId].push({
       timestamp: new Date().toISOString(),
       message,
       response,
       userId
     });
-    
+
     // Keep only last 100 messages per user
     if (data[userId].length > 100) {
       data[userId] = data[userId].slice(-100);
     }
-    
+
     fs.writeFileSync(CHAT_HISTORY_FILE, JSON.stringify(data, null, 2));
     console.log(`💾 Chat History - Saved for user ${userId}`);
   } catch (error) {
@@ -129,7 +129,7 @@ export async function POST(request: NextRequest) {
     // Load chat history for context
     const chatHistory = loadChatHistory(userId);
     const recentContext = chatHistory.slice(-5); // Last 5 messages for context
-    
+
     console.log(`🤖 AI Chat - User: ${userId}, Message: "${userQuery}"`);
     console.log(`📚 Chat History Context: ${recentContext.length} recent messages`);
 
@@ -137,8 +137,8 @@ export async function POST(request: NextRequest) {
     const [goals, deadlines, incomes, expenses] = await Promise.all([
       prisma.goal.findMany({ where: { userId } }),
       prisma.deadline.findMany({ where: { userId } }),
-      prisma.incomeSource.findMany({ where: { userId } }),
-      prisma.expense.findMany({ where: { userId } })
+      prisma.transaction.findMany({ where: { userId, financialCategory: 'INCOME', isDeleted: false } }),
+      prisma.transaction.findMany({ where: { userId, financialCategory: 'EXPENSE', isDeleted: false } })
     ]);
 
     console.log('🔍 AI Analysis - Data fetched:', {
@@ -160,8 +160,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Calculate financial metrics
-    const totalIncome = incomes.reduce((sum: number, income: any) => sum + parseFloat(income.amount), 0);
-    const totalExpenses = expenses.reduce((sum: number, expense: any) => sum + parseFloat(expense.amount), 0);
+    const totalIncome = incomes.reduce((sum: number, income: any) => sum + parseFloat(income.creditAmount || income.amount || 0), 0);
+    const totalExpenses = expenses.reduce((sum: number, expense: any) => sum + parseFloat(expense.debitAmount || expense.amount || 0), 0);
     const netSavings = totalIncome - totalExpenses;
     const savingsRate = totalIncome > 0 ? (netSavings / totalIncome) * 100 : 0;
 
@@ -169,24 +169,24 @@ export async function POST(request: NextRequest) {
     const monthlyTrends = [];
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const currentMonth = new Date().getMonth();
-    
+
     for (let i = 0; i < 6; i++) {
       const monthIndex = (currentMonth - 5 + i + 12) % 12;
       const monthName = months[monthIndex];
-      
+
       const monthIncome = incomes
         .filter((income: any) => {
-          const incomeDate = new Date(income.startDate);
+          const incomeDate = new Date(income.transactionDate || income.startDate);
           return incomeDate.getMonth() === monthIndex;
         })
-        .reduce((sum: number, income: any) => sum + parseFloat(income.amount), 0);
+        .reduce((sum: number, income: any) => sum + parseFloat(income.creditAmount || income.amount || 0), 0);
 
       const monthExpenses = expenses
         .filter((expense: any) => {
-          const expenseDate = new Date(expense.date);
+          const expenseDate = new Date(expense.transactionDate || expense.date);
           return expenseDate.getMonth() === monthIndex;
         })
-        .reduce((sum: number, expense: any) => sum + parseFloat(expense.amount), 0);
+        .reduce((sum: number, expense: any) => sum + parseFloat(expense.debitAmount || expense.amount || 0), 0);
 
       const monthSavings = monthIncome - monthExpenses;
 
@@ -205,33 +205,33 @@ export async function POST(request: NextRequest) {
     const categoryBreakdown = expenses.reduce((acc: any, expense: any) => {
       const category = expense.category || 'Uncategorized';
       if (!acc[category]) acc[category] = 0;
-      acc[category] += parseFloat(expense.amount);
+      acc[category] += parseFloat(expense.debitAmount || expense.amount || 0);
       return acc;
     }, {});
 
     const topExpenseCategories = Object.entries(categoryBreakdown)
-      .sort(([,a]: any, [,b]: any) => b - a)
+      .sort(([, a]: any, [, b]: any) => b - a)
       .slice(0, 5)
-      .map(([category, amount]: any) => ({ 
-        category, 
+      .map(([category, amount]: any) => ({
+        category,
         amount,
         percentage: totalExpenses > 0 ? (amount / totalExpenses) * 100 : 0
       }));
 
     // Get income sources
     const incomeSources = incomes.map((income: any) => ({
-      name: income.name || 'Income',
-      amount: parseFloat(income.amount),
+      name: income.name || income.description || 'Income',
+      amount: parseFloat(income.creditAmount || income.amount || 0),
       frequency: income.frequency || 'Monthly'
     }));
 
     // Get recent transactions
     const recentTransactions = [...incomes, ...expenses]
       .map((item: any) => ({
-        type: ('income' in item ? 'income' : 'expense') as 'income' | 'expense',
+        type: (item.financialCategory === 'INCOME' || 'income' in item ? 'income' : 'expense') as 'income' | 'expense',
         title: (item.name || item.description || 'Transaction') as string,
-        amount: parseFloat(item.amount),
-        date: (item.startDate || item.date) as string
+        amount: parseFloat(item.creditAmount || item.debitAmount || item.amount || 0),
+        date: (item.transactionDate || item.startDate || item.date) as string
       }))
       .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
       .slice(0, 10);
@@ -373,7 +373,7 @@ export async function POST(request: NextRequest) {
         if (goals.length > 0) {
           const currentMonth = new Date().getMonth();
           const currentYear = new Date().getFullYear();
-          
+
           // Find current month goals
           const currentMonthGoals = goals.filter((goal: any) => {
             const goalDate = new Date(goal.targetDate || goal.createdAt);
@@ -386,7 +386,7 @@ export async function POST(request: NextRequest) {
               const targetAmount = goal.targetAmount ? parseFloat(goal.targetAmount) : 0;
               const currentAmount = goal.currentAmount ? parseFloat(goal.currentAmount) : 0;
               const progress = targetAmount > 0 ? ((currentAmount / targetAmount) * 100).toFixed(1) : 0;
-              
+
               response += `${index + 1}. ${goal.title || goal.name || 'Goal'}: ₹${targetAmount.toLocaleString()} target, ₹${currentAmount.toLocaleString()} saved (${progress}%)\n`;
             });
           } else {
@@ -405,7 +405,7 @@ export async function POST(request: NextRequest) {
               const targetAmount = goal.targetAmount ? parseFloat(goal.targetAmount) : 0;
               const currentAmount = goal.currentAmount ? parseFloat(goal.currentAmount) : 0;
               const targetDate = goal.targetDate ? new Date(goal.targetDate).toLocaleDateString() : 'No deadline';
-              
+
               response += `${index + 1}. ${goal.title || goal.name || 'Goal'}: ₹${targetAmount.toLocaleString()} by ${targetDate} (₹${currentAmount.toLocaleString()}/${targetAmount.toLocaleString()})\n`;
             });
           }
@@ -441,7 +441,7 @@ export async function POST(request: NextRequest) {
               const dueDate = new Date(deadline.dueDate);
               const daysUntilDue = Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
               const priority = deadline.priority || 'Medium';
-              
+
               response += `${index + 1}. ${deadline.title || deadline.name || 'Deadline'}: Due ${dueDate.toLocaleDateString()} (${daysUntilDue} days) - Priority: ${priority}\n`;
             });
           } else {
@@ -536,7 +536,7 @@ export async function POST(request: NextRequest) {
       } else {
         // Comprehensive financial overview - FIXED LOGIC
         response = `Here's your financial snapshot: Income ₹${totalIncome.toLocaleString()}, Expenses ₹${totalExpenses.toLocaleString()}, Savings ₹${netSavings.toLocaleString()}, Health Score ${healthScore}/100 (${healthStatus}). `;
-        
+
         if (netSavings < 0) {
           response += `🚨 CRISIS: You're spending more than you earn! This is unsustainable. Immediate action required.`;
         } else if (netSavings <= 1000) {
@@ -546,7 +546,7 @@ export async function POST(request: NextRequest) {
         } else {
           response += `🎯 DOING WELL: Great job with ₹${netSavings.toLocaleString()}! Consider: 1) Emergency fund to ₹30,000, 2) Invest 20% of savings, 3) Plan for major purchases or retirement.`;
         }
-        
+
         // Add context-aware follow-up
         if (queryLower.includes('web') || queryLower.includes('developer') || queryLower.includes('tech')) {
           response += `\n\n💻 AS A WEB DEVELOPER: Your skills are in high demand! Focus on freelancing to boost income quickly.`;
@@ -586,7 +586,7 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('❌ AI Analysis - Error:', error);
-    return NextResponse.json({ 
+    return NextResponse.json({
       error: 'Failed to analyze financial data',
       details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 });

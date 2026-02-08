@@ -76,7 +76,7 @@ export default async function DailyBriefingPage({ params }: { params: Promise<{ 
                         {briefing.heroImage ? (
                             <Image
                                 src={briefing.heroImage}
-                                alt={briefing.title}
+                                alt={briefing.title || 'Daily Briefing'}
                                 fill
                                 className="object-cover transition-transform duration-1000 group-hover:scale-105"
                                 priority
@@ -125,7 +125,7 @@ export default async function DailyBriefingPage({ params }: { params: Promise<{ 
                                 <Sparkles className="w-3 h-3" /> Key Takeaways
                             </h3>
                             <ul className="space-y-3">
-                                {(briefing.summary as string[])?.map((point, i) => (
+                                {Array.isArray(briefing.summary) && (briefing.summary as string[]).map((point, i) => (
                                     <li key={i} className="flex gap-3 text-lg font-display text-muted-foreground/90 italic">
                                         <span className="text-primary font-bold text-sm mt-1.5">•</span>
                                         {point}
@@ -152,8 +152,8 @@ export default async function DailyBriefingPage({ params }: { params: Promise<{ 
                                         ),
                                         strong: ({ ...props }) => <strong className="text-foreground font-semibold" {...props} />,
                                         a: ({ ...props }) => <a className="text-primary underline decoration-primary/30 underline-offset-4 hover:decoration-primary transition-all" {...props} />,
-                                        blockquote: ({ ...props }) => (
-                                            <div className="bg-accent/50 border border-border p-6 rounded-xl my-10 relative overflow-hidden italic text-muted-foreground" {...props} />
+                                        blockquote: ({ node, ...props }) => (
+                                            <blockquote className="bg-accent/50 border border-border p-6 rounded-xl my-10 relative overflow-hidden italic text-muted-foreground" {...props} />
                                         )
                                     }}
                                 >

@@ -295,6 +295,18 @@ export default function AdminEducationPage() {
                                     />
                                     <Label htmlFor="published" className="text-[10px] font-black uppercase tracking-widest">Published</Label>
                                 </div>
+                                {editingPost?.id && (
+                                    <div className="flex items-center space-x-2 pt-8">
+                                        <input
+                                            type="checkbox"
+                                            id="regenerateImage"
+                                            checked={(editingPost as any).regenerateImage || false}
+                                            onChange={e => setEditingPost({ ...editingPost, regenerateImage: e.target.checked } as any)}
+                                            className="size-5 rounded border-border text-primary focus:ring-primary bg-muted/20"
+                                        />
+                                        <Label htmlFor="regenerateImage" className="text-[10px] font-black uppercase tracking-widest text-primary font-bold">Regenerate AI Image</Label>
+                                    </div>
+                                )}
                             </div>
 
                             <DialogFooter className="pt-6 border-t border-border mt-8">

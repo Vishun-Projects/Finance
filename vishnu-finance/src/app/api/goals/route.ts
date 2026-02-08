@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { prisma } from '../../../lib/db';
+import { addImageGenerationJob } from '@/lib/services/image-queue';
+import { ImageJobType } from '@prisma/client';
 
 // Configure route caching - user-specific dynamic data
 export const dynamic = 'force-dynamic';
@@ -74,6 +76,15 @@ export async function POST(request: NextRequest) {
       }
     });
 
+    // Trigger AI image generation for the new goal
+    try {
+      const prompt = `A professional, high-end, Cinematic photography of ${title}, representing financial success and luxury, 8k resolution, photorealistic, cinematic lighting, minimalist aesthetic, 16:9 aspect ratio`;
+      await addImageGenerationJob(newGoal.id, ImageJobType.GOAL, prompt);
+      console.log(`🎨 Goal Image - Queued generation for: "${title}" (ID: ${newGoal.id})`);
+    } catch (imageErr) {
+      console.error('⚠️ Goal Image - Failed to queue generation:', imageErr);
+    }
+
     revalidatePath('/');
     revalidatePath('/plans');
     return NextResponse.json(newGoal);
@@ -137,6 +148,19 @@ export async function PUT(request: NextRequest) {
           },
           include: { contributions: { orderBy: { date: 'desc' } } }
         });
+
+        // Trigger AI image generation if title changed
+        if (updateData.title && updateData.title !== updatedGoal.title) {
+          try {
+            const prompt = `A professional, high-quality, high-resolution photography of ${updateData.title}, financial goal achievement, wealth, success, photorealistic, 16:9 aspect ratio`;
+            await addImageGenerationJob(id, ImageJobType.GOAL, prompt);
+            console.log(`🎨 Goal Image - Re-queued generation for updated title: "${updateData.title}"`);
+          } catch (imageErr) {
+            console.error('⚠️ Goal Image - Failed to queue generation:', imageErr);
+          }
+        }
+
+        return updatedGoal;
       });
     } else {
       // Standard update without contribution record
@@ -151,6 +175,17 @@ export async function PUT(request: NextRequest) {
         },
         include: { contributions: { orderBy: { date: 'desc' } } }
       });
+
+      // Trigger AI image generation if title changed
+      if (updateData.title && updateData.title !== updatedGoal.title) {
+        try {
+          const prompt = `A professional, high-quality, high-resolution photography of ${updateData.title}, financial goal achievement, wealth, success, photorealistic, 16:9 aspect ratio`;
+          await addImageGenerationJob(id, ImageJobType.GOAL, prompt);
+          console.log(`🎨 Goal Image - Re-queued generation for updated title: "${updateData.title}"`);
+        } catch (imageErr) {
+          console.error('⚠️ Goal Image - Failed to queue generation:', imageErr);
+        }
+      }
     }
 
     console.log('✅ GOALS PUT - Successfully updated goal:', { id: updatedGoal.id, currentAmount: updatedGoal.currentAmount });

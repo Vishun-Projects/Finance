@@ -2,12 +2,12 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
-import { 
-  Plus, 
-  DollarSign, 
-  Calendar, 
-  Tag, 
-  Edit, 
+import {
+  Plus,
+  DollarSign,
+  Calendar,
+  Tag,
+  Edit,
   Trash2,
   CheckCircle,
   Clock,
@@ -17,7 +17,7 @@ import {
 import { useAuth } from '../hooks/useAuth';
 import { useCurrency } from '../contexts/CurrencyContext';
 import { useToast } from '../contexts/ToastContext';
-import PageSkeleton from './page-skeleton';
+import PageSkeleton from '@/components/feedback/page-skeleton';
 import { Combobox } from './ui/combobox';
 
 interface WishlistItem {
@@ -65,7 +65,7 @@ export default function WishlistManagement() {
 
   const fetchWishlistItems = useCallback(async () => {
     if (!user) return;
-    
+
     try {
       const response = await fetch('/api/app', {
         method: 'POST',
@@ -118,7 +118,7 @@ export default function WishlistManagement() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
-    
+
     try {
       const action = editingItem ? 'wishlist_update' : 'wishlist_create';
       const payload = {
@@ -165,7 +165,7 @@ export default function WishlistManagement() {
   const handleDelete = async (id: string) => {
     if (!user) return;
     if (!confirm('Are you sure you want to delete this item?')) return;
-    
+
     try {
       const response = await fetch('/api/app', {
         method: 'POST',
@@ -254,10 +254,10 @@ export default function WishlistManagement() {
 
   const filteredItems = wishlistItems.filter(item => {
     const matchesSearchTerm = item.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                              item.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                              item.category?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                              item.notes?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                              item.tags?.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
+      item.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.category?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.notes?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.tags?.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
 
     const matchesPriority = filterPriority === 'all' || item.priority === filterPriority.toUpperCase();
     const matchesStatus = filterStatus === 'all' || (filterStatus === 'completed' ? item.isCompleted : !item.isCompleted);
@@ -369,9 +369,8 @@ export default function WishlistManagement() {
               <button
                 key={status}
                 onClick={() => setFilterStatus(status)}
-                className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-                  isActive ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground hover:bg-accent'
-                }`}
+                className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${isActive ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground hover:bg-accent'
+                  }`}
                 type="button"
               >
                 {label}
@@ -434,7 +433,7 @@ export default function WishlistManagement() {
                 ×
               </button>
             </div>
-            
+
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -450,7 +449,7 @@ export default function WishlistManagement() {
                     placeholder="Enter item title"
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-1">
                     Estimated Cost *
@@ -498,7 +497,7 @@ export default function WishlistManagement() {
                     searchPlaceholder="Search priorities..."
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-1">
                     Category
@@ -506,11 +505,11 @@ export default function WishlistManagement() {
                   <input
                     type="text"
                     value={formData.category}
-                                         onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData(prev => ({ ...prev, category: e.target.value }))}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData(prev => ({ ...prev, category: e.target.value }))}
                     className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-input text-foreground"
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-1">
                     Target Date
@@ -518,7 +517,7 @@ export default function WishlistManagement() {
                   <input
                     type="date"
                     value={formData.targetDate}
-                                         onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData(prev => ({ ...prev, targetDate: e.target.value }))}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData(prev => ({ ...prev, targetDate: e.target.value }))}
                     className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-input text-foreground"
                   />
                 </div>
@@ -531,7 +530,7 @@ export default function WishlistManagement() {
                 <input
                   type="url"
                   value={formData.imageUrl}
-                                       onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData(prev => ({ ...prev, imageUrl: e.target.value }))}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData(prev => ({ ...prev, imageUrl: e.target.value }))}
                   className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-input text-foreground"
                 />
               </div>
@@ -542,7 +541,7 @@ export default function WishlistManagement() {
                 </label>
                 <textarea
                   value={formData.notes}
-                                       onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
                   rows={2}
                   className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-input text-foreground"
                 />
@@ -732,16 +731,16 @@ export default function WishlistManagement() {
             <Star className="w-16 h-16 mx-auto" />
           </div>
           <h3 className="text-lg font-medium text-gray-900 mb-2">
-            {filterPriority === 'all' ? 'No wishlist items yet' : 
-             filterPriority === 'low' ? 'No low priority items' :
-             filterPriority === 'medium' ? 'No medium priority items' :
-             filterPriority === 'high' ? 'No high priority items' : 'No critical items'}
+            {filterPriority === 'all' ? 'No wishlist items yet' :
+              filterPriority === 'low' ? 'No low priority items' :
+                filterPriority === 'medium' ? 'No medium priority items' :
+                  filterPriority === 'high' ? 'No high priority items' : 'No critical items'}
           </h3>
           <p className="text-gray-600">
             {filterPriority === 'all' ? 'Start building your bucket list by adding your first item!' :
-             filterPriority === 'low' ? 'Complete some high priority items to see them here!' :
-             filterPriority === 'medium' ? 'Complete some high priority items to see them here!' :
-             filterPriority === 'high' ? 'Complete some critical items to see them here!' : 'Complete some items to see them here!'}
+              filterPriority === 'low' ? 'Complete some high priority items to see them here!' :
+                filterPriority === 'medium' ? 'Complete some high priority items to see them here!' :
+                  filterPriority === 'high' ? 'Complete some critical items to see them here!' : 'Complete some items to see them here!'}
           </p>
         </div>
       )}

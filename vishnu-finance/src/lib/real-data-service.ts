@@ -45,14 +45,14 @@ export class RealDataService {
         salaryStructures,
         recurringItems
       ] = await Promise.all([
-        prisma.expense.findMany({
-          where: { userId, isDeleted: false },
+        prisma.transaction.findMany({
+          where: { userId, financialCategory: 'EXPENSE', isDeleted: false },
           include: { category: true },
-          orderBy: { date: 'desc' },
+          orderBy: { transactionDate: 'desc' },
           take: 50
         }),
-        prisma.incomeSource.findMany({
-          where: { userId, isActive: true, isDeleted: false },
+        prisma.transaction.findMany({
+          where: { userId, financialCategory: 'INCOME', isDeleted: false },
           include: { category: true }
         }),
         prisma.goal.findMany({
@@ -84,45 +84,23 @@ export class RealDataService {
       const recurringItemCount = recurringItems.length;
 
       // Calculate total income for current month (including one-time income)
-      const totalIncomeThisMonth = incomeSources.reduce((sum, source) => {
-        const sourceDate = new Date(source.startDate);
+      const totalIncomeThisMonth = incomeSources.reduce((sum: number, source: any) => {
+        const sourceDate = new Date(source.transactionDate);
         const isInCurrentMonth = sourceDate >= startOfMonth && sourceDate <= endOfMonth;
-        
-        if (source.frequency === 'ONE_TIME') {
-          // Include one-time income if it occurred this month
-          return isInCurrentMonth ? sum + Number(source.amount) : sum;
-        } else if (source.frequency === 'MONTHLY') {
-          return sum + Number(source.amount);
-        } else if (source.frequency === 'YEARLY') {
-          return sum + (Number(source.amount) / 12);
-        } else if (source.frequency === 'WEEKLY') {
-          return sum + (Number(source.amount) * 4.33);
-        } else if (source.frequency === 'DAILY') {
-          return sum + (Number(source.amount) * 30);
-        }
-        return sum;
+
+        // Transaction model uses creditAmount for income
+        return isInCurrentMonth ? sum + Number(source.creditAmount) : sum;
       }, 0);
 
       // Also calculate recurring monthly income for trends
-      const recurringMonthlyIncome = incomeSources.reduce((sum, source) => {
-        if (source.frequency === 'MONTHLY') {
-          return sum + Number(source.amount);
-        } else if (source.frequency === 'YEARLY') {
-          return sum + (Number(source.amount) / 12);
-        } else if (source.frequency === 'WEEKLY') {
-          return sum + (Number(source.amount) * 4.33);
-        } else if (source.frequency === 'DAILY') {
-          return sum + (Number(source.amount) * 30);
-        }
-        return sum;
-      }, 0);
+      const recurringMonthlyIncome = 0; // Simplified as Transaction model doesn't track frequency directly
 
       const monthlyExpenses = expenses
-        .filter(expense => {
-          const expenseDate = new Date(expense.date);
+        .filter((expense: any) => {
+          const expenseDate = new Date(expense.transactionDate);
           return expenseDate >= startOfMonth && expenseDate <= endOfMonth;
         })
-        .reduce((sum, expense) => sum + Number(expense.amount), 0);
+        .reduce((sum: number, expense: any) => sum + Number(expense.debitAmount), 0);
 
       const netSavings = totalIncomeThisMonth - monthlyExpenses;
       const savingsRate = totalIncomeThisMonth > 0 ? (netSavings / totalIncomeThisMonth) * 100 : 0;
@@ -144,22 +122,22 @@ export class RealDataService {
       const categoryBreakdown = this.getCategoryBreakdown(expenses);
 
       // Get recent transactions
-      const recentTransactions = expenses.slice(0, 10).map(expense => ({
+      const recentTransactions = expenses.slice(0, 10).map((expense: any) => ({
         id: expense.id,
         title: expense.description || 'Expense',
-        amount: -Number(expense.amount),
+        amount: -Number(expense.debitAmount),
         type: 'expense',
-        date: expense.date.toISOString().split('T')[0],
+        date: expense.transactionDate.toISOString().split('T')[0],
         category: expense.category?.name || 'Other'
       }));
 
       // Add income transactions
-      const incomeTransactions = incomeSources.slice(0, 5).map(income => ({
+      const incomeTransactions = incomeSources.slice(0, 5).map((income: any) => ({
         id: income.id,
-        title: income.name,
-        amount: Number(income.amount),
+        title: income.description || 'Income',
+        amount: Number(income.creditAmount),
         type: 'income',
-        date: income.startDate.toISOString().split('T')[0],
+        date: income.transactionDate.toISOString().split('T')[0],
         category: income.category?.name || 'Income'
       }));
 
@@ -171,7 +149,7 @@ export class RealDataService {
       const userPersona = this.detectUserPersona({
         incomePattern: incomeSources.length > 1 ? 'multiple' : 'regular',
         expenseComplexity: expenses.length > 50 ? 'complex' : 'moderate',
-        goalTypes: goals.map(g => g.category || 'general'),
+        goalTypes: goals.map((g: any) => g.category || 'general'),
         featureUsage: ['expense-tracking', 'goal-setting'],
         timeSpent: 15
       });
@@ -204,7 +182,7 @@ export class RealDataService {
       const spendingPatterns = this.analyzeSpendingPatterns(expenses);
 
       // Get goal progress
-      const goalProgress = goals.map(goal => ({
+      const goalProgress = goals.map((goal: any) => ({
         id: goal.id,
         title: goal.title,
         target: Number(goal.targetAmount),
@@ -216,10 +194,10 @@ export class RealDataService {
 
       // Get upcoming bills
       const upcomingBills = deadlines
-        .filter(deadline => !deadline.isCompleted && deadline.dueDate > new Date())
-        .sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime())
+        .filter((deadline: any) => !deadline.isCompleted && deadline.dueDate > new Date())
+        .sort((a: any, b: any) => a.dueDate.getTime() - b.dueDate.getTime())
         .slice(0, 5)
-        .map(deadline => ({
+        .map((deadline: any) => ({
           id: deadline.id,
           title: deadline.title,
           amount: Number(deadline.amount || 0),
@@ -240,7 +218,7 @@ export class RealDataService {
         totalExpenses: monthlyExpenses,
         netSavings,
         savingsRate: Math.round(savingsRate * 100) / 100,
-        upcomingDeadlines: deadlines.filter(d => !d.isCompleted && d.dueDate > new Date()).length,
+        upcomingDeadlines: deadlines.filter((d: any) => !d.isCompleted && d.dueDate > new Date()).length,
         activeGoals: goals.length,
         recentTransactions: allTransactions,
         monthlyTrends,
@@ -285,7 +263,7 @@ export class RealDataService {
     else if (data.expenses.length >= 10) score += 10;
 
     // Deadline management (15 points)
-    const overdueDeadlines = data.deadlines.filter((d: any) => 
+    const overdueDeadlines = data.deadlines.filter((d: any) =>
       !d.isCompleted && d.dueDate < new Date()
     ).length;
     if (overdueDeadlines === 0) score += 15;
@@ -307,32 +285,34 @@ export class RealDataService {
       const monthEnd = new Date(currentDate.getFullYear(), currentDate.getMonth() - i + 1, 0);
 
       const [monthlyExpenses, monthlyIncome] = await Promise.all([
-        prisma.expense.aggregate({
+        prisma.transaction.aggregate({
           where: {
             userId,
-            date: {
+            financialCategory: 'EXPENSE',
+            transactionDate: {
               gte: monthStart,
               lte: monthEnd
-            }
+            },
+            isDeleted: false
           },
-          _sum: { amount: true }
+          _sum: { debitAmount: true }
         }),
-        prisma.incomeSource.aggregate({
+        prisma.transaction.aggregate({
           where: {
             userId,
-            isActive: true,
-            startDate: { lte: monthEnd },
-            OR: [
-              { endDate: null },
-              { endDate: { gte: monthStart } }
-            ]
+            financialCategory: 'INCOME',
+            transactionDate: {
+              gte: monthStart,
+              lte: monthEnd
+            },
+            isDeleted: false
           },
-          _sum: { amount: true }
+          _sum: { creditAmount: true }
         })
       ]);
 
-      const income = Number(monthlyIncome._sum.amount || 0);
-      const expenses = Number(monthlyExpenses._sum.amount || 0);
+      const income = Number(monthlyIncome._sum.creditAmount || 0);
+      const expenses = Number(monthlyExpenses._sum.debitAmount || 0);
       const savings = income - expenses;
 
       trends.push({
@@ -352,7 +332,7 @@ export class RealDataService {
 
     expenses.forEach(expense => {
       const categoryName = expense.category?.name || 'Other';
-      const amount = Number(expense.amount);
+      const amount = Number(expense.debitAmount || 0);
 
       if (categoryMap.has(categoryName)) {
         categoryMap.set(categoryName, categoryMap.get(categoryName) + amount);
@@ -414,7 +394,7 @@ export class RealDataService {
       });
     }
 
-    const overdueDeadlines = data.deadlines.filter((d: any) => 
+    const overdueDeadlines = data.deadlines.filter((d: any) =>
       !d.isCompleted && d.dueDate < new Date()
     );
     if (overdueDeadlines.length > 0) {
@@ -459,20 +439,20 @@ export class RealDataService {
     };
 
     if (expenses.length > 0) {
-      const totalAmount = expenses.reduce((sum, expense) => sum + Number(expense.amount), 0);
+      const totalAmount = expenses.reduce((sum, expense) => sum + Number(expense.debitAmount || 0), 0);
       patterns.averageTransaction = totalAmount / expenses.length;
 
       // Find most expensive category
       const categoryMap = new Map();
       expenses.forEach(expense => {
         const category = expense.category?.name || 'Other';
-        const amount = Number(expense.amount);
+        const amount = Number(expense.debitAmount || 0);
         categoryMap.set(category, (categoryMap.get(category) || 0) + amount);
       });
 
       const sortedCategories = Array.from(categoryMap.entries())
         .sort((a, b) => b[1] - a[1]);
-      
+
       patterns.mostExpensiveCategory = sortedCategories[0]?.[0] || 'Other';
       patterns.topCategories = sortedCategories.slice(0, 3).map(([category, total]) => ({
         category,
@@ -485,8 +465,8 @@ export class RealDataService {
 
   // Calculate emergency fund months
   private static calculateEmergencyFundMonths(monthlyExpenses: number, goals: any[]): number {
-    const emergencyGoal = goals.find(goal => 
-      goal.title.toLowerCase().includes('emergency') || 
+    const emergencyGoal = goals.find(goal =>
+      goal.title.toLowerCase().includes('emergency') ||
       goal.category?.toLowerCase().includes('emergency')
     );
 
@@ -501,13 +481,13 @@ export class RealDataService {
   // Calculate debt-to-income ratio
   private static calculateDebtToIncomeRatio(monthlyIncome: number, expenses: any[]): number {
     // This is a simplified calculation - in reality, you'd need to identify debt payments
-    const debtExpenses = expenses.filter(expense => 
+    const debtExpenses = expenses.filter(expense =>
       expense.category?.name?.toLowerCase().includes('loan') ||
       expense.category?.name?.toLowerCase().includes('debt') ||
       expense.description?.toLowerCase().includes('emi')
     );
 
-    const monthlyDebt = debtExpenses.reduce((sum, expense) => sum + Number(expense.amount), 0);
+    const monthlyDebt = debtExpenses.reduce((sum, expense) => sum + Number(expense.debitAmount || 0), 0);
     return monthlyIncome > 0 ? (monthlyDebt / monthlyIncome) * 100 : 0;
   }
 
@@ -548,12 +528,12 @@ export class RealDataService {
   // Get user's financial health assessment
   static async getFinancialHealthAssessment(userId: string): Promise<any> {
     const dashboardData = await this.getDashboardData(userId);
-    
+
     return {
       score: dashboardData.financialHealthScore,
-      category: dashboardData.financialHealthScore >= 75 ? 'excellent' : 
-                dashboardData.financialHealthScore >= 60 ? 'good' : 
-                dashboardData.financialHealthScore >= 40 ? 'fair' : 'poor',
+      category: dashboardData.financialHealthScore >= 75 ? 'excellent' :
+        dashboardData.financialHealthScore >= 60 ? 'good' :
+          dashboardData.financialHealthScore >= 40 ? 'fair' : 'poor',
       factors: {
         savingsRate: dashboardData.savingsRate,
         debtToIncome: dashboardData.debtToIncomeRatio,
@@ -569,23 +549,23 @@ export class RealDataService {
 
   private static getStrengths(data: any): string[] {
     const strengths = [];
-    
+
     if (data.savingsRate >= 20) strengths.push('Excellent savings rate');
     if (data.activeGoals >= 3) strengths.push('Multiple financial goals set');
     if (data.recentTransactions.length >= 20) strengths.push('Good expense tracking');
     if (data.upcomingDeadlines === 0) strengths.push('No overdue deadlines');
-    
+
     return strengths;
   }
 
   private static getWeaknesses(data: any): string[] {
     const weaknesses = [];
-    
+
     if (data.savingsRate < 10) weaknesses.push('Low savings rate');
     if (data.activeGoals === 0) weaknesses.push('No financial goals set');
     if (data.recentTransactions.length < 10) weaknesses.push('Limited expense tracking');
     if (data.emergencyFundMonths < 3) weaknesses.push('Insufficient emergency fund');
-    
+
     return weaknesses;
   }
 }

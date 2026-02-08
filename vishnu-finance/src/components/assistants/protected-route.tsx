@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { LoadingSpinner } from '@/components/feedback/loading-spinner';
+import LoadingSpinner from '@/components/feedback/loading-spinner';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
@@ -12,10 +12,10 @@ interface ProtectedRouteProps {
   redirectTo?: string;
 }
 
-export function ProtectedRoute({ 
-  children, 
+export function ProtectedRoute({
+  children,
   fallback,
-  redirectTo = '/login' 
+  redirectTo = '/login'
 }: ProtectedRouteProps) {
   const { user, loading } = useAuth();
   const router = useRouter();

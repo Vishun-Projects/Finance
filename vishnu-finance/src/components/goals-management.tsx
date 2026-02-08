@@ -1,12 +1,12 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { 
-  Plus, 
-  Target, 
-  TrendingUp, 
-  Calendar, 
-  DollarSign, 
+import {
+  Plus,
+  Target,
+  TrendingUp,
+  Calendar,
+  DollarSign,
   Trash2,
   RefreshCw,
   AlertCircle,
@@ -16,7 +16,7 @@ import {
   Save
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
-import PageSkeleton from './page-skeleton';
+import PageSkeleton from '@/components/feedback/page-skeleton';
 import { Combobox } from './ui/combobox';
 
 interface Goal {
@@ -62,11 +62,11 @@ export default function GoalsManagement() {
   // Fetch goals on component mount
   const fetchGoals = useCallback(async () => {
     if (!user) return;
-    
+
     try {
       setIsFetching(true);
       setError(null);
-      
+
       const response = await fetch('/api/app', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -103,7 +103,7 @@ export default function GoalsManagement() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
-    
+
     setIsLoading(true);
     setError(null);
 
@@ -198,14 +198,14 @@ export default function GoalsManagement() {
             <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
             <span>Refresh</span>
           </button>
-        <button
-          onClick={() => setShowForm(true)}
+          <button
+            onClick={() => setShowForm(true)}
             className="minimal-button-primary flex items-center space-x-2 btn-touch"
-        >
+          >
             <Plus className="w-4 h-4" />
-          <span>Add Goal</span>
-        </button>
-      </div>
+            <span>Add Goal</span>
+          </button>
+        </div>
       </div>
 
       {/* Error Display */}
@@ -400,7 +400,7 @@ export default function GoalsManagement() {
                 </div>
               </div>
 
-              
+
             </div>
 
             {/* Description Field */}
@@ -408,15 +408,15 @@ export default function GoalsManagement() {
               <label htmlFor="description" className="block text-sm font-semibold text-primary mb-3">
                 Description
               </label>
-                <textarea
-                  id="description"
-                  name="description"
-                  rows={3}
-                  value={formData.description}
-                  onChange={handleChange}
+              <textarea
+                id="description"
+                name="description"
+                rows={3}
+                value={formData.description}
+                onChange={handleChange}
                 className="minimal-textarea"
-                  placeholder="Optional description of your goal..."
-                />
+                placeholder="Optional description of your goal..."
+              />
             </div>
 
             {/* Submit Button */}
@@ -447,7 +447,7 @@ export default function GoalsManagement() {
           <h3 className="text-lg font-semibold text-primary">Your Goals</h3>
           <span className="text-sm text-muted">{goals.length} goals</span>
         </div>
-        
+
         {goals.length === 0 ? (
           <div className="text-center py-12">
             <Target className="w-16 h-16 text-muted mx-auto mb-4" />
@@ -466,51 +466,51 @@ export default function GoalsManagement() {
             {goals.map((goal) => {
               const progress = calculateProgress(goal.currentAmount, goal.targetAmount);
               const isCompleted = goal.currentAmount >= goal.targetAmount;
-              
+
               return (
                 <div key={goal.id} className="minimal-card-inset p-6 hover-lift transition-all">
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex-1">
-                                             <div className="flex items-center space-x-3 mb-2">
-                         <h4 className="text-lg font-semibold text-primary">{goal.title}</h4>
-                         {isCompleted && (
-                           <span className="minimal-badge minimal-badge-success">
-                             Completed
-                           </span>
-                         )}
-                       </div>
+                      <div className="flex items-center space-x-3 mb-2">
+                        <h4 className="text-lg font-semibold text-primary">{goal.title}</h4>
+                        {isCompleted && (
+                          <span className="minimal-badge minimal-badge-success">
+                            Completed
+                          </span>
+                        )}
+                      </div>
                       <p className="text-muted mb-3">{goal.description}</p>
-                      
+
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                         <div>
                           <p className="text-sm text-muted">Target Amount</p>
                           <p className="font-semibold text-primary currency-inr">{formatCurrency(goal.targetAmount)}</p>
-                      </div>
-                      <div>
+                        </div>
+                        <div>
                           <p className="text-sm text-muted">Current Amount</p>
                           <p className="font-semibold text-success currency-inr">{formatCurrency(goal.currentAmount)}</p>
-                      </div>
+                        </div>
                         <div>
                           <p className="text-sm text-muted">Target Date</p>
                           <p className="font-semibold text-info">{goal.targetDate ? new Date(goal.targetDate).toLocaleDateString('en-IN') : 'Not set'}</p>
-                    </div>
-                  </div>
-                  
-                  {/* Progress Bar */}
+                        </div>
+                      </div>
+
+                      {/* Progress Bar */}
                       <div className="mb-2">
                         <div className="flex justify-between text-sm mb-1">
                           <span className="text-muted">Progress</span>
                           <span className="font-medium">{progress.toFixed(1)}%</span>
-                    </div>
-                        <div className="minimal-progress">
-                      <div 
-                            className="minimal-progress-fill" 
-                            style={{ width: `${progress}%` }}
-                      ></div>
                         </div>
+                        <div className="minimal-progress">
+                          <div
+                            className="minimal-progress-fill"
+                            style={{ width: `${progress}%` }}
+                          ></div>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                  
+
                     <div className="flex items-center space-x-2 ml-4">
                       <button
                         onClick={() => handleDelete(goal.id)}
@@ -518,7 +518,7 @@ export default function GoalsManagement() {
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
-                      </div>
+                    </div>
                   </div>
                 </div>
               );

@@ -1,12 +1,12 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { 
-  Plus, 
-  Calendar, 
-  Clock, 
-  AlertTriangle, 
-  CheckCircle, 
+import {
+  Plus,
+  Calendar,
+  Clock,
+  AlertTriangle,
+  CheckCircle,
   X,
   Trash2,
   RefreshCw,
@@ -27,7 +27,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { Deadline } from '@/types';
-import PageSkeleton from './page-skeleton';
+import PageSkeleton from '@/components/feedback/page-skeleton';
 import { Combobox } from './ui/combobox';
 
 export default function DeadlinesManagement() {
@@ -84,11 +84,11 @@ export default function DeadlinesManagement() {
 
   const fetchDeadlines = useCallback(async () => {
     if (!user) return;
-    
+
     try {
       setIsFetching(true);
       setError(null);
-      
+
       const response = await fetch('/api/app', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -127,7 +127,7 @@ export default function DeadlinesManagement() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
-    
+
     setIsLoading(true);
     setError(null);
 
@@ -245,25 +245,25 @@ export default function DeadlinesManagement() {
 
   const filteredDeadlines = deadlines.filter(deadline => {
     const matchesSearch = deadline.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         deadline.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         deadline.category?.toLowerCase().includes(searchTerm.toLowerCase());
-    
+      deadline.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      deadline.category?.toLowerCase().includes(searchTerm.toLowerCase());
+
     const matchesStatus = filterStatus === 'all' ||
-                         (filterStatus === 'pending' && !deadline.isCompleted) ||
-                         (filterStatus === 'completed' && deadline.isCompleted) ||
-                         (filterStatus === 'overdue' && !deadline.isCompleted && getDaysUntilDue(deadline.dueDate) < 0);
-    
+      (filterStatus === 'pending' && !deadline.isCompleted) ||
+      (filterStatus === 'completed' && deadline.isCompleted) ||
+      (filterStatus === 'overdue' && !deadline.isCompleted && getDaysUntilDue(deadline.dueDate) < 0);
+
     const matchesCategory = filterCategory === 'all' || deadline.category === filterCategory;
-    
+
     return matchesSearch && matchesStatus && matchesCategory;
   });
 
   const totalDeadlines = deadlines.length;
   const completedDeadlines = deadlines.filter(deadline => deadline.isCompleted).length;
-  const overdueDeadlines = deadlines.filter(deadline => 
+  const overdueDeadlines = deadlines.filter(deadline =>
     !deadline.isCompleted && getDaysUntilDue(deadline.dueDate) < 0
   ).length;
-  const upcomingDeadlines = deadlines.filter(deadline => 
+  const upcomingDeadlines = deadlines.filter(deadline =>
     !deadline.isCompleted && getDaysUntilDue(deadline.dueDate) <= 7 && getDaysUntilDue(deadline.dueDate) >= 0
   ).length;
   const recurringDeadlines = deadlines.filter(deadline => deadline.isRecurring).length;
@@ -665,7 +665,7 @@ export default function DeadlinesManagement() {
             </button>
           </div>
         </div>
-        
+
         {filteredDeadlines.length === 0 ? (
           <div className="text-center py-12">
             <Clock className="w-16 h-16 text-muted mx-auto mb-4" />
@@ -685,7 +685,7 @@ export default function DeadlinesManagement() {
               const statusBadge = getStatusBadge(deadline.dueDate, deadline.isCompleted);
               const statusText = getStatusText(deadline.dueDate, deadline.isCompleted);
               const statusIcon = getStatusIcon(deadline.status, deadline.isCompleted);
-              
+
               return (
                 <div key={deadline.id} className="minimal-card-inset p-4 hover-lift transition-all">
                   <div className="flex items-start justify-between">
@@ -744,11 +744,10 @@ export default function DeadlinesManagement() {
                     <div className="flex items-center space-x-2 ml-4">
                       <button
                         onClick={() => handleToggleComplete(deadline.id, deadline.isCompleted)}
-                        className={`minimal-button-small p-2 transition-all ${
-                          deadline.isCompleted 
-                            ? 'text-success hover:bg-success hover:text-white' 
+                        className={`minimal-button-small p-2 transition-all ${deadline.isCompleted
+                            ? 'text-success hover:bg-success hover:text-white'
                             : 'text-primary hover:bg-primary hover:text-white'
-                        }`}
+                          }`}
                         title={deadline.isCompleted ? 'Mark as pending' : 'Mark as completed'}
                       >
                         {deadline.isCompleted ? <CheckCircle className="w-4 h-4" /> : <Clock className="w-4 h-4" />}

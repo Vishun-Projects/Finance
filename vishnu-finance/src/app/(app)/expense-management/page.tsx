@@ -1,6 +1,6 @@
 import { Suspense } from 'react';
 import ExpenseManagementPageClient from '@/app/(app)/expense-management/page-client';
-import PageSkeleton from '@/components/page-skeleton';
+import PageSkeleton from '@/components/feedback/page-skeleton';
 import { requireUser } from '@/lib/auth/server-auth';
 import { getCurrentMonthRange } from '@/lib/date-range';
 import { loadTransactionsBootstrap, loadTransactionCategories } from '@/lib/loaders/transactions';

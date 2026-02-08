@@ -108,8 +108,13 @@ Rules:
 
         // 3. Generate a cover image URL based on the imagePrompt
         if (postData.imagePrompt) {
-            console.log('Generating image with Multi-Model Pollinations...');
-            postData.coverImage = await generatePollinationsImage(postData.imagePrompt, 'uploads/education');
+            try {
+                const { generateAndSaveImagenImage } = await import('@/lib/imagen');
+                postData.coverImage = await generateAndSaveImagenImage(postData.imagePrompt, 'uploads/education');
+            } catch (imgError) {
+                console.error('[AI Post Gen] Image generation failed:', imgError);
+                // Continue without image, user can regenerate later
+            }
         }
 
         return NextResponse.json(postData);

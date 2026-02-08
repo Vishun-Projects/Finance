@@ -63,10 +63,14 @@ export default function EducationPage() {
     fetchDailyNews();
   }, []);
 
-  const fetchDailyNews = async () => {
+  const fetchDailyNews = async (force: boolean = false) => {
     try {
-      console.log('[DailyNews Client] Requesting news...');
-      const res = await fetch('/api/education/daily-news');
+      setNewsLoading(true);
+      console.log(`[DailyNews Client] Requesting news (force=${force})...`);
+      const url = new URL('/api/education/daily-news', window.location.origin);
+      if (force) url.searchParams.append('force', 'true');
+
+      const res = await fetch(url.toString());
       console.log('[DailyNews Client] Response received:', res.status);
       if (res.ok) {
         const data = await res.json();
@@ -156,10 +160,10 @@ export default function EducationPage() {
                 <h3 className="text-sm font-bold text-foreground uppercase tracking-widest leading-none">Daily Briefing</h3>
                 <div className="flex items-center border-l border-border pl-2 ml-2 gap-1">
                   <button
-                    onClick={() => fetchDailyNews()}
+                    onClick={() => fetchDailyNews(true)}
                     disabled={newsLoading}
                     className="p-1 hover:bg-background/50 rounded-md text-muted-foreground hover:text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    title="Refresh News"
+                    title="Force Regenerate News & Image"
                   >
                     <RefreshCcw className={`w-3 h-3 ${newsLoading ? 'animate-spin' : ''}`} />
                   </button>

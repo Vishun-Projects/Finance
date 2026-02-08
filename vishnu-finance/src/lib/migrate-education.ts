@@ -22,7 +22,7 @@ async function migrateTips() {
     }
 
     for (const tip of financialTips) {
-        const slug = slugify(`${tip.category}-${tip.title}`, { lower: true, strict: true });
+        const slug = slugify(`${tip.category}-${tip.title}`);
 
         try {
             await prisma.educationPost.upsert({

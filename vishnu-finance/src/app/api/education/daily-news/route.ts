@@ -11,9 +11,10 @@ export async function GET(request: NextRequest) {
         const dateParam = searchParams.get('date');
         const today = dateParam ? new Date(dateParam) : new Date();
 
-        console.log(`[DailyNews API] Requesting briefing for ${today.toISOString()} in ${normalizedLocation}`);
-
-        const briefing = await BriefingService.getOrGenerate(today, normalizedLocation);
+        const force = searchParams.get('force') === 'true';
+        const briefing = force
+            ? await BriefingService.generate(today, normalizedLocation)
+            : await BriefingService.getOrGenerate(today, normalizedLocation);
 
         if (!briefing) {
             return NextResponse.json({ error: 'Failed to generate briefing' }, { status: 500 });

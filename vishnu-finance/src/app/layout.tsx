@@ -79,7 +79,7 @@ import FetchInterceptor from "@/components/fetch-interceptor";
 import { DesignProvider } from "@/components/providers/design-provider";
 import { getDesignSettings } from "@/app/actions/design-system";
 
-import { Inter, JetBrains_Mono, Newsreader } from "next/font/google";
+import { Inter, JetBrains_Mono /*, Newsreader*/ } from "next/font/google";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -93,12 +93,14 @@ const jetbrainsMono = JetBrains_Mono({
   display: "swap",
 });
 
+/*
 const newsreader = Newsreader({
   subsets: ["latin"],
   variable: "--font-newsreader",
   display: "swap",
   style: ["normal", "italic"]
 });
+*/
 
 export default async function RootLayout({
   children,
@@ -109,7 +111,7 @@ export default async function RootLayout({
   const normalizedUser = normalizeAuthUser(currentUser);
 
   return (
-    <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable} ${newsreader.variable}`} suppressHydrationWarning>
+    <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable} {/*${newsreader.variable}*/}`} suppressHydrationWarning>
       <body className="font-sans antialiased bg-background text-foreground">
         <FetchInterceptor />
         <AuthProvider initialUser={normalizedUser}>

@@ -1,0 +1,5 @@
+pandas
+numpy
+tabula-py
+requests
+openpyxl

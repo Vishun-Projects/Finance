@@ -74,6 +74,29 @@
                     "name": "Telegram account"
                 }
             }
+        },
+        {
+            "parameters": {
+                "requestMethod": "POST",
+                "url": "https://defaultecad5b7df11f4f4c98a4a18703be63.22.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/d3024fef11ac409ebd151466086de121/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=jc-WPpDSYs9dVzMYCh6SqjGfZrRqWAbdPjN_85Kyg7o",
+                "options": {},
+                "bodyParametersUi": {
+                    "parameter": [
+                        {
+                            "name": "text",
+                            "value": "={{ $json.body.payload.message }}"
+                        }
+                    ]
+                }
+            },
+            "id": "e969d27f-9584-4b53-b0fc-71b3152db9ed",
+            "name": "Microsoft Teams Webhook",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 2,
+            "position": [
+                400,
+                200
+            ]
         }
     ],
     "pinData": {},
@@ -88,6 +111,11 @@
                     },
                     {
                         "node": "Telegram",
+                        "type": "main",
+                        "index": 0
+                    },
+                    {
+                        "node": "Microsoft Teams Webhook",
                         "type": "main",
                         "index": 0
                     }

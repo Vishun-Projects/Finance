@@ -23,28 +23,23 @@ export async function POST(request: NextRequest) {
     // Register user
     const result = await AuthService.registerUser(email, password, name);
 
-    // Set HTTP-only cookie with JWT token
-    const response = NextResponse.json(
-      { 
-        message: 'User registered successfully',
-        user: result.user 
-      },
-      { status: 201 }
-    );
+    // Prepare response
+    const responsePayload: any = {
+      message: 'User registered successfully',
+      user: result.user
+    };
 
-    response.cookies.set('auth-token', result.token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-      path: '/'
-    });
+    if (result.requiresVerification) {
+      responsePayload.requiresVerification = true;
+    }
+
+    const response = NextResponse.json(responsePayload, { status: 201 });
 
     return response;
 
   } catch (error: any) {
     console.error('Registration error:', error);
-    
+
     if (error.message === 'User already exists with this email') {
       return NextResponse.json(
         { error: 'User already exists with this email' },

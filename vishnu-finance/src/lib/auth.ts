@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { prisma } from './db';
+import { MailerService } from './mailer-service';
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET;
@@ -50,6 +51,83 @@ export class AuthService {
     const duration = Date.now() - startTime;
     console.log(`⏱️ COMPARE PASSWORD: ${duration}ms`);
     return result;
+  }
+
+  // Generate OTP
+  static async generateOTP(email: string): Promise<string> {
+    // Generate 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // Hash OTP before saving
+    const hashedOTP = await this.hashPassword(otp);
+
+    // Set expiry (10 minutes)
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
+    // Save to DB
+    await prisma.user.update({
+      where: { email },
+      data: {
+        otp: hashedOTP,
+        otpExpiresAt: expiresAt
+      }
+    });
+
+    return otp;
+  }
+
+  // Verify OTP
+  static async verifyOTP(email: string, otp: string): Promise<{ user: any; token: string }> {
+    const user = await prisma.user.findUnique({
+      where: { email }
+    });
+
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    if (!user.otp || !user.otpExpiresAt) {
+      throw new Error('No OTP request found');
+    }
+
+    if (new Date() > user.otpExpiresAt) {
+      throw new Error('OTP has expired');
+    }
+
+    const isValid = await this.comparePassword(otp, user.otp);
+    if (!isValid) {
+      throw new Error('Invalid OTP');
+    }
+
+    // Mark as verified and clear OTP
+    const updatedUser = await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        isVerified: true,
+        otp: null,
+        otpExpiresAt: null,
+        lastLogin: new Date()
+      }
+    });
+
+    // Generate token
+    const token = this.generateToken({
+      userId: updatedUser.id,
+      email: updatedUser.email,
+      name: updatedUser.name || undefined,
+      role: updatedUser.role,
+    });
+
+    return {
+      user: {
+        id: updatedUser.id,
+        email: updatedUser.email,
+        name: updatedUser.name,
+        role: updatedUser.role,
+        isVerified: updatedUser.isVerified
+      },
+      token
+    };
   }
 
   // Generate access token
@@ -114,51 +192,36 @@ export class AuthService {
     // Hash password
     const hashedPassword = await this.hashPassword(password);
 
-    // Create user
+    // Create user with UNVERIFIED status
     const dbStart2 = Date.now();
     const user = await prisma.user.create({
       data: {
         email,
         password: hashedPassword,
-        name: name || email.split('@')[0], // Use email prefix as default name
+        name: name || email.split('@')[0],
         role: 'USER',
+        isVerified: false // Default to unverified
       }
     });
     console.log(`⏱️ DB QUERY (create): ${Date.now() - dbStart2}ms`);
 
-    // Generate token
-    const token = this.generateToken({
-      userId: user.id,
-      email: user.email,
-      name: user.name || undefined,
-      role: user.role,
-    });
+    // Generate OTP for the new user
+    const otp = await this.generateOTP(email);
+
+    // Send OTP email
+    await MailerService.sendOTP(email, otp);
 
     console.log(`⏱️ REGISTER COMPLETE: ${Date.now() - startTime}ms`);
+
+    // Return user info but NO token
     return {
       user: {
         id: user.id,
         email: user.email,
         name: user.name,
-        avatarUrl: user.avatarUrl,
-        gender: user.gender,
-        phone: user.phone,
-        dateOfBirth: user.dateOfBirth,
-        addressLine1: user.addressLine1,
-        addressLine2: user.addressLine2,
-        city: user.city,
-        state: user.state,
-        country: user.country,
-        pincode: user.pincode,
-        occupation: user.occupation,
-        bio: user.bio,
-        isActive: user.isActive,
-        lastLogin: user.lastLogin,
-        createdAt: user.createdAt,
-        updatedAt: user.updatedAt,
-        role: user.role,
+        isVerified: user.isVerified
       },
-      token
+      requiresVerification: true
     };
   }
 
@@ -192,6 +255,15 @@ export class AuthService {
     if (!user.password) {
       console.log('❌ LOGIN API - User has no password (OAuth user)');
       throw new Error('This account uses Google sign-in. Please use "Sign in with Google" instead.');
+    }
+
+    // Check if user is verified
+    if (!user.isVerified) {
+      console.log('❌ LOGIN API - User not verified');
+      // Generate new OTP for verification
+      const otp = await this.generateOTP(email);
+      await MailerService.sendOTP(email, otp);
+      throw new Error('Account not verified. A new verification code has been sent to your email.');
     }
 
     // Check if password is hashed (starts with $2b$)

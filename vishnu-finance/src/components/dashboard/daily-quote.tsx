@@ -1,9 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Quote, RefreshCw } from 'lucide-react';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Quote } from 'lucide-react';
 
 interface DailyQuote {
     text: string;
@@ -33,34 +31,28 @@ export function DailyQuoteCard() {
 
     if (loading) {
         return (
-            <Card className="bg-gradient-to-br from-primary/5 to-transparent border-primary/10">
-                <CardContent className="p-6">
-                    <Skeleton className="h-4 w-3/4 mb-2" />
-                    <Skeleton className="h-4 w-1/2" />
-                </CardContent>
-            </Card>
+            <div className="bg-card/40 border border-border/40 rounded-2xl p-6 h-full flex flex-col justify-center animate-pulse">
+                <div className="h-4 bg-muted/20 w-3/4 mb-3 rounded" />
+                <div className="h-3 bg-muted/20 w-1/2 rounded" />
+            </div>
         );
     }
 
     if (!quote) return null;
 
     return (
-        <Card className="bg-gradient-to-br from-primary/5 to-transparent border-primary/10 overflow-hidden group">
-            <CardContent className="p-6 relative">
-                <Quote className="absolute -top-2 -left-2 w-12 h-12 text-primary/5 group-hover:text-primary/10 transition-colors" />
-                <div className="relative">
-                    <p className="text-lg font-medium italic text-foreground/90 leading-relaxed mb-4">
-                        "{quote.text}"
+        <div className="bg-card/40 border border-border/40 backdrop-blur-md rounded-2xl p-6 h-full flex flex-col justify-center relative overflow-hidden group hover:border-border/60 transition-colors">
+            <Quote className="absolute top-4 right-4 w-8 h-8 text-foreground/5 opacity-50" />
+            <div className="relative z-10">
+                <p className="text-lg md:text-xl font-display font-medium text-foreground leading-relaxed italic mb-3 opacity-90">
+                    "{quote.text}"
+                </p>
+                {quote.author && (
+                    <p className="text-xs uppercase tracking-widest text-muted-foreground font-bold pl-1 border-l-2 border-primary/30">
+                        {quote.author}
                     </p>
-                    {quote.author && (
-                        <div className="flex items-center justify-between">
-                            <p className="text-sm font-semibold text-primary">
-                                — {quote.author}
-                            </p>
-                        </div>
-                    )}
-                </div>
-            </CardContent>
-        </Card>
+                )}
+            </div>
+        </div>
     );
 }

@@ -17,7 +17,6 @@ import { DateRange } from 'react-day-picker';
 import { Skeleton } from '@/components/ui/skeleton';
 import TransactionCard from './transaction-card';
 import TransactionFormModal, { TransactionFormData } from './transaction-form-modal';
-import FabButton from './ui/fab-button';
 import MobileHeader from './ui/mobile-header';
 import FilterSheet from './ui/filter-sheet';
 import QuickRangeChips, { QuickRange } from './ui/quick-range-chips';
@@ -1804,6 +1803,12 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
           right={
             <div className="flex items-center gap-2">
               <button
+                onClick={() => setIsFilterOpen(true)}
+                className="p-2 rounded-md bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20"
+              >
+                <Filter className="w-5 h-5" />
+              </button>
+              <button
                 onClick={() => setShowSelectionMode(!showSelectionMode)}
                 className={`p-2 rounded-md hover:bg-muted ${showSelectionMode ? 'bg-primary/10' : ''}`}
               >
@@ -2071,43 +2076,90 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                     <Sparkles className="w-4 h-4 text-primary" />
                     <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Financial Overview</h2>
                   </div>
-                  <Badge variant="outline" className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground bg-card/50 px-2 py-0.5">{rangeLabel}</Badge>
+                  <Badge variant="outline" className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground bg-card/50 px-2 py-0.5 backdrop-blur-sm">{rangeLabel}</Badge>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-6">
                   {isLoading ? (
                     [1, 2, 3].map((i) => (
                       <Skeleton key={i} className="h-32 w-full rounded-2xl" />
                     ))
                   ) : (
                     <>
-                      <div className="bg-card border border-border p-6 rounded-2xl hover:border-emerald-500/30 transition-all shadow-sm group">
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-4 group-hover:text-emerald-500 transition-colors">Total Income</p>
-                        <h3 className="text-2xl font-black text-emerald-500">{formatAmount(income)}</h3>
-                        <p className="text-[10px] text-muted-foreground mt-1">Total inflow in this range</p>
+                      <div className="glass-card p-4 md:p-6 rounded-2xl hover:bg-emerald-500/5 transition-all shadow-sm group border-l-4 border-l-emerald-500">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2 md:mb-4 group-hover:text-emerald-500 transition-colors">Total Income</p>
+                        <h3 className="text-xl md:text-2xl font-black text-emerald-500 font-display">{formatAmount(income)}</h3>
+                        <p className="text-[10px] text-muted-foreground mt-1 font-medium hidden md:block">Total inflow in this range</p>
                       </div>
-                      <div className="bg-card border border-border p-6 rounded-2xl hover:border-foreground/30 transition-all shadow-sm group">
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-4 group-hover:text-foreground transition-colors">Total Spends</p>
-                        <h3 className="text-2xl font-black text-foreground">{formatAmount(expense)}</h3>
-                        <p className="text-[10px] text-muted-foreground mt-1">Total outflow in this range</p>
+                      <div className="glass-card p-4 md:p-6 rounded-2xl hover:bg-rose-500/5 transition-all shadow-sm group border-l-4 border-l-rose-500">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2 md:mb-4 group-hover:text-rose-500 transition-colors">Total Spends</p>
+                        <h3 className="text-xl md:text-2xl font-black text-foreground font-display">{formatAmount(expense)}</h3>
+                        <p className="text-[10px] text-muted-foreground mt-1 font-medium hidden md:block">Total outflow in this range</p>
                       </div>
-                      <div className="bg-card border border-border p-6 rounded-2xl border-t-4 border-t-primary/20 hover:border-primary/50 transition-all shadow-sm group">
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-4 group-hover:text-primary transition-colors">Net Flow</p>
-                        <h3 className="text-2xl font-black text-foreground">{formatAmount(net)}</h3>
-                        <p className="text-[10px] text-muted-foreground mt-1">Savings or deficit</p>
+                      <div className="glass-card p-4 md:p-6 rounded-2xl border-l-4 border-l-primary/50 hover:bg-primary/5 transition-all shadow-sm group col-span-2 md:col-span-1">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2 md:mb-4 group-hover:text-primary transition-colors">Net Flow</p>
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-xl md:text-2xl font-black text-foreground font-display">{formatAmount(net)}</h3>
+                          <p className="text-[10px] text-muted-foreground font-medium md:hidden">{net > 0 ? 'Saved' : 'Deficit'}</p>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground mt-1 font-medium hidden md:block">Savings or deficit</p>
                       </div>
                     </>
                   )}
                 </div>
+
+                {/* Mobile Action Buttons (Inline) */}
+                {/* Mobile Action Buttons (Inline) */}
+                <div className="grid grid-cols-2 gap-3 mt-6 md:hidden">
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsFilterOpen(true)}
+                    className="h-12 rounded-xl border-border bg-card/50 font-bold text-xs uppercase tracking-widest shadow-sm"
+                  >
+                    <Filter className="w-4 h-4 mr-2" />
+                    Filters
+                  </Button>
+                  <Button
+                    variant={showSelectionMode ? "default" : "outline"}
+                    onClick={() => {
+                      setShowSelectionMode(!showSelectionMode);
+                      if (showSelectionMode) setSelectedIds(new Set());
+                    }}
+                    className={cn(
+                      "h-12 rounded-xl font-bold text-xs uppercase tracking-widest shadow-sm transition-all",
+                      showSelectionMode ? "bg-foreground text-background border-foreground" : "border-border bg-card/50"
+                    )}
+                  >
+                    {showSelectionMode ? (
+                      <>
+                        <X className="w-4 h-4 mr-2" />
+                        Cancel
+                      </>
+                    ) : (
+                      <>
+                        <CheckSquare className="w-4 h-4 mr-2" />
+                        Select
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    onClick={() => { setEditingTransaction(null); setShowForm(true); }}
+                    className="h-12 rounded-xl font-bold text-xs uppercase tracking-widest shadow-md bg-primary text-primary-foreground col-span-2"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add New Transaction
+                  </Button>
+                </div>
+
                 <div className="flex gap-4 mt-4 text-[10px] text-muted-foreground font-black uppercase tracking-widest">
-                  <span className="bg-muted px-2 py-1 rounded-md">{count} records identified</span>
-                  {rangeSummary && <span className="bg-muted px-2 py-1 rounded-md">{rangeSummary}</span>}
+                  <span className="bg-muted/50 px-2 py-1 rounded-md backdrop-blur-sm">{count} records identified</span>
+                  {rangeSummary && <span className="bg-muted/50 px-2 py-1 rounded-md backdrop-blur-sm">{rangeSummary}</span>}
                 </div>
               </section>
             </div>
 
             {/* Standardized Transaction Table */}
-            <section className="bg-card border border-border rounded-2xl shadow-xl overflow-hidden flex flex-col">
-              <div className="overflow-x-auto">
+            <section className="glass-card rounded-2xl shadow-xl overflow-hidden flex flex-col border-none">
+              <div className="overflow-x-auto hidden md:block">
                 <table className="w-full text-left border-collapse min-w-[800px]">
                   <thead>
                     <tr className="border-b border-border bg-muted/20">
@@ -2198,8 +2250,12 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                                   <CategoryIcon category={transaction.category?.name || ''} />
                                 </div>
                                 <div className="flex flex-col min-w-0">
-                                  <span className="text-sm font-bold text-foreground truncate max-w-[280px] tracking-tight">{transaction.store || transaction.description}</span>
-                                  {transaction.personName && <span className="text-[10px] text-muted-foreground font-black uppercase tracking-widest mt-0.5 truncate max-w-[320px] block">By {transaction.personName}</span>}
+                                  <span className="text-sm font-bold text-foreground truncate max-w-[280px] tracking-tight">{transaction.personName || transaction.store || transaction.description}</span>
+                                  {(transaction.personName || transaction.store) && transaction.personName !== transaction.description && transaction.store !== transaction.description && (
+                                    <span className="text-[10px] text-muted-foreground font-black uppercase tracking-widest mt-0.5 truncate max-w-[320px] block">
+                                      {transaction.personName ? (transaction.store || transaction.description) : transaction.description}
+                                    </span>
+                                  )}
                                 </div>
                               </div>
                             </td>
@@ -2231,6 +2287,88 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                 </table>
               </div>
 
+              {/* Mobile Card List View */}
+              <div className="block md:hidden divide-y divide-border/50">
+                {isLoading && !transactions.length ? (
+                  <div className="p-4 space-y-4">
+                    {[1, 2, 3].map((i) => (
+                      <Skeleton key={i} className="h-24 w-full rounded-xl" />
+                    ))}
+                  </div>
+                ) : filteredTransactions.length === 0 ? (
+                  <div className="p-8 text-center text-muted-foreground italic font-medium">No transactions found.</div>
+                ) : (
+                  visibleTransactions.map(transaction => {
+                    const isIncome = transaction.financialCategory === 'INCOME';
+                    const isExpense = transaction.financialCategory === 'EXPENSE';
+                    const amount = transaction.creditAmount || transaction.debitAmount || 0;
+                    const isSelected = selectedIds.has(transaction.id);
+                    const transactionDate = transaction.transactionDate ? new Date(transaction.transactionDate) : null;
+                    const isValidDate = transactionDate && !isNaN(transactionDate.getTime());
+
+                    return (
+                      <div
+                        key={transaction.id}
+                        onClick={() => {
+                          if (showSelectionMode) toggleSelect(transaction.id);
+                          else { setEditingTransaction(transaction); setShowForm(true); }
+                        }}
+                        className={cn(
+                          "p-4 active:bg-muted/30 transition-colors flex items-start gap-3",
+                          isSelected && "bg-primary/5"
+                        )}
+                      >
+                        {showSelectionMode && (
+                          <div className="pt-1">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); toggleSelect(transaction.id); }}
+                              className={cn(
+                                "w-5 h-5 rounded-md border flex items-center justify-center transition-all",
+                                isSelected ? "bg-foreground border-foreground text-background shadow-md" : "bg-background border-input"
+                              )}
+                            >
+                              {isSelected && <Check className="w-3.5 h-3.5" />}
+                            </button>
+                          </div>
+                        )}
+                        <div className="size-10 rounded-xl bg-muted/50 border border-border/50 flex items-center justify-center shrink-0">
+                          <CategoryIcon category={transaction.category?.name || ''} className="w-5 h-5" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-2 mb-1">
+                            <h4 className="font-bold text-sm text-foreground truncate">{transaction.personName || transaction.store || transaction.description}</h4>
+                            <span className={cn(
+                              "font-black text-sm tracking-tight whitespace-nowrap",
+                              isIncome ? "text-emerald-500" : isExpense ? "text-rose-500" : "text-foreground"
+                            )}>
+                              {isIncome ? '+' : '-'}{formatAmount(amount)}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between text-xs text-muted-foreground">
+                            <div className="flex items-center gap-2">
+                              <span>{isValidDate ? format(transactionDate, 'MMM dd') : 'No Date'}</span>
+                              <span className="w-1 h-1 rounded-full bg-border" />
+                              <span className={cn(
+                                "uppercase tracking-wider font-bold text-[10px]",
+                                isIncome ? "text-emerald-500" : "text-muted-foreground"
+                              )}>
+                                {transaction.category?.name || 'General'}
+                              </span>
+                            </div>
+                            {transaction.accountStatementId && (
+                              <div className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-emerald-500">
+                                <div className="size-1.5 rounded-full bg-emerald-500" />
+                                Cleared
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
               {/* Load More Button - Satisfies "overall data" request while preserving performance */}
               {visibleCount < filteredTransactions.length && (
                 <div className="flex justify-center p-8 border-t border-border bg-muted/5">
@@ -2248,11 +2386,11 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
           </div>
         </div>
         {/* Analytics Panel (Right Sidebar) - Permanent */}
-        <aside className="w-80 lg:w-96 flex flex-col bg-card/30 border-l border-border overflow-y-auto custom-scrollbar shrink-0 hidden md:flex">
+        <aside className="w-80 lg:w-96 flex flex-col bg-background/50 border-l border-border overflow-y-auto custom-scrollbar shrink-0 hidden md:flex backdrop-blur-sm">
           <div className="p-6">
             <div className="flex items-center justify-between mb-8">
-              <h2 className="text-xl font-bold tracking-tight">Analytics</h2>
-              <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs font-bold border-border bg-background" onClick={() => {
+              <h2 className="text-xl font-bold tracking-tight font-display">Analytics</h2>
+              <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs font-bold border-border bg-card/50 backdrop-blur-sm" onClick={() => {
                 // Basic export logic mockup
                 const csv = transactions.map(t => `${t.transactionDate},${t.description},${t.debitAmount || 0},${t.creditAmount || 0}`).join('\n');
                 const blob = new Blob([csv], { type: 'text/csv' });
@@ -2268,7 +2406,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
             </div>
 
             {/* Expenditure Chart Card */}
-            <div className="bg-card border border-border p-6 rounded-2xl mb-8 shadow-sm">
+            <div className="glass-card p-6 rounded-2xl mb-8 shadow-sm">
               <div className="flex items-center justify-between mb-4">
                 <p className="text-muted-foreground text-[10px] font-bold uppercase tracking-widest">Expenditure Breakdown</p>
                 <div className="bg-emerald-500/10 text-emerald-500 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center border border-emerald-500/20">
@@ -2277,7 +2415,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                 </div>
               </div>
               <div className="flex items-end gap-3 mb-2">
-                <h3 className="text-3xl font-bold tracking-tighter">{formatAmount(expense)}</h3>
+                <h3 className="text-3xl font-black tracking-tighter font-display">{formatAmount(expense)}</h3>
               </div>
 
               {/* Pie Chart Visual */}
@@ -2326,10 +2464,10 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
               <div className="relative flex justify-center py-4">
                 <div className="relative size-48">
                   <svg className="size-full -rotate-90">
-                    <circle cx="96" cy="96" r="88" fill="none" stroke="currentColor" strokeWidth="12" className="text-muted/20" />
+                    <circle cx="96" cy="96" r="88" fill="none" stroke="currentColor" strokeWidth="12" className="text-muted/10" />
                     <circle
                       cx="96" cy="96" r="88" fill="none" stroke="currentColor" strokeWidth="12"
-                      className="text-foreground transition-all duration-1000 ease-in-out"
+                      className="text-foreground transition-all duration-1000 ease-in-out opacity-80"
                       strokeDasharray={2 * Math.PI * 88}
                       strokeDashoffset={2 * Math.PI * 88 * (1 - Math.min(1, expense / (income || 1)))}
                       strokeLinecap="round"
@@ -2337,7 +2475,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                   </svg>
                   <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
                     <p className="text-muted-foreground text-[10px] uppercase tracking-widest font-bold mb-0.5">Avg / Day</p>
-                    <p className="text-2xl font-black tracking-tight">{formatAmount(expense / daysInRange)}</p>
+                    <p className="text-2xl font-black tracking-tight font-display">{formatAmount(expense / daysInRange)}</p>
                   </div>
                 </div>
               </div>
@@ -2365,7 +2503,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                             </div>
                             <p className="text-xs font-bold">{formatAmount(stats.amount)}</p>
                           </div>
-                          <div className="w-full bg-muted h-1 rounded-full overflow-hidden">
+                          <div className="w-full bg-muted/50 h-1.5 rounded-full overflow-hidden backdrop-blur-sm">
                             <div className={cn("h-full transition-all duration-1000", i === 0 ? "bg-foreground" : "bg-muted-foreground/60")} style={{ width: `${percent}%` }}></div>
                           </div>
                         </div>
@@ -2395,14 +2533,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
         </aside>
       </div>
 
-      {/* Floating Action Button (Mobile) */}
-      <div className="md:hidden">
-        <FabButton
-          icon={<Plus className="h-5 w-5" />}
-          label="Add"
-          onClick={() => { setEditingTransaction(null); setShowForm(true); }}
-        />
-      </div>
+
 
       {/* Advanced Filters Sheet */}
       <FilterSheet
@@ -2790,19 +2921,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
         )
       }
 
-      {/* FAB - Mobile */}
-      {
-        !showSelectionMode && (
-          <FabButton
-            icon={<Plus className="h-5 w-5" />}
-            label="Add Transaction"
-            onClick={() => {
-              setEditingTransaction(null);
-              setShowForm(true);
-            }}
-          />
-        )
-      }
+
 
       {/* Transaction Form Modal */}
       <TransactionFormModal
@@ -2845,7 +2964,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                 </button>
               </div>
 
-              <div className="p-4 md:p-6 space-y-6">
+              <div className="p-4 md:p-6 space-y-6 overflow-y-auto">
                 {/* Instructions */}
                 <div className="bg-muted/50 rounded-lg p-4 border border-border">
                   <div className="flex items-start space-x-3">
@@ -3552,39 +3671,39 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
       {selectedIds.size > 0 && (
         <div
           ref={selectionToolbarRef}
-          className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-8 duration-300"
+          className="fixed bottom-24 md:bottom-8 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-8 duration-300 w-[90%] md:w-auto"
         >
-          <div className="bg-foreground text-background shadow-2xl rounded-2xl px-6 py-4 flex items-center gap-6 border border-background/20 backdrop-blur-xl">
-            <div className="flex items-center gap-3 pr-6 border-r border-background/20">
-              <div className="size-8 rounded-full bg-background/10 flex items-center justify-center font-bold text-sm">
+          <div className="bg-foreground text-background shadow-2xl rounded-2xl px-4 py-3 md:px-6 md:py-4 flex items-center justify-between gap-3 md:gap-6 border border-background/20 backdrop-blur-xl w-full md:w-auto">
+            <div className="flex items-center gap-3 pr-3 md:pr-6 border-r border-background/20 shrink-0">
+              <div className="size-8 rounded-full bg-background/10 flex items-center justify-center font-bold text-sm shrink-0">
                 {selectedIds.size}
               </div>
-              <p className="text-sm font-bold tracking-tight">Selected</p>
+              <p className="text-sm font-bold tracking-tight hidden md:block">Selected</p>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 md:gap-2 flex-1 justify-center">
               <Button
                 variant="ghost"
                 size="sm"
-                className="hover:bg-background/10 text-background font-bold text-[10px] uppercase tracking-widest h-9 px-4 gap-2"
+                className="hover:bg-background/10 text-background font-bold text-[10px] uppercase tracking-widest h-9 px-2 md:px-4 gap-1 md:gap-2 flex-1 md:flex-none"
                 onClick={() => setShowBulkCategorize(true)}
               >
-                <Tag size={14} />
-                Categorize
+                <Tag size={14} className="shrink-0" />
+                <span className="truncate">Categorize</span>
               </Button>
 
               <Button
                 variant="ghost"
                 size="sm"
-                className="hover:bg-rose-500/20 text-rose-400 font-bold text-[10px] uppercase tracking-widest h-9 px-4 gap-2"
+                className="hover:bg-rose-500/20 text-rose-400 font-bold text-[10px] uppercase tracking-widest h-9 px-2 md:px-4 gap-1 md:gap-2 flex-1 md:flex-none"
                 onClick={() => setShowBulkDeleteDialog(true)}
               >
-                <Trash2 size={14} />
-                Delete
+                <Trash2 size={14} className="shrink-0" />
+                <span className="truncate">Delete</span>
               </Button>
             </div>
 
-            <div className="pl-4">
+            <div className="pl-2 md:pl-4 border-l border-background/20 md:border-none shrink-0">
               <button
                 onClick={clearSelection}
                 className="p-2 rounded-full hover:bg-background/10 transition-colors"
@@ -3623,12 +3742,12 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
   );
 }
 
-function CategoryIcon({ category }: { category: string }) {
+function CategoryIcon({ category, className }: { category: string; className?: string }) {
   const cat = category.toLowerCase();
-  if (cat.includes('tech') || cat.includes('apple') || cat.includes('electronic')) return <ShoppingCart className="size-4" />;
-  if (cat.includes('food') || cat.includes('dine') || cat.includes('sushi')) return <Utensils className="size-4" />;
-  if (cat.includes('utility') || cat.includes('bill') || cat.includes('con edison')) return <Zap className="size-4" />;
-  return <ShoppingBag className="size-4" />;
+  if (cat.includes('tech') || cat.includes('apple') || cat.includes('electronic')) return <ShoppingCart className={className} />;
+  if (cat.includes('food') || cat.includes('dine') || cat.includes('sushi')) return <Utensils className={className} />;
+  if (cat.includes('utility') || cat.includes('bill') || cat.includes('con edison')) return <Zap className={className} />;
+  return <ShoppingBag className={className} />;
 }
 
 

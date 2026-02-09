@@ -196,7 +196,7 @@ function DocumentManagement({ initialDocuments }: DocumentManagementProps) {
   };
 
   return (
-    <Card className="bg-card border border-border/60 rounded-xl shadow-sm">
+    <Card className="glass-card rounded-xl shadow-sm">
       <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="size-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
@@ -270,7 +270,7 @@ function DocumentManagement({ initialDocuments }: DocumentManagementProps) {
 
               return (
 
-                <Card key={doc.id} className="bg-card border border-border/60 rounded-lg shadow-sm hover:border-border/80 transition-all">
+                <Card key={doc.id} className="glass-card rounded-lg shadow-sm hover:border-border/80 transition-all">
                   <CardContent className="p-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
@@ -503,7 +503,7 @@ function CategoryManagement() {
 
   return (
     <>
-      <Card className="bg-card border border-border/60 rounded-xl shadow-sm">
+      <Card className="glass-card rounded-xl shadow-sm">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -600,8 +600,8 @@ function CategoryManagement() {
 
       {/* Add/Edit Category Modal */}
       {showForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => { setShowForm(false); setEditingCategory(null); }}>
-          <Card className="w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => { setShowForm(false); setEditingCategory(null); }}>
+          <Card className="w-full max-w-md mx-4 glass-card" onClick={(e) => e.stopPropagation()}>
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle>{editingCategory ? 'Edit Category' : 'Add Category'}</CardTitle>

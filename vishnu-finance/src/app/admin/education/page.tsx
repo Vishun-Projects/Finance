@@ -319,7 +319,7 @@ export default function AdminEducationPage() {
                 </Dialog>
             </div>
 
-            <div className="bg-card border border-border rounded-2xl overflow-hidden">
+            <div className="glass-card rounded-2xl overflow-hidden shadow-sm border-none">
                 <div className="overflow-x-auto">
                     <table className="w-full text-left">
                         <thead>

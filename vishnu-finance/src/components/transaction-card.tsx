@@ -85,7 +85,7 @@ export default function TransactionCard({
   return (
     <motion.div
       className={cn(
-        "w-full cursor-pointer overflow-hidden rounded-2xl border bg-card shadow-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 active:scale-[0.98] active:bg-accent/50",
+        "glass-card w-full cursor-pointer overflow-hidden rounded-2xl border-none shadow-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 active:scale-[0.98] hover:bg-card/40",
         isCredit ? "border-l-4 border-l-emerald-500" : "border-l-4 border-l-rose-500",
       )}
       whileHover={reducedMotion ? undefined : { translateY: -2 }}

@@ -31,7 +31,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <NavigationIsland />
       </Suspense>
 
-      <main className="flex-1 flex flex-col min-w-0 bg-background overflow-y-auto custom-scrollbar">
+      <main className="flex-1 flex flex-col min-w-0 bg-background overflow-y-auto custom-scrollbar overflow-x-hidden">
         {children}
       </main>
     </div>

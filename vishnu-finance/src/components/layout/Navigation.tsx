@@ -15,6 +15,7 @@ import {
   LogOut,
   User as UserIcon,
   BookOpen,
+  Menu,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -24,23 +25,40 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import { Avatar } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { useTheme } from '../../contexts/ThemeContext';
+import { Sun, Moon } from 'lucide-react';
 
 // Map user's requested icons to Lucide equivalent
 const primaryNavItemsConfig = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutGrid },
-  { href: '/financial-health', label: 'Health Score', icon: Heart },
+  { href: '/education', label: 'Blogs and News', icon: BookOpen },
   { href: '/transactions', label: 'Transactions', icon: ReceiptText },
   { href: '/plans', label: 'Plans', icon: Layers },
+  { href: '/financial-health', label: 'Health Score', icon: Heart },
   { href: '/salary', label: 'Salary', icon: Wallet },
-  { href: '/education', label: 'Blogs and News', icon: BookOpen },
   { href: '/advisor', label: 'AI Advisor', icon: Brain },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 
-const mobilePrimaryNavItems = primaryNavItemsConfig.slice(0, 5);
+const mobilePrimaryNavItems = [
+  ...primaryNavItemsConfig.slice(0, 4), // Top 4 priority items
+  { href: '#menu', label: 'More', icon: Menu }, // 5th item triggers menu
+];
+// Drawer contains everything NOT in the top 4
+const mobileDrawerItems = primaryNavItemsConfig.slice(4);
 
 export default function Navigation() {
   const { user, logout } = useAuth();
+  const { theme, setTheme } = useTheme();
   const pathname = usePathname();
 
   const activeByHref = useMemo(() => {
@@ -120,12 +138,96 @@ export default function Navigation() {
         </div>
       </aside>
 
-      {/* Mobile Bottom Tab Bar (Preserved) */}
       <nav className="safe-area-bottom fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-card/95 backdrop-blur lg:hidden">
         <div className="mx-auto flex h-16 w-full max-w-screen-sm items-center justify-around gap-1 px-2 pb-[env(safe-area-inset-bottom)] sm:px-4">
           {mobilePrimaryNavItems.map((item) => {
             const Icon = item.icon;
-            const isActive = activeByHref.has(item.href);
+            const isMenu = item.label === 'More';
+            const isActive = activeByHref.has(item.href) && !isMenu;
+
+            if (isMenu) {
+              return (
+                <Sheet key={item.label}>
+                  <SheetTrigger asChild>
+                    <button
+                      className="flex flex-col items-center justify-center gap-1 flex-1 h-full rounded-lg transition-all duration-200 active:scale-95 text-muted-foreground hover:text-foreground"
+                    >
+                      <Icon className="w-5 h-5" />
+                      <span className="text-[10px] font-medium">{item.label}</span>
+                    </button>
+                  </SheetTrigger>
+                  <SheetContent side="bottom" className="h-[80vh] rounded-t-xl bg-card/95 backdrop-blur-xl border-t border-border p-0">
+                    {/* Reusing the Drawer Content Logic but adapting for bottom sheet style */}
+                    <SheetHeader className="p-6 text-left border-b border-border">
+                      <SheetTitle className="text-lg font-bold flex items-center gap-3">
+                        <Avatar
+                          userId={user?.id || 'guest'}
+                          src={user?.avatarUrl}
+                          size="md"
+                        />
+                        <div className="flex flex-col">
+                          <span className="text-base truncate max-w-[180px]">{user?.name || 'Guest User'}</span>
+                          <span className="text-xs font-normal text-muted-foreground uppercase tracking-wider">Premium Member</span>
+                        </div>
+                      </SheetTitle>
+                    </SheetHeader>
+
+                    <div className="flex flex-col h-full overflow-y-auto px-4 py-6 pb-20 custom-scrollbar">
+                      <div className="space-y-1">
+                        <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-3 px-2">Apps</p>
+                        {mobileDrawerItems.map((drawerItem) => {
+                          const DrawerIcon = drawerItem.icon;
+                          const isDrawerActive = activeByHref.has(drawerItem.href);
+                          return (
+                            <Link
+                              key={drawerItem.href}
+                              href={drawerItem.href}
+                              className={`flex items-center gap-3 w-full px-3 py-3 rounded-lg transition-colors ${isDrawerActive
+                                ? 'text-primary bg-primary/10 border border-primary/20'
+                                : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                                }`}
+                            >
+                              <DrawerIcon className="w-5 h-5" />
+                              <span className="text-sm font-medium">{drawerItem.label}</span>
+                            </Link>
+                          );
+                        })}
+                      </div>
+
+                      <div className="mt-8 space-y-1">
+                        <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-3 px-2">Preferences</p>
+
+                        <div className="flex items-center justify-between px-3 py-3 rounded-lg text-muted-foreground hover:bg-muted/50">
+                          <div className="flex items-center gap-3">
+                            {theme === 'dark' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
+                            <span className="text-sm font-medium">Dark Mode</span>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                            className="h-6 w-10 p-0"
+                          >
+                            <div className={`w-8 h-4 rounded-full relative transition-colors ${theme === 'dark' ? 'bg-primary' : 'bg-muted'}`}>
+                              <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all ${theme === 'dark' ? 'left-4.5' : 'left-0.5'}`} />
+                            </div>
+                          </Button>
+                        </div>
+
+                        <button
+                          onClick={() => logout()}
+                          className="flex items-center gap-3 w-full px-3 py-3 rounded-lg text-destructive hover:bg-destructive/10 transition-colors"
+                        >
+                          <LogOut className="w-5 h-5" />
+                          <span className="text-sm font-medium">Log out</span>
+                        </button>
+                      </div>
+                    </div>
+                  </SheetContent>
+                </Sheet>
+              );
+            }
+
             return (
               <Link
                 key={item.href}
@@ -145,11 +247,16 @@ export default function Navigation() {
         </div>
       </nav>
 
-      {/* Mobile Top Bar (Updated) */}
-      <div className="fixed top-0 left-0 right-0 z-40 border-b border-border bg-background/80 backdrop-blur lg:hidden px-4 h-14 flex items-center justify-between">
-        <div className="w-10"></div> {/* Spacer for symmetry */}
-        <span className="text-sm font-bold tracking-widest uppercase text-foreground">Vishnu Finance</span>
-        <div className="w-10"></div> {/* Spacer for symmetry */}
+      {/* Mobile Top Bar (Clean) */}
+      <div className="fixed top-0 left-0 right-0 z-40 border-b border-border bg-background/80 backdrop-blur-md lg:hidden px-4 h-14 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="size-8 flex items-center justify-center shrink-0">
+            <img src="/icon-removebg-preview.png" alt="Logo" className="w-full h-full object-contain" />
+          </div>
+          <span className="text-sm font-bold tracking-widest uppercase text-foreground">Vishnu</span>
+        </div>
+        {/* Top Bar Actions (Optional: Search, Notifications could go here) */}
+        <div className="w-8"></div>
       </div>
     </>
   );

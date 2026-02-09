@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Save, Store, User } from 'lucide-react';
+import { Save, Store, User, X } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { Transaction, TransactionCategory } from '@/types';
 import { Combobox, ComboboxOption } from './ui/combobox';
 import { Button } from './ui/button';
@@ -138,7 +139,7 @@ export default function TransactionFormModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!formData.description || (!formData.creditAmount && !formData.debitAmount)) {
       return;
     }
@@ -178,228 +179,217 @@ export default function TransactionFormModal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div 
-        className="bg-background rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-xl"
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 sm:p-6" onClick={onClose}>
+      <div
+        className="bg-background rounded-2xl w-full max-w-2xl max-h-[90vh] shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-xl font-bold">
+        {/* Header - Fixed */}
+        <div className="px-5 py-4 border-b border-border flex justify-between items-center bg-background/50 backdrop-blur-xl shrink-0">
+          <h3 className="text-lg font-bold font-display tracking-tight">
             {transaction ? 'Edit Transaction' : 'Add Transaction'}
           </h3>
           <button
             onClick={onClose}
-            className="text-muted-foreground hover:text-foreground text-2xl leading-none"
+            className="text-muted-foreground hover:text-foreground p-2 rounded-full hover:bg-muted transition-colors"
             aria-label="Close"
           >
-            ×
+            <X className="w-5 h-5" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Financial Category Type */}
-          <div>
-            <label className="block text-sm font-medium mb-2">Type *</label>
-            <div className="grid grid-cols-5 gap-2">
-              {(['INCOME', 'EXPENSE', 'TRANSFER', 'INVESTMENT', 'OTHER'] as TransactionCategory[]).map((type) => (
-                <button
-                  key={type}
-                  type="button"
-                  onClick={() => handleFinancialCategoryChange(type)}
-                  className={`
-                    px-3 py-2 rounded-md text-sm font-medium transition-colors
-                    ${formData.financialCategory === type
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                    }
-                  `}
-                >
-                  {type}
-                </button>
-              ))}
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto custom-scrollbar p-5">
+          <form id="transaction-form" onSubmit={handleSubmit} className="space-y-5">
+            {/* Financial Category Type */}
+            <div>
+              <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-3 block">Type</label>
+              <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+                {(['INCOME', 'EXPENSE', 'TRANSFER', 'INVESTMENT', 'OTHER'] as TransactionCategory[]).map((type) => (
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={() => handleFinancialCategoryChange(type)}
+                    className={cn(
+                      "px-2 py-2 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all border",
+                      formData.financialCategory === type
+                        ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                        : "bg-background border-border text-muted-foreground hover:bg-muted hover:text-foreground"
+                    )}
+                  >
+                    {type}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
 
-          {/* Description */}
-          <div>
-            <label className="block text-sm font-medium mb-1">Description *</label>
-            <input
-              type="text"
-              required
-              value={formData.description}
-              onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-              className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-              placeholder="Enter transaction description"
-            />
-          </div>
+            {/* Description */}
+            <div>
+              <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-2 block">Description *</label>
+              <input
+                type="text"
+                required
+                value={formData.description}
+                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                className="w-full px-4 py-3 bg-muted/30 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-medium text-sm"
+                placeholder="What is this transaction for?"
+              />
+            </div>
 
-          {/* Amount */}
-          <div className="grid grid-cols-2 gap-4">
-            {formData.financialCategory === 'INCOME' || formData.financialCategory === 'TRANSFER' ? (
+            {/* Amount & Date */}
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium mb-1">Credit Amount *</label>
+                <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-2 block">
+                  {formData.financialCategory === 'INCOME' || formData.financialCategory === 'TRANSFER' ? 'Credit Amount *' : 'Debit Amount *'}
+                </label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-bold">₹</span>
+                  <input
+                    type="number"
+                    required
+                    min="0"
+                    step="0.01"
+                    value={formData.financialCategory === 'INCOME' || formData.financialCategory === 'TRANSFER' ? (formData.creditAmount || '') : (formData.debitAmount || '')}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value) || 0;
+                      if (formData.financialCategory === 'INCOME' || formData.financialCategory === 'TRANSFER') {
+                        setFormData(prev => ({ ...prev, creditAmount: val, debitAmount: 0 }));
+                      } else {
+                        setFormData(prev => ({ ...prev, debitAmount: val, creditAmount: 0 }));
+                      }
+                    }}
+                    className="w-full pl-8 pr-4 py-3 bg-muted/30 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-bold text-lg"
+                    placeholder="0.00"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-2 block">Date *</label>
                 <input
-                  type="number"
+                  type="date"
                   required
-                  min="0"
-                  step="0.01"
-                  value={formData.creditAmount || ''}
-                  onChange={(e) => setFormData(prev => ({ 
-                    ...prev, 
-                    creditAmount: parseFloat(e.target.value) || 0,
-                    debitAmount: 0 
-                  }))}
-                  className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-                  placeholder="0.00"
+                  value={formData.transactionDate}
+                  onChange={(e) => setFormData(prev => ({ ...prev, transactionDate: e.target.value }))}
+                  className="w-full px-4 py-3 bg-muted/30 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-medium text-sm"
                 />
               </div>
-            ) : (
+            </div>
+
+            {/* Category */}
+            {categoryOptions.length > 0 && (
               <div>
-                <label className="block text-sm font-medium mb-1">Debit Amount *</label>
-                <input
-                  type="number"
-                  required
-                  min="0"
-                  step="0.01"
-                  value={formData.debitAmount || ''}
-                  onChange={(e) => setFormData(prev => ({ 
-                    ...prev, 
-                    debitAmount: parseFloat(e.target.value) || 0,
-                    creditAmount: 0 
-                  }))}
-                  className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-                  placeholder="0.00"
+                <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-2 block">Category</label>
+                <Combobox
+                  options={categoryOptions}
+                  value={formData.categoryId || ''}
+                  onValueChange={(value) => setFormData(prev => ({ ...prev, categoryId: value || '' }))}
+                  placeholder="Select category"
+                  allowClear
+                  className="w-full"
                 />
               </div>
             )}
-            
-            <div>
-              <label className="block text-sm font-medium mb-1">Date *</label>
+
+            {/* Entity Type Toggle */}
+            <div className="p-4 bg-muted/30 rounded-xl border border-border space-y-3">
+              <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground block">Entity Details</label>
+
+              <div className="flex bg-muted p-1 rounded-lg">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEntityType('STORE');
+                    setFormData(prev => ({ ...prev, personName: '' }));
+                  }}
+                  className={cn(
+                    "flex-1 px-3 py-2 rounded-md text-xs font-bold transition-all flex items-center justify-center gap-2",
+                    entityType === 'STORE'
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <Store className="w-3.5 h-3.5" />
+                  Store / Merchant
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEntityType('PERSON');
+                    setFormData(prev => ({ ...prev, store: '' }));
+                  }}
+                  className={cn(
+                    "flex-1 px-3 py-2 rounded-md text-xs font-bold transition-all flex items-center justify-center gap-2",
+                    entityType === 'PERSON'
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <User className="w-3.5 h-3.5" />
+                  Person / Peer
+                </button>
+              </div>
+
+              {/* Store/Person Name */}
               <input
-                type="date"
-                required
-                value={formData.transactionDate}
-                onChange={(e) => setFormData(prev => ({ ...prev, transactionDate: e.target.value }))}
-                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                type="text"
+                value={entityType === 'STORE' ? formData.store : formData.personName}
+                onChange={(e) => setFormData(prev => ({
+                  ...prev,
+                  [entityType === 'STORE' ? 'store' : 'personName']: e.target.value,
+                }))}
+                className="w-full px-4 py-3 bg-background border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-medium text-sm"
+                placeholder={entityType === 'STORE' ? 'Enter store/merchant name' : 'Enter person/peer name'}
               />
             </div>
-          </div>
 
-          {/* Category */}
-          {categoryOptions.length > 0 && (
+            {/* UPI ID */}
             <div>
-              <label className="block text-sm font-medium mb-1">Category</label>
-              <Combobox
-                options={categoryOptions}
-                value={formData.categoryId || ''}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, categoryId: value || '' }))}
-                placeholder="Select category"
-                allowClear
+              <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-2 block">UPI ID (Optional)</label>
+              <input
+                type="text"
+                value={formData.upiId}
+                onChange={(e) => setFormData(prev => ({ ...prev, upiId: e.target.value }))}
+                className="w-full px-4 py-3 bg-muted/30 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-medium text-sm font-mono text-xs"
+                placeholder="user@upi"
               />
             </div>
-          )}
 
-          {/* Entity Type Toggle */}
-          <div>
-            <label className="block text-sm font-medium mb-2">Entity Type</label>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setEntityType('STORE');
-                  setFormData(prev => ({ ...prev, personName: '' }));
-                }}
-                className={`
-                  flex-1 px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center justify-center gap-2
-                  ${entityType === 'STORE'
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                  }
-                `}
-              >
-                <Store className="w-4 h-4" />
-                Store
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setEntityType('PERSON');
-                  setFormData(prev => ({ ...prev, store: '' }));
-                }}
-                className={`
-                  flex-1 px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center justify-center gap-2
-                  ${entityType === 'PERSON'
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                  }
-                `}
-              >
-                <User className="w-4 h-4" />
-                Person
-              </button>
+            {/* Notes */}
+            <div>
+              <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-2 block">Notes</label>
+              <textarea
+                value={formData.notes}
+                onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+                rows={3}
+                className="w-full px-4 py-3 bg-muted/30 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-medium text-sm resize-none"
+                placeholder="Add any additional details..."
+              />
             </div>
-          </div>
+          </form>
+        </div>
 
-          {/* Store/Person Name */}
-          <div>
-            <label className="block text-sm font-medium mb-1">
-              {entityType === 'STORE' ? 'Store Name' : 'Person Name'}
-            </label>
-            <input
-              type="text"
-              value={entityType === 'STORE' ? formData.store : formData.personName}
-              onChange={(e) => setFormData(prev => ({
-                ...prev,
-                [entityType === 'STORE' ? 'store' : 'personName']: e.target.value,
-              }))}
-              className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-              placeholder={entityType === 'STORE' ? 'Enter store name' : 'Enter person name'}
-            />
-          </div>
-
-          {/* UPI ID */}
-          <div>
-            <label className="block text-sm font-medium mb-1">UPI ID</label>
-            <input
-              type="text"
-              value={formData.upiId}
-              onChange={(e) => setFormData(prev => ({ ...prev, upiId: e.target.value }))}
-              className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-              placeholder="Enter UPI ID (optional)"
-            />
-          </div>
-
-          {/* Notes */}
-          <div>
-            <label className="block text-sm font-medium mb-1">Notes</label>
-            <textarea
-              value={formData.notes}
-              onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-              rows={3}
-              className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-              placeholder="Additional notes (optional)"
-            />
-          </div>
-
-          {/* Actions */}
-          <div className="flex gap-2 justify-end pt-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onClose}
-              disabled={isSaving}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              disabled={isSaving}
-            >
-              <Save className="w-4 h-4 mr-2" />
-              {isSaving ? 'Saving...' : transaction ? 'Update' : 'Save'}
-            </Button>
-          </div>
-        </form>
+        {/* Footer - Fixed */}
+        <div className="p-4 border-t border-border bg-background/50 backdrop-blur-xl shrink-0 flex items-center gap-3">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClose}
+            disabled={isSaving}
+            className="flex-1 h-11 rounded-xl font-bold uppercase tracking-widest text-xs"
+          >
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            form="transaction-form"
+            disabled={isSaving}
+            className="flex-[2] h-11 rounded-xl font-bold uppercase tracking-widest text-xs shadow-lg shadow-primary/20"
+          >
+            <Save className="w-4 h-4 mr-2" />
+            {isSaving ? 'Saving...' : transaction ? 'Update Transaction' : 'Save Transaction'}
+          </Button>
+        </div>
       </div>
     </div>
   );

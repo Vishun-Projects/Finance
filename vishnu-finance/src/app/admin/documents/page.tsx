@@ -226,17 +226,17 @@ export default function AdminDocumentsPage() {
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+      <div className="glass-card p-6 rounded-2xl shadow-sm">
+        <div className="flex flex-col gap-1.5 mb-6">
+          <h3 className="text-lg font-bold leading-none tracking-tight flex items-center gap-2 font-display">
             <Shield className="w-5 h-5 text-primary" />
             <span>Portal Document Library</span>
-          </CardTitle>
-          <CardDescription>
+          </h3>
+          <p className="text-sm text-muted-foreground">
             Upload platform-wide resources, manage bank statement archives, and track system-generated documents.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+          </p>
+        </div>
+        <div className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="admin-doc-file">Upload PDF</Label>
@@ -301,14 +301,14 @@ export default function AdminDocumentsPage() {
               Refresh List
             </Button>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
-      <Card>
-        <CardHeader className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+      <div className="glass-card rounded-2xl shadow-sm overflow-hidden border-none">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 p-6 border-b border-border/10">
           <div>
-            <CardTitle className="text-sm font-semibold">Documents</CardTitle>
-            <CardDescription>Filter library entries and manage retention.</CardDescription>
+            <h3 className="text-sm font-bold leading-none tracking-tight font-display">Documents</h3>
+            <p className="text-xs text-muted-foreground mt-1">Filter library entries and manage retention.</p>
           </div>
           <div className="w-full flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -356,8 +356,8 @@ export default function AdminDocumentsPage() {
               Apply
             </Button>
           </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
+        </div>
+        <div className="p-6 space-y-4">
           {loading ? (
             <div className="border border-dashed rounded-lg p-8 text-center text-sm text-muted-foreground">
               Loading documents...
@@ -542,8 +542,8 @@ export default function AdminDocumentsPage() {
               </div>
             </>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       <Dialog open={deleteState.open} onOpenChange={open => !open && closeDeleteDialog()}>
         <DialogContent className="sm:max-w-md">

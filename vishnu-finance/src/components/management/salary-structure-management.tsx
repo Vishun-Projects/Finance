@@ -27,7 +27,8 @@ import {
   Briefcase,
   PieChart as PieChartIcon,
   ChevronRight,
-  ArrowRight
+  ArrowRight,
+  MessageSquare
 } from 'lucide-react';
 import {
   AreaChart,
@@ -658,7 +659,9 @@ export default function SalaryStructureManagement() {
                   </div>
                 </div>
 
-                <Button onClick={handleSubmit} className="w-full" size="lg">Save Structure</Button>
+                <Button onClick={handleSubmit} className="w-full bg-primary text-primary-foreground font-black uppercase tracking-[0.2em] py-6 rounded-2xl shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all" size="lg">
+                  {editingStructure ? 'Update Architecture' : 'Deploy Structure'}
+                </Button>
               </div>
             </div>
           </SheetContent>
@@ -668,147 +671,153 @@ export default function SalaryStructureManagement() {
       {activeStructure ? (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Main Info Card */}
-          <Card className="md:col-span-2 overflow-hidden border-none shadow-xl bg-gradient-to-br from-primary/10 via-background to-background relative isolate">
-            <div className="absolute inset-0 bg-grid-white/10 [mask-image:linear-gradient(0deg,white,rgba(255,255,255,0.6))] -z-10" />
+          <div className="glass-card md:col-span-2 p-6 md:p-8 rounded-3xl flex flex-col relative overflow-hidden group shadow-xl shadow-primary/5 border-l-4 border-l-primary/40">
+            <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none transition-transform group-hover:scale-110 duration-1000">
+              <Briefcase className="w-32 h-32 md:w-48 md:h-48" />
+            </div>
 
-            <CardHeader className="pb-2">
-              <div className="flex justify-between items-start">
-                <div>
-                  <CardTitle className="text-2xl font-bold flex items-center gap-2">
-                    {activeStructure.jobTitle}
-                    <Badge variant="secondary" className="text-xs font-normal">Active</Badge>
-                  </CardTitle>
-                  <CardDescription className="text-base mt-1 flex items-center gap-2">
-                    <Briefcase className="w-4 h-4" /> {activeStructure.company}
-                    <span className="text-muted-foreground/50">•</span>
-                    <MapPin className="w-4 h-4" /> {activeStructure.location || 'Remote'}
-                  </CardDescription>
-                </div>
-                <div className="h-12 w-12 rounded-full border-2 border-background shadow-sm flex items-center justify-center overflow-hidden bg-primary/20 text-primary font-bold">
-                  {activeStructure.company.substring(0, 2).toUpperCase()}
+            <div className="relative z-10 flex justify-between items-start mb-8">
+              <div>
+                <h2 className="text-xl md:text-3xl font-black flex flex-wrap items-center gap-3 font-display tracking-tight">
+                  {activeStructure.jobTitle}
+                  <Badge variant="secondary" className="text-[9px] font-black uppercase tracking-[0.2em] bg-emerald-500/10 text-emerald-500 border-emerald-500/20 px-3 py-1">Active Pulse</Badge>
+                </h2>
+                <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mt-3 text-xs md:text-sm text-muted-foreground font-bold uppercase tracking-widest opacity-70">
+                  <span className="flex items-center gap-2"><Building className="w-4 h-4 text-primary" /> {activeStructure.company}</span>
+                  <span className="flex items-center gap-2"><MapPin className="w-4 h-4 text-primary" /> {activeStructure.location || 'Remote'}</span>
                 </div>
               </div>
-            </CardHeader>
-            <CardContent className="pt-4">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 rounded-xl bg-background/50 backdrop-blur-sm border border-border/50">
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Gross Annual</p>
-                  <p className="text-xl font-bold text-foreground">{formatRupees(grossAnnual)}</p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Annual CTC</p>
-                  <p className="text-xl font-bold text-blue-600 dark:text-blue-400">{formatRupees(annualCTC)}</p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Monthly Allowances</p>
-                  <p className="text-xl font-bold text-green-600 dark:text-green-400">+{formatRupees(totalMonthlyAllowances)}</p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Monthly Deductions</p>
-                  <p className="text-xl font-bold text-red-600 dark:text-red-400">-{formatRupees(totalMonthlyDeductions)}</p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider text-primary">Net Monthly</p>
-                  <p className="text-xl font-bold text-primary">{formatRupees(netMonthly)}</p>
+              <div className="h-14 w-14 md:h-16 md:w-16 rounded-2xl md:rounded-3xl glass-card border-primary/20 flex items-center justify-center text-xl md:text-2xl font-black text-primary font-display shadow-2xl shadow-primary/10 group-hover:rotate-6 transition-transform">
+                {activeStructure.company.substring(0, 2).toUpperCase()}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 p-5 md:p-6 rounded-2xl md:rounded-3xl bg-primary/5 border border-dashed border-primary/20 relative z-10">
+              <div className="space-y-1">
+                <p className="text-[9px] text-muted-foreground font-black uppercase tracking-[0.2em]">Gross Annual</p>
+                <p className="text-lg md:text-2xl font-bold text-foreground font-display tracking-tight">{formatRupees(grossAnnual)}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-[9px] text-muted-foreground font-black uppercase tracking-[0.2em]">Total CTC</p>
+                <p className="text-lg md:text-2xl font-bold text-blue-500 font-display tracking-tight">{formatRupees(annualCTC)}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-[9px] text-muted-foreground font-black uppercase tracking-[0.2em]">Allowances</p>
+                <p className="text-lg md:text-2xl font-bold text-emerald-500 font-display tracking-tight">+{formatRupees(totalMonthlyAllowances)}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-[9px] text-muted-foreground font-black uppercase tracking-[0.2em]">Deductions</p>
+                <p className="text-lg md:text-2xl font-bold text-rose-500 font-display tracking-tight">-{formatRupees(totalMonthlyDeductions)}</p>
+              </div>
+            </div>
+
+            {/* Visual Breakdown */}
+            <div className="mt-8 flex flex-col lg:flex-row items-center gap-8 relative z-10 pt-8 border-t border-border/10">
+              <div className="h-40 w-40 md:h-48 md:w-48 relative shrink-0">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={salaryComponents}
+                      innerRadius={45}
+                      outerRadius={70}
+                      paddingAngle={4}
+                      dataKey="value"
+                      stroke="none"
+                    >
+                      {salaryComponents.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} className="focus:outline-none" />
+                      ))}
+                    </Pie>
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="absolute inset-0 flex items-center justify-center flex-col pointer-events-none">
+                  <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground opacity-50">Components</span>
+                  <span className="text-2xl font-black font-display text-primary">{salaryComponents.length}</span>
                 </div>
               </div>
-
-              {/* Visual Breakdown using Recharts Pie (Simplified) */}
-              <div className="mt-8 flex flex-col md:flex-row items-center gap-8">
-                <div className="h-48 w-48 relative">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={salaryComponents}
-                        innerRadius={35}
-                        outerRadius={60}
-                        paddingAngle={5}
-                        dataKey="value"
-                        stroke="none"
-                      >
-                        {salaryComponents.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                      </Pie>
-                    </PieChart>
-                  </ResponsiveContainer>
-                  <div className="absolute inset-0 flex items-center justify-center flex-col pointer-events-none">
-                    <span className="text-xs text-muted-foreground">Components</span>
-                    <span className="font-bold">{salaryComponents.length}</span>
-                  </div>
-                </div>
-                <div className="flex-1 w-full space-y-3">
-                  <h4 className="font-semibold text-sm mb-2">Salary Breakdown</h4>
-                  {salaryComponents.map((comp, i) => (
-                    <div key={comp.name} className="flex items-center justify-between text-sm">
-                      <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
-                        <span className="text-muted-foreground capitalize">{comp.name}</span>
-                      </div>
-                      <span className="font-mono font-medium">{formatRupees(comp.value)}</span>
+              <div className="flex-1 w-full grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">
+                <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground col-span-full mb-2">Compensation Architecture</h4>
+                {salaryComponents.map((comp, i) => (
+                  <div key={comp.name} className="flex items-center justify-between text-xs border-b border-border/5 pb-2 group/item">
+                    <div className="flex items-center gap-3">
+                      <div className="w-2.5 h-2.5 rounded-full shadow-sm" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
+                      <span className="text-muted-foreground font-bold uppercase tracking-widest text-[9px] group-hover/item:text-foreground transition-colors">{comp.name}</span>
                     </div>
-                  ))}
-                </div>
+                    <span className="font-bold font-display opacity-80 text-sm">{formatRupees(comp.value)}</span>
+                  </div>
+                ))}
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
 
           {/* Quick Stats / Side Column */}
           <div className="space-y-6">
             {/* Net Pay Highlight */}
-            <Card className="bg-primary text-primary-foreground border-none shadow-xl">
-              <CardHeader className="pb-2">
-                <CardDescription className="text-primary-foreground/80">Monthly Take Home</CardDescription>
-                <CardTitle className="text-3xl font-bold tracking-tight">
+            <div className="glass-card p-6 md:p-8 rounded-3xl bg-foreground text-background border-none shadow-2xl shadow-primary/20 relative overflow-hidden group">
+              <div className="absolute -right-4 -top-4 bg-background/10 w-32 h-32 rounded-full blur-3xl opacity-20 group-hover:scale-150 transition-transform duration-1000"></div>
+              <div className="relative z-10">
+                <p className="text-[10px] font-black uppercase tracking-[0.3em] opacity-60 mb-3">Monthly Liquid Surplus</p>
+                <p className="text-4xl md:text-5xl font-black tracking-tighter font-display mb-6">
                   {formatRupees(netMonthly)}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-xs text-primary-foreground/70 bg-primary-foreground/10 p-2 rounded inline-block">
-                  After all deductions
+                </p>
+                <div className="inline-flex items-center gap-2 px-4 py-2 bg-background/10 rounded-xl text-[9px] font-black uppercase tracking-widest backdrop-blur-md border border-white/10">
+                  <CheckCircle className="w-3.5 h-3.5 text-emerald-400" />
+                  Verified Net Yield
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
 
             {/* Details List */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Details</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-muted-foreground flex items-center gap-2"><Calendar className="w-4 h-4" /> Effective Date</span>
-                  <span className="font-medium">{new Date(activeStructure.effectiveDate).toLocaleDateString()}</span>
+            <div className="glass-card p-6 md:p-8 rounded-3xl space-y-6 shadow-xl shadow-primary/5">
+              <div className="flex items-center gap-2 mb-2">
+                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground">Contractual Meta</p>
+              </div>
+
+              <div className="flex justify-between items-center text-[10px] md:text-xs group">
+                <span className="text-muted-foreground flex items-center gap-3 font-black uppercase tracking-widest group-hover:text-primary transition-colors"><Calendar className="w-4 h-4" /> Start Date</span>
+                <span className="font-black font-display tracking-widest">{new Date(activeStructure.effectiveDate).toLocaleDateString()}</span>
+              </div>
+              <div className="w-full h-px bg-border/10"></div>
+
+              <div className="flex justify-between items-center text-[10px] md:text-xs group">
+                <span className="text-muted-foreground flex items-center gap-3 font-black uppercase tracking-widest group-hover:text-primary transition-colors"><Award className="w-4 h-4" /> Grade</span>
+                <span className="font-black font-display tracking-widest text-primary">{activeStructure.grade || 'N/A'}</span>
+              </div>
+              <div className="w-full h-px bg-border/10"></div>
+
+              <div className="flex justify-between items-center text-[10px] md:text-xs group">
+                <span className="text-muted-foreground flex items-center gap-3 font-black uppercase tracking-widest group-hover:text-primary transition-colors"><Users className="w-4 h-4" /> Dept</span>
+                <span className="font-black font-display tracking-widest">{activeStructure.department || 'GLOBAL'}</span>
+              </div>
+
+              {activeStructure.notes && (
+                <div className="rounded-2xl bg-primary/5 p-5 border border-primary/10 mt-6 relative overflow-hidden">
+                  <div className="absolute top-0 right-0 p-2 opacity-10"><MessageSquare className="w-4 h-4" /></div>
+                  <p className="text-[9px] font-black uppercase tracking-[0.2em] text-primary mb-2">Strategic Notes</p>
+                  <p className="text-xs text-muted-foreground/80 font-medium italic leading-relaxed">"{activeStructure.notes}"</p>
                 </div>
-                <Separator />
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-muted-foreground flex items-center gap-2"><Award className="w-4 h-4" /> Grade</span>
-                  <span className="font-medium">{activeStructure.grade || '-'}</span>
-                </div>
-                <Separator />
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-muted-foreground flex items-center gap-2"><Users className="w-4 h-4" /> Department</span>
-                  <span className="font-medium">{activeStructure.department || '-'}</span>
-                </div>
-                {activeStructure.notes && (
-                  <div className="pt-4 text-sm text-muted-foreground italic">
-                    "{activeStructure.notes}"
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+              )}
+            </div>
           </div>
         </div>
+
       ) : (
-        <div className="flex flex-col items-center justify-center p-12 border-2 border-dashed rounded-xl bg-muted/20">
-          <div className="bg-primary/10 p-6 rounded-full mb-4">
-            <DollarSign className="w-8 h-8 text-primary" />
+        <div className="flex flex-col items-center justify-center p-12 md:p-20 glass-card rounded-[2.5rem] bg-primary/5 border-dashed border-primary/20 shadow-2xl shadow-primary/5 relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent pointer-events-none"></div>
+          <div className="bg-primary/10 p-8 rounded-3xl mb-8 relative z-10 shadow-inner">
+            <DollarSign className="w-12 h-12 text-primary animate-pulse" />
           </div>
-          <h3 className="text-lg font-semibold">No Salary Structure Setup</h3>
-          <p className="text-sm text-muted-foreground max-w-sm text-center mt-2 mb-6">
-            Add your current salary details to get insights into your earnings, deductions, and monthly take-home.
+          <h3 className="text-2xl md:text-3xl font-black font-display tracking-tight relative z-10">Economic Engine Offline</h3>
+          <p className="text-xs md:text-sm text-muted-foreground max-w-sm text-center mt-3 mb-10 font-medium opacity-70 relative z-10 leading-relaxed">
+            Your compensation architecture is currently unmapped. Deploy your first salary structure to begin financial trajectory modeling.
           </p>
-          <Button onClick={() => setShowForm(true)}>Add Compensation Plan</Button>
+          <Button
+            onClick={() => setShowForm(true)}
+            size="lg"
+            className="rounded-2xl px-10 py-7 text-[10px] font-black uppercase tracking-[0.3em] shadow-2xl shadow-primary/20 hover:scale-105 active:scale-95 transition-all relative z-10"
+          >
+            Map First Structure
+          </Button>
         </div>
       )}
 
@@ -827,104 +836,113 @@ export default function SalaryStructureManagement() {
           </div>
 
           <TabsContent value="history" className="mt-0">
-            <Card>
-              <CardContent className="p-6">
-                {salaryHistory.length > 0 ? (
-                  <div className="relative border-l border-border ml-3 space-y-8 py-2">
-                    {salaryHistory.map((item, i) => {
-                      const prevItem = salaryHistory[i + 1]; // Previous entry (older)
-                      const allowances = typeof item.allowances === 'string' ? JSON.parse(item.allowances || '{}') : (item.allowances || {});
-                      const deductions = typeof item.deductions === 'string' ? JSON.parse(item.deductions || '{}') : (item.deductions || {});
-                      const contributions = typeof item.employerContributions === 'string' ? JSON.parse(item.employerContributions || '{}') : (item.employerContributions || {});
-                      const totalAllowances = Object.values(allowances).reduce((sum: number, val: any) => sum + (Number(val) || 0), 0);
-                      const totalDeductions = Object.values(deductions).reduce((sum: number, val: any) => sum + (Number(val) || 0), 0);
-                      const totalContributions = Object.values(contributions).reduce((sum: number, val: any) => sum + (Number(val) || 0), 0);
-                      const monthlyBase = Number(item.baseSalary) / 12;
-                      const grossMonthly = monthlyBase + totalAllowances;
-                      const netMonthly = grossMonthly - totalDeductions;
-                      const ctc = grossMonthly + totalContributions;
+            <div className="space-y-6 pt-4">
+              {salaryHistory.length > 0 ? (
+                <div className="relative space-y-8 pl-4 py-2">
+                  <div className="absolute left-4 top-2 bottom-2 w-px bg-gradient-to-b from-primary/40 via-primary/20 to-transparent" />
 
-                      return (
-                        <div
-                          key={item.id}
-                          className="ml-6 relative cursor-pointer group"
-                          onClick={() => setSelectedHistoryItem(item)}
-                        >
-                          <span className="absolute -left-[31px] top-1 h-4 w-4 rounded-full border-2 border-background bg-primary ring-4 ring-background group-hover:ring-primary/20 transition-all" />
-                          <div className="p-4 -m-4 rounded-lg hover:bg-accent/50 transition-colors">
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-1">
-                              <p className="text-sm font-medium text-muted-foreground">
-                                {new Date(item.effectiveDate).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
+                  {salaryHistory.map((item, i) => {
+                    const allowances = typeof item.allowances === 'string' ? JSON.parse(item.allowances || '{}') : (item.allowances || {});
+                    const deductions = typeof item.deductions === 'string' ? JSON.parse(item.deductions || '{}') : (item.deductions || {});
+                    const totalAllowances = Object.values(allowances).reduce((sum: number, val: any) => sum + (Number(val) || 0), 0);
+                    const totalDeductions = Object.values(deductions).reduce((sum: number, val: any) => sum + (Number(val) || 0), 0);
+                    const grossMonthly = (Number(item.baseSalary) / 12) + totalAllowances;
+                    const netMonthly = grossMonthly - totalDeductions;
+
+                    return (
+                      <div
+                        key={item.id}
+                        className="pl-10 relative cursor-pointer group/item"
+                        onClick={() => setSelectedHistoryItem(item)}
+                      >
+                        <span className="absolute left-[-5px] top-1.5 h-2.5 w-2.5 rounded-full bg-primary shadow-[0_0_15px_rgba(var(--primary),0.5)] group-hover/item:scale-150 transition-transform duration-500 z-10" />
+
+                        <div className="glass-card p-6 rounded-2xl hover:bg-muted/10 transition-all border-l-4 border-l-primary/30 group-hover/item:border-l-primary group-hover/item:translate-x-1 shadow-lg shadow-black/5">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                            <div>
+                              <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest opacity-60 mb-1">
+                                {new Date(item.effectiveDate).toLocaleDateString(undefined, { year: 'numeric', month: 'long' })}
                               </p>
-                              <Badge variant="outline" className="w-fit text-xs">{getChangeTypeLabel(item.changeType)}</Badge>
+                              <h3 className="font-bold text-lg group-hover/item:text-primary transition-colors font-display tracking-tight leading-tight">{item.jobTitle}</h3>
+                              <p className="text-[10px] font-bold text-muted-foreground mt-1 uppercase tracking-widest flex items-center gap-2">
+                                <Building className="w-3 h-3 text-primary/50" /> {item.company}
+                              </p>
                             </div>
-                            <h3 className="font-semibold text-lg group-hover:text-primary transition-colors">{item.jobTitle} at {item.company}</h3>
-                            <div className="mt-2 p-3 bg-muted/40 rounded-lg text-sm grid grid-cols-3 gap-4 max-w-lg">
-                              <div>
-                                <p className="text-muted-foreground text-xs uppercase">Base (Annual)</p>
-                                <p className="font-medium">{formatRupees(Number(item.baseSalary))}</p>
-                              </div>
-                              <div>
-                                <p className="text-muted-foreground text-xs uppercase">Take Home</p>
-                                <p className="font-medium text-green-600 dark:text-green-400">{formatRupees(netMonthly)}/mo</p>
-                              </div>
-                              <div>
-                                <p className="text-muted-foreground text-xs uppercase">CTC</p>
-                                <p className="font-medium text-primary">{formatRupees(ctc * 12)}</p>
-                              </div>
+                            <Badge variant="outline" className="w-fit text-[8px] font-black uppercase tracking-widest py-1 border-primary/20 text-primary-foreground/70 bg-primary/5">{getChangeTypeLabel(item.changeType)}</Badge>
+                          </div>
+
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-6 pt-4 border-t border-border/5">
+                            <div>
+                              <p className="text-[9px] text-muted-foreground font-black uppercase tracking-widest mb-1">Base Analysis</p>
+                              <p className="font-bold text-sm md:text-base font-display">{formatRupees(Number(item.baseSalary))}</p>
                             </div>
-                            <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
-                              <ChevronRight className="w-3 h-3" /> Click to view full breakdown
-                            </p>
+                            <div>
+                              <p className="text-[9px] text-muted-foreground font-black uppercase tracking-widest mb-1">Net Monthly</p>
+                              <p className="font-bold text-sm md:text-base text-emerald-500 font-display">{formatRupees(netMonthly)}</p>
+                            </div>
+                            <div className="hidden md:block">
+                              <p className="text-[9px] text-muted-foreground font-black uppercase tracking-widest mb-1">Status</p>
+                              <p className="font-black text-[10px] uppercase tracking-widest text-primary/70">Verified</p>
+                            </div>
                           </div>
                         </div>
-                      )
-                    })}
-                  </div>
-                ) : (
-                  <p className="text-center text-muted-foreground py-8">No history available yet.</p>
-                )}
-              </CardContent>
-            </Card>
+                      </div>
+                    )
+                  })}
+                </div>
+              ) : (
+                <div className="p-12 glass-card rounded-3xl text-center border-dashed border-border/50">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">No archival records found</p>
+                </div>
+              )}
+            </div>
           </TabsContent>
 
           <TabsContent value="list" className="mt-0">
-            <div className="grid gap-4">
+            <div className="grid gap-4 pt-4">
               {salaryStructures.map(structure => (
-                <Card key={structure.id} className={`transition-all hover:bg-accent/40 ${structure.isActive ? 'border-primary/50 bg-primary/5' : ''}`}>
-                  <CardContent className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h4 className="font-semibold">{structure.jobTitle}</h4>
-                        {structure.isActive && <Badge>Active</Badge>}
-                      </div>
-                      <p className="text-sm text-muted-foreground">{structure.company} • {new Date(structure.effectiveDate).getFullYear()}</p>
+                <div
+                  key={structure.id}
+                  className={`glass-card p-6 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 transition-all border-l-4 ${structure.isActive ? 'border-l-primary bg-primary/5 shadow-xl shadow-primary/5' : 'border-l-transparent hover:border-l-primary/30 hover:bg-muted/10'
+                    }`}
+                >
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      <h4 className="font-bold text-lg font-display tracking-tight">{structure.jobTitle}</h4>
+                      {structure.isActive && (
+                        <Badge variant="secondary" className="text-[9px] font-black uppercase tracking-widest bg-primary/10 text-primary border-primary/20">Active Pulse</Badge>
+                      )}
                     </div>
+                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-2 opacity-60">
+                      <Building className="w-3.5 h-3.5" /> {structure.company} • {new Date(structure.effectiveDate).getFullYear()} Archives
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-8">
                     <div className="text-right">
-                      <p className="font-bold">{formatRupees(Number(structure.baseSalary))}</p>
-                      <p className="text-xs text-muted-foreground">Annual Base</p>
+                      <p className="text-sm md:text-lg font-black font-display">{formatRupees(Number(structure.baseSalary))}</p>
+                      <p className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em] opacity-50">Annual Base</p>
                     </div>
                     <div className="flex gap-2">
                       {!structure.isActive && (
                         <Button
-                          variant="outline"
+                          variant="ghost"
                           size="sm"
-                          className="text-green-600 border-green-200 hover:bg-green-50 dark:hover:bg-green-900/20"
+                          className="text-emerald-500 hover:text-emerald-400 hover:bg-emerald-500/10 rounded-xl h-10 w-10 p-0"
                           onClick={() => handleSetActive(structure.id)}
+                          title="Set as Active"
                         >
-                          <CheckCircle className="w-4 h-4 mr-2" />
-                          Make Active
+                          <CheckCircle className="w-5 h-5" />
                         </Button>
                       )}
-                      <Button variant="ghost" size="icon" onClick={() => handleEdit(structure)}>
-                        <Edit className="w-4 h-4 text-muted-foreground hover:text-foreground" />
+                      <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl hover:bg-primary/10 hover:text-primary transition-colors" onClick={() => handleEdit(structure)}>
+                        <Edit className="w-4 h-4" />
                       </Button>
-                      <Button variant="ghost" size="icon" onClick={() => handleDelete(structure.id)}>
-                        <Trash2 className="w-4 h-4 text-muted-foreground hover:text-destructive" />
+                      <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl hover:bg-rose-500/10 hover:text-rose-500 transition-colors" onClick={() => handleDelete(structure.id)}>
+                        <Trash2 className="w-4 h-4" />
                       </Button>
                     </div>
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
               ))}
             </div>
           </TabsContent>
@@ -933,156 +951,117 @@ export default function SalaryStructureManagement() {
 
       {/* History Detail Sheet */}
       <Sheet open={!!selectedHistoryItem} onOpenChange={(open) => !open && setSelectedHistoryItem(null)}>
-        <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
+        <SheetContent className="w-full sm:max-w-xl overflow-y-auto bg-background/80 backdrop-blur-xl border-l border-border/40 p-0">
           {selectedHistoryItem && (() => {
             const item = selectedHistoryItem;
             const allowances = typeof item.allowances === 'string' ? JSON.parse(item.allowances || '{}') : (item.allowances || {});
             const deductions = typeof item.deductions === 'string' ? JSON.parse(item.deductions || '{}') : (item.deductions || {});
-            const contributions = typeof item.employerContributions === 'string' ? JSON.parse(item.employerContributions || '{}') : (item.employerContributions || {});
             const totalAllowances = Object.values(allowances).reduce((sum: number, val: any) => sum + (Number(val) || 0), 0);
             const totalDeductions = Object.values(deductions).reduce((sum: number, val: any) => sum + (Number(val) || 0), 0);
-            const totalContributions = Object.values(contributions).reduce((sum: number, val: any) => sum + (Number(val) || 0), 0);
             const monthlyBase = Number(item.baseSalary) / 12;
             const grossMonthly = monthlyBase + totalAllowances;
             const netMonthly = grossMonthly - totalDeductions;
-            const ctc = grossMonthly + totalContributions;
 
             return (
-              <>
-                <SheetHeader className="pb-4 border-b">
+              <div className="p-8 space-y-10">
+                <SheetHeader className="pb-8 border-b border-border/10 space-y-4">
                   <div className="flex items-center justify-between">
-                    <Badge variant="outline">{getChangeTypeLabel(item.changeType)}</Badge>
-                    <span className="text-sm text-muted-foreground">
+                    <Badge variant="outline" className="text-[9px] font-black uppercase tracking-widest px-3 py-1 bg-primary/5 text-primary border-primary/20">{getChangeTypeLabel(item.changeType)}</Badge>
+                    <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">
                       {new Date(item.effectiveDate).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
                     </span>
                   </div>
-                  <SheetTitle className="text-2xl">{item.jobTitle}</SheetTitle>
-                  <SheetDescription className="flex items-center gap-2">
-                    <Building className="w-4 h-4" /> {item.company}
-                    {item.location && <><MapPin className="w-4 h-4 ml-2" /> {item.location}</>}
-                  </SheetDescription>
+                  <div>
+                    <SheetTitle className="text-3xl font-black font-display tracking-tight leading-tight mb-2">{item.jobTitle}</SheetTitle>
+                    <SheetDescription className="flex flex-wrap items-center gap-x-6 gap-y-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                      <span className="flex items-center gap-2"><Building className="w-4 h-4 text-primary" /> {item.company}</span>
+                      {item.location && <span className="flex items-center gap-2 font-black"><MapPin className="w-4 h-4 text-primary" /> {item.location}</span>}
+                    </SheetDescription>
+                  </div>
                 </SheetHeader>
 
-                <div className="py-6 space-y-6">
-                  {/* Key Metrics */}
+                <div className="space-y-8">
+                  {/* Primary Grid Analysis */}
                   <div className="grid grid-cols-2 gap-4">
-                    <Card className="bg-gradient-to-br from-green-500/10 to-emerald-500/10 border-green-500/20">
-                      <CardContent className="p-4 text-center">
-                        <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Take Home (Monthly)</p>
-                        <p className="text-2xl font-bold text-green-600 dark:text-green-400">{formatRupees(netMonthly)}</p>
-                      </CardContent>
-                    </Card>
-                    <Card className="bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
-                      <CardContent className="p-4 text-center">
-                        <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">CTC (Annual)</p>
-                        <p className="text-2xl font-bold text-primary">{formatRupees(ctc * 12)}</p>
-                      </CardContent>
-                    </Card>
-                  </div>
-
-                  {/* Base Salary */}
-                  <div className="bg-muted/40 rounded-lg p-4">
-                    <div className="flex justify-between items-center">
-                      <span className="font-medium">Base Salary (Annual)</span>
-                      <span className="font-bold">{formatRupees(Number(item.baseSalary))}</span>
+                    <div className="glass-card p-6 rounded-3xl bg-emerald-500/5 border-emerald-500/10 text-center flex flex-col items-center justify-center">
+                      <p className="text-[9px] font-black uppercase tracking-[0.2em] text-emerald-500 mb-3 opacity-60">Net Yield (Monthly)</p>
+                      <p className="text-2xl font-black text-emerald-500 font-display tracking-tight leading-none">{formatRupees(netMonthly)}</p>
                     </div>
-                    <div className="flex justify-between items-center text-sm text-muted-foreground mt-1">
-                      <span>Monthly</span>
-                      <span>{formatRupees(monthlyBase)}</span>
+                    <div className="glass-card p-6 rounded-3xl bg-primary/5 border-primary/10 text-center flex flex-col items-center justify-center">
+                      <p className="text-[9px] font-black uppercase tracking-[0.2em] text-primary mb-3 opacity-60">Base Portfolio (Annual)</p>
+                      <p className="text-2xl font-black text-primary font-display tracking-tight leading-none">{formatRupees(Number(item.baseSalary))}</p>
                     </div>
                   </div>
 
-                  {/* Allowances */}
-                  {Object.keys(allowances).length > 0 && (
+                  {/* Operational Details */}
+                  <div className="space-y-6">
                     <div>
-                      <h4 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
-                        <TrendingUp className="w-4 h-4 text-green-500" /> Allowances
+                      <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground mb-4 flex items-center gap-2">
+                        <History className="w-4 h-4 opacity-50" /> Architectural Breakdown
                       </h4>
-                      <div className="space-y-2 bg-green-500/5 rounded-lg p-3">
-                        {Object.entries(allowances).map(([name, amount]) => (
-                          <div key={name} className="flex justify-between text-sm">
-                            <span>{name}</span>
-                            <span className="text-green-600 dark:text-green-400">+{formatRupees(Number(amount))}</span>
-                          </div>
-                        ))}
-                        <Separator />
-                        <div className="flex justify-between font-semibold">
-                          <span>Total Allowances</span>
-                          <span className="text-green-600 dark:text-green-400">+{formatRupees(totalAllowances)}</span>
+
+                      <div className="space-y-4">
+                        <div className="flex justify-between items-center p-4 rounded-2xl bg-muted/20 border border-border/5 group">
+                          <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Monthly Base</span>
+                          <span className="font-bold font-display text-base">{formatRupees(monthlyBase)}</span>
                         </div>
+
+                        {Object.keys(allowances).length > 0 && (
+                          <div className="space-y-3 rounded-2xl bg-emerald-500/[0.02] p-5 border border-emerald-500/10">
+                            {Object.entries(allowances).map(([name, amount]) => (
+                              <div key={name} className="flex justify-between items-center text-xs">
+                                <span className="text-muted-foreground font-medium uppercase tracking-widest text-[9px]">{name}</span>
+                                <span className="text-emerald-500 font-bold font-display">+{formatRupees(Number(amount))}</span>
+                              </div>
+                            ))}
+                            <div className="h-px bg-emerald-500/10 my-2" />
+                            <div className="flex justify-between items-center text-emerald-500">
+                              <span className="text-[10px] font-black uppercase tracking-[0.2em]">Total Benefits</span>
+                              <span className="font-black font-display text-lg">+{formatRupees(totalAllowances)}</span>
+                            </div>
+                          </div>
+                        )}
+
+                        {Object.keys(deductions).length > 0 && (
+                          <div className="space-y-3 rounded-2xl bg-rose-500/[0.02] p-5 border border-rose-500/10">
+                            {Object.entries(deductions).map(([name, amount]) => (
+                              <div key={name} className="flex justify-between items-center text-xs">
+                                <span className="text-muted-foreground font-medium uppercase tracking-widest text-[9px]">{name}</span>
+                                <span className="text-rose-500 font-bold font-display">-{formatRupees(Number(amount))}</span>
+                              </div>
+                            ))}
+                            <div className="h-px bg-rose-500/10 my-2" />
+                            <div className="flex justify-between items-center text-rose-500">
+                              <span className="text-[10px] font-black uppercase tracking-[0.2em]">Total Deductions</span>
+                              <span className="font-black font-display text-lg">-{formatRupees(totalDeductions)}</span>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
-                  )}
 
-                  {/* Deductions */}
-                  {Object.keys(deductions).length > 0 && (
-                    <div>
-                      <h4 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
-                        <ArrowDown className="w-4 h-4 text-red-500" /> Deductions
-                      </h4>
-                      <div className="space-y-2 bg-red-500/5 rounded-lg p-3">
-                        {Object.entries(deductions).map(([name, amount]) => (
-                          <div key={name} className="flex justify-between text-sm">
-                            <span>{name}</span>
-                            <span className="text-red-500">-{formatRupees(Number(amount))}</span>
-                          </div>
-                        ))}
-                        <Separator />
-                        <div className="flex justify-between font-semibold">
-                          <span>Total Deductions</span>
-                          <span className="text-red-500">-{formatRupees(totalDeductions)}</span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Employer Contributions */}
-                  {Object.keys(contributions).length > 0 && (
-                    <div>
-                      <h4 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
-                        <Users className="w-4 h-4 text-blue-500" /> Employer Contributions
-                      </h4>
-                      <div className="space-y-2 bg-blue-500/5 rounded-lg p-3">
-                        {Object.entries(contributions).map(([name, amount]) => (
-                          <div key={name} className="flex justify-between text-sm">
-                            <span>{name}</span>
-                            <span className="text-blue-500">+{formatRupees(Number(amount))}</span>
-                          </div>
-                        ))}
-                        <Separator />
-                        <div className="flex justify-between font-semibold">
-                          <span>Total Employer Contributions</span>
-                          <span className="text-blue-500">+{formatRupees(totalContributions)}</span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Additional Info */}
-                  <div className="grid grid-cols-2 gap-4 pt-4 border-t">
-                    {item.department && (
+                    {/* Metadata Context */}
+                    <div className="grid grid-cols-2 gap-6 p-6 rounded-2xl bg-muted/20 border border-border/5">
                       <div>
-                        <p className="text-xs text-muted-foreground uppercase">Department</p>
-                        <p className="font-medium">{item.department}</p>
+                        <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-1">Corporate Dept</p>
+                        <p className="font-bold text-xs font-display tracking-widest text-foreground">{item.department || 'GLOBAL OPS'}</p>
                       </div>
-                    )}
-                    {item.grade && (
                       <div>
-                        <p className="text-xs text-muted-foreground uppercase">Grade / Level</p>
-                        <p className="font-medium">{item.grade}</p>
+                        <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-1">Status Grade</p>
+                        <p className="font-bold text-xs font-display tracking-widest text-primary">{item.grade || 'N/A'}</p>
+                      </div>
+                    </div>
+
+                    {item.changeReason && (
+                      <div className="rounded-2xl bg-primary/5 p-6 border border-primary/10 relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:rotate-12 transition-transform"><Plus className="w-5 h-5 text-primary" /></div>
+                        <p className="text-[9px] font-black uppercase tracking-[0.2em] text-primary mb-3">Historical Context</p>
+                        <p className="text-xs text-muted-foreground/80 font-medium italic leading-relaxed">"{item.changeReason}"</p>
                       </div>
                     )}
                   </div>
-
-                  {/* Change Reason */}
-                  {item.changeReason && (
-                    <div className="bg-muted/40 rounded-lg p-4">
-                      <p className="text-xs text-muted-foreground uppercase mb-1">Change Reason</p>
-                      <p className="font-medium">{item.changeReason}</p>
-                    </div>
-                  )}
                 </div>
-              </>
+              </div>
             );
           })()}
         </SheetContent>

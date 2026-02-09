@@ -38,6 +38,7 @@ export interface SimpleDashboardData {
         name: string;
         amount: number;
     }>;
+    totalTransactionsCount: number;
     financialHealthScore: number;
     categoryStats: Record<string, { credits: number; debits: number }>;
     // NEW: Additional KPI data
@@ -400,6 +401,7 @@ export class DashboardService {
             upcomingDeadlines: deadlinesData?.count || 0,
             activeGoals: activeGoalsCount,
             recentTransactions: allTransactions,
+            totalTransactionsCount: (transactionStats._count || 0) + (legacyExpenseStats._count || 0),
             monthlyTrends,
             categoryBreakdown,
             financialHealthScore: Math.min(financialHealthScore, 100),

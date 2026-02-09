@@ -36,6 +36,7 @@ export interface SimpleDashboardData {
   netSavings: number;
   savingsRate: number;
   totalNetWorth: number;
+  totalTransactionsCount?: number;
   upcomingDeadlines: number;
   activeGoals: number;
   recentTransactions: Array<{
@@ -248,58 +249,42 @@ export default function SimpleDashboard({
           </div>
         </div>
 
-        {/* Net Worth & Key Stats - Glass Panels */}
-        <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Total Net Worth - Featured */}
-          <div className="col-span-1 md:col-span-2 lg:col-span-2 rounded-2xl p-6 bg-card/40 backdrop-blur-md border border-border/50 relative overflow-hidden group">
+        {/* Net Worth & Key Stats */}
+        <section className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
+          {/* Total Net Worth */}
+          <div className="col-span-2 rounded-2xl p-4 md:p-6 glass-card border-l-4 border-l-primary/50 hover:bg-primary/5 transition-all shadow-sm group relative overflow-hidden">
             <div className="relative z-10">
-              <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground/80 mb-2 block">Net Worth</span>
-              <div className="flex items-baseline gap-2">
-                <h2 className="text-4xl md:text-5xl font-display font-medium text-foreground tabular-nums tracking-tight">
-                  {formatRupees(netWorth)}
-                </h2>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2 group-hover:text-primary transition-colors">Net Worth</p>
+              <div className="flex items-center justify-between">
+                <h3 className="text-xl md:text-3xl font-black text-foreground font-display tracking-tight">{formatRupees(netWorth)}</h3>
               </div>
-              <div className="mt-4 flex items-center gap-3">
-                <div className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 ${dashboardData.savingsRate >= 0 ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'bg-rose-500/10 text-rose-600 dark:text-rose-400'}`}>
-                  <TrendingUp className="w-3 h-3" />
+              <div className="mt-2 flex items-center gap-2">
+                <div className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 ${dashboardData.savingsRate >= 0 ? 'bg-emerald-500/10 text-emerald-600' : 'bg-rose-500/10 text-rose-600'}`}>
+                  {dashboardData.savingsRate >= 0 ? <TrendingUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />}
                   {Math.abs(dashboardData.savingsRate).toFixed(1)}%
                 </div>
-                <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Savings Rate</span>
+                <span className="text-[10px] text-muted-foreground font-medium hidden md:block">Savings Rate</span>
               </div>
             </div>
-
-            {/* Subtle background decoration */}
-            <div className="absolute -bottom-12 -right-12 w-48 h-48 bg-foreground/5 rounded-full blur-3xl pointer-events-none group-hover:bg-foreground/10 transition-colors duration-500" />
           </div>
 
-          {/* Monthly In/Out */}
-          <div className="rounded-2xl p-6 bg-card/40 backdrop-blur-md border border-border/50 flex flex-col justify-between group hover:border-border/80 transition-colors">
-            <div className="flex justify-between items-start mb-4">
-              <span className="p-2 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                <ArrowDown className="w-4 h-4" />
-              </span>
-            </div>
-            <div>
-              <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/80">Income</span>
-              <p className="text-2xl font-display font-medium text-foreground mt-1 tabular-nums">{formatRupees(monthlyIncome)}</p>
-            </div>
+          {/* Monthly Income */}
+          <div className="rounded-2xl p-4 md:p-6 glass-card border-l-4 border-l-emerald-500 hover:bg-emerald-500/5 transition-all shadow-sm group">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2 group-hover:text-emerald-500 transition-colors">Income</p>
+            <h3 className="text-xl md:text-2xl font-black text-emerald-500 font-display">{formatRupees(monthlyIncome)}</h3>
+            <p className="text-[10px] text-muted-foreground mt-1 font-medium hidden md:block">This Month</p>
           </div>
 
-          <div className="rounded-2xl p-6 bg-card/40 backdrop-blur-md border border-border/50 flex flex-col justify-between group hover:border-border/80 transition-colors">
-            <div className="flex justify-between items-start mb-4">
-              <span className="p-2 rounded-lg bg-rose-500/10 text-rose-600 dark:text-rose-400">
-                <ArrowUp className="w-4 h-4" />
-              </span>
-            </div>
-            <div>
-              <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/80">Expenses</span>
-              <p className="text-2xl font-display font-medium text-foreground mt-1 tabular-nums">{formatRupees(monthlyExpenses)}</p>
-            </div>
+          {/* Monthly Expenses */}
+          <div className="rounded-2xl p-4 md:p-6 glass-card border-l-4 border-l-rose-500 hover:bg-rose-500/5 transition-all shadow-sm group">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2 group-hover:text-rose-500 transition-colors">Expenses</p>
+            <h3 className="text-xl md:text-2xl font-black text-foreground font-display">{formatRupees(monthlyExpenses)}</h3>
+            <p className="text-[10px] text-muted-foreground mt-1 font-medium hidden md:block">This Month</p>
           </div>
         </section>
 
-        {/* Quick Access Grid - Minimal Cards */}
-        <section className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4">
+        {/* Quick Access Grid - Horizontal Scroll on Mobile */}
+        <section className="flex overflow-x-auto snap-x gap-3 pb-4 md:grid md:grid-cols-3 lg:grid-cols-6 md:gap-4 md:pb-0 -mx-4 px-4 md:mx-0 md:px-0 hide-scrollbar">
           {[
             {
               label: 'Salary',
@@ -313,8 +298,8 @@ export default function SimpleDashboard({
               label: 'Transactions',
               icon: ArrowDown,
               href: '/transactions',
-              value: formatRupees(dashboardData.totalDebits || dashboardData.totalExpenses),
-              subtext: 'Spent',
+              value: dashboardData.totalTransactionsCount?.toString() || dashboardData.recentTransactions.length.toString(),
+              subtext: 'Count',
               color: 'text-blue-500'
             },
             {
@@ -350,7 +335,7 @@ export default function SimpleDashboard({
               color: 'text-emerald-500'
             },
           ].map((item, i) => (
-            <Link href={item.href} key={i} className="group">
+            <Link href={item.href} key={i} className="group min-w-[160px] md:min-w-0 snap-center">
               <div className="h-full bg-card/30 border border-border/40 rounded-xl p-4 hover:bg-card/60 hover:border-primary/20 transition-all duration-300 flex flex-col justify-between backdrop-blur-sm">
                 <div className="flex justify-between items-start mb-2">
                   <item.icon className={`w-4 h-4 ${item.color} opacity-70 group-hover:opacity-100 transition-opacity`} />
@@ -472,32 +457,36 @@ export default function SimpleDashboard({
             </Link>
           </div>
 
-          <div className="bg-card/30 border border-border/40 rounded-2xl backdrop-blur-md overflow-hidden">
+          <div className="glass-card border-none shadow-none md:shadow-sm md:border md:border-border/40 md:rounded-2xl md:backdrop-blur-md overflow-hidden bg-transparent md:bg-card/30">
             {dashboardData.recentTransactions.length > 0 ? (
-              <div className="divide-y divide-border/40">
-                {dashboardData.recentTransactions.slice(0, 5).map((tx) => (
-                  <div key={tx.id} className="p-4 flex items-center justify-between hover:bg-muted/10 transition-colors group">
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-full bg-background border border-border flex items-center justify-center shrink-0 text-muted-foreground group-hover:text-foreground group-hover:border-foreground/30 transition-all">
-                        <ShoppingBag className="w-4 h-4" />
+              <div className="divide-y divide-border/50">
+                {dashboardData.recentTransactions.slice(0, 5).map((tx) => {
+                  const isIncome = tx.type === 'income' || tx.type === 'credit';
+                  return (
+                    <div key={tx.id} className="p-4 active:bg-muted/30 transition-colors flex items-start gap-3 group hover:bg-muted/10">
+                      <div className="size-10 rounded-xl bg-muted/50 border border-border/50 flex items-center justify-center shrink-0 group-hover:border-foreground/20 transition-colors">
+                        <ShoppingBag className="w-5 h-5 opacity-70" />
                       </div>
-                      <div>
-                        <p className="text-sm font-medium text-foreground">{tx.store || tx.title}</p>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <span className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground/80">{tx.category || 'General'}</span>
-                          <span className="w-1 h-1 rounded-full bg-border" />
-                          <span className="text-[10px] text-muted-foreground">{new Date(tx.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2 mb-1">
+                          <h4 className="font-bold text-sm text-foreground truncate leading-tight">{tx.store || tx.title}</h4>
+                          <span className={`font-black text-sm tracking-tight whitespace-nowrap ${isIncome ? 'text-emerald-500' : 'text-foreground'}`}>
+                            {isIncome ? '+' : '-'}{formatRupees(Math.abs(tx.amount))}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <div className="flex items-center gap-2">
+                            <span>{new Date(tx.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</span>
+                            <span className="w-1 h-1 rounded-full bg-border" />
+                            <span className={`uppercase tracking-wider font-bold text-[10px] ${isIncome ? 'text-emerald-500' : 'text-muted-foreground'}`}>
+                              {tx.category || 'General'}
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <p className={`text-sm font-bold tabular-nums ${tx.type === 'income' || tx.type === 'credit' ? 'text-emerald-600 dark:text-emerald-400' : 'text-foreground'
-                        }`}>
-                        {tx.type === 'income' || tx.type === 'credit' ? '+' : '-'}{formatRupees(Math.abs(tx.amount))}
-                      </p>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <div className="p-12 text-center">

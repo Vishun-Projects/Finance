@@ -47,7 +47,7 @@ export default async function AdminOverviewPage() {
   return (
     <div className="space-y-6">
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <div className="rounded-lg border bg-card p-4 shadow-sm">
+        <div className="glass-card rounded-lg p-6 shadow-xl">
           <p className="text-sm text-muted-foreground">Total Documents</p>
           <p className="text-3xl font-semibold text-foreground mt-2">
             {documentStats._count.id}
@@ -56,14 +56,15 @@ export default async function AdminOverviewPage() {
             Includes statements, portal resources, and uploads.
           </p>
         </div>
-        <div className="rounded-lg border bg-card p-4 shadow-sm">
+        <div className="glass-card rounded-lg p-6 shadow-xl">
           <p className="text-sm text-muted-foreground">Portal Resources</p>
           <p className="text-3xl font-semibold text-foreground mt-2">{portalDocs}</p>
           <p className="text-xs text-muted-foreground mt-1">
             Documents visible across all users.
           </p>
         </div>
-        <div className="rounded-lg border bg-card p-4 shadow-sm">
+
+        <div className="glass-card rounded-lg p-6 shadow-xl">
           <p className="text-sm text-muted-foreground">Bank Field Mappings</p>
           <p className="text-3xl font-semibold text-foreground mt-2">
             {mappingStats._count.id}
@@ -74,7 +75,7 @@ export default async function AdminOverviewPage() {
         </div>
       </section>
 
-      <section className="rounded-lg border bg-card shadow-sm">
+      <section className="glass-card rounded-lg shadow-xl">
         <div className="border-b px-4 py-3">
           <h2 className="text-sm font-semibold text-foreground">Recent Documents</h2>
           <p className="text-xs text-muted-foreground">

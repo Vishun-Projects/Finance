@@ -113,7 +113,7 @@ export default function AdminSuperDocumentsPage() {
       const data = await response.json();
       setDocuments((prev) => [data.document, ...prev]);
       success('Uploaded', `${file.name} added as super document`);
-      
+
       // Reset form
       if (fileInputRef) {
         fileInputRef.value = '';
@@ -171,12 +171,14 @@ export default function AdminSuperDocumentsPage() {
       </div>
 
       {/* Upload Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Upload Super Document</CardTitle>
-          <CardDescription>Upload PDF documents that will be searchable by the AI advisor</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <div className="glass-card p-6 rounded-2xl shadow-sm">
+        <div className="flex flex-col gap-1.5 mb-6">
+          <h3 className="text-lg font-bold leading-none tracking-tight font-display">Upload Super Document</h3>
+          <p className="text-sm text-muted-foreground">
+            Upload PDF documents that will be searchable by the AI advisor
+          </p>
+        </div>
+        <div className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="file">PDF File</Label>
             <Input
@@ -233,26 +235,24 @@ export default function AdminSuperDocumentsPage() {
               </>
             )}
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* Documents List */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Super Documents</CardTitle>
-              <CardDescription>Documents available for AI advisor search</CardDescription>
-            </div>
-            <Input
-              placeholder="Search documents..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-64"
-            />
+      <div className="glass-card rounded-2xl shadow-sm overflow-hidden border-none">
+        <div className="flex items-center justify-between p-6 border-b border-border/10">
+          <div>
+            <h3 className="text-lg font-bold leading-none tracking-tight font-display">Super Documents</h3>
+            <p className="text-sm text-muted-foreground mt-1">Documents available for AI advisor search</p>
           </div>
-        </CardHeader>
-        <CardContent>
+          <Input
+            placeholder="Search documents..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-64 bg-background/50 border-border/50"
+          />
+        </div>
+        <div className="p-6">
           {loading ? (
             <div className="py-8 text-center text-muted-foreground">Loading...</div>
           ) : filteredDocuments.length === 0 ? (
@@ -295,8 +295,8 @@ export default function AdminSuperDocumentsPage() {
               ))}
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

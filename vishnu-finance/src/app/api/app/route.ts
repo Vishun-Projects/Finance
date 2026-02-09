@@ -1286,22 +1286,32 @@ export async function POST(request: NextRequest) {
       const { AuthService } = await import('@/lib/auth');
       try {
         const result = await AuthService.registerUser(email, password, name);
-        const response = NextResponse.json(
-          { message: 'User registered successfully', user: result.user },
-          { status: 201 }
-        );
-        response.cookies.set('auth-token', result.token, {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'strict',
-          maxAge: 7 * 24 * 60 * 60 * 1000,
-          path: '/',
-        });
+
+        const responseData: any = {
+          message: 'User registered successfully',
+          user: result.user,
+          requiresVerification: !!result.requiresVerification
+        };
+
+        const response = NextResponse.json(responseData, { status: 201 });
+
+        // Only set cookie if there's a token (unlikely in new verification flow)
+        if ((result as any).token) {
+          response.cookies.set('auth-token', (result as any).token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict',
+            maxAge: 7 * 24 * 60 * 60 * 1000,
+            path: '/',
+          });
+        }
+
         return response;
       } catch (error: any) {
         if (error.message === 'User already exists with this email') {
           return NextResponse.json({ error: 'User already exists with this email' }, { status: 409 });
         }
+        console.error('Registration error in main app route:', error);
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
       }
     }

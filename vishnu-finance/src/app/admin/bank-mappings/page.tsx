@@ -225,17 +225,17 @@ export default function AdminBankMappingsPage() {
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader className="space-y-2">
-          <CardTitle className="flex items-center gap-2">
+      <div className="glass-card p-6 rounded-2xl shadow-sm">
+        <div className="flex flex-col gap-1.5 mb-6">
+          <h3 className="text-lg font-bold leading-none tracking-tight flex items-center gap-2 font-display">
             <Plus className="w-5 h-5 text-primary" />
             <span>Create Bank Mapping</span>
-          </CardTitle>
-          <CardDescription>
+          </h3>
+          <p className="text-sm text-muted-foreground">
             Define how parsed fields map to internal transaction schema for each bank.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+          </p>
+        </div>
+        <div className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="bank-code">Bank Code</Label>
@@ -290,17 +290,17 @@ export default function AdminBankMappingsPage() {
               {creating ? "Saving..." : "Save Mapping"}
             </Button>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
-      <Card>
-        <CardHeader className="space-y-2">
-          <CardTitle>Parser Field Catalog</CardTitle>
-          <CardDescription>
+      <div className="glass-card p-6 rounded-2xl shadow-sm">
+        <div className="flex flex-col gap-1.5 mb-6">
+          <h3 className="text-lg font-bold leading-none tracking-tight font-display">Parser Field Catalog</h3>
+          <p className="text-sm text-muted-foreground">
             Explore the fields each parser emits so you can align bank mappings without digging into Python code.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-5">
+          </p>
+        </div>
+        <div className="space-y-5">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-4">
             <Select value={selectedBankCode} onValueChange={setSelectedBankCode}>
               <SelectTrigger className="w-full lg:w-60">
@@ -398,14 +398,14 @@ export default function AdminBankMappingsPage() {
               Select a bank to preview its parser fields.
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
-      <Card>
-        <CardHeader className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+      <div className="glass-card rounded-2xl shadow-sm overflow-hidden border-none">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 p-6 border-b border-border/10">
           <div>
-            <CardTitle className="text-sm font-semibold">Existing Mappings</CardTitle>
-            <CardDescription>Enable or disable mappings and keep versions updated.</CardDescription>
+            <h3 className="text-sm font-bold leading-none tracking-tight font-display">Existing Mappings</h3>
+            <p className="text-xs text-muted-foreground mt-1">Enable or disable mappings and keep versions updated.</p>
           </div>
           <div className="w-full flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-2">
@@ -431,8 +431,8 @@ export default function AdminBankMappingsPage() {
               Apply
             </Button>
           </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
+        </div>
+        <div className="p-6 space-y-4">
           {loading ? (
             <div className="border border-dashed rounded-lg p-8 text-center text-sm text-muted-foreground">
               Loading mappings...
@@ -445,8 +445,8 @@ export default function AdminBankMappingsPage() {
             <div className="space-y-3">
               <div className="hidden lg:block space-y-3">
                 {filteredMappings.map(mapping => (
-                  <Card key={mapping.id} className="border border-border/70">
-                    <CardContent className="p-4 space-y-3">
+                  <div key={mapping.id} className="border border-border/70 rounded-xl bg-card/30 backdrop-blur-sm">
+                    <div className="p-4 space-y-3">
                       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
                         <div>
                           <div className="flex items-center gap-2">
@@ -490,8 +490,8 @@ export default function AdminBankMappingsPage() {
                           {JSON.stringify(mapping.mappingConfig, null, 2)}
                         </pre>
                       )}
-                    </CardContent>
-                  </Card>
+                    </div>
+                  </div>
                 ))}
               </div>
 
@@ -543,8 +543,8 @@ export default function AdminBankMappingsPage() {
               </div>
             </div>
           )}
-        </CardContent>
-      </Card>
-    </div>
+        </div>
+      </div>
+    </div >
   );
 }

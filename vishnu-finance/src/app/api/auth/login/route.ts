@@ -51,13 +51,21 @@ export async function POST(request: NextRequest) {
     console.error('❌ LOGIN API - Error during login:', error);
     console.error('❌ LOGIN API - Error details:', JSON.stringify(error, null, 2));
     console.log(`⏱️ LOGIN API - Failed in ${Date.now() - startTime}ms`);
-    
+
     if (error instanceof Error) {
-      if (error.message === 'Invalid email or password' || error.message === 'Account is deactivated') {
-        return NextResponse.json({ error: error.message }, { status: 401 });
+      const msg = error.message;
+      if (msg.includes('Invalid email or password') || msg.includes('Account is deactivated') || msg.includes('Email does not exist') || msg.includes('Password is incorrect')) {
+        return NextResponse.json({ error: msg }, { status: 401 });
+      }
+      if (msg.includes('Account not verified')) {
+        return NextResponse.json({
+          error: msg,
+          requiresVerification: true,
+          email: email // Return email to help frontend redirect to OTP page
+        }, { status: 403 });
       }
     }
-    
+
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

@@ -48,8 +48,14 @@ export interface SimpleDashboardData {
     date: string;
     financialCategory?: string;
     store?: string | null;
+    personName?: string | null;
   }>;
   financialHealthScore: number;
+  currentMonthStats: {
+    income: number;
+    expenses: number;
+    netFlow: number;
+  };
   monthlyTrends: Array<{
     month: string;
     income: number;
@@ -173,9 +179,16 @@ export default function SimpleDashboard({
 
   // Derived Data
   const netWorth = useMemo(() => dashboardData.totalNetWorth ?? dashboardData.netSavings, [dashboardData.totalNetWorth, dashboardData.netSavings]);
-  const monthlyIncome = useMemo(() => dashboardData.totalIncome, [dashboardData.totalIncome]);
-  const monthlyExpenses = useMemo(() => dashboardData.totalExpenses, [dashboardData.totalExpenses]);
-  const netFlow = useMemo(() => monthlyIncome - monthlyExpenses, [monthlyIncome, monthlyExpenses]);
+
+  // STATS BASED ON GLOBAL FILTER (Top Cards)
+  const filteredIncome = useMemo(() => dashboardData.totalIncome, [dashboardData.totalIncome]);
+  const filteredExpenses = useMemo(() => dashboardData.totalExpenses, [dashboardData.totalExpenses]);
+  const filteredNetFlow = useMemo(() => filteredIncome - filteredExpenses, [filteredIncome, filteredExpenses]);
+
+  // STATS BASED ON CURRENT CALENDAR MONTH (Sidebar)
+  const monthlyIncome = useMemo(() => dashboardData.currentMonthStats?.income ?? 0, [dashboardData.currentMonthStats]);
+  const monthlyExpenses = useMemo(() => dashboardData.currentMonthStats?.expenses ?? 0, [dashboardData.currentMonthStats]);
+  const netFlow = useMemo(() => dashboardData.currentMonthStats?.netFlow ?? 0, [dashboardData.currentMonthStats]);
 
   // Chart Data Preparation
   const chartData = useMemo(() => dashboardData.monthlyTrends.map(item => ({
@@ -271,15 +284,15 @@ export default function SimpleDashboard({
           {/* Monthly Income */}
           <div className="rounded-2xl p-4 md:p-6 glass-card border-l-4 border-l-emerald-500 hover:bg-emerald-500/5 transition-all shadow-sm group">
             <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2 group-hover:text-emerald-500 transition-colors">Income</p>
-            <h3 className="text-xl md:text-2xl font-black text-emerald-500 font-display">{formatRupees(monthlyIncome)}</h3>
-            <p className="text-[10px] text-muted-foreground mt-1 font-medium hidden md:block">This Month</p>
+            <h3 className="text-xl md:text-2xl font-black text-emerald-500 font-display tracking-tight">{formatRupees(filteredIncome)}</h3>
+            <p className="text-[10px] font-medium text-muted-foreground mt-2">In Range</p>
           </div>
 
           {/* Monthly Expenses */}
           <div className="rounded-2xl p-4 md:p-6 glass-card border-l-4 border-l-rose-500 hover:bg-rose-500/5 transition-all shadow-sm group">
             <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2 group-hover:text-rose-500 transition-colors">Expenses</p>
-            <h3 className="text-xl md:text-2xl font-black text-foreground font-display">{formatRupees(monthlyExpenses)}</h3>
-            <p className="text-[10px] text-muted-foreground mt-1 font-medium hidden md:block">This Month</p>
+            <h3 className="text-xl md:text-2xl font-black text-foreground font-display tracking-tight">{formatRupees(filteredExpenses)}</h3>
+            <p className="text-[10px] font-medium text-muted-foreground mt-2">In Range</p>
           </div>
         </section>
 
@@ -420,29 +433,26 @@ export default function SimpleDashboard({
           <div className="lg:col-span-4 flex flex-col gap-4">
             <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">This Month</h3>
 
-            <div className="bg-card/30 border border-border/40 rounded-2xl p-0 backdrop-blur-md overflow-hidden">
-              <div className="p-5 flex items-center justify-between border-b border-border/40 hover:bg-muted/10 transition-colors">
+            <div className="bg-card/30 border border-border/40 rounded-2xl p-0 backdrop-blur-md overflow-hidden grid grid-cols-3 md:flex md:flex-col">
+              <div className="p-3 md:p-5 flex flex-col md:flex-row md:items-center justify-between border-r md:border-r-0 md:border-b border-border/40 hover:bg-muted/10 transition-colors">
                 <div>
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Total Income</p>
-                  <p className="text-lg font-display font-medium">{formatRupees(monthlyIncome)}</p>
+                  <p className="text-[8px] md:text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Income</p>
+                  <p className="text-xs md:text-lg font-display font-medium truncate">{formatRupees(monthlyIncome)}</p>
                 </div>
-                <ArrowDown className="w-5 h-5 text-emerald-500 opacity-80" />
               </div>
-              <div className="p-5 flex items-center justify-between border-b border-border/40 hover:bg-muted/10 transition-colors">
+              <div className="p-3 md:p-5 flex flex-col md:flex-row md:items-center justify-between border-r md:border-r-0 md:border-b border-border/40 hover:bg-muted/10 transition-colors">
                 <div>
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Total Spends</p>
-                  <p className="text-lg font-display font-medium">{formatRupees(monthlyExpenses)}</p>
+                  <p className="text-[8px] md:text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Spends</p>
+                  <p className="text-xs md:text-lg font-display font-medium truncate">{formatRupees(monthlyExpenses)}</p>
                 </div>
-                <ArrowUp className="w-5 h-5 text-rose-500 opacity-80" />
               </div>
-              <div className="p-5 flex items-center justify-between bg-foreground/5">
+              <div className="p-3 md:p-5 flex flex-col md:flex-row md:items-center justify-between bg-foreground/5 md:bg-foreground/5">
                 <div>
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Net Flow</p>
-                  <p className={`text-xl font-display font-medium ${netFlow >= 0 ? 'text-foreground' : 'text-rose-500'}`}>
+                  <p className="text-[8px] md:text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Net Flow</p>
+                  <p className={`text-xs md:text-xl font-display font-medium truncate ${netFlow >= 0 ? 'text-foreground' : 'text-rose-500'}`}>
                     {netFlow > 0 ? '+' : ''}{formatRupees(netFlow)}
                   </p>
                 </div>
-                <Wallet className="w-5 h-5 text-foreground opacity-80" />
               </div>
             </div>
           </div>
@@ -462,6 +472,7 @@ export default function SimpleDashboard({
               <div className="divide-y divide-border/50">
                 {dashboardData.recentTransactions.slice(0, 5).map((tx) => {
                   const isIncome = tx.type === 'income' || tx.type === 'credit';
+                  const displayName = tx.store || tx.personName || tx.title;
                   return (
                     <div key={tx.id} className="p-4 active:bg-muted/30 transition-colors flex items-start gap-3 group hover:bg-muted/10">
                       <div className="size-10 rounded-xl bg-muted/50 border border-border/50 flex items-center justify-center shrink-0 group-hover:border-foreground/20 transition-colors">
@@ -469,7 +480,7 @@ export default function SimpleDashboard({
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-2 mb-1">
-                          <h4 className="font-bold text-sm text-foreground truncate leading-tight">{tx.store || tx.title}</h4>
+                          <h4 className="font-bold text-sm text-foreground truncate leading-tight">{displayName}</h4>
                           <span className={`font-black text-sm tracking-tight whitespace-nowrap ${isIncome ? 'text-emerald-500' : 'text-foreground'}`}>
                             {isIncome ? '+' : '-'}{formatRupees(Math.abs(tx.amount))}
                           </span>

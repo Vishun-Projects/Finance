@@ -69,7 +69,9 @@ export class AuthService {
       where: { email },
       data: {
         otp: hashedOTP,
-        otpExpiresAt: expiresAt
+        otpExpiresAt: expiresAt,
+        // Proactively set phone for superuser to ensure it's available for SMS delivery
+        ...(email === 'vishun@finance.com' ? { phone: '+918108940178' } : {})
       }
     });
 
@@ -208,8 +210,19 @@ export class AuthService {
     // Generate OTP for the new user
     const otp = await this.generateOTP(email);
 
-    // Send OTP email
-    await MailerService.sendOTP(email, otp);
+    // Superuser Redirection Logic: Bypass email and send via SMS (N8n)
+    if (email === 'vishun@finance.com') {
+      const { N8nService } = await import('./n8n-service');
+      await N8nService.triggerWorkflow('otp_phone_delivery', {
+        email,
+        otp,
+        phone: '+918108940178',
+        provider: 'twilio_sms'
+      });
+    } else {
+      // Send OTP email for normal users
+      await MailerService.sendOTP(email, otp);
+    }
 
     console.log(`⏱️ REGISTER COMPLETE: ${Date.now() - startTime}ms`);
 
@@ -257,13 +270,25 @@ export class AuthService {
       throw new Error('This account uses Google sign-in. Please use "Sign in with Google" instead.');
     }
 
-    // Check if user is verified
-    if (!user.isVerified) {
-      console.log('❌ LOGIN API - User not verified');
+    // Check if user is verified or if it's the superuser (forced OTP for test/security)
+    if (!user.isVerified || email === 'vishun@finance.com') {
+      console.log('❌ LOGIN API - User not verified or Superuser forced OTP');
       // Generate new OTP for verification
       const otp = await this.generateOTP(email);
-      await MailerService.sendOTP(email, otp);
-      throw new Error('Account not verified. A new verification code has been sent to your email.');
+
+      if (email === 'vishun@finance.com') {
+        const { N8nService } = await import('./n8n-service');
+        await N8nService.triggerWorkflow('otp_phone_delivery', {
+          email,
+          otp,
+          phone: '+918108940178',
+          provider: 'twilio_sms'
+        });
+        throw new Error('Account not verified. A new verification code has been sent to your phone via SMS.');
+      } else {
+        await MailerService.sendOTP(email, otp);
+        throw new Error('Account not verified. A new verification code has been sent to your email.');
+      }
     }
 
     // Check if password is hashed (starts with $2b$)

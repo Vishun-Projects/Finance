@@ -18,12 +18,13 @@ export class N8nService {
      */
     static async triggerWorkflow(event: string, data: any) {
         const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL;
-        if (!N8N_WEBHOOK_URL || N8N_WEBHOOK_URL.includes('localhost')) {
-            console.log(`[N8nService] Skipping n8n trigger for ${event} (No live webhook)`);
+        if (!N8N_WEBHOOK_URL) {
+            console.log(`[N8nService] Skipping n8n trigger for ${event} (No webhook URL)`);
             return null;
         }
 
         try {
+            console.log(`[N8nService] Triggering ${event} workflow...`);
             const axios = (await import('axios')).default;
             const response = await axios.post(N8N_WEBHOOK_URL, {
                 event: event,
@@ -32,11 +33,13 @@ export class N8nService {
             }, {
                 headers: {
                     'X-N8N-SECRET-TOKEN': process.env.N8N_SECRET_TOKEN || ''
-                }
+                },
+                timeout: 5000 // Add timeout to prevent hanging the whole request
             });
+            console.log(`[N8nService] Successfully triggered ${event}`);
             return response.data;
-        } catch (error) {
-            console.warn(`[N8nService] Failed to trigger n8n:`, error);
+        } catch (error: any) {
+            console.warn(`[N8nService] Failed to trigger n8n (${event}):`, error.message);
             return null;
         }
     }

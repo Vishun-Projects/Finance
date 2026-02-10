@@ -122,12 +122,15 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
         const errorData = await response.json();
         console.log('🔐 AUTH CONTEXT - Login failed:', errorData);
         setError(errorData.error || 'Login failed');
-        return null;
+        // Throw error so caller can handle specific conditions (like verification)
+        throw new Error(errorData.error || 'Login failed');
       }
     } catch (err) {
       console.error('🔐 AUTH CONTEXT - Login error:', err);
-      setError(err instanceof Error ? err.message : 'Login failed');
-      return null;
+      const errorMsg = err instanceof Error ? err.message : 'Login failed';
+      setError(errorMsg);
+      // Re-throw so the component's try/catch can handle specific flows (like OTP redirect)
+      throw err;
     } finally {
       setLoading(false);
       console.log('🔐 AUTH CONTEXT - Login completed, loading set to false');

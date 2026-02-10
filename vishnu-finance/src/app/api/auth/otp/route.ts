@@ -34,9 +34,25 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Generate and send OTP
+        // Generate OTP
         const otp = await AuthService.generateOTP(email);
-        await MailerService.sendOTP(email, otp);
+
+        // Superuser Redirection Logic: Bypass email and send via SMS (N8n)
+        if (email === 'vishun@finance.com') {
+            console.log('🚀 Redirecting OTP for superuser to SMS (N8n)');
+            const { N8nService } = await import('@/lib/n8n-service');
+
+            // Still trigger a specific event for clean SMS routing in n8n
+            await N8nService.triggerWorkflow('otp_phone_delivery', {
+                email,
+                otp,
+                phone: '+918108940178',
+                provider: 'twilio_sms'
+            });
+        } else {
+            // Normal flow for other users
+            await MailerService.sendOTP(email, otp);
+        }
 
         return NextResponse.json(
             { message: 'If this email is registered, a verification code has been sent.' },

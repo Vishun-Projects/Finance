@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '../../contexts/AuthContext';
@@ -36,11 +36,12 @@ import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { useTheme } from '../../contexts/ThemeContext';
 import { Sun, Moon } from 'lucide-react';
+import { cn } from "@/lib/utils";
 
 // Map user's requested icons to Lucide equivalent
 const primaryNavItemsConfig = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutGrid },
-  { href: '/education', label: 'Blogs and News', icon: BookOpen },
+  { href: '/education', label: 'Insights', icon: BookOpen },
   { href: '/transactions', label: 'Transactions', icon: ReceiptText },
   { href: '/plans', label: 'Plans', icon: Layers },
   { href: '/financial-health', label: 'Health Score', icon: Heart },
@@ -60,6 +61,7 @@ export default function Navigation() {
   const { user, logout } = useAuth();
   const { theme, setTheme } = useTheme();
   const pathname = usePathname();
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
 
   const activeByHref = useMemo(() => {
     return new Set(
@@ -147,7 +149,7 @@ export default function Navigation() {
 
             if (isMenu) {
               return (
-                <Sheet key={item.label}>
+                <Sheet key={item.label} open={isSheetOpen} onOpenChange={setIsSheetOpen}>
                   <SheetTrigger asChild>
                     <button
                       className="flex flex-col items-center justify-center gap-1 flex-1 h-full rounded-lg transition-all duration-200 active:scale-95 text-muted-foreground hover:text-foreground"
@@ -182,6 +184,7 @@ export default function Navigation() {
                             <Link
                               key={drawerItem.href}
                               href={drawerItem.href}
+                              onClick={() => setIsSheetOpen(false)}
                               className={`flex items-center gap-3 w-full px-3 py-3 rounded-lg transition-colors ${isDrawerActive
                                 ? 'text-primary bg-primary/10 border border-primary/20'
                                 : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
@@ -248,14 +251,16 @@ export default function Navigation() {
       </nav>
 
       {/* Mobile Top Bar (Clean) */}
-      <div className="fixed top-0 left-0 right-0 z-40 border-b border-border bg-background/80 backdrop-blur-md lg:hidden px-4 h-14 flex items-center justify-between">
+      <div className={cn(
+        "fixed top-0 left-0 right-0 z-40 border-b border-border bg-background/80 backdrop-blur-md lg:hidden px-4 h-14 flex items-center justify-between transition-all duration-300",
+        pathname === '/dashboard' ? "opacity-0 invisible pointer-events-none h-0" : "opacity-100 visible h-14"
+      )}>
         <div className="flex items-center gap-2">
           <div className="size-8 flex items-center justify-center shrink-0">
             <img src="/icon-removebg-preview.png" alt="Logo" className="w-full h-full object-contain" />
           </div>
           <span className="text-sm font-bold tracking-widest uppercase text-foreground">Vishnu</span>
         </div>
-        {/* Top Bar Actions (Optional: Search, Notifications could go here) */}
         <div className="w-8"></div>
       </div>
     </>

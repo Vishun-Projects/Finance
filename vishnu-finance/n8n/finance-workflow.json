@@ -1,5 +1,5 @@
 {
-    "name": "My workflow",
+    "name": "Finance Notification Workflow",
     "nodes": [
         {
             "parameters": {
@@ -16,6 +16,69 @@
                 0
             ],
             "webhookId": "finance-webhook"
+        },
+        {
+            "parameters": {
+                "rules": {
+                    "values": [
+                        {
+                            "conditions": {
+                                "options": {
+                                    "caseSensitive": true,
+                                    "leftValue": "={{ $json.body.event }}",
+                                    "type": "string"
+                                },
+                                "conditions": [
+                                    {
+                                        "leftValue": "={{ $json.body.event }}",
+                                        "rightValue": "otp_phone_delivery",
+                                        "operator": {
+                                            "type": "string",
+                                            "operation": "equals",
+                                            "name": "equals"
+                                        }
+                                    }
+                                ],
+                                "combinator": "and"
+                            },
+                            "renameOutput": true,
+                            "outputKey": "OTP Delivery"
+                        },
+                        {
+                            "conditions": {
+                                "options": {
+                                    "caseSensitive": true,
+                                    "leftValue": "={{ $json.body.event }}",
+                                    "type": "string"
+                                },
+                                "conditions": [
+                                    {
+                                        "leftValue": "={{ $json.body.event }}",
+                                        "rightValue": "notification",
+                                        "operator": {
+                                            "type": "string",
+                                            "operation": "equals",
+                                            "name": "equals"
+                                        }
+                                    }
+                                ],
+                                "combinator": "and"
+                            },
+                            "renameOutput": true,
+                            "outputKey": "Standard Notification"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "switch-node-id",
+            "name": "Event Router",
+            "type": "n8n-nodes-base.switch",
+            "typeVersion": 3,
+            "position": [
+                200,
+                0
+            ]
         },
         {
             "parameters": {
@@ -48,8 +111,8 @@
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 2,
             "position": [
-                208,
-                0
+                500,
+                -150
             ]
         },
         {
@@ -63,10 +126,9 @@
             "type": "n8n-nodes-base.telegram",
             "typeVersion": 1,
             "position": [
-                400,
-                0
+                750,
+                -150
             ],
-            "webhookId": "d1accfd5-22fd-47f0-8f1e-394df1e68b81",
             "retryOnFail": true,
             "credentials": {
                 "telegramApi": {
@@ -94,15 +156,55 @@
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 2,
             "position": [
-                400,
-                200
+                750,
+                0
             ]
+        },
+        {
+            "parameters": {
+                "resource": "message",
+                "from": "+18207321092",
+                "to": "={{ $json.body.payload.phone }}",
+                "message": "={{ $json.body.payload.otp ? 'Your Finance App OTP is: ' + $json.body.payload.otp : $json.body.payload.message }}",
+                "whatsapp": false
+            },
+            "id": "twilio-sms-node",
+            "name": "Twilio SMS",
+            "type": "n8n-nodes-base.twilio",
+            "typeVersion": 1,
+            "position": [
+                500,
+                200
+            ],
+            "credentials": {
+                "twilioApi": {
+                    "id": "twilio-creds-id",
+                    "name": "Twilio account"
+                }
+            }
         }
     ],
-    "pinData": {},
     "connections": {
         "Webhook": {
             "main": [
+                [
+                    {
+                        "node": "Event Router",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Event Router": {
+            "main": [
+                [
+                    {
+                        "node": "Twilio SMS",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
                 [
                     {
                         "node": "Push to App",
@@ -123,15 +225,8 @@
             ]
         }
     },
-    "active": true,
     "settings": {
         "executionOrder": "v1"
     },
-    "versionId": "cc2983c6-1ff9-482a-909d-811df404f253",
-    "meta": {
-        "templateCredsSetupCompleted": true,
-        "instanceId": "2b44a743fb3f76cab4d15bd9333917401e64251e18ab3fad77d71b5f89383d76"
-    },
-    "id": "07eEgS2EvbmXbdVz",
-    "tags": []
+    "active": true
 }

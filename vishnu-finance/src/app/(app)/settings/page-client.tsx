@@ -23,6 +23,8 @@ import {
   Trash2,
   TrendingDown,
   TrendingUp,
+  Search,
+  Send,
   X,
   Save,
   Sun,
@@ -806,77 +808,35 @@ export default function SettingsPageClient({ initialDocuments, initialPreference
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="max-w-[1440px] mx-auto px-6 py-8 space-y-8">
-        {/* Header */}
-        <div>
-          <h4 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-1">Configuration</h4>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Settings</h1>
+      <div className="max-w-[1200px] mx-auto px-4 sm:px-6 py-8 md:py-12">
+        <div className="mb-10">
+          <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/50">Configuration</h4>
+          <h1 className="text-4xl md:text-5xl font-black tracking-tighter text-foreground mt-1">Settings</h1>
         </div>
 
-
-        {/* Settings Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full space-y-8">
-          <div className="w-full overflow-x-auto border-b border-border/40 scrollbar-hide">
-            <TabsList className="inline-flex h-auto items-center justify-start rounded-none bg-transparent p-0 w-full gap-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full space-y-10">
+          <TabsList className="flex items-center justify-start h-auto p-1 bg-muted/30 backdrop-blur-md rounded-2xl border border-border/10 w-full overflow-x-auto no-scrollbar gap-1">
+            {[
+              { value: 'profile', icon: User, label: 'Profile' },
+              { value: 'appearance', icon: Palette, label: 'Appearance' },
+              { value: 'notifications', icon: Bell, label: 'Alerts' },
+              { value: 'security', icon: Shield, label: 'Security' },
+              { value: 'categories', icon: Tag, label: 'Categories' },
+              { value: 'documentation', icon: FileText, label: 'Portal' }
+            ].map((tab) => (
               <TabsTrigger
-                value="profile"
-                className="rounded-none border-b-2 border-transparent bg-transparent px-2 py-3 text-sm font-medium text-muted-foreground transition-all hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:shadow-none"
+                key={tab.value}
+                value={tab.value}
+                className="flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold text-muted-foreground transition-all hover:text-foreground data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-lg"
               >
-                <div className="flex items-center gap-2">
-                  <User className="w-4 h-4" />
-                  <span>Profile</span>
-                </div>
+                <tab.icon className="w-3.5 h-3.5" />
+                <span>{tab.label}</span>
               </TabsTrigger>
-              <TabsTrigger
-                value="appearance"
-                className="rounded-none border-b-2 border-transparent bg-transparent px-2 py-3 text-sm font-medium text-muted-foreground transition-all hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:shadow-none"
-              >
-                <div className="flex items-center gap-2">
-                  <Palette className="w-4 h-4" />
-                  <span>Appearance</span>
-                </div>
-              </TabsTrigger>
-              <TabsTrigger
-                value="notifications"
-                className="rounded-none border-b-2 border-transparent bg-transparent px-2 py-3 text-sm font-medium text-muted-foreground transition-all hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:shadow-none"
-              >
-                <div className="flex items-center gap-2">
-                  <Bell className="w-4 h-4" />
-                  <span>Notifications</span>
-                </div>
-              </TabsTrigger>
-              <TabsTrigger
-                value="security"
-                className="rounded-none border-b-2 border-transparent bg-transparent px-2 py-3 text-sm font-medium text-muted-foreground transition-all hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:shadow-none"
-              >
-                <div className="flex items-center gap-2">
-                  <Shield className="w-4 h-4" />
-                  <span>Security</span>
-                </div>
-              </TabsTrigger>
-              <TabsTrigger
-                value="categories"
-                className="rounded-none border-b-2 border-transparent bg-transparent px-2 py-3 text-sm font-medium text-muted-foreground transition-all hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:shadow-none"
-              >
-                <div className="flex items-center gap-2">
-                  <Tag className="w-4 h-4" />
-                  <span>Categories</span>
-                </div>
-              </TabsTrigger>
-              <TabsTrigger
-                value="documentation"
-                className="rounded-none border-b-2 border-transparent bg-transparent px-2 py-3 text-sm font-medium text-muted-foreground transition-all hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:shadow-none"
-              >
-                <div className="flex items-center gap-2">
-                  <FileText className="w-4 h-4" />
-                  <span>Docs</span>
-                </div>
-              </TabsTrigger>
-            </TabsList>
-          </div>
+            ))}
+          </TabsList>
 
           {/* Tab Content */}
-          <TabsContent value="profile" className="space-y-6">
+          < TabsContent value="profile" className="space-y-6" >
             <div className="space-y-4">
               <div>
                 <h2 className="text-xl sm:text-2xl font-semibold text-foreground">Profile</h2>
@@ -904,7 +864,7 @@ export default function SettingsPageClient({ initialDocuments, initialPreference
                 </CardContent>
               </Card>
             </div>
-          </TabsContent>
+          </TabsContent >
 
           <TabsContent value="appearance" className="space-y-6">
             {/* Theme Selection */}
@@ -1170,232 +1130,122 @@ export default function SettingsPageClient({ initialDocuments, initialPreference
           </TabsContent>
 
           <TabsContent value="notifications" className="space-y-6">
-            {/* Email Notifications */}
-            <Card className="bg-card border border-border/60 rounded-xl shadow-sm">
-              <CardHeader>
-                <div className="flex items-center gap-3">
-                  <div className="size-10 rounded-lg bg-orange-500/10 flex items-center justify-center">
-                    <Mail className="w-5 h-5 text-orange-500" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-base font-bold uppercase tracking-wide text-foreground">Email Alerts</CardTitle>
-                    <CardDescription>Configure your email notification preferences</CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-1">
-                    <Label htmlFor="email-notifications">Email Notifications</Label>
-                    <p className="text-sm text-muted-foreground">Receive professional alerts via email</p>
+            <Card className="bg-card border border-border/60 rounded-xl shadow-lg shadow-black/5 overflow-hidden">
+              <div className="divide-y divide-border/40">
+                {/* Email Alerts */}
+                <div className="p-6 flex items-center justify-between hover:bg-muted/30 transition-colors">
+                  <div className="flex items-center gap-4">
+                    <div className="size-12 rounded-2xl bg-orange-500/10 flex items-center justify-center border border-orange-500/20">
+                      <Mail className="w-6 h-6 text-orange-500" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold text-foreground">Email Notifications</h4>
+                      <p className="text-xs text-muted-foreground">Professional alerts & monthly digests</p>
+                    </div>
                   </div>
                   <Switch
-                    id="email-notifications"
                     checked={preferences.emailEnabled}
                     onCheckedChange={(checked) => setPreferences(prev => ({ ...prev, emailEnabled: checked }))}
                   />
                 </div>
 
-                {preferences.emailEnabled && (
-                  <div className="space-y-2 pt-2 pb-2">
-                    <Label htmlFor="notification-email">Delivery Email (e.g. Outlook)</Label>
-                    <Input
-                      id="notification-email"
-                      type="email"
-                      placeholder="e.g. vishnu.v@outlook.com"
-                      value={preferences.notificationEmail || ''}
-                      onChange={(e) => setPreferences(prev => ({ ...prev, notificationEmail: e.target.value }))}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      If left blank, notifications will be sent to your login email: <span className="font-medium">{user?.email}</span>
-                    </p>
-                  </div>
-                )}
-
-                <Separator />
-                <div className="flex items-center justify-between">
-                  <div className="space-y-1">
-                    <Label htmlFor="marketing-emails">Marketing Emails</Label>
-                    <p className="text-sm text-muted-foreground">Receive updates about new features</p>
+                {/* Push Notifications */}
+                <div className="p-6 flex items-center justify-between hover:bg-muted/30 transition-colors">
+                  <div className="flex items-center gap-4">
+                    <div className="size-12 rounded-2xl bg-indigo-500/10 flex items-center justify-center border border-indigo-500/20">
+                      <Smartphone className="w-6 h-6 text-indigo-500" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold text-foreground">Push Notifications</h4>
+                      <p className="text-xs text-muted-foreground">Browser & mobile instant status</p>
+                    </div>
                   </div>
                   <Switch
-                    id="marketing-emails"
-                    checked={notifications.marketing}
-                    onCheckedChange={(checked) => setNotifications(prev => ({ ...prev, marketing: checked }))}
+                    checked={notifications.push && permission === 'granted'}
+                    onCheckedChange={(checked) => {
+                      if (checked && permission !== 'granted') handleNotificationPermission();
+                      else setNotifications(prev => ({ ...prev, push: checked }));
+                    }}
+                    disabled={!isSupported}
                   />
                 </div>
-              </CardContent>
-            </Card>
 
-            {/* Push Notifications */}
-            <Card className="bg-card border border-border/60 rounded-xl shadow-sm">
-              <CardHeader>
-                <div className="flex items-center gap-3">
-                  <div className="size-10 rounded-lg bg-indigo-500/10 flex items-center justify-center">
-                    <Smartphone className="w-5 h-5 text-indigo-500" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-base font-bold uppercase tracking-wide text-foreground">Push Notifications</CardTitle>
-                    <CardDescription>Configure browser and mobile notifications</CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="space-y-1">
-                    <Label htmlFor="browser-notifications">Browser Notifications</Label>
-                    <p className="text-sm text-muted-foreground">Show notifications in your browser</p>
-                    {!isSupported && (
-                      <p className="text-xs text-destructive">Notifications not supported in this browser</p>
-                    )}
-                    {isSupported && permission === 'denied' && (
-                      <p className="text-xs text-destructive">Notifications blocked. Please enable in browser settings.</p>
-                    )}
-                    {isSupported && permission === 'granted' && (
-                      <p className="text-xs text-green-500">Notifications enabled</p>
-                    )}
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    {isSupported && permission !== 'granted' && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleNotificationPermission}
-                      >
-                        Enable Notifications
-                      </Button>
-                    )}
-                    <Switch
-                      id="browser-notifications"
-                      checked={notifications.push && permission === 'granted'}
-                      onCheckedChange={(checked) => {
-                        if (checked && permission !== 'granted') {
-                          handleNotificationPermission();
-                        } else {
-                          setNotifications(prev => ({ ...prev, push: checked }));
-                        }
-                      }}
-                      disabled={!isSupported}
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Telegram Notifications */}
-            <Card className="bg-card border border-border/60 rounded-xl shadow-sm">
-              <CardHeader>
-                <div className="flex items-center gap-3">
-                  <div className="size-10 rounded-lg bg-sky-500/10 flex items-center justify-center">
-                    <Mail className="w-5 h-5 text-sky-500" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-base font-bold uppercase tracking-wide text-foreground">Telegram Notifications</CardTitle>
-                    <CardDescription>Receive instant alerts and quote briefings via Telegram</CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-1">
-                    <Label htmlFor="telegram-enabled">Enable Telegram Alerts</Label>
-                    <p className="text-sm text-muted-foreground">Receive notifications directly on Telegram</p>
+                {/* Telegram Notifications */}
+                <div className="p-6 flex items-center justify-between hover:bg-muted/30 transition-colors">
+                  <div className="flex items-center gap-4">
+                    <div className="size-12 rounded-2xl bg-sky-500/10 flex items-center justify-center border border-sky-500/20">
+                      <Send className="w-6 h-6 text-sky-500" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold text-foreground">Telegram Alerts</h4>
+                      <p className="text-xs text-muted-foreground">Instant briefings via notification bot</p>
+                    </div>
                   </div>
                   <Switch
-                    id="telegram-enabled"
                     checked={preferences.telegramEnabled}
                     onCheckedChange={(checked) => setPreferences(prev => ({ ...prev, telegramEnabled: checked }))}
                   />
                 </div>
-                {preferences.telegramEnabled && (
-                  <div className="space-y-2 pt-2">
-                    <Label htmlFor="telegram-chat-id">Telegram Chat ID</Label>
-                    <Input
-                      id="telegram-chat-id"
-                      placeholder="Enter your Telegram Chat ID"
-                      value={preferences.telegramUserId || ''}
-                      onChange={(e) => setPreferences(prev => ({ ...prev, telegramUserId: e.target.value }))}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Tip: Use a bot like @userinfobot to find your ID, or message our notification bot.
-                    </p>
-                    <div className="pt-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="bg-sky-500/5 border-sky-500/20 text-sky-500 hover:bg-sky-500/10"
-                        onClick={async () => {
-                          try {
-                            const res = await fetch('/api/n8n/test-notification', {
-                              method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ message: "Hello! This is a test from your Finance Dashboard. Telegram is working! 🚀" })
-                            });
-                            if (res.ok) {
-                              success('Test Sent', 'Test notification triggered successfully!');
-                            } else {
-                              const err = await res.json();
-                              showError('Test Failed', err.error || 'Failed to send test notification');
-                            }
-                          } catch (e) {
-                            showError('Error', 'Failed to connect to notification service');
-                          }
-                        }}
-                      >
-                        Send Test Notification
-                      </Button>
+
+                {/* Daily Quotes */}
+                <div className="p-6 flex items-center justify-between hover:bg-muted/30 transition-colors">
+                  <div className="flex items-center gap-4">
+                    <div className="size-12 rounded-2xl bg-amber-500/10 flex items-center justify-center border border-amber-500/20">
+                      <Sun className="w-6 h-6 text-amber-500" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold text-foreground">Daily Briefings</h4>
+                      <p className="text-xs text-muted-foreground">Inspirational quotes & focus themes</p>
                     </div>
                   </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Daily Quotes & Briefings */}
-            <Card className="bg-card border border-border/60 rounded-xl shadow-sm">
-              <CardHeader>
-                <div className="flex items-center gap-3">
-                  <div className="size-10 rounded-lg bg-amber-500/10 flex items-center justify-center">
-                    <Sun className="w-5 h-5 text-amber-500" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-base font-bold uppercase tracking-wide text-foreground">Daily Briefings</CardTitle>
-                    <CardDescription>Start your day with financial quotes and summaries</CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-1">
-                    <Label htmlFor="daily-quote-enabled">Daily Financial Quotes</Label>
-                    <p className="text-sm text-muted-foreground">Show inspirational quotes on your dashboard</p>
-                  </div>
                   <Switch
-                    id="daily-quote-enabled"
                     checked={preferences.dailyQuoteEnabled}
                     onCheckedChange={(checked) => setPreferences(prev => ({ ...prev, dailyQuoteEnabled: checked }))}
                   />
                 </div>
-              </CardContent>
+              </div>
+
+              {/* Conditional Advanced Settings */}
+              {(preferences.emailEnabled || preferences.telegramEnabled) && (
+                <div className="p-6 bg-muted/20 border-t border-border/40 space-y-4">
+                  {preferences.emailEnabled && (
+                    <div className="space-y-2">
+                      <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Delivery Email</Label>
+                      <Input
+                        type="email"
+                        placeholder="e.g. vishnu.v@outlook.com"
+                        value={preferences.notificationEmail || ''}
+                        onChange={(e) => setPreferences(prev => ({ ...prev, notificationEmail: e.target.value }))}
+                        className="bg-background/50"
+                      />
+                    </div>
+                  )}
+                  {preferences.telegramEnabled && (
+                    <div className="space-y-2">
+                      <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Telegram Chat ID</Label>
+                      <Input
+                        placeholder="Enter your Telegram Chat ID"
+                        value={preferences.telegramUserId || ''}
+                        onChange={(e) => setPreferences(prev => ({ ...prev, telegramUserId: e.target.value }))}
+                        className="bg-background/50"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
             </Card>
 
-            {/* Save Button */}
-            <div className="flex justify-end">
+            {/* Actions */}
+            <div className="flex items-center justify-between pt-2">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                Last updated: {new Date().toLocaleTimeString()}
+              </p>
               <Button
                 onClick={() => handleSave('Notifications')}
                 disabled={loading}
-                className="h-10 px-6 text-xs font-bold uppercase tracking-widest bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg transition-all flex items-center gap-2"
+                className="rounded-xl px-8 h-12 text-xs font-black uppercase tracking-widest shadow-xl shadow-primary/20"
               >
-                {loading ? (
-                  <>
-                    <div className="size-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    <span>Saving...</span>
-                  </>
-                ) : (
-                  <>
-                    <Save className="size-4" />
-                    <span>Save Changes</span>
-                  </>
-                )}
+                {loading ? 'Saving...' : 'Sync Alerts'}
               </Button>
             </div>
           </TabsContent>
@@ -1511,6 +1361,6 @@ export default function SettingsPageClient({ initialDocuments, initialPreference
           </TabsContent>
         </Tabs>
       </div>
-    </div >
+    </div>
   );
 }

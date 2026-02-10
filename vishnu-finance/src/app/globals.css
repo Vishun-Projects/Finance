@@ -155,9 +155,9 @@
 
 /* Custom Dashboard Styles */
 .glass-card {
-  background: hsl(var(--card) / 0.6);
-  backdrop-filter: blur(12px);
-  border: 1px solid hsl(var(--border));
+  background: hsl(var(--card) / 0.4);
+  backdrop-filter: blur(16px);
+  border: 1px solid hsl(var(--border) / 0.2);
 }
 
 .custom-scrollbar::-webkit-scrollbar {

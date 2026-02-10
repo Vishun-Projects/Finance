@@ -119,12 +119,14 @@ function AuthPageInner({ initialTab }: AuthPageClientProps) {
         setLoginError('Invalid credentials');
       }
     } catch (error: any) {
-      if (error.message.includes('not verified') || error.message.includes('verification code')) {
+      const errorMsg = error.message || '';
+      if (errorMsg.includes('not verified') || errorMsg.includes('verification code')) {
         setVerificationEmail(loginData.email);
         setShowOTP(true);
-        toast.info('Verification required. Code sent to email.');
+        toast.info(errorMsg); // Use the specific message from backend (mentions SMS/Email)
       } else {
-        setLoginError(error.message || 'Connection failed. Please retrying.');
+        setLoginError(errorMsg || 'Connection failed. Please try again.');
+        toast.error(errorMsg || 'Login failed');
       }
     } finally {
       setIsLoggingIn(false);

@@ -166,31 +166,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
   const [selectedCategoryId, setSelectedCategoryId] = useState(searchParams.get('categoryId') || '');
   const [quickRange, setQuickRange] = useState<QuickRange>(quickRangeParam);
 
-  // Draft Filter State for Deferred Application
-  const [draftFilters, setDraftFilters] = useState({
-    search: currentSearchTerm,
-    categoryId: selectedCategoryId,
-    type: financialCategory,
-    amountPreset: amountPreset,
-    range: quickRange,
-    startDate: startDateParam,
-    endDate: endDateParam,
-  });
 
-  // Sync draft filters when modal opens
-  useEffect(() => {
-    if (isFilterOpen) {
-      setDraftFilters({
-        search: currentSearchTerm,
-        categoryId: selectedCategoryId,
-        type: financialCategory,
-        amountPreset: amountPreset,
-        range: quickRange,
-        startDate: startDateParam,
-        endDate: endDateParam,
-      });
-    }
-  }, [isFilterOpen, currentSearchTerm, selectedCategoryId, financialCategory, amountPreset, quickRange, startDateParam, endDateParam]);
 
 
   // Sync state if URL changes externally (e.g. back button)
@@ -346,42 +322,45 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
     window.history.replaceState(null, '', newUrl);
   }, [router, searchParams, resolvedUserId, setFinancialCategory, setCurrentSearchTerm, setAmountPreset, setSelectedCategoryId]);
 
-  const applyDraftFilters = useCallback(() => {
+  const applyDraftFilters = useCallback((filters: any) => {
     const updates: Record<string, string | null> = {
-      search: draftFilters.search || null,
-      categoryId: draftFilters.categoryId || null,
-      type: draftFilters.type === 'ALL' ? null : draftFilters.type,
-      amountPreset: draftFilters.amountPreset === 'all' ? null : draftFilters.amountPreset,
+      search: filters.search || null,
+      categoryId: filters.categoryId || null,
+      type: filters.type === 'ALL' ? null : filters.type,
+      amountPreset: filters.amountPreset === 'all' ? null : filters.amountPreset,
       page: '1'
     };
 
     // Only update date params if they actually changed
     // Use permissive comparison for null/empty string handling
-    if ((draftFilters.range || 'month') !== (quickRangeParam || 'month')) {
-      updates.range = draftFilters.range;
+    if ((filters.range || 'month') !== (quickRangeParam || 'month')) {
+      updates.range = filters.range;
     }
-    if ((draftFilters.startDate || '') !== (startDateParam || '')) {
-      updates.startDate = draftFilters.startDate;
+    if ((filters.startDate || '') !== (startDateParam || '')) {
+      updates.startDate = filters.startDate;
     }
-    if ((draftFilters.endDate || '') !== (endDateParam || '')) {
-      updates.endDate = draftFilters.endDate;
+    if ((filters.endDate || '') !== (endDateParam || '')) {
+      updates.endDate = filters.endDate;
     }
 
     updateURLParams(updates);
     setIsFilterOpen(false);
-  }, [draftFilters, updateURLParams, quickRangeParam, startDateParam, endDateParam]);
+  }, [updateURLParams, quickRangeParam, startDateParam, endDateParam]);
 
   const resetDraftFilters = useCallback(() => {
-    setDraftFilters({
-      search: '',
-      categoryId: '',
-      type: 'ALL',
-      amountPreset: 'all',
+    updateURLParams({
+      search: null,
+      categoryId: null,
+      type: null,
+      amountPreset: null,
       range: 'month',
-      startDate: '',
-      endDate: '',
+      startDate: null,
+      endDate: null,
+      page: '1'
     });
-  }, []);
+    setIsFilterOpen(false);
+  }, [updateURLParams]);
+
 
   /**
    * Period Synchronization: 
@@ -441,53 +420,34 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
     }
     try {
       let allTransactions: Transaction[] = [];
-      let currentPage = 1;
-      let hasMore = true;
       let fetchedTotals = null;
       let firstPagination = null;
+      // SINGLE FETCH STRATEGY: Optimized for performance and responsiveness
+      // We fetch a significant amount for analytics, but capped to prevent browser hangs
+      const PAGE_SIZE_CAP = 3000;
 
-      // Recursive fetch loop to get EVERYTHING
-      while (hasMore) {
-        const response = await fetch('/api/app', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'transactions_list',
-            page: currentPage,
-            pageSize: 'all', // Request max (5000)
-            includeTotals: currentPage === 1, // Only need totals once
-            startDate: startDate || undefined,
-            endDate: endDate || undefined,
-            includeDeleted: true,
-            sortField: 'transactionDate',
-            sortDirection: 'desc',
-          }),
-        });
+      const response = await fetch('/api/app', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'transactions_list',
+          page: 1,
+          pageSize: PAGE_SIZE_CAP, // Request a large chunk but within safe limits
+          includeTotals: true,
+          startDate: startDate || undefined,
+          endDate: endDate || undefined,
+          includeDeleted: true,
+          sortField: 'transactionDate',
+          sortDirection: 'desc',
+        }),
+      });
 
-        if (!response.ok) throw new Error('Failed to fetch transactions');
+      if (!response.ok) throw new Error('Failed to fetch transactions');
 
-        const data = await response.json();
-        const pageTransactions = data.transactions || [];
-
-        // Add to accumulator
-        allTransactions = [...allTransactions, ...pageTransactions];
-
-        if (currentPage === 1) {
-          fetchedTotals = data.totals;
-          firstPagination = data.pagination;
-        }
-
-        // Check if we need to fetch more
-        const totalRecords = data.pagination?.total || 0;
-        const currentCount = allTransactions.length;
-
-        // Safety break for extremely large datasets (e.g. > 50k) to prevent browser crash
-        if (currentCount >= totalRecords || pageTransactions.length === 0 || currentCount > 50000) {
-          hasMore = false;
-        } else {
-          currentPage++;
-        }
-      }
+      const data = await response.json();
+      allTransactions = data.transactions || [];
+      fetchedTotals = data.totals;
+      firstPagination = data.pagination;
 
       setTransactions(allTransactions);
       setPagination(firstPagination || { page: 1, pageSize: allTransactions.length, total: allTransactions.length, totalPages: 1 });
@@ -623,7 +583,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
 
       return true;
     });
-  }, [transactions, currentSearchTerm, financialCategory, selectedCategoryId, amountPreset, showDeleted]);
+  }, [transactions, deferredSearchTerm, financialCategory, selectedCategoryId, amountPreset, showDeleted]);
 
   // Performance Optimization: Combine totals and analytics calculations into a single pass
   const analytics = useMemo(() => {
@@ -2143,10 +2103,18 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                   </Button>
                   <Button
                     onClick={() => { setEditingTransaction(null); setShowForm(true); }}
-                    className="h-12 rounded-xl font-bold text-xs uppercase tracking-widest shadow-md bg-primary text-primary-foreground col-span-2"
+                    variant="outline"
+                    className="h-10 rounded-xl font-bold text-[10px] uppercase tracking-widest border-border bg-card/50 shadow-sm"
                   >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add New Transaction
+                    <Plus className="w-3.5 h-3.5 mr-1.5" />
+                    Manual Entry
+                  </Button>
+                  <Button
+                    onClick={() => setShowFileDialog(true)}
+                    className="h-10 rounded-xl font-bold text-[10px] uppercase tracking-widest shadow-md bg-foreground text-background"
+                  >
+                    <Upload className="w-3.5 h-3.5 mr-1.5" />
+                    Open Importer
                   </Button>
                 </div>
 
@@ -2542,144 +2510,21 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
         activeFiltersCount={activeFilters.length}
         onClearFilters={clearAllFilters}
       >
-        <div className="space-y-8 py-6">
-          {/* Date Range Section */}
-          <div className="space-y-4">
-            <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground block">Date Range</label>
-            <QuickRangeChips
-              value={draftFilters.range}
-              onChange={(val) => {
-                const range = computeRange(val);
-                setDraftFilters(prev => ({
-                  ...prev,
-                  range: val,
-                  startDate: range[0],
-                  endDate: range[1] || ''
-                }));
-              }}
-              className="gap-2"
-            />
-
-            <div className="pt-2">
-              <Popover open={dateRangePickerOpen} onOpenChange={setDateRangePickerOpen}>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className="w-full justify-start gap-3 bg-muted/50 border-border font-bold text-xs h-12 px-4 rounded-xl">
-                    <CalendarIcon size={16} className="text-muted-foreground" />
-                    {rangeLabel}
-                    <ChevronDown size={14} className="ml-auto text-muted-foreground" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0 shadow-2xl border-border" align="start">
-                  <Calendar
-                    initialFocus
-                    mode="range"
-                    defaultMonth={draftFilters.startDate ? new Date(draftFilters.startDate) : undefined}
-                    selected={
-                      draftFilters.startDate
-                        ? {
-                          from: new Date(draftFilters.startDate),
-                          to: draftFilters.endDate ? new Date(draftFilters.endDate) : undefined,
-                        }
-                        : undefined
-                    }
-                    onSelect={(range) => {
-                      if (range?.from) {
-                        const newStart = format(range.from, 'yyyy-MM-dd');
-                        const newEnd = range.to ? format(range.to, 'yyyy-MM-dd') : '';
-                        setDraftFilters(prev => ({
-                          ...prev,
-                          range: 'custom',
-                          startDate: newStart,
-                          endDate: newEnd
-                        }));
-                        if (range.to) setDateRangePickerOpen(false);
-                      }
-                    }}
-                    numberOfMonths={1}
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-          </div>
-
-          {/* Search Section */}
-          <div className="space-y-3">
-            <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground block">Search</label>
-            <div className="relative group">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground size-4 group-focus-within:text-foreground transition-colors" />
-              <Input
-                type="text"
-                placeholder="Search description, store, UPI..."
-                className="w-full bg-muted/50 border-border rounded-xl pl-10 pr-4 py-2 text-sm focus-visible:ring-1 focus-visible:ring-foreground transition-all outline-none"
-                value={draftFilters.search}
-                onChange={(e) => setDraftFilters(prev => ({ ...prev, search: e.target.value }))}
-              />
-            </div>
-          </div>
-
-          {/* Category Section */}
-          <div className="space-y-3">
-            <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground block">Category</label>
-            <div className="relative">
-              <select
-                value={draftFilters.categoryId || ''}
-                onChange={(e) => setDraftFilters(prev => ({ ...prev, categoryId: e.target.value }))}
-                className="w-full bg-muted/50 border border-border rounded-xl px-4 py-3 text-sm appearance-none focus:ring-1 focus:ring-ring transition-all text-foreground outline-none cursor-pointer"
-              >
-                <option value="">All Categories</option>
-                {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
-              <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none w-4 h-4" />
-            </div>
-          </div>
-
-          {/* Type Section */}
-          <div className="space-y-3">
-            <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground block">Transaction Type</label>
-            <div className="flex flex-wrap gap-2">
-              <button
-                onClick={() => setDraftFilters(prev => ({ ...prev, type: 'ALL' }))}
-                className={cn("px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all", (draftFilters.type === 'ALL' || !draftFilters.type) ? "bg-foreground text-background shadow-md" : "bg-muted/50 text-muted-foreground hover:bg-muted")}
-              >
-                All Types
-              </button>
-              {['INCOME', 'EXPENSE', 'TRANSFER', 'INVESTMENT'].map(t => (
-                <button
-                  key={t}
-                  onClick={() => setDraftFilters(prev => ({ ...prev, type: t as any }))}
-                  className={cn("px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all", draftFilters.type === t ? "bg-foreground text-background shadow-md" : "bg-muted/50 text-muted-foreground hover:bg-muted")}
-                >
-                  {t}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Amount Section */}
-          <div className="space-y-3">
-            <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground block">Amount Range</label>
-            <div className="flex flex-wrap gap-2">
-              {[{ value: 'all', label: 'All' }, { value: 'lt1k', label: '<1k' }, { value: '1to10k', label: '1-10k' }, { value: '10to50k', label: '10-50k' }, { value: '50to100k', label: '50-100k' }, { value: 'gt100k', label: '>100k' }].map(opt => (
-                <button
-                  key={opt.value}
-                  onClick={() => setDraftFilters(prev => ({ ...prev, amountPreset: opt.value as any }))}
-                  className={cn("px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all", (draftFilters.amountPreset === opt.value || (!draftFilters.amountPreset && opt.value === 'all')) ? "bg-foreground text-background shadow-md" : "bg-muted/50 text-muted-foreground hover:bg-muted")}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="pt-6 border-t mt-4 flex gap-3">
-          <Button variant="outline" className="flex-1 font-bold text-xs uppercase tracking-widest" onClick={resetDraftFilters}>
-            Reset
-          </Button>
-          <Button className="flex-1 font-bold text-xs uppercase tracking-widest" onClick={applyDraftFilters}>
-            Apply Filters
-          </Button>
-        </div>
+        <TransactionFilterContent
+          initialFilters={{
+            search: currentSearchTerm,
+            categoryId: selectedCategoryId,
+            type: financialCategory,
+            amountPreset: amountPreset,
+            range: quickRange,
+            startDate: startDateParam,
+            endDate: endDateParam,
+          }}
+          categories={categories}
+          onApply={applyDraftFilters}
+          onReset={resetDraftFilters}
+          computeRange={computeRange}
+        />
       </FilterSheet>
 
       {/* Bulk Categorize Modal */}
@@ -3749,5 +3594,190 @@ function CategoryIcon({ category, className }: { category: string; className?: s
   if (cat.includes('utility') || cat.includes('bill') || cat.includes('con edison')) return <Zap className={className} />;
   return <ShoppingBag className={className} />;
 }
+
+// Separate component for filter content to prevent main component re-renders
+const TransactionFilterContent = React.memo(({
+  initialFilters,
+  categories,
+  onApply,
+  onReset,
+  computeRange
+}: {
+  initialFilters: any;
+  categories: any[];
+  onApply: (filters: any) => void;
+  onReset: () => void;
+  computeRange: (range: any) => [string, string];
+}) => {
+  const [draft, setDraft] = useState(initialFilters);
+  const [dateRangePickerOpen, setDateRangePickerOpen] = useState(false);
+
+  // Range label localized for preview
+  const rangeLabel = useMemo(() => {
+    if (draft.range && draft.range !== 'custom') {
+      const labels: Record<string, string> = {
+        month: 'This month',
+        lastMonth: 'Last month',
+        quarter: 'This quarter',
+        year: 'This year',
+        all: 'All time',
+      };
+      return labels[draft.range] || 'Custom Range';
+    }
+    if (draft.startDate && draft.endDate) {
+      return `${format(new Date(draft.startDate), 'd MMM')} - ${format(new Date(draft.endDate), 'd MMM yyyy')}`;
+    }
+    return 'Select Range';
+  }, [draft.range, draft.startDate, draft.endDate]);
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="flex-1 space-y-8 overflow-y-auto px-1 py-6 custom-scrollbar pr-2">
+        {/* Date Range Section */}
+        <div className="space-y-4">
+          <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground block">Date Range</label>
+          <QuickRangeChips
+            value={draft.range}
+            onChange={(val) => {
+              const range = computeRange(val);
+              setDraft((prev: any) => ({
+                ...prev,
+                range: val,
+                startDate: range[0],
+                endDate: range[1] || ''
+              }));
+            }}
+            className="gap-2"
+          />
+
+          <div className="pt-2">
+            <Popover open={dateRangePickerOpen} onOpenChange={setDateRangePickerOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="w-full justify-start gap-3 bg-muted/50 border-border font-bold text-xs h-12 px-4 rounded-xl">
+                  <CalendarIcon size={16} className="text-muted-foreground" />
+                  {rangeLabel}
+                  <ChevronDown size={14} className="ml-auto text-muted-foreground" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0 shadow-2xl border-border" align="start">
+                <Calendar
+                  initialFocus
+                  mode="range"
+                  defaultMonth={draft.startDate ? new Date(draft.startDate) : undefined}
+                  selected={
+                    draft.startDate
+                      ? {
+                        from: new Date(draft.startDate),
+                        to: draft.endDate ? new Date(draft.endDate) : undefined,
+                      }
+                      : undefined
+                  }
+                  onSelect={(range) => {
+                    if (range?.from) {
+                      const newStart = format(range.from, 'yyyy-MM-dd');
+                      const newEnd = range.to ? format(range.to, 'yyyy-MM-dd') : '';
+                      setDraft((prev: any) => ({
+                        ...prev,
+                        range: 'custom',
+                        startDate: newStart,
+                        endDate: newEnd
+                      }));
+                      if (range.to) setDateRangePickerOpen(false);
+                    }
+                  }}
+                  numberOfMonths={1}
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+        </div>
+
+        {/* Search Section */}
+        <div className="space-y-3">
+          <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground block">Search</label>
+          <div className="relative group">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground size-4 group-focus-within:text-foreground transition-colors" />
+            <Input
+              type="text"
+              placeholder="Search description, store, UPI..."
+              className="w-full bg-muted/50 border-border rounded-xl pl-10 pr-4 py-2 text-sm focus-visible:ring-1 focus-visible:ring-foreground transition-all outline-none"
+              value={draft.search}
+              onChange={(e) => {
+                const val = e.target.value;
+                setDraft((prev: any) => ({ ...prev, search: val }));
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Category Section */}
+        <div className="space-y-3">
+          <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground block">Category</label>
+          <div className="relative">
+            <select
+              value={draft.categoryId || ''}
+              onChange={(e) => {
+                const val = e.target.value;
+                setDraft((prev: any) => ({ ...prev, categoryId: val }));
+              }}
+              className="w-full bg-muted/50 border border-border rounded-xl px-4 py-3 text-sm appearance-none focus:ring-1 focus:ring-ring transition-all text-foreground outline-none cursor-pointer"
+            >
+              <option value="">All Categories</option>
+              {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+            <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none w-4 h-4" />
+          </div>
+        </div>
+
+        {/* Type Section */}
+        <div className="space-y-3">
+          <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground block">Transaction Type</label>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setDraft((prev: any) => ({ ...prev, type: 'ALL' }))}
+              className={cn("px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all", (draft.type === 'ALL' || !draft.type) ? "bg-foreground text-background shadow-md" : "bg-muted/50 text-muted-foreground hover:bg-muted")}
+            >
+              All Types
+            </button>
+            {['INCOME', 'EXPENSE', 'TRANSFER', 'INVESTMENT'].map(t => (
+              <button
+                key={t}
+                onClick={() => setDraft((prev: any) => ({ ...prev, type: t as any }))}
+                className={cn("px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all", draft.type === t ? "bg-foreground text-background shadow-md" : "bg-muted/50 text-muted-foreground hover:bg-muted")}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Amount Section */}
+        <div className="space-y-3">
+          <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground block">Amount Range</label>
+          <div className="flex flex-wrap gap-2">
+            {[{ value: 'all', label: 'All' }, { value: 'lt1k', label: '<1k' }, { value: '1to10k', label: '1-10k' }, { value: '10to50k', label: '10-50k' }, { value: '50to100k', label: '50-100k' }, { value: 'gt100k', label: '>100k' }].map(opt => (
+              <button
+                key={opt.value}
+                onClick={() => setDraft((prev: any) => ({ ...prev, amountPreset: opt.value as any }))}
+                className={cn("px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all", (draft.amountPreset === opt.value || (!draft.amountPreset && opt.value === 'all')) ? "bg-foreground text-background shadow-md" : "bg-muted/50 text-muted-foreground hover:bg-muted")}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="pt-6 border-t mt-4 flex gap-3 pb-2">
+        <Button variant="outline" className="flex-1 font-bold text-xs uppercase tracking-widest h-12 rounded-xl" onClick={() => onReset()}>
+          Reset
+        </Button>
+        <Button className="flex-1 font-bold text-xs uppercase tracking-widest h-12 rounded-xl" onClick={() => onApply(draft)}>
+          Apply Filters
+        </Button>
+      </div>
+    </div>
+  );
+});
 
 

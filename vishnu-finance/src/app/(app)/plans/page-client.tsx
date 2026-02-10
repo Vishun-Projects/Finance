@@ -86,36 +86,36 @@ export default function PlansPageClient({ bootstrap, userId, defaultTab = "overv
   }, [bootstrap.wishlist.data]);
 
   return (
-    <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-8 px-4 py-6 sm:px-6 lg:px-8">
+    <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-4 md:gap-8 px-4 py-4 md:py-12 sm:px-6 lg:px-8">
       {/* Mobile Header Removed per user request */}
 
       {/* Main Navigation Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full space-y-8">
-        <div className="flex items-center justify-between border-b border-border pb-4">
-          <TabsList className="bg-transparent p-0 gap-6 h-auto overflow-x-auto hide-scrollbar w-full justify-start">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full space-y-6 md:space-y-12">
+        <div className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl -mx-4 px-4 py-4 mb-2 border-b border-border/10">
+          <TabsList className="bg-secondary/50 p-1 gap-1.5 h-12 overflow-x-auto w-full justify-start rounded-2xl border border-border/40 shadow-inner no-scrollbar">
             <TabsTrigger
               value="overview"
-              className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:text-foreground data-[state=active]:border-b-2 data-[state=active]:border-foreground rounded-none px-0 py-2 bg-transparent text-muted-foreground font-bold uppercase tracking-wider text-xs hover:text-foreground/80 transition-colors"
+              className="data-[state=active]:bg-foreground data-[state=active]:text-background data-[state=active]:shadow-xl rounded-xl px-5 md:px-8 py-2 md:py-3 bg-transparent text-muted-foreground font-black uppercase tracking-[0.2em] text-[9px] md:text-[10px] hover:text-foreground transition-all duration-300 shrink-0"
             >
               Overview
             </TabsTrigger>
             <TabsTrigger
               value="goals"
-              className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:text-foreground data-[state=active]:border-b-2 data-[state=active]:border-foreground rounded-none px-0 py-2 bg-transparent text-muted-foreground font-bold uppercase tracking-wider text-xs hover:text-foreground/80 transition-colors"
+              className="data-[state=active]:bg-foreground data-[state=active]:text-background data-[state=active]:shadow-lg rounded-xl px-4 md:px-8 py-2 md:py-3 bg-transparent text-muted-foreground font-black uppercase tracking-[0.2em] text-[9px] md:text-[10px] hover:text-foreground transition-all duration-300 shrink-0"
               onClick={() => setActiveTab('goals')}
             >
               Goals
             </TabsTrigger>
             <TabsTrigger
               value="deadlines"
-              className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:text-foreground data-[state=active]:border-b-2 data-[state=active]:border-foreground rounded-none px-0 py-2 bg-transparent text-muted-foreground font-bold uppercase tracking-wider text-xs hover:text-foreground/80 transition-colors"
+              className="data-[state=active]:bg-foreground data-[state=active]:text-background data-[state=active]:shadow-lg rounded-xl px-4 md:px-8 py-2 md:py-3 bg-transparent text-muted-foreground font-black uppercase tracking-[0.2em] text-[9px] md:text-[10px] hover:text-foreground transition-all duration-300 shrink-0"
               onClick={() => setActiveTab('deadlines')}
             >
               Deadlines
             </TabsTrigger>
             <TabsTrigger
               value="wishlist"
-              className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:text-foreground data-[state=active]:border-b-2 data-[state=active]:border-foreground rounded-none px-0 py-2 bg-transparent text-muted-foreground font-bold uppercase tracking-wider text-xs hover:text-foreground/80 transition-colors"
+              className="data-[state=active]:bg-foreground data-[state=active]:text-background data-[state=active]:shadow-lg rounded-xl px-4 md:px-8 py-2 md:py-3 bg-transparent text-muted-foreground font-black uppercase tracking-[0.2em] text-[9px] md:text-[10px] hover:text-foreground transition-all duration-300 shrink-0"
               onClick={() => setActiveTab('wishlist')}
             >
               Wishlist

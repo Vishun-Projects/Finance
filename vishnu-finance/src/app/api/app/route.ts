@@ -52,8 +52,9 @@ function processCategoryBreakdown(expenses: any[]) {
 }
 
 export async function POST(request: NextRequest) {
+  let body: any = {};
   try {
-    const body = await request.json().catch(() => ({}));
+    body = await request.json().catch(() => ({}));
     const action = body?.action as string | undefined;
 
     if (!action) {
@@ -2346,9 +2347,24 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ error: 'Unsupported action' }, { status: 400 });
-  } catch {
+  } catch (error: any) {
+    console.error(`❌ Consolidated API Error [Action: ${body?.action}]:`, error);
+
+    // Handle specific auth error messages to prevent generic 500s
+    const msg = error.message || '';
+    if (msg.includes('Account not verified')) {
+      return NextResponse.json({
+        error: msg,
+        requiresVerification: true,
+        email: body?.email
+      }, { status: 403 });
+    }
+    if (msg.includes('Invalid email or password') || msg.includes('Email does not exist') || msg.includes('Password is incorrect')) {
+      return NextResponse.json({ error: msg }, { status: 401 });
+    }
+
     return NextResponse.json(
-      { error: 'Unexpected error in consolidated API' },
+      { error: error.message || 'Unexpected error in consolidated API' },
       { status: 500 }
     );
   }

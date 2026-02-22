@@ -170,32 +170,32 @@ export default function SimpleDashboard({
     if (user) fetchDashboardData();
   }, [user, fetchDashboardData]);
 
+  // Derived Data (Hooks above early return to obey Rules of Hooks)
+  const netWorth = useMemo(() => dashboardData?.totalNetWorth ?? dashboardData?.netSavings ?? 0, [dashboardData]);
+
+  // STATS BASED ON GLOBAL FILTER (Top Cards)
+  const filteredIncome = useMemo(() => dashboardData?.totalIncome ?? 0, [dashboardData]);
+  const filteredExpenses = useMemo(() => dashboardData?.totalExpenses ?? 0, [dashboardData]);
+  const filteredNetFlow = useMemo(() => filteredIncome - filteredExpenses, [filteredIncome, filteredExpenses]);
+
+  // STATS BASED ON CURRENT CALENDAR MONTH (Sidebar)
+  const monthlyIncome = useMemo(() => dashboardData?.currentMonthStats?.income ?? 0, [dashboardData]);
+  const monthlyExpenses = useMemo(() => dashboardData?.currentMonthStats?.expenses ?? 0, [dashboardData]);
+  const netFlow = useMemo(() => dashboardData?.currentMonthStats?.netFlow ?? 0, [dashboardData]);
+
+  // Chart Data Preparation
+  const chartData = useMemo(() => dashboardData?.monthlyTrends.map(item => ({
+    name: item.month,
+    credits: item.credits || item.income,
+    debits: item.debits || item.expenses
+  })) || [], [dashboardData]);
+
   // Loading State
   if (authLoading || (isLoading && !dashboardData)) {
     return <FinancialSkeleton />;
   }
 
   if (!dashboardData) return null;
-
-  // Derived Data
-  const netWorth = useMemo(() => dashboardData.totalNetWorth ?? dashboardData.netSavings, [dashboardData.totalNetWorth, dashboardData.netSavings]);
-
-  // STATS BASED ON GLOBAL FILTER (Top Cards)
-  const filteredIncome = useMemo(() => dashboardData.totalIncome, [dashboardData.totalIncome]);
-  const filteredExpenses = useMemo(() => dashboardData.totalExpenses, [dashboardData.totalExpenses]);
-  const filteredNetFlow = useMemo(() => filteredIncome - filteredExpenses, [filteredIncome, filteredExpenses]);
-
-  // STATS BASED ON CURRENT CALENDAR MONTH (Sidebar)
-  const monthlyIncome = useMemo(() => dashboardData.currentMonthStats?.income ?? 0, [dashboardData.currentMonthStats]);
-  const monthlyExpenses = useMemo(() => dashboardData.currentMonthStats?.expenses ?? 0, [dashboardData.currentMonthStats]);
-  const netFlow = useMemo(() => dashboardData.currentMonthStats?.netFlow ?? 0, [dashboardData.currentMonthStats]);
-
-  // Chart Data Preparation
-  const chartData = useMemo(() => dashboardData.monthlyTrends.map(item => ({
-    name: item.month,
-    credits: item.credits || item.income,
-    debits: item.debits || item.expenses
-  })), [dashboardData.monthlyTrends]);
 
   // Chart Colors using CSS Variables
   const creditsColor = 'hsl(var(--chart-1))'; // Primary (Gold/Blue/etc)

@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbo",
-    "dev:fast": "concurrently \"npm run dev\" \"set NODE_OPTIONS=--dns-result-order=ipv4first && npx n8n start\" \"npm run localtunnel\"",
+    "python:dev": "cd python_api && uvicorn main:app --port 8000 --reload",
+    "dev:fast": "concurrently \"npm run dev\" \"npm run python:dev\" \"set NODE_OPTIONS=--dns-result-order=ipv4first && npx n8n start\" \"npm run localtunnel\"",
     "localtunnel": "lt --port 3000 --subdomain vishnu-finance",
     "build": "next build",
     "build:analyze": "ANALYZE=true next build",

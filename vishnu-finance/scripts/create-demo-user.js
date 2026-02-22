@@ -20,9 +20,9 @@ async function createDemoUser() {
     const user = await prisma.user.create({
       data: {
         id: 'demo-user-id',
-        email: 'demo@example.com',
-        password: 'demo-password-hash',
-        name: 'Demo User',
+        email: process.env.DEMO_USER_EMAIL || 'demo@example.com',
+        password: process.env.DEMO_USER_PASSWORD || 'demo-password-hash',
+        name: process.env.DEMO_USER_NAME || 'Demo User',
         isActive: true
       }
     });

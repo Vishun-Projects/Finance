@@ -152,6 +152,33 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
   const selectionToolbarRef = useRef<HTMLDivElement | null>(null);
   const [filterPulse, setFilterPulse] = useState(false);
   const [selectionPulse, setSelectionPulse] = useState(false);
+  const [isPending, startTransition] = React.useTransition();
+
+  // AI OPTIMIZATION: Timer management to prevent resource leaks
+  const activeTimersRef = useRef<Record<string, NodeJS.Timeout | number>>({});
+  const isMountedRef = useRef(true);
+
+  const cleanupTimer = useCallback((name: string) => {
+    if (activeTimersRef.current[name]) {
+      clearInterval(activeTimersRef.current[name] as any);
+      clearTimeout(activeTimersRef.current[name] as any);
+      delete activeTimersRef.current[name];
+    }
+  }, []);
+
+  const registerTimer = useCallback((name: string, timer: NodeJS.Timeout | number) => {
+    cleanupTimer(name);
+    activeTimersRef.current[name] = timer;
+  }, [cleanupTimer]);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      // Clear all active timers on unmount
+      Object.keys(activeTimersRef.current).forEach(cleanupTimer);
+    };
+  }, [cleanupTimer]);
 
   // Filters from URL
   const startDateParam = searchParams.get('startDate') || '';
@@ -302,10 +329,12 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
     }
 
     // Client-side filtering filtering - Update local state first
-    if ('type' in updates) setFinancialCategory((updates.type as TransactionCategory | 'ALL') || 'ALL');
-    if ('search' in updates) setCurrentSearchTerm(updates.search || '');
-    if ('amountPreset' in updates) setAmountPreset((updates.amountPreset as any) || 'all');
-    if ('categoryId' in updates) setSelectedCategoryId(updates.categoryId || '');
+    startTransition(() => {
+      if ('type' in updates) setFinancialCategory((updates.type as TransactionCategory | 'ALL') || 'ALL');
+      if ('search' in updates) setCurrentSearchTerm(updates.search || '');
+      if ('amountPreset' in updates) setAmountPreset((updates.amountPreset as any) || 'all');
+      if ('categoryId' in updates) setSelectedCategoryId(updates.categoryId || '');
+    });
 
     // Client-side filtering only - use window.history to update URL without server hit
     const params = new URLSearchParams(searchParams.toString());
@@ -320,7 +349,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
     // Update URL silently
     const newUrl = `/transactions?${params.toString()}`;
     window.history.replaceState(null, '', newUrl);
-  }, [router, searchParams, resolvedUserId, setFinancialCategory, setCurrentSearchTerm, setAmountPreset, setSelectedCategoryId]);
+  }, [router, searchParams, resolvedUserId]);
 
   const applyDraftFilters = useCallback((filters: any) => {
     const updates: Record<string, string | null> = {
@@ -436,8 +465,13 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
           includeTotals: true,
           startDate: startDate || undefined,
           endDate: endDate || undefined,
-          range: quickRange, // Pass range to enable 'all'-time bypass in API
-          includeDeleted: showDeleted, // Use current toggled state instead of hardcoded true
+          range: quickRange,
+          includeDeleted: showDeleted,
+          // AI PERFORMANCE OPTIMIZATION: Pass filters to backend
+          searchTerm: currentSearchTerm || undefined,
+          categoryId: selectedCategoryId || undefined,
+          financialCategory: financialCategory !== 'ALL' ? financialCategory : undefined,
+          amountPreset: amountPreset !== 'all' ? amountPreset : undefined,
           sortField: 'transactionDate',
           sortDirection: 'desc',
         }),
@@ -462,7 +496,8 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
       }
     }
     // Dependencies only on DATE RANGE and User. Not on filters.
-  }, [resolvedUserId, startDate, endDate, showDeleted, quickRange, showError]);
+    // Dependencies now include all filters for server-side optimization
+  }, [resolvedUserId, startDate, endDate, showDeleted, quickRange, currentSearchTerm, selectedCategoryId, financialCategory, amountPreset, showError]);
 
   // Fetch all categories (not just those with transactions)
   const fetchCategories = useCallback(async () => {
@@ -1354,16 +1389,15 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
     const file = fileToParse || selectedFile;
     if (!file || !user?.id) return;
 
-    let parseTimer: NodeJS.Timeout | null = null;
     try {
       setIsParsingFile(true);
       setParseProgress(10);
       setFileError(null);
 
       // Simulate parsing progress
-      parseTimer = setInterval(() => {
+      registerTimer('parseProgress', setInterval(() => {
         setParseProgress((p) => (p < 90 ? p + 2 : p));
-      }, 300);
+      }, 300));
 
       const formData = new FormData();
       formData.append('file', file);
@@ -1388,6 +1422,8 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
       const data = await response.json();
       const transactionsToSet = data.transactions || [];
 
+      if (!isMountedRef.current) return;
+
       setParsedTransactions(transactionsToSet);
       setStatementMetadata(data.metadata || null);
       setTempFiles(data.tempFiles || []);
@@ -1398,6 +1434,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
       success('PDF Parsed', `Extracted ${data.count || transactionsToSet.length} transactions`);
       setParseProgress(100);
     } catch (error) {
+      if (!isMountedRef.current) return;
       console.error('Error parsing file:', error);
       const msg = error instanceof Error ? error.message : 'Failed to parse file';
       if (msg === 'PASSWORD_REQUIRED') {
@@ -1407,9 +1444,11 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
         setFileError(msg);
       }
     } finally {
-      if (parseTimer) clearInterval(parseTimer);
-      setIsParsingFile(false);
-      setTimeout(() => setParseProgress(0), 1000);
+      cleanupTimer('parseProgress');
+      if (isMountedRef.current) {
+        setIsParsingFile(false);
+        registerTimer('parseDone', setTimeout(() => setParseProgress(0), 1000));
+      }
     }
   };
 
@@ -1428,6 +1467,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
     });
 
     const poll = async () => {
+      if (!isMountedRef.current) return;
       try {
         const response = await fetch('/api/app', {
           method: 'POST',
@@ -1439,7 +1479,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
           }),
         });
 
-        if (response.ok) {
+        if (response.ok && isMountedRef.current) {
           const status = await response.json();
           const progress = status.progress || 0;
           const categorized = status.categorized || 0;
@@ -1465,14 +1505,14 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
             // Refresh transactions to show updated categories
             router.refresh();
             // Clear progress after 3 seconds
-            setTimeout(() => setCategorizationProgress(null), 3000);
+            registerTimer('catDone', setTimeout(() => setCategorizationProgress(null), 3000));
             return;
           }
 
           // Continue polling if not complete
           if (attempts < maxAttempts) {
             attempts++;
-            setTimeout(poll, 5000); // Poll every 5 seconds
+            registerTimer('catPoll', setTimeout(poll, 5000)); // Poll every 5 seconds
           } else {
             // Max attempts reached, but keep showing progress
             setCategorizationProgress({
@@ -1486,13 +1526,11 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
         }
       } catch (error) {
         console.error('Error polling categorization status:', error);
-        // Don't show error to user - it's background process
-        // But keep progress visible
       }
     };
 
     // Start polling after 2 seconds
-    setTimeout(poll, 2000);
+    registerTimer('catPoll', setTimeout(poll, 2000));
   };
 
   const handleImportParsedTransactions = async () => {
@@ -1633,18 +1671,20 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
       importPayload.metadata = statementMetadata;
     }
 
-    let importTimer: NodeJS.Timeout | null = null;
     try {
       // Simulate import progress up to 90% while waiting for server
-      importTimer = setInterval(() => {
+      registerTimer('importProgress', setInterval(() => {
         setImportProgress((p) => (p < 90 ? Math.min(90, p + 4) : p));
-      }, 300);
+      }, 300));
 
       const response = await fetch('/api/import-bank-statement', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(importPayload),
       });
+
+      if (!isMountedRef.current) return;
+
       if (!response.ok) {
         const err = await response.json().catch(() => ({}));
         throw new Error(err.error || 'Batch import failed');
@@ -1733,26 +1773,49 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ files: filesToCleanup }),
             });
-            setTempFiles(documentMeta ? [documentMeta.storageKey] : []);
+            if (isMountedRef.current) setTempFiles(documentMeta ? [documentMeta.storageKey] : []);
           } catch (error) {
             console.warn('⚠️ Cleanup error, but import succeeded:', error);
           }
         }
 
         // Close preview dialog
-        setShowCsvPreview(false);
-        setParsedTransactions([]);
+        if (isMountedRef.current) {
+          setShowCsvPreview(false);
+          setParsedTransactions([]);
+        }
       }
     } catch (e) {
-      console.error('Batch import error', e);
-      setFileError(e instanceof Error ? e.message : 'Batch import failed');
-      showError('Import failed', e instanceof Error ? e.message : 'Batch import failed');
+      if (isMountedRef.current) {
+        console.error('Batch import error', e);
+        setFileError(e instanceof Error ? e.message : 'Batch import failed');
+        showError('Import failed', e instanceof Error ? e.message : 'Batch import failed');
+      }
     } finally {
-      if (importTimer) clearInterval(importTimer);
-      setIsImporting(false);
-      setTimeout(() => setImportProgress(0), 1000);
+      cleanupTimer('importProgress');
+      if (isMountedRef.current) {
+        setIsImporting(false);
+        registerTimer('importDone', setTimeout(() => setImportProgress(0), 1000));
+      }
     }
   };
+
+  // AI OPTIMIZATION: Memoize filter props to prevent sheet re-renders
+  const filterProps = useMemo(() => ({
+    initialFilters: {
+      search: currentSearchTerm,
+      categoryId: selectedCategoryId,
+      type: financialCategory,
+      amountPreset: amountPreset,
+      range: quickRange,
+      startDate: startDateParam,
+      endDate: endDateParam,
+    },
+    categories,
+    onApply: applyDraftFilters,
+    onReset: resetDraftFilters,
+    computeRange,
+  }), [currentSearchTerm, selectedCategoryId, financialCategory, amountPreset, quickRange, startDateParam, endDateParam, categories, applyDraftFilters, resetDraftFilters, computeRange]);
 
   return (
     <div className="flex flex-col min-w-0 bg-background overflow-hidden h-full flex-1">
@@ -1881,7 +1944,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
 
                     let hasMore = true;
                     let safetyLimit = 100;
-                    let consecutiveFiles = 0;
+                    const consecutiveFiles = 0;
 
                     while (hasMore && safetyLimit > 0) {
                       try {
@@ -1960,7 +2023,8 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                       }
 
                       // Small delay to be nice to API
-                      await new Promise(r => setTimeout(r, 1500));
+                      await new Promise(r => registerTimer('autoCatDelay', setTimeout(r, 1500)));
+                      if (!isMountedRef.current) return;
                       safetyLimit--;
                     }
 
@@ -2177,80 +2241,17 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                     ) : filteredTransactions.length === 0 ? (
                       <tr><td colSpan={6} className="px-6 py-16 text-center text-muted-foreground italic font-medium">No transactions found matching criteria.</td></tr>
                     ) : (
-                      visibleTransactions.map(transaction => {
-                        const isIncome = transaction.financialCategory === 'INCOME';
-                        const isExpense = transaction.financialCategory === 'EXPENSE';
-                        const amount = transaction.creditAmount || transaction.debitAmount || 0;
-                        const isSelected = selectedIds.has(transaction.id);
-                        const transactionDate = transaction.transactionDate ? new Date(transaction.transactionDate) : null;
-                        const isValidDate = transactionDate && !isNaN(transactionDate.getTime());
-
-                        return (
-                          <tr
-                            key={transaction.id}
-                            onClick={() => {
-                              if (showSelectionMode) toggleSelect(transaction.id);
-                              else { setEditingTransaction(transaction); setShowForm(true); }
-                            }}
-                            className={cn(
-                              "hover:bg-muted/30 transition-all cursor-pointer group border-l-4 border-l-transparent",
-                              isSelected ? "bg-primary/5 border-l-primary hover:bg-primary/10" : "hover:border-l-primary/30"
-                            )}
-                          >
-                            {showSelectionMode && (
-                              <td className="px-6 py-5" onClick={e => e.stopPropagation()}>
-                                <button
-                                  onClick={() => toggleSelect(transaction.id)}
-                                  className={cn(
-                                    "w-5 h-5 rounded-md border flex items-center justify-center transition-all",
-                                    isSelected ? "bg-foreground border-foreground text-background shadow-md" : "bg-background border-input hover:border-foreground"
-                                  )}
-                                >
-                                  {isSelected && <Check className="w-3.5 h-3.5" />}
-                                </button>
-                              </td>
-                            )}
-                            <td className="px-6 py-5 text-xs font-bold text-muted-foreground">
-                              {isValidDate ? format(transactionDate, 'MMM dd, yyyy') : 'No Date'}
-                            </td>
-                            <td className="px-6 py-5">
-                              <div className="flex items-center gap-4">
-                                <div className="size-9 rounded-xl bg-muted border border-border flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
-                                  <CategoryIcon category={transaction.category?.name || ''} />
-                                </div>
-                                <div className="flex flex-col min-w-0">
-                                  <span className="text-sm font-bold text-foreground truncate max-w-[280px] tracking-tight">{transaction.personName || transaction.store || transaction.description}</span>
-                                  {(transaction.personName || transaction.store) && transaction.personName !== transaction.description && transaction.store !== transaction.description && (
-                                    <span className="text-[10px] text-muted-foreground font-black uppercase tracking-widest mt-0.5 truncate max-w-[320px] block">
-                                      {transaction.personName ? (transaction.store || transaction.description) : transaction.description}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            </td>
-                            <td className="px-6 py-5">
-                              <span className={cn(
-                                "px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest border transition-colors",
-                                isIncome ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" : "bg-muted text-muted-foreground border-border"
-                              )}>
-                                {transaction.category?.name || 'General'}
-                              </span>
-                            </td>
-                            <td className="px-6 py-5">
-                              <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 group-hover:text-muted-foreground transition-colors">
-                                <div className={cn("size-2 rounded-full", transaction.accountStatementId ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.3)]" : "bg-amber-500 shadow-[0_0_8_8px_rgba(245,158,11,0.2)]")}></div>
-                                {transaction.accountStatementId ? 'Cleared' : 'Pending'}
-                              </div>
-                            </td>
-                            <td className={cn(
-                              "px-6 py-5 text-sm font-black text-right tracking-tight tabular-nums",
-                              isIncome ? "text-emerald-500" : isExpense ? "text-rose-500" : "text-foreground"
-                            )}>
-                              {isIncome ? '+' : '-'}{formatAmount(amount)}
-                            </td>
-                          </tr>
-                        );
-                      })
+                      visibleTransactions.map(transaction => (
+                        <TransactionRow
+                          key={transaction.id}
+                          transaction={transaction}
+                          isSelected={selectedIds.has(transaction.id)}
+                          showSelectionMode={showSelectionMode}
+                          toggleSelect={toggleSelect}
+                          formatAmount={formatAmount}
+                          onEdit={(t) => { setEditingTransaction(t); setShowForm(true); }}
+                        />
+                      ))
                     )}
                   </tbody>
                 </table>
@@ -2511,21 +2512,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
         activeFiltersCount={activeFilters.length}
         onClearFilters={clearAllFilters}
       >
-        <TransactionFilterContent
-          initialFilters={{
-            search: currentSearchTerm,
-            categoryId: selectedCategoryId,
-            type: financialCategory,
-            amountPreset: amountPreset,
-            range: quickRange,
-            startDate: startDateParam,
-            endDate: endDateParam,
-          }}
-          categories={categories}
-          onApply={applyDraftFilters}
-          onReset={resetDraftFilters}
-          computeRange={computeRange}
-        />
+        <TransactionFilterContent {...filterProps} />
       </FilterSheet>
 
       {/* Bulk Categorize Modal */}
@@ -3596,6 +3583,103 @@ function CategoryIcon({ category, className }: { category: string; className?: s
   return <ShoppingBag className={className} />;
 }
 
+// AI OPTIMIZATION: Memoized table row to prevent expensive re-renders
+const TransactionRow = React.memo(({
+  transaction,
+  isSelected,
+  showSelectionMode,
+  toggleSelect,
+  formatAmount,
+  onEdit
+}: {
+  transaction: any;
+  isSelected: boolean;
+  showSelectionMode: boolean;
+  toggleSelect: (id: string) => void;
+  formatAmount: (val: number) => string;
+  onEdit: (t: any) => void;
+}) => {
+  const isIncome = transaction.financialCategory === 'INCOME';
+  const isExpense = transaction.financialCategory === 'EXPENSE';
+  const amount = transaction.creditAmount || transaction.debitAmount || 0;
+  const transactionDate = transaction.transactionDate ? new Date(transaction.transactionDate) : null;
+  const isValidDate = transactionDate && !isNaN(transactionDate.getTime());
+
+  return (
+    <tr
+      className={cn(
+        "group border-b border-border/40 hover:bg-muted/30 transition-all duration-300",
+        isSelected && "bg-primary/5 active-row"
+      )}
+      onClick={() => {
+        if (showSelectionMode) toggleSelect(transaction.id);
+        else onEdit(transaction);
+      }}
+    >
+      {showSelectionMode && (
+        <td className="px-6 py-5">
+          <button
+            onClick={(e) => { e.stopPropagation(); toggleSelect(transaction.id); }}
+            className={cn(
+              "w-5 h-5 rounded-md border flex items-center justify-center transition-all",
+              isSelected ? "bg-foreground border-foreground text-background shadow-md" : "bg-background border-input"
+            )}
+          >
+            {isSelected && <Check className="w-3.5 h-3.5" />}
+          </button>
+        </td>
+      )}
+      <td className="px-6 py-5">
+        <div className="flex flex-col">
+          <span className="text-sm font-bold text-foreground">
+            {isValidDate ? format(transactionDate, 'MMM dd') : 'No Date'}
+          </span>
+          <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-tighter">
+            {isValidDate ? format(transactionDate, 'yyyy') : '-'}
+          </span>
+        </div>
+      </td>
+      <td className="px-6 py-5">
+        <div className="flex items-center gap-4">
+          <div className="size-10 rounded-xl bg-muted/50 border border-border/50 flex items-center justify-center group-hover:bg-background transition-colors shadow-sm">
+            <CategoryIcon category={transaction.category?.name || ''} className="w-5 h-5" />
+          </div>
+          <div className="min-w-0">
+            <p className="font-bold text-sm text-foreground truncate group-hover:text-primary transition-colors">
+              {transaction.personName || transaction.store || transaction.description}
+            </p>
+            {transaction.description && (transaction.personName || transaction.store) && (
+              <p className="text-[10px] text-muted-foreground truncate max-w-[200px] uppercase font-black tracking-widest mt-1 opacity-60">
+                {transaction.description}
+              </p>
+            )}
+          </div>
+        </div>
+      </td>
+      <td className="px-6 py-5">
+        <span className={cn(
+          "px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest",
+          isIncome ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20" : "bg-muted/50 text-muted-foreground border border-border"
+        )}>
+          {transaction.category?.name || 'General'}
+        </span>
+      </td>
+      <td className="px-6 py-5">
+        <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 group-hover:text-muted-foreground transition-colors">
+          <div className={cn("size-2 rounded-full", transaction.accountStatementId ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.3)]" : "bg-amber-500 shadow-[0_0_8_8px_rgba(245,158,11,0.2)]")}></div>
+          {transaction.accountStatementId ? 'Cleared' : 'Pending'}
+        </div>
+      </td>
+      <td className={cn(
+        "px-6 py-5 text-sm font-black text-right tracking-tight tabular-nums",
+        isIncome ? "text-emerald-500" : isExpense ? "text-rose-500" : "text-foreground"
+      )}>
+        {isIncome ? '+' : '-'}{formatAmount(amount)}
+      </td>
+    </tr>
+  );
+});
+
 // Separate component for filter content to prevent main component re-renders
 const TransactionFilterContent = React.memo(({
   initialFilters,
@@ -3780,5 +3864,7 @@ const TransactionFilterContent = React.memo(({
     </div>
   );
 });
+
+TransactionFilterContent.displayName = 'TransactionFilterContent';
 
 

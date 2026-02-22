@@ -27,7 +27,8 @@ export default function FetchInterceptor() {
         const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://vishun-finance.vercel.app';
 
         window.fetch = async (...args) => {
-            let [resource, config] = args;
+            let resource = args[0];
+            const config = args[1];
             const method = config?.method || 'GET';
 
             // Robust URL extraction for logging

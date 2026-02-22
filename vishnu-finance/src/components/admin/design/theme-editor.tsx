@@ -321,7 +321,7 @@ function ThemePreviewFrame({ mode, settings }: { mode: 'light' | 'dark', setting
     const isDark = mode === 'dark';
 
     // --- Smart Contrast Tuning & Monochrome Inversion ---
-    let tunedH = h
+    const tunedH = h
     let tunedS = s
     let tunedL = l
 

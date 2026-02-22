@@ -1,0 +1,288 @@
+{
+  "project": ".",
+  "timestamp": "2026-02-22T17:10:35.913015",
+  "scan_type": "all",
+  "scans": {
+    "dependencies": {
+      "tool": "dependency_scanner",
+      "findings": [
+        {
+          "type": "Missing Lock File",
+          "severity": "high",
+          "message": "yarn: No lock file found. Supply chain integrity at risk."
+        },
+        {
+          "type": "Missing Lock File",
+          "severity": "high",
+          "message": "pnpm: No lock file found. Supply chain integrity at risk."
+        }
+      ],
+      "status": "[OK] Secure"
+    },
+    "secrets": {
+      "tool": "secret_scanner",
+      "findings": [
+        {
+          "file": ".agent\\skills\\vulnerability-scanner\\scripts\\security_scan.py",
+          "type": "Bearer Token",
+          "severity": "critical",
+          "count": 1
+        },
+        {
+          "file": "scripts\\benchmark-airforce.js",
+          "type": "API Key",
+          "severity": "high",
+          "count": 1
+        },
+        {
+          "file": "scripts\\check-data.js",
+          "type": "Password",
+          "severity": "high",
+          "count": 1
+        },
+        {
+          "file": "scripts\\create-demo-user.js",
+          "type": "Password",
+          "severity": "high",
+          "count": 1
+        },
+        {
+          "file": "scripts\\index.js",
+          "type": "Database Connection String",
+          "severity": "critical",
+          "count": 1
+        },
+        {
+          "file": "scripts\\reset-password.js",
+          "type": "Password",
+          "severity": "high",
+          "count": 1
+        },
+        {
+          "file": "scripts\\test-apis.js",
+          "type": "Password",
+          "severity": "high",
+          "count": 1
+        },
+        {
+          "file": "scripts\\update-default-password.js",
+          "type": "Password",
+          "severity": "high",
+          "count": 1
+        },
+        {
+          "file": "scripts\\verify-fast-models.js",
+          "type": "API Key",
+          "severity": "high",
+          "count": 1
+        },
+        {
+          "file": "src\\app\\api\\auth\\me\\route.ts",
+          "type": "Token",
+          "severity": "high",
+          "count": 1
+        }
+      ],
+      "status": "[!!] CRITICAL: Secrets exposed!",
+      "scanned_files": 673,
+      "by_severity": {
+        "critical": 2,
+        "high": 8,
+        "medium": 0
+      }
+    },
+    "code_patterns": {
+      "tool": "pattern_scanner",
+      "findings": [
+        {
+          "file": ".agent\\skills\\vulnerability-scanner\\scripts\\security_scan.py",
+          "line": 63,
+          "pattern": "eval() usage",
+          "severity": "critical",
+          "category": "Code Injection risk",
+          "snippet": "(r'eval\\s*\\(', \"eval() usage\", \"critical\", \"Code Injection risk\"),"
+        },
+        {
+          "file": ".agent\\skills\\vulnerability-scanner\\scripts\\security_scan.py",
+          "line": 64,
+          "pattern": "exec() usage",
+          "severity": "critical",
+          "category": "Code Injection risk",
+          "snippet": "(r'exec\\s*\\(', \"exec() usage\", \"critical\", \"Code Injection risk\"),"
+        },
+        {
+          "file": ".agent\\skills\\vulnerability-scanner\\scripts\\security_scan.py",
+          "line": 70,
+          "pattern": "dangerouslySetInnerHTML",
+          "severity": "high",
+          "category": "XSS risk",
+          "snippet": "(r'dangerouslySetInnerHTML', \"dangerouslySetInnerHTML\", \"high\", \"XSS risk\"),"
+        },
+        {
+          "file": ".agent\\skills\\vulnerability-scanner\\scripts\\security_scan.py",
+          "line": 80,
+          "pattern": "Insecure flag",
+          "severity": "medium",
+          "category": "Security disabled",
+          "snippet": "(r'--insecure', \"Insecure flag\", \"medium\", \"Security disabled\"),"
+        },
+        {
+          "file": "android\\app\\src\\main\\assets\\public\\_next\\static\\chunks\\08f1d148dfa4fa72.js",
+          "line": 1,
+          "pattern": "dangerouslySetInnerHTML",
+          "severity": "high",
+          "category": "XSS risk",
+          "snippet": "(globalThis.TURBOPACK||(globalThis.TURBOPACK=[])).push([\"object\"==typeof documen"
+        },
+        {
+          "file": "android\\app\\src\\main\\assets\\public\\_next\\static\\chunks\\08f1d148dfa4fa72.js",
+          "line": 1,
+          "pattern": "SQL String Concat",
+          "severity": "critical",
+          "category": "SQL Injection risk",
+          "snippet": "(globalThis.TURBOPACK||(globalThis.TURBOPACK=[])).push([\"object\"==typeof documen"
+        },
+        {
+          "file": "android\\app\\src\\main\\assets\\public\\_next\\static\\chunks\\1bce2cbee217b25d.js",
+          "line": 1,
+          "pattern": "SQL String Concat",
+          "severity": "critical",
+          "category": "SQL Injection risk",
+          "snippet": "(globalThis.TURBOPACK||(globalThis.TURBOPACK=[])).push([\"object\"==typeof documen"
+        },
+        {
+          "file": "android\\app\\src\\main\\assets\\public\\_next\\static\\chunks\\1bce2cbee217b25d.js",
+          "line": 5,
+          "pattern": "exec() usage",
+          "severity": "critical",
+          "category": "Code Injection risk",
+          "snippet": "`,whileTap:a?{}:(0,G.getWhileTap)(),\"aria-label\":`Add ${e.label} transaction`,ch"
+        },
+        {
+          "file": "android\\app\\src\\main\\assets\\public\\_next\\static\\chunks\\1bce2cbee217b25d.js",
+          "line": 5,
+          "pattern": "dangerouslySetInnerHTML",
+          "severity": "high",
+          "category": "XSS risk",
+          "snippet": "`,whileTap:a?{}:(0,G.getWhileTap)(),\"aria-label\":`Add ${e.label} transaction`,ch"
+        },
+        {
+          "file": "android\\app\\src\\main\\assets\\public\\_next\\static\\chunks\\29aa08b59df6b4ed.js",
+          "line": 1,
+          "pattern": "exec() usage",
+          "severity": "critical",
+          "category": "Code Injection risk",
+          "snippet": "(globalThis.TURBOPACK||(globalThis.TURBOPACK=[])).push([\"object\"==typeof documen"
+        },
+        {
+          "file": "android\\app\\src\\main\\assets\\public\\_next\\static\\chunks\\30ea11065999f7ac.js",
+          "line": 1,
+          "pattern": "exec() usage",
+          "severity": "critical",
+          "category": "Code Injection risk",
+          "snippet": "(globalThis.TURBOPACK||(globalThis.TURBOPACK=[])).push([\"object\"==typeof documen"
+        },
+        {
+          "file": "android\\app\\src\\main\\assets\\public\\_next\\static\\chunks\\30ea11065999f7ac.js",
+          "line": 1,
+          "pattern": "dangerouslySetInnerHTML",
+          "severity": "high",
+          "category": "XSS risk",
+          "snippet": "(globalThis.TURBOPACK||(globalThis.TURBOPACK=[])).push([\"object\"==typeof documen"
+        },
+        {
+          "file": "android\\app\\src\\main\\assets\\public\\_next\\static\\chunks\\30ea11065999f7ac.js",
+          "line": 1,
+          "pattern": "innerHTML assignment",
+          "severity": "medium",
+          "category": "XSS risk",
+          "snippet": "(globalThis.TURBOPACK||(globalThis.TURBOPACK=[])).push([\"object\"==typeof documen"
+        },
+        {
+          "file": "android\\app\\src\\main\\assets\\public\\_next\\static\\chunks\\30ea11065999f7ac.js",
+          "line": 1,
+          "pattern": "SQL String Concat",
+          "severity": "critical",
+          "category": "SQL Injection risk",
+          "snippet": "(globalThis.TURBOPACK||(globalThis.TURBOPACK=[])).push([\"object\"==typeof documen"
+        },
+        {
+          "file": "android\\app\\src\\main\\assets\\public\\_next\\static\\chunks\\3ae296f02e48f0ba.js",
+          "line": 1,
+          "pattern": "exec() usage",
+          "severity": "critical",
+          "category": "Code Injection risk",
+          "snippet": "(globalThis.TURBOPACK||(globalThis.TURBOPACK=[])).push([\"object\"==typeof documen"
+        },
+        {
+          "file": "android\\app\\src\\main\\assets\\public\\_next\\static\\chunks\\3ae296f02e48f0ba.js",
+          "line": 1,
+          "pattern": "SQL String Concat",
+          "severity": "critical",
+          "category": "SQL Injection risk",
+          "snippet": "(globalThis.TURBOPACK||(globalThis.TURBOPACK=[])).push([\"object\"==typeof documen"
+        },
+        {
+          "file": "android\\app\\src\\main\\assets\\public\\_next\\static\\chunks\\40a8e6a80b78c13e.js",
+          "line": 1,
+          "pattern": "SQL String Concat",
+          "severity": "critical",
+          "category": "SQL Injection risk",
+          "snippet": "(globalThis.TURBOPACK||(globalThis.TURBOPACK=[])).push([\"object\"==typeof documen"
+        },
+        {
+          "file": "android\\app\\src\\main\\assets\\public\\_next\\static\\chunks\\6d7268107a9f3e31.js",
+          "line": 1,
+          "pattern": "exec() usage",
+          "severity": "critical",
+          "category": "Code Injection risk",
+          "snippet": "(globalThis.TURBOPACK||(globalThis.TURBOPACK=[])).push([\"object\"==typeof documen"
+        },
+        {
+          "file": "android\\app\\src\\main\\assets\\public\\_next\\static\\chunks\\6d7268107a9f3e31.js",
+          "line": 1,
+          "pattern": "SQL String Concat",
+          "severity": "critical",
+          "category": "SQL Injection risk",
+          "snippet": "(globalThis.TURBOPACK||(globalThis.TURBOPACK=[])).push([\"object\"==typeof documen"
+        },
+        {
+          "file": "android\\app\\src\\main\\assets\\public\\_next\\static\\chunks\\702675db352c0714.js",
+          "line": 1,
+          "pattern": "dangerouslySetInnerHTML",
+          "severity": "high",
+          "category": "XSS risk",
+          "snippet": "(globalThis.TURBOPACK||(globalThis.TURBOPACK=[])).push([\"object\"==typeof documen"
+        }
+      ],
+      "status": "[!!] CRITICAL: 62 dangerous patterns",
+      "scanned_files": 628,
+      "by_category": {
+        "Code Injection risk": 30,
+        "XSS risk": 11,
+        "Security disabled": 1,
+        "SQL Injection risk": 32
+      }
+    },
+    "configuration": {
+      "tool": "config_scanner",
+      "findings": [
+        {
+          "issue": "No security headers configuration found",
+          "severity": "medium",
+          "recommendation": "Configure CSP, HSTS, X-Frame-Options headers"
+        }
+      ],
+      "status": "[?] Minor configuration issues",
+      "checks": {
+        "security_headers_config": false
+      }
+    }
+  },
+  "summary": {
+    "total_findings": 33,
+    "critical": 15,
+    "high": 15,
+    "overall_status": "[!!] CRITICAL ISSUES FOUND"
+  }
+}

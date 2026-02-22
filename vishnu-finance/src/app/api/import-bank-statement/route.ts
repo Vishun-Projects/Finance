@@ -12,6 +12,7 @@ import { relative } from 'path';
 import { writeAuditLog, extractRequestMeta } from '@/lib/audit';
 import { validateBalanceReconciliation, formatValidationResult } from '@/lib/balance-validator';
 import { categorizeTransactions, detectAutoPayTransactions } from '@/lib/transaction-categorization-service';
+import * as crypto from 'crypto';
 
 interface ImportRecord {
   title?: string;
@@ -1426,7 +1427,6 @@ function generateDedupHash(tx: {
 
   // Simple hashing (djb2-like) or just a long string if DB column allows
   // For PostgreSQL, a long unique string is fine, but let's use a basic buffer hash
-  const crypto = require('crypto');
   return crypto.createHash('md5').update(rawString).digest('hex');
 }
 

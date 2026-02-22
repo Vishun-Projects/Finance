@@ -28,12 +28,12 @@ interface TransactionCardProps {
   currency?: string;
 }
 
-export default function TransactionCard({
+const TransactionCard = React.memo(({
   transaction,
   onEdit,
   onDelete,
   currency = "INR",
-}: TransactionCardProps) {
+}: TransactionCardProps) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const reducedMotion = prefersReducedMotion();
 
@@ -263,4 +263,6 @@ export default function TransactionCard({
       </button>
     </motion.div>
   );
-}
+});
+
+export default TransactionCard;

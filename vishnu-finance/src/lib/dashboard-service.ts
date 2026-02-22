@@ -90,8 +90,6 @@ export class DashboardService {
 
         const [
             transactionStats,
-            legacyExpenseStats,
-            legacyIncomeStats,
             activeGoalsCount,
             deadlinesData,
             recentTransactions,
@@ -99,7 +97,6 @@ export class DashboardService {
             plansInfo,
             wishlistInfo,
             netWorthStats,
-            categoryStatsData,
             transactionTotalsData,
             categoryBreakdownRaw,
             currentMonthStatsResult
@@ -114,13 +111,9 @@ export class DashboardService {
                     });
                 } catch { return { _sum: { creditAmount: 0, debitAmount: 0 }, _count: 0 }; }
             })(),
-            // 2. Legacy Expenses (Removed)
-            Promise.resolve({ _sum: { amount: 0 }, _count: 0 }),
-            // 3. Legacy Income (Removed)
-            Promise.resolve([]),
-            // 4. Goals
+            // 2. Goals
             prisma.goal.count({ where: { userId, isActive: true } }).catch(() => 0),
-            // 5. Deadlines
+            // 3. Deadlines
             (async () => {
                 try {
                     const deadlines = await prisma.deadline.findMany({
@@ -136,7 +129,7 @@ export class DashboardService {
                     };
                 } catch { return { count: 0, next: null, items: [] }; }
             })(),
-            // 6. Recent Transactions
+            // 4. Recent Transactions
             (async () => {
                 try {
                     return await (prisma as any).transaction.findMany({
@@ -151,7 +144,7 @@ export class DashboardService {
                     });
                 } catch { return []; }
             })(),
-            // 7. Salary
+            // 5. Salary
             (async () => {
                 try {
                     const salary = await (prisma as any).salaryStructure.findFirst({ where: { userId, isActive: true } });
@@ -164,7 +157,7 @@ export class DashboardService {
                     return { takeHome: netMonthly, ctc: Number(salary.baseSalary), jobTitle: salary.jobTitle, company: salary.company };
                 } catch { return null; }
             })(),
-            // 8. Plans
+            // 6. Plans
             (async () => {
                 try {
                     const goals = await prisma.goal.findMany({
@@ -175,38 +168,54 @@ export class DashboardService {
                     return { activePlans: goals.length, totalCommitted: goals.reduce((s: number, p: any) => s + Number(p.targetAmount || 0), 0), topPlan: goals[0]?.title || null, items: goals.map(p => ({ name: p.title, targetAmount: Number(p.targetAmount), currentAmount: Number(p.currentAmount) })) };
                 } catch { return { activePlans: 0, totalCommitted: 0, topPlan: null, items: [] }; }
             })(),
-            // 9. Wishlist
+            // 7. Wishlist
             (async () => {
                 try {
                     const items = await (prisma as any).wishlistItem.findMany({ where: { userId }, take: 20 });
                     return { totalItems: items.length, totalCost: items.reduce((s: number, i: any) => s + Number(i.estimatedCost || 0), 0), topItem: items[0]?.title || null, items: items.map((i: any) => ({ name: i.title, estimatedPrice: Number(i.estimatedCost) })) };
                 } catch { return { totalItems: 0, totalCost: 0, topItem: null, items: [] }; }
             })(),
-            // 10. Net Worth (ALL TIME)
+            // 8. Net Worth (ALL TIME)
             (async () => {
                 try {
                     return await (prisma as any).transaction.aggregate({ where: { userId, isDeleted: false }, _sum: { creditAmount: true, debitAmount: true } });
                 } catch { return { _sum: { creditAmount: 0, debitAmount: 0 } }; }
             })(),
-            // 11. Category Stats (FILTERED)
+            // 9. Transaction Totals for Monthly Trends (FILTERED)
             (async () => {
                 try {
-                    return await (prisma as any).transaction.groupBy({ by: ['financialCategory'], where: { userId, isDeleted: false, transactionDate: { gte: rangeStart, lte: rangeEnd } }, _sum: { creditAmount: true, debitAmount: true } });
+                    // Group by year and month to build trends
+                    const data = await (prisma as any).transaction.findMany({
+                        where: { userId, isDeleted: false, transactionDate: { gte: rangeStart, lte: rangeEnd } },
+                        select: { transactionDate: true, creditAmount: true, debitAmount: true }
+                    });
+                    return data;
                 } catch { return []; }
             })(),
-            // 12. Transaction Totals (FILTERED)
+            // 10. Category Breakdown (FILTERED) with Category Names
             (async () => {
                 try {
-                    return await (prisma as any).transaction.groupBy({ by: ['transactionDate'], where: { userId, isDeleted: false, transactionDate: { gte: rangeStart, lte: rangeEnd } }, _sum: { creditAmount: true, debitAmount: true } });
+                    const data = await (prisma as any).transaction.groupBy({
+                        by: ['categoryId'],
+                        where: { userId, isDeleted: false, transactionDate: { gte: rangeStart, lte: rangeEnd }, financialCategory: 'EXPENSE' },
+                        _sum: { debitAmount: true }
+                    });
+
+                    // Fetch category names for these IDs
+                    const categoryIds = data.map((item: any) => item.categoryId).filter(Boolean);
+                    const categories = await (prisma as any).category.findMany({
+                        where: { id: { in: categoryIds } },
+                        select: { id: true, name: true }
+                    });
+                    const catMap = new Map(categories.map((c: any) => [c.id, c.name]));
+
+                    return data.map((item: any) => ({
+                        name: catMap.get(item.categoryId) || 'Uncategorized',
+                        amount: Number(item._sum.debitAmount || 0)
+                    }));
                 } catch { return []; }
             })(),
-            // 13. Category Breakdown (FILTERED)
-            (async () => {
-                try {
-                    return await (prisma as any).transaction.groupBy({ by: ['categoryId'], where: { userId, isDeleted: false, transactionDate: { gte: rangeStart, lte: rangeEnd } }, _sum: { debitAmount: true, creditAmount: true } });
-                } catch { return []; }
-            })(),
-            // 14. Current Month Stats (STRICT CALENDAR MONTH)
+            // 11. Current Month Stats (STRICT CALENDAR MONTH)
             (async () => {
                 try {
                     const stats = await (prisma as any).transaction.aggregate({
@@ -224,6 +233,37 @@ export class DashboardService {
         const totalExpenses = Number(transactionStats._sum?.debitAmount || 0);
         const netSavings = totalIncome - totalExpenses;
         const totalNetWorth = Number(netWorthStats._sum?.creditAmount || 0) - Number(netWorthStats._sum?.debitAmount || 0);
+
+        // Process Monthly Trends
+        const trendsMap = new Map<string, { income: number; expenses: number; savings: number; credits: number; debits: number }>();
+        (transactionTotalsData as any[]).forEach(t => {
+            const d = new Date(t.transactionDate);
+            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+            const monthName = d.toLocaleDateString('en-US', { month: 'short' });
+
+            const existing = trendsMap.get(key) || { income: 0, expenses: 0, savings: 0, credits: 0, debits: 0, name: monthName };
+            const credit = Number(t.creditAmount || 0);
+            const debit = Number(t.debitAmount || 0);
+
+            existing.income += credit;
+            existing.expenses += debit;
+            existing.credits += credit;
+            existing.debits += debit;
+            existing.savings = existing.income - existing.expenses;
+
+            trendsMap.set(key, existing);
+        });
+
+        const monthlyTrends = Array.from(trendsMap.entries())
+            .sort((a, b) => a[0].localeCompare(b[0]))
+            .map(([_, val]: [any, any]) => ({
+                month: val.name,
+                income: val.income,
+                expenses: val.expenses,
+                savings: val.savings,
+                credits: val.credits,
+                debits: val.debits
+            }));
 
         const result: SimpleDashboardData = {
             totalIncome,
@@ -247,8 +287,8 @@ export class DashboardService {
                 personName: t.personName || null
             })),
             totalTransactionsCount: transactionStats._count || 0,
-            monthlyTrends: [], // Simplified for brevity in this clean write - can be re-added later
-            categoryBreakdown: (categoryBreakdownRaw as any[]).map(item => ({ name: item.categoryId || 'Uncategorized', amount: Number(item._sum.debitAmount || 0) })),
+            monthlyTrends,
+            categoryBreakdown: categoryBreakdownRaw as any[],
             financialHealthScore: 0,
             categoryStats: {},
             salaryInfo: salaryInfo || null,

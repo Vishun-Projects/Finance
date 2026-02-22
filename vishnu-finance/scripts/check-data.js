@@ -52,9 +52,9 @@ async function checkData() {
       console.log('\n⚠️  No users found! Creating a test user...');
       const testUser = await prisma.user.create({
         data: {
-          email: 'test@example.com',
-          name: 'Test User',
-          password: 'hashedpassword123'
+          email: process.env.TEST_USER_EMAIL || 'test@example.com',
+          name: process.env.TEST_USER_NAME || 'Test User',
+          password: process.env.TEST_USER_PASSWORD || 'hashedpassword123'
         }
       });
       console.log(`✅ Created test user: ${testUser.name} (${testUser.id})`);
@@ -63,7 +63,7 @@ async function checkData() {
     if (incomeSources.length === 0 && users.length > 0) {
       console.log('\n⚠️  No income sources found! Creating sample data...');
       const user = users[0];
-      
+
       // Create sample income
       await prisma.incomeSource.create({
         data: {

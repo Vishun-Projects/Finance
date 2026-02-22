@@ -1,0 +1,53 @@
+
+c:\Users\vishnu.vishwakarma\Desktop\Projects\Finance\vishnu-finance\src\app\(app)\advisor\page-client.tsx
+  310:149  error  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+
+c:\Users\vishnu.vishwakarma\Desktop\Projects\Finance\vishnu-finance\src\app\(app)\education\[slug]\page.tsx
+  185:29  error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  185:44  error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+
+c:\Users\vishnu.vishwakarma\Desktop\Projects\Finance\vishnu-finance\src\app\(app)\plans\page-client.tsx
+  549:103  error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  549:112  error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+
+c:\Users\vishnu.vishwakarma\Desktop\Projects\Finance\vishnu-finance\src\components\BriefingGenerator.tsx
+  91:45  error  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+
+c:\Users\vishnu.vishwakarma\Desktop\Projects\Finance\vishnu-finance\src\components\admin\design\theme-editor.tsx
+  324:9  error  'tunedH' is never reassigned. Use 'const' instead  prefer-const
+
+c:\Users\vishnu.vishwakarma\Desktop\Projects\Finance\vishnu-finance\src\components\dashboard\daily-quote.tsx
+  48:21  error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  48:34  error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+
+c:\Users\vishnu.vishwakarma\Desktop\Projects\Finance\vishnu-finance\src\components\debug\debug-overlay.tsx
+  93:37  error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  93:45  error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+
+c:\Users\vishnu.vishwakarma\Desktop\Projects\Finance\vishnu-finance\src\components\fetch-interceptor.tsx
+  30:28  error  'config' is never reassigned. Use 'const' instead  prefer-const
+
+c:\Users\vishnu.vishwakarma\Desktop\Projects\Finance\vishnu-finance\src\components\management\salary-structure-management.tsx
+  795:21  error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  795:45  error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+
+c:\Users\vishnu.vishwakarma\Desktop\Projects\Finance\vishnu-finance\src\components\providers\design-provider.tsx
+  40:13  error  'tunedH' is never reassigned. Use 'const' instead  prefer-const
+
+c:\Users\vishnu.vishwakarma\Desktop\Projects\Finance\vishnu-finance\src\components\transaction-unified-management.tsx
+  1884:25  error  'consecutiveFiles' is never reassigned. Use 'const' instead  prefer-const
+  3600:34  error  Component definition is missing display name                 react/display-name
+
+c:\Users\vishnu.vishwakarma\Desktop\Projects\Finance\vishnu-finance\src\lib\advisor-service.ts
+  348:28  error  'messages' is never reassigned. Use 'const' instead  prefer-const
+
+c:\Users\vishnu.vishwakarma\Desktop\Projects\Finance\vishnu-finance\src\lib\financial-analysis.ts
+  115:11  error  'cached' is never reassigned. Use 'const' instead  prefer-const
+
+c:\Users\vishnu.vishwakarma\Desktop\Projects\Finance\vishnu-finance\src\lib\gemini.ts
+  729:5  error  Include a description after the "@ts-expect-error" directive to explain why the @ts-expect-error is necessary. The description must be 3 characters or longer  @typescript-eslint/ban-ts-comment
+  731:7  error  Include a description after the "@ts-expect-error" directive to explain why the @ts-expect-error is necessary. The description must be 3 characters or longer  @typescript-eslint/ban-ts-comment
+
+✖ 21 problems (21 errors, 0 warnings)
+  4 errors and 0 warnings potentially fixable with the `--fix` option.
+

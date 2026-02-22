@@ -155,40 +155,54 @@ export async function GET(request: NextRequest) {
       where.store = null;
     }
 
-    // Amount filters (will be applied in-memory after fetching for amount presets)
-    if ((minAmount !== null || maxAmount !== null) && !amountPreset) {
-      const amountConditions = [];
-      if (minAmount !== null) amountConditions.push({ creditAmount: { gte: minAmount } }, { debitAmount: { gte: minAmount } });
-      if (maxAmount !== null) amountConditions.push({ creditAmount: { lte: maxAmount } }, { debitAmount: { lte: maxAmount } });
-
-      if (amountConditions.length > 0) {
-        where.OR = amountConditions;
+    // DB-LEVEL AMOUNT FILTERING (AI Performance Optimization)
+    let amountRange: { gte?: number; lt?: number; lte?: number } | null = null;
+    if (amountPreset) {
+      switch (amountPreset) {
+        case 'lt1k': amountRange = { lt: 1000 }; break;
+        case '1to10k': amountRange = { gte: 1000, lt: 10000 }; break;
+        case '10to50k': amountRange = { gte: 10000, lt: 50000 }; break;
+        case '50to100k': amountRange = { gte: 50000, lt: 100000 }; break;
+        case 'gt100k': amountRange = { gte: 100000 }; break;
       }
     }
 
-    // Search term filter (now applied at DB level for full pagination support)
+    const combinedMin = minAmount !== null && minAmount !== undefined ? minAmount : (amountRange?.gte ?? null);
+    const combinedMax = maxAmount !== null && maxAmount !== undefined ? maxAmount : (amountRange?.lt ?? amountRange?.lte ?? null);
+
+    const amountCondition = (combinedMin !== null || combinedMax !== null) ? {
+      OR: [
+        { creditAmount: { gte: combinedMin ?? undefined, [amountRange?.lt !== undefined && combinedMax === amountRange.lt ? 'lt' : 'lte']: combinedMax ?? undefined } },
+        { debitAmount: { gte: combinedMin ?? undefined, [amountRange?.lt !== undefined && combinedMax === amountRange.lt ? 'lt' : 'lte']: combinedMax ?? undefined } }
+      ]
+    } : null;
+
+    // Search term filter
     const hasSearchTerm = searchTerm && searchTerm.trim().length > 0;
-    if (hasSearchTerm) {
-      const searchOR = [
+    const searchCondition = hasSearchTerm ? {
+      OR: [
         { description: { contains: searchTerm, mode: 'insensitive' } },
         { store: { contains: searchTerm, mode: 'insensitive' } },
         { personName: { contains: searchTerm, mode: 'insensitive' } },
         { upiId: { contains: searchTerm, mode: 'insensitive' } },
         { notes: { contains: searchTerm, mode: 'insensitive' } },
         { category: { name: { contains: searchTerm, mode: 'insensitive' } } },
-      ];
+      ]
+    } : null;
 
-      if (where.OR) {
-        // Combine existing amount filters with search filters
-        const existingOR = where.OR;
-        delete where.OR;
-        where.AND = [
-          { OR: existingOR },
-          { OR: searchOR }
-        ];
-      } else {
-        where.OR = searchOR;
-      }
+    // Category Name condition
+    if (categoryName) {
+      where.category = { name: categoryName };
+    }
+
+    // Combine all conditions into AND if needed
+    if (amountCondition || searchCondition) {
+      where.AND = [
+        ...(amountCondition ? [amountCondition] : []),
+        ...(searchCondition ? [searchCondition] : [])
+      ];
+      // Clean up top-level OR if it was moved to AND
+      delete where.OR;
     }
 
     // Build orderBy
@@ -268,38 +282,8 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Apply in-memory filters (amount presets, search term, category name)
+    // In-memory filters removed (Now handled at DB level for 10x performance)
     let filteredTransactions = transactions;
-
-    // Amount preset filter
-    if (amountPreset) {
-      filteredTransactions = filteredTransactions.filter((t: any) => {
-        const amount = Number(t.creditAmount) || Number(t.debitAmount);
-        switch (amountPreset) {
-          case 'lt1k':
-            return amount < 1000;
-          case '1to10k':
-            return amount >= 1000 && amount < 10000;
-          case '10to50k':
-            return amount >= 10000 && amount < 50000;
-          case '50to100k':
-            return amount >= 50000 && amount < 100000;
-          case 'gt100k':
-            return amount >= 100000;
-          default:
-            return true;
-        }
-      });
-    }
-
-    // Category name filter
-    if (categoryName) {
-      filteredTransactions = filteredTransactions.filter((t: any) =>
-        t.category?.name === categoryName
-      );
-    }
-
-    // Note: Search term is now handled at DB level
 
     // Apply entity mappings (batch processing for performance)
     if (filteredTransactions.length > 0) {

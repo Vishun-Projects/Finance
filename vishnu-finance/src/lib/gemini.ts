@@ -704,7 +704,6 @@ export async function generateImage(prompt: string): Promise<string | null> {
     }
 
     const result = await retryWithBackoff(async () => {
-      // @ts-ignore - The types definitions might not be up to date for image generation yet
       return await model.generateContent(enhancedPrompt);
     }, 2, 2000);
 
@@ -726,9 +725,7 @@ export async function generateImage(prompt: string): Promise<string | null> {
     // The response.text() would be empty for image only response usually.
     // We look for parts.
 
-    // @ts-ignore
     if (response.candidates && response.candidates[0] && response.candidates[0].content && response.candidates[0].content.parts) {
-      // @ts-ignore
       const parts = response.candidates[0].content.parts;
       for (const part of parts) {
         if (part.inlineData && part.inlineData.mimeType.startsWith('image/')) {

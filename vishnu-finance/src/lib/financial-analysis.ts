@@ -112,7 +112,7 @@ export async function analyzeUserFinances(
     // AI OPTIMIZATION: Start all independent DB queries in parallel
     const transactionsPromise = (async () => {
       const cacheKey = `finance_summary:${userId}:${cacheParams}`;
-      let cached = await getCachedData(cacheKey);
+      const cached = await getCachedData(cacheKey);
 
       if (!cached) {
         // Targeted queries get more results if they exist, general queries are capped at 300

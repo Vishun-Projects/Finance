@@ -37,7 +37,7 @@ export function DesignProvider({ children, initialSettings }: DesignProviderProp
         const [h, s, l] = settings.primaryColor.split(' ').map(v => parseFloat(v))
 
         // --- Smart Contrast Tuning & Monochrome Inversion ---
-        let tunedH = h
+        const tunedH = h
         let tunedS = s
         let tunedL = l
 

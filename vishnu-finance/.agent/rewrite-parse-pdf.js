@@ -1,4 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server';
+const fs = require('fs');
+const path = require('path');
+
+const targetFile = path.join(__dirname, 'src', 'app', 'api', 'parse-pdf', 'route.ts');
+const code = fs.readFileSync(targetFile, 'utf8');
+
+// We want to replace tryPythonParser and the bulk of the POST handler
+// We will look for `export async function POST` and replace everything below it.
+
+let newCode = `import { NextRequest, NextResponse } from 'next/server';
 export const dynamic = 'force-dynamic';
 import { prisma } from '@/lib/db';
 
@@ -9,14 +18,14 @@ async function tryPythonParser(pdfBuffer: Buffer, bankHint: string, bankParserCo
   try {
     let baseUrl: string;
     const isVercel = !!process.env.VERCEL_URL || !!process.env.VERCEL;
-
+    
     if (isVercel) {
-      baseUrl = `https://${process.env.VERCEL_URL || process.env.NEXT_PUBLIC_APP_URL}`;
+      baseUrl = \`https://\${process.env.VERCEL_URL || process.env.NEXT_PUBLIC_APP_URL}\`;
     } else {
       baseUrl = 'http://127.0.0.1:8000'; // Target local FastAPI microservice
     }
 
-    const pythonFunctionUrl = `${baseUrl}/api/parser`;
+    const pythonFunctionUrl = \`\${baseUrl}/api/parser\`;
 
     // Convert buffer to base64
     const pdfBase64 = pdfBuffer.toString('base64');
@@ -66,7 +75,7 @@ async function tryPythonParser(pdfBuffer: Buffer, bankHint: string, bankParserCo
       } catch {
         // Not JSON
       }
-      console.error(`❌ PDF API: Python function returned error status ${response.status}:`, errorMessage);
+      console.error(\`❌ PDF API: Python function returned error status \${response.status}:\`, errorMessage);
       return { success: false, error: errorMessage };
     }
   } catch (error) {
@@ -104,7 +113,7 @@ export async function POST(request: NextRequest) {
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
     const originalName = file.name || 'document.pdf';
-    const filename = `statement_${Date.now()}${originalName.substring(originalName.lastIndexOf('.'))}`;
+    const filename = \`statement_\${Date.now()}\${originalName.substring(originalName.lastIndexOf('.'))}\`;
 
     // Upload to Supabase Storage (bank-statements bucket)
     let remoteFilePath = '';
@@ -128,7 +137,7 @@ export async function POST(request: NextRequest) {
       console.warn('⚠️ PDF API: Supabase upload error:', supaError);
     }
 
-    console.log('🐍 PDF API: Attempting Python microservice function...');
+    console.log('🐍 PDF API: Attempting Python serverless/microservice function...');
     const pythonResult = await tryPythonParser(buffer, bankHint, bankParserConfigs);
 
     if (pythonResult.success && pythonResult.data) {
@@ -162,3 +171,7 @@ export async function POST(request: NextRequest) {
     }, { status: 500 });
   }
 }
+`;
+
+fs.writeFileSync(targetFile, newCode);
+console.log('Updated parse-pdf/route.ts successfully.');

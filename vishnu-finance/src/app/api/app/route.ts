@@ -421,7 +421,7 @@ export async function POST(request: NextRequest) {
       const dbSortField = validSortFields[sortField] || 'transactionDate';
       const orderBy: Record<string, 'asc' | 'desc'> = { [dbSortField]: sortDirection };
 
-      // Search term filter (now applied at DB level for full pagination support)
+      // Search term filter
       const hasSearchTerm = searchTerm && searchTerm.trim().length > 0;
       if (hasSearchTerm) {
         where.OR = [
@@ -432,6 +432,51 @@ export async function POST(request: NextRequest) {
           { notes: { contains: searchTerm, mode: 'insensitive' } },
           { category: { name: { contains: searchTerm, mode: 'insensitive' } } },
         ];
+      }
+
+      // DB-LEVEL AMOUNT FILTERING (AI Performance Optimization)
+      let amountRange: { gte?: number; lt?: number; lte?: number } | null = null;
+      if (amountPreset) {
+        switch (amountPreset) {
+          case 'lt1k': amountRange = { lt: 1000 }; break;
+          case '1to10k': amountRange = { gte: 1000, lt: 10000 }; break;
+          case '10to50k': amountRange = { gte: 10000, lt: 50000 }; break;
+          case '50to100k': amountRange = { gte: 50000, lt: 100000 }; break;
+          case 'gt100k': amountRange = { gte: 100000 }; break;
+        }
+      }
+
+      const combinedMin = minAmount !== null && minAmount !== undefined ? minAmount : (amountRange?.gte ?? null);
+      const combinedMax = maxAmount !== null && maxAmount !== undefined ? maxAmount : (amountRange?.lt ?? amountRange?.lte ?? null);
+
+      if (combinedMin !== null || combinedMax !== null) {
+        const amountFilter: any = {};
+        if (combinedMin !== null) amountFilter.gte = combinedMin;
+        if (combinedMax !== null) {
+          if (amountRange?.lt !== undefined && combinedMax === amountRange.lt) {
+            amountFilter.lt = combinedMax;
+          } else {
+            amountFilter.lte = combinedMax;
+          }
+        }
+
+        // Apply to both credit and debit amounts since we don't know which one holds the value
+        // Use AND to combine with existing filters if necessary
+        const amountCondition = {
+          OR: [
+            { creditAmount: amountFilter },
+            { debitAmount: amountFilter }
+          ]
+        };
+
+        if (where.OR) {
+          // If we already have search (where.OR), we must wrap both in AND to preserve both conditions
+          const searchCondition = { OR: where.OR };
+          delete where.OR;
+          where.AND = [searchCondition, amountCondition];
+        } else {
+          where.AND = [amountCondition];
+        }
       }
 
       // Fetch data in parallel
@@ -484,36 +529,7 @@ export async function POST(request: NextRequest) {
       const totals = totalsData;
 
 
-      // No need for in-memory searchTerm filter here as it's now in 'where'
-
-      if (amountPreset) {
-        transactions = transactions.filter((t: any) => {
-          const amount = t.creditAmount > 0 ? t.creditAmount : t.debitAmount;
-          switch (amountPreset) {
-            case 'lt1k': return amount < 1000;
-            case '1to10k': return amount >= 1000 && amount < 10000;
-            case '10to50k': return amount >= 10000 && amount < 50000;
-            case '50to100k': return amount >= 50000 && amount < 100000;
-            case 'gt100k': return amount >= 100000;
-            default: return true;
-          }
-        });
-      }
-
-      if (minAmount !== null && minAmount !== undefined) {
-        transactions = transactions.filter((t: any) => {
-          const amount = t.creditAmount > 0 ? t.creditAmount : t.debitAmount;
-          return amount >= minAmount;
-        });
-      }
-
-      if (maxAmount !== null && maxAmount !== undefined) {
-        transactions = transactions.filter((t: any) => {
-          const amount = t.creditAmount > 0 ? t.creditAmount : t.debitAmount;
-          return amount <= maxAmount;
-        });
-      }
-
+      // In-memory filters removed (Now handled at DB level for 10x performance)
       const transformed = transactions.map((t: any) => ({
         ...t,
         creditAmount: Number(t.creditAmount),

@@ -39,13 +39,13 @@ async function lookupFromCache(
     const cached = await (prisma as any).$queryRaw`
       SELECT 
         id,
-        categoryName,
-        categoryId,
+        "categoryName",
+        "categoryId",
         confidence,
         source,
-        hitCount
+        "hitCount"
       FROM merchant_categories
-      WHERE normalizedName = ${normalizedName}
+      WHERE "normalizedName" = ${normalizedName}
       LIMIT 1
     `;
 
@@ -55,7 +55,7 @@ async function lookupFromCache(
       // Update hit count
       await (prisma as any).$executeRaw`
         UPDATE merchant_categories
-        SET hitCount = hitCount + 1, updatedAt = NOW()
+        SET "hitCount" = "hitCount" + 1, "updatedAt" = NOW()
         WHERE id = ${record.id}
       `;
 
@@ -276,19 +276,19 @@ async function saveToCache(
     // Use raw query for upsert
     await (prisma as any).$executeRaw`
       INSERT INTO merchant_categories (
-        id, merchantName, normalizedName, categoryName, categoryId, 
-        confidence, source, lookupDate, hitCount, createdAt, updatedAt
+        id, "merchantName", "normalizedName", "categoryName", "categoryId", 
+        confidence, source, "lookupDate", "hitCount", "createdAt", "updatedAt"
       ) VALUES (
         ${id}, ${merchantName}, ${normalizedName}, ${result.categoryName}, ${result.categoryId},
         ${result.confidence}, ${result.source}, NOW(), 0, NOW(), NOW()
       )
-      ON DUPLICATE KEY UPDATE
-        categoryName = VALUES(categoryName),
-        categoryId = VALUES(categoryId),
-        confidence = VALUES(confidence),
-        source = VALUES(source),
-        lookupDate = NOW(),
-        updatedAt = NOW()
+      ON CONFLICT ("normalizedName") DO UPDATE SET
+        "categoryName" = EXCLUDED."categoryName",
+        "categoryId" = EXCLUDED."categoryId",
+        confidence = EXCLUDED.confidence,
+        source = EXCLUDED.source,
+        "lookupDate" = NOW(),
+        "updatedAt" = NOW()
     `;
   } catch (error) {
     console.error('Error saving merchant category to cache:', error);

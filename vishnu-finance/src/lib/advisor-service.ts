@@ -345,10 +345,11 @@ export async function processAdvisorQuery(context: AdvisorContext): Promise<Advi
     }) : Promise.resolve([]);
 
     // Wait for essential context
-    let [financialSummary, messages] = await Promise.all([
+    const [financialSummaryResult, messages] = await Promise.all([
       financialSummaryPromise,
       historyPromise
     ]);
+    let financialSummary = financialSummaryResult;
 
     // Step 3: Handle specific amount filters if mentioned (already processed by analyzeUserFinances but we keep for extra safety)
     const specificAmountMatch = userMessage.match(/(?:₹|rs\.?|inr\s*)?(\d+(?:,\d{3})*(?:k|thousand)?)/i);

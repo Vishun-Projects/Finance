@@ -8,7 +8,7 @@ async function updateDefaultPassword() {
     console.log('🔐 Updating all user passwords to default: password123\n');
 
     // Hash the default password
-    const defaultPassword = 'password123';
+    const defaultPassword = process.env.DEFAULT_PASSWORD || 'password123';
     const hashedPassword = await bcrypt.hash(defaultPassword, 10);
     console.log('✅ Generated bcrypt hash for default password\n');
 

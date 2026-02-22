@@ -1,5 +1,5 @@
-const apiKey = 'sk-air-4205oGKbigqXGrtZRYshwrZHxSnrOYHFIlW3qVeNsbGMHx6rvGDF5uBySEkD6BJe';
-const prompt = "A red sports car, professional photography";
+const apiKey = process.env.AIRFORCE_API_KEY;
+const prompt = process.env.PROMPT || "A red sports car, professional photography";
 
 async function benchmark(model) {
     console.log(`Benchmarking model ${model}...`);

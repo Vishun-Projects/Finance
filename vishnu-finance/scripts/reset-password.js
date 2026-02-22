@@ -24,11 +24,11 @@ async function resetPassword() {
 
     // Reset password for the first user (Vishnu)
     const targetUser = users.find(u => u.email === 'vishun.orv@gmail.com') || users[0];
-    
+
     if (targetUser) {
-      const newPassword = 'password123'; // Simple password for testing
+      const newPassword = process.env.DEFAULT_PASSWORD || 'password123'; // Optional env override
       const hashedPassword = await bcrypt.hash(newPassword, 12);
-      
+
       await prisma.user.update({
         where: { id: targetUser.id },
         data: { password: hashedPassword }

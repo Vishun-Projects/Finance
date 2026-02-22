@@ -65,17 +65,31 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
       console.log('🔐 AUTH CONTEXT - /api/app auth_me response status:', response.status);
 
       if (response.ok) {
-        const data = await response.json();
-        console.log('🔐 AUTH CONTEXT - User data received:', JSON.stringify(data, null, 2));
-        setUser(data.user);
-        console.log('🔐 AUTH CONTEXT - User state set to:', data.user);
+        const text = await response.text();
+        try {
+          const data = JSON.parse(text);
+          console.log('🔐 AUTH CONTEXT - User data received:', JSON.stringify(data, null, 2));
+          setUser(data.user);
+          console.log('🔐 AUTH CONTEXT - User state set to:', data.user);
+        } catch (e) {
+          console.error('🔐 AUTH CONTEXT - Failed to parse auth_me JSON:', text.substring(0, 100));
+          throw new Error('Server returned invalid data format');
+        }
         console.log(`⏱️ AUTH CONTEXT - checkAuth complete in ${Date.now() - startTime}ms`);
       } else if (response.status === 401) {
         console.log('🔐 AUTH CONTEXT - 401 Unauthorized, setting user to null');
         setUser(null);
       } else {
         console.log('🔐 AUTH CONTEXT - Other error status:', response.status);
-        throw new Error(`HTTP ${response.status}`);
+        const text = await response.text();
+        let errorMessage = `HTTP ${response.status}`;
+        try {
+          const errorData = JSON.parse(text);
+          errorMessage = errorData.error || errorMessage;
+        } catch (e) {
+          // Use default HTTP error message if not JSON
+        }
+        throw new Error(errorMessage);
       }
     } catch (err) {
       console.error('🔐 AUTH CONTEXT - Auth check failed:', err);
@@ -112,18 +126,31 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
       console.log('🔐 AUTH CONTEXT - Login response status:', response.status);
 
       if (response.ok) {
-        const data = await response.json();
-        console.log('🔐 AUTH CONTEXT - Login successful, user data:', JSON.stringify(data, null, 2));
-        setUser(data.user);
-        console.log('🔐 AUTH CONTEXT - User state set to:', data.user);
-        console.log(`⏱️ AUTH CONTEXT - login complete in ${Date.now() - startTime}ms`);
-        return data.user;
+        const text = await response.text();
+        try {
+          const data = JSON.parse(text);
+          console.log('🔐 AUTH CONTEXT - Login successful, user data:', JSON.stringify(data, null, 2));
+          setUser(data.user);
+          console.log('🔐 AUTH CONTEXT - User state set to:', data.user);
+          console.log(`⏱️ AUTH CONTEXT - login complete in ${Date.now() - startTime}ms`);
+          return data.user;
+        } catch (e) {
+          console.error('🔐 AUTH CONTEXT - Failed to parse login JSON:', text.substring(0, 100));
+          throw new Error('Server returned invalid data format');
+        }
       } else {
-        const errorData = await response.json();
-        console.log('🔐 AUTH CONTEXT - Login failed:', errorData);
-        setError(errorData.error || 'Login failed');
-        // Throw error so caller can handle specific conditions (like verification)
-        throw new Error(errorData.error || 'Login failed');
+        const text = await response.text();
+        let errorMessage = 'Login failed';
+        try {
+          const errorData = JSON.parse(text);
+          errorMessage = errorData.error || errorMessage;
+          console.log('🔐 AUTH CONTEXT - Login failed (JSON error):', errorData);
+        } catch (e) {
+          console.log('🔐 AUTH CONTEXT - Login failed (Non-JSON error):', text.substring(0, 100));
+          errorMessage = `Login failed (HTTP ${response.status})`;
+        }
+        setError(errorMessage);
+        throw new Error(errorMessage);
       }
     } catch (err) {
       console.error('🔐 AUTH CONTEXT - Login error:', err);

@@ -5,13 +5,23 @@ const globalForPrisma = globalThis as unknown as {
 }
 
 // Optimized Prisma client with connection pooling and performance settings
-// Connection pool configuration: 10-20 connections recommended for 250 concurrent users
-// DATABASE_URL should include: ?connection_limit=10&pool_timeout=20
+// Forced connection limits for high concurrent advisor tasks
+const getDatabaseUrl = () => {
+  const url = process.env.DATABASE_URL || '';
+  if (url.includes('?')) {
+    if (!url.includes('connection_limit')) {
+      return `${url}&connection_limit=20&pool_timeout=30`;
+    }
+    return url;
+  }
+  return `${url}?connection_limit=20&pool_timeout=30`;
+};
+
 export const prisma = globalForPrisma.prisma ?? new PrismaClient({
   log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
   datasources: {
     db: {
-      url: process.env.DATABASE_URL,
+      url: getDatabaseUrl(),
     },
   },
 })

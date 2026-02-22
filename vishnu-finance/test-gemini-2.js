@@ -3,8 +3,8 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 async function listModels() {
     const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
     try {
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-        console.log("Attempting to generate TEXT with gemini-1.5-flash...");
+        const model = genAI.getGenerativeModel({ model: "gemma-3-27b-it" });
+        console.log("Attempting to generate TEXT with gemma-3-27b-it...");
         const result = await model.generateContent("Hello");
         console.log("Text Gen Success:", result.response.text());
 
@@ -12,10 +12,10 @@ async function listModels() {
         // Or maybe the user meant "gemini-pro-vision" (which is improper for gen)?
         // Let's try 'imagen-2'
         try {
-            console.log("Attempting imagen-2");
-            const model2 = genAI.getGenerativeModel({ model: "imagen-2.0" }); // Guessing name
+            console.log("Attempting gemma-3-27b-it again as variant");
+            const model2 = genAI.getGenerativeModel({ model: "gemma-3-27b-it" });
             await model2.generateContent("test");
-        } catch (e) { console.log("imagen-2 failed:", e.message) }
+        } catch (e) { console.log("gemma-3 failed:", e.message) }
 
     } catch (error) {
         console.error("Error:", error.message);

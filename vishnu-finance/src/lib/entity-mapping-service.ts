@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db';
+import { globalCache } from './cache-singleton';
 
 type EntityType = 'PERSON' | 'STORE';
 
@@ -30,6 +31,39 @@ export async function getCanonicalNamesBatch(
 
   if (!names?.length) {
     return result;
+  }
+
+  // AI OPTIMIZATION: Check global singleton cache
+  const cacheKey = `entity_mappings:${userId}:${entityTypes.join('_')}`;
+  const cachedMappings = globalCache.get<Map<string, string>>(cacheKey);
+
+  const processResolved = (nameToCanonical: Map<string, string>) => {
+    for (const name of names) {
+      if (!name || !name.trim()) {
+        result[name] = name;
+        continue;
+      }
+
+      let resolved = false;
+      for (const entityType of entityTypes) {
+        const key = `${name.toLowerCase().trim()}:${entityType}`;
+        const canonical = nameToCanonical.get(key);
+        if (canonical) {
+          result[name] = canonical;
+          resolved = true;
+          break;
+        }
+      }
+
+      if (!resolved) {
+        result[name] = name;
+      }
+    }
+    return result;
+  };
+
+  if (cachedMappings) {
+    return processResolved(cachedMappings);
   }
 
   try {
@@ -83,29 +117,10 @@ export async function getCanonicalNamesBatch(
       }
     }
 
-    for (const name of names) {
-      if (!name || !name.trim()) {
-        result[name] = name;
-        continue;
-      }
+    // AI OPTIMIZATION: Update global cache
+    globalCache.set(cacheKey, nameToCanonical, 600000); // 10 minutes
 
-      let resolved = false;
-      for (const entityType of entityTypes) {
-        const key = `${name.toLowerCase().trim()}:${entityType}`;
-        const canonical = nameToCanonical.get(key);
-        if (canonical) {
-          result[name] = canonical;
-          resolved = true;
-          break;
-        }
-      }
-
-      if (!resolved) {
-        result[name] = name;
-      }
-    }
-
-    return result;
+    return processResolved(nameToCanonical);
   } catch (error) {
     console.warn(
       '⚠️ Error resolving canonical names batch:',

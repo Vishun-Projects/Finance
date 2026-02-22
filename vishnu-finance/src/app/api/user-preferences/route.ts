@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '../../../lib/db';
+import { globalCache } from '../../../lib/cache-singleton';
 
 // GET user preferences
 export async function GET(request: NextRequest) {
@@ -9,6 +10,14 @@ export async function GET(request: NextRequest) {
 
     if (!userId) {
       return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
+    }
+
+    // AI OPTIMIZATION: Check global singleton cache
+    const cacheKey = `user_prefs:${userId}`;
+    const cachedPrefs = globalCache.get(cacheKey);
+    if (cachedPrefs) {
+      // console.log(`⚡ PREFS CACHE HIT (Global): ${userId}`);
+      return NextResponse.json(cachedPrefs);
     }
 
     const preferences = await (prisma as any).userPreferences.findUnique({
@@ -25,6 +34,8 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    // Update cache
+    globalCache.set(cacheKey, preferences);
     return NextResponse.json(preferences);
   } catch (error) {
     console.error('Error fetching user preferences:', error);
@@ -45,7 +56,6 @@ export async function POST(request: NextRequest) {
       language,
       timezone,
       dateFormat,
-      notificationEmail
     } = body;
 
     if (!userId) {
@@ -92,6 +102,9 @@ export async function POST(request: NextRequest) {
       }
     });
 
+    // Invalidate cache
+    globalCache.delete(`user_prefs:${userId}`);
+
     return NextResponse.json(preferences);
   } catch (error: any) {
     if (error.code === 'P2002') {
@@ -121,6 +134,9 @@ export async function DELETE(request: NextRequest) {
     await (prisma as any).userPreferences.delete({
       where: { userId }
     });
+
+    // Invalidate cache
+    globalCache.delete(`user_prefs:${userId}`);
 
     return NextResponse.json({ message: 'Preferences deleted successfully' });
   } catch (error) {

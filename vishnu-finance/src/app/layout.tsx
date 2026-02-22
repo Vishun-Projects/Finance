@@ -5,6 +5,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { LayoutProvider } from "@/contexts/LayoutContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { CurrencyProvider } from "@/contexts/CurrencyContext";
+import { MobileNavigationListener } from '@/components/layout/mobile-navigation-listener';
 import { ToastProvider } from "@/contexts/ToastContext";
 import { LoadingProvider } from "@/contexts/LoadingContext";
 import { Toaster } from "@/components/ui/sonner";
@@ -76,6 +77,7 @@ export const viewport: Viewport = {
 };
 
 import FetchInterceptor from "@/components/fetch-interceptor";
+import DebugOverlay from "@/components/debug/debug-overlay";
 import { DesignProvider } from "@/components/providers/design-provider";
 import { getDesignSettings } from "@/app/actions/design-system";
 
@@ -124,6 +126,8 @@ export default async function RootLayout({
                       {children}
                       <GlobalPreloader />
                       <Toaster />
+                      <MobileNavigationListener />
+                      <DebugOverlay />
                     </LayoutProvider>
                   </LoadingProvider>
                 </ToastProvider>

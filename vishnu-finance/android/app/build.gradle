@@ -3,6 +3,19 @@ apply plugin: 'com.android.application'
 android {
     namespace "com.vishnu.finance"
     compileSdk rootProject.ext.compileSdkVersion
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_21
+        targetCompatibility JavaVersion.VERSION_21
+    }
+
+    // Ensure Java 21 Toolchain is used for consistent builds across environments
+    java {
+        toolchain {
+            languageVersion = JavaLanguageVersion.of(21)
+        }
+    }
+
     defaultConfig {
         applicationId "com.vishnu.finance"
         minSdkVersion rootProject.ext.minSdkVersion

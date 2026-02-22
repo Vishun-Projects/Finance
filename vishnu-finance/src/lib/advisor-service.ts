@@ -1,7 +1,6 @@
 import { prisma } from './db';
-import { searchDocuments, generateResponse, searchInternet } from './gemini';
+import { generateResponse } from './gemini';
 import { analyzeUserFinances, formatFinancialSummary, DateRange } from './financial-analysis';
-import { getDocumentText } from './document-processor';
 
 export interface AdvisorContext {
   userId: string;
@@ -34,13 +33,13 @@ interface TransactionQueryFilters {
 function parseTransactionFiltersFromQuery(query: string): TransactionQueryFilters {
   const lowerQuery = query.toLowerCase();
   const filters: TransactionQueryFilters = {};
-  
+
   // Parse date range
   const dateRange = parseDateRangeFromQuery(query);
   if (dateRange) {
     filters.dateRange = dateRange;
   }
-  
+
   // Parse amount filters
   // "above ₹15,000", "more than 15000", "over 15k", ">= 15000"
   const amountAboveMatch = lowerQuery.match(/(?:above|more than|over|greater than|>=|>\s*)(?:₹|rs\.?|inr\s*)?(\d+(?:,\d{3})*(?:k|thousand)?)/i);
@@ -50,7 +49,7 @@ function parseTransactionFiltersFromQuery(query: string): TransactionQueryFilter
       filters.minAmount = amount;
     }
   }
-  
+
   // "below ₹10,000", "less than 10000", "under 10k", "<= 10000"
   const amountBelowMatch = lowerQuery.match(/(?:below|less than|under|<=|<\s*)(?:₹|rs\.?|inr\s*)?(\d+(?:,\d{3})*(?:k|thousand)?)/i);
   if (amountBelowMatch) {
@@ -59,7 +58,7 @@ function parseTransactionFiltersFromQuery(query: string): TransactionQueryFilter
       filters.maxAmount = amount;
     }
   }
-  
+
   // "between ₹5,000 and ₹10,000"
   const amountBetweenMatch = lowerQuery.match(/(?:between|from)\s*(?:₹|rs\.?|inr\s*)?(\d+(?:,\d{3})*(?:k|thousand)?)\s*(?:and|to)\s*(?:₹|rs\.?|inr\s*)?(\d+(?:,\d{3})*(?:k|thousand)?)/i);
   if (amountBetweenMatch) {
@@ -68,14 +67,14 @@ function parseTransactionFiltersFromQuery(query: string): TransactionQueryFilter
     if (minAmount) filters.minAmount = minAmount;
     if (maxAmount) filters.maxAmount = maxAmount;
   }
-  
+
   // Parse transaction type
   if (lowerQuery.includes('income') || lowerQuery.includes('earning')) {
     filters.transactionType = 'INCOME';
   } else if (lowerQuery.includes('expense') || lowerQuery.includes('spending') || lowerQuery.includes('expenditure')) {
     filters.transactionType = 'EXPENSE';
   }
-  
+
   return filters;
 }
 
@@ -107,7 +106,7 @@ function parseAmount(amountStr: string): number | undefined {
 function parseDateRangeFromQuery(query: string): DateRange | undefined {
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  
+
   // Patterns for relative dates
   const patterns = [
     // "last N months/weeks/days"
@@ -117,7 +116,7 @@ function parseDateRangeFromQuery(query: string): DateRange | undefined {
         const num = parseInt(match[1]);
         const unit = match[2].toLowerCase();
         const startDate = new Date(today);
-        
+
         if (unit.startsWith('month')) {
           startDate.setMonth(startDate.getMonth() - num);
         } else if (unit.startsWith('week')) {
@@ -125,7 +124,7 @@ function parseDateRangeFromQuery(query: string): DateRange | undefined {
         } else if (unit.startsWith('day')) {
           startDate.setDate(startDate.getDate() - num);
         }
-        
+
         return { startDate, endDate: today };
       },
     },
@@ -213,7 +212,13 @@ function parseDateRangeFromQuery(query: string): DateRange | undefined {
           const endDate = new Date(year, monthIndex + 1, 0, 23, 59, 59, 999);
           return { startDate, endDate };
         }
-        return undefined;
+      },
+    },
+    // "all time", "overall", "since beginning"
+    {
+      regex: /(all time|overall|since beginning|full history|everything)/i,
+      handler: () => {
+        return { startDate: new Date(2000, 0, 1), endDate: new Date(2040, 0, 1) };
       },
     },
   ];
@@ -241,7 +246,7 @@ function parseDateString(dateStr: string): Date | undefined {
       const date = new Date(dateStr);
       if (!isNaN(date.getTime())) return date;
     }
-    
+
     // Try DD/MM/YYYY or MM/DD/YYYY
     const slashMatch = dateStr.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
     if (slashMatch) {
@@ -253,7 +258,7 @@ function parseDateString(dateStr: string): Date | undefined {
       const date2 = new Date(parseInt(y), parseInt(d) - 1, parseInt(m));
       if (!isNaN(date2.getTime())) return date2;
     }
-    
+
     // Try natural language month names
     const monthNames = [
       'january', 'february', 'march', 'april', 'may', 'june',
@@ -270,7 +275,7 @@ function parseDateString(dateStr: string): Date | undefined {
         if (!isNaN(date.getTime())) return date;
       }
     }
-    
+
     // Fallback to Date constructor
     const date = new Date(dateStr);
     if (!isNaN(date.getTime())) return date;
@@ -287,185 +292,115 @@ export async function processAdvisorQuery(context: AdvisorContext): Promise<Advi
   try {
     const { userId, conversationId, userMessage } = context;
 
-    // Step 1: Parse transaction filters from query if present
-    const transactionFilters = parseTransactionFiltersFromQuery(userMessage);
-    const dateRange = transactionFilters.dateRange;
+    // AI OPTIMIZATION: Smart Filtering & Token Management
+    // Detect if the user is asking about a specific entity (Person/Store) or keyword
+    const extractKeyword = (query: string): string | undefined => {
+      const stopWords = ['income', 'expense', 'transaction', 'transactions', 'spending', 'data', 'summary', 'month', 'year', 'last', 'this', 'total', 'average', 'analyze', 'explain', 'show', 'for', 'about', 'the', 'check', 'find', 'overall', 'related', 'give', 'amount', 'amounts', 'recheck', 'search', 'details', 'detail', 'want', 'just'];
+      const words = query.toLowerCase().replace(/[^a-z\s]/g, '').split(/\s+/).filter(w => w.length >= 3 && !stopWords.includes(w));
 
-    // Step 2: Get user's financial summary with optional date range
-    let financialSummary = await analyzeUserFinances(userId, dateRange);
-    
-    // Step 3: Check if query is asking about a specific amount (for "why did I send X" type questions)
+      // PRIORITY 1: URL Search Parameter (highest precision if user pastes link)
+      const urlMatch = query.match(/[?&]search=([^&]+)/i);
+      if (urlMatch) return decodeURIComponent(urlMatch[1]).toLowerCase();
+
+      // PRIORITY 2: Pattern: "to [Name]", "paid [Name]", etc.
+      const entityMatch = query.match(/(?:to|from|paid|payout|gave|sent|received from|at|on|for|about|of|named|called|related to)\s+([a-zA-Z]{3,})/i);
+      if (entityMatch) {
+        const candidate = entityMatch[1].toLowerCase();
+        if (!stopWords.includes(candidate)) return candidate;
+      }
+
+      // PRIORITY 2: Quoted strings (highest precision)
+      const quotedMatch = query.match(/"([^"]+)"|'([^']+)'/);
+      if (quotedMatch) return (quotedMatch[1] || quotedMatch[2]).toLowerCase();
+
+      // PRIORITY 3: Capitalized words (likely names/brands)
+      const capitalizedMatch = query.match(/\b[A-Z][a-z]{2,}\b/);
+      if (capitalizedMatch) {
+        const candidate = capitalizedMatch[0].toLowerCase();
+        if (!stopWords.includes(candidate)) return candidate;
+      }
+
+      // PRIORITY 4: The longest non-stopword (likely the core subject)
+      if (words.length > 0) {
+        // Tie-breaker: prefer words that look like proper names (not in stopWords)
+        return words.sort((a, b) => b.length - a.length)[0];
+      }
+
+      return undefined;
+    };
+
+    const keyword = extractKeyword(userMessage);
+    const filters = parseTransactionFiltersFromQuery(userMessage);
+
+    // AI OPTIMIZATION: Targeted queries get 3000 limit (safely within token limits for specific searches)
+    // General summaries get 500 recently active transactions
+    const limit = keyword ? 3000 : 500;
+
+    const financialSummaryPromise = analyzeUserFinances(userId, filters.dateRange, keyword, limit);
+
+    const historyPromise = conversationId ? (prisma as any).advisorMessage.findMany({
+      where: { conversationId },
+      orderBy: { createdAt: 'asc' },
+      take: 15,
+    }) : Promise.resolve([]);
+
+    // Wait for essential context
+    let [financialSummary, messages] = await Promise.all([
+      financialSummaryPromise,
+      historyPromise
+    ]);
+
+    // Step 3: Handle specific amount filters if mentioned (already processed by analyzeUserFinances but we keep for extra safety)
     const specificAmountMatch = userMessage.match(/(?:₹|rs\.?|inr\s*)?(\d+(?:,\d{3})*(?:k|thousand)?)/i);
     let specificAmount: number | undefined;
     if (specificAmountMatch) {
       specificAmount = parseAmount(specificAmountMatch[1]);
     }
-    
-    // Step 4: Apply additional filters to transactions if specified
-    if (transactionFilters.minAmount || transactionFilters.maxAmount || transactionFilters.transactionType || specificAmount) {
+
+    if (filters.minAmount || filters.maxAmount || filters.transactionType || specificAmount) {
       let filteredTransactions = financialSummary.transactions;
-      
-      if (transactionFilters.minAmount) {
-        filteredTransactions = filteredTransactions.filter(t => t.amount >= transactionFilters.minAmount!);
+
+      if (filters.minAmount) filteredTransactions = filteredTransactions.filter(t => t.amount >= filters.minAmount!);
+      if (filters.maxAmount) filteredTransactions = filteredTransactions.filter(t => t.amount <= filters.maxAmount!);
+      if (filters.transactionType && filters.transactionType !== 'ALL') {
+        filteredTransactions = filteredTransactions.filter(t => t.type === filters.transactionType);
       }
-      if (transactionFilters.maxAmount) {
-        filteredTransactions = filteredTransactions.filter(t => t.amount <= transactionFilters.maxAmount!);
-      }
-      if (transactionFilters.transactionType && transactionFilters.transactionType !== 'ALL') {
-        filteredTransactions = filteredTransactions.filter(t => t.type === transactionFilters.transactionType);
-      }
-      
-      // If specific amount is mentioned, find transactions within ±10% range for approximate matching
+
       if (specificAmount) {
-        const tolerance = specificAmount * 0.1; // 10% tolerance
-        filteredTransactions = filteredTransactions.filter(t => 
+        const tolerance = specificAmount * 0.1;
+        filteredTransactions = filteredTransactions.filter(t =>
           Math.abs(t.amount - specificAmount) <= tolerance || t.amount === specificAmount
         );
-        // Sort by closest match first
-        filteredTransactions.sort((a, b) => 
-          Math.abs(a.amount - specificAmount) - Math.abs(b.amount - specificAmount)
-        );
       }
-      
-      // Update the summary with filtered transactions
+
       financialSummary = {
         ...financialSummary,
         transactions: filteredTransactions,
         totalTransactionCount: filteredTransactions.length,
       };
     }
-    
+
     const financialSummaryText = formatFinancialSummary(financialSummary);
+    const conversationHistory = messages.map((msg: { role: string; content: string }) => ({
+      role: msg.role === 'USER' ? 'user' : 'assistant',
+      content: msg.content,
+    }));
 
-    // Step 5: Determine if query is about user's own data or general financial advice
-    // Only search external sources for general financial advice, not for user's own data queries
-    const lowerQuery = userMessage.toLowerCase();
-    const isUserDataQuery = 
-      lowerQuery.includes('my ') ||
-      lowerQuery.includes('my transactions') ||
-      lowerQuery.includes('my expenses') ||
-      lowerQuery.includes('my income') ||
-      lowerQuery.includes('my spending') ||
-      lowerQuery.includes('my savings') ||
-      lowerQuery.includes('my goals') ||
-      lowerQuery.includes('my wishlist') ||
-      lowerQuery.includes('my categories') ||
-      lowerQuery.includes('my data') ||
-      lowerQuery.includes('my financial') ||
-      lowerQuery.includes('tell me about myself') ||
-      lowerQuery.includes('tell me about me') ||
-      lowerQuery.includes('based on my') ||
-      lowerQuery.includes('based on financial trend') ||
-      lowerQuery.includes('based on my financial') ||
-      (lowerQuery.includes('list') && (lowerQuery.includes('transaction') || lowerQuery.includes('expense'))) ||
-      lowerQuery.includes('show me') ||
-      lowerQuery.includes('what are my') ||
-      lowerQuery.includes('how much did i') ||
-      lowerQuery.includes('where did i spend') ||
-      lowerQuery.includes('analyze my') ||
-      lowerQuery.includes('my spending pattern') ||
-      lowerQuery.includes('my financial situation') ||
-      lowerQuery.includes('why did i') ||
-      lowerQuery.includes('why did i send') ||
-      lowerQuery.includes('why did i pay') ||
-      lowerQuery.includes('what did i pay') ||
-      lowerQuery.includes('what did i send') ||
-      lowerQuery.includes('deduce') ||
-      lowerQuery.includes('what was') ||
-      lowerQuery.includes('who did i pay') ||
-      lowerQuery.includes('who did i send') ||
-      lowerQuery.includes('category') ||
-      lowerQuery.includes('business') ||
-      lowerQuery.includes('person');
-
-    const relevantDocs: Array<{ id: string; title: string; content: string }> = [];
-    const sources: Array<{ type: 'document' | 'internet'; id?: string; title?: string; url?: string }> = [];
-
-    // Only search external sources if NOT a user data query
-    if (!isUserDataQuery) {
-      // Search super documents first
-      const allSuperDocs = await (prisma as any).superDocument.findMany({
-        where: {
-          visibility: 'PUBLIC',
-        },
-        select: {
-          id: true,
-          title: true,
-          processedText: true,
-        },
-      });
-
-      if (allSuperDocs.length > 0) {
-        // Search documents
-        const searchResults = await searchDocuments(
-          userMessage,
-          allSuperDocs.map((doc: { id: string; title: string; processedText: string | null }) => ({
-            id: doc.id,
-            title: doc.title,
-            processedText: doc.processedText,
-          }))
-        );
-
-        // Get full text for top 3 relevant documents
-        const topDocs = searchResults.slice(0, 3);
-        for (const result of topDocs) {
-          const docText = await getDocumentText(result.documentId);
-          if (docText) {
-            relevantDocs.push({
-              id: result.documentId,
-              title: result.title,
-              content: docText,
-            });
-            sources.push({
-              type: 'document',
-              id: result.documentId,
-              title: result.title,
-            });
-          }
-        }
-      }
-
-      // Step 6: If no relevant documents found, search internet
-      if (relevantDocs.length === 0) {
-        const internetResults = await searchInternet(userMessage);
-        const internetSources = internetResults.map((result) => ({
-          type: 'internet' as const,
-          url: result.url,
-          title: result.title,
-        }));
-        sources.push(...internetSources);
-      }
-    }
-
-    // Step 7: Get conversation history if conversationId exists
-    let conversationHistory: Array<{ role: 'user' | 'assistant'; content: string }> = [];
-    if (conversationId) {
-      const messages = await (prisma as any).advisorMessage.findMany({
-        where: {
-          conversationId,
-        },
-        orderBy: {
-          createdAt: 'asc',
-        },
-        take: 10, // Last 10 messages for context
-      });
-
-      conversationHistory = messages.map((msg: { role: string; content: string }) => ({
-        role: msg.role === 'USER' ? 'user' : 'assistant',
-        content: msg.content,
-      }));
-    }
-
-    // Step 8: Generate AI response
+    // Step 4: Generate AI response directly (Zero Document/Internet Overhead)
     const aiResponse = await generateResponse(userMessage, {
       financialSummary: financialSummaryText,
-      relevantDocuments: relevantDocs.length > 0 ? relevantDocs : undefined,
       conversationHistory: conversationHistory.length > 0 ? conversationHistory : undefined,
+      // Pass filtering metadata to help AI understand its "window" into the data
+      filterContext: {
+        searchTerm: keyword,
+        dateRange: filters.dateRange,
+        appliedLimit: limit
+      } as any
     });
 
     return {
       response: aiResponse.response,
-      sources: [...sources, ...aiResponse.sources.filter((s) => !sources.find((existing) => existing.id === s.id))],
+      sources: aiResponse.sources as any,
     };
   } catch (error) {
     console.error('Error processing advisor query:', error);

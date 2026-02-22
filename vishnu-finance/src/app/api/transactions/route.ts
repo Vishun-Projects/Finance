@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db';
 import { getCanonicalName, getCanonicalNamesBatch } from '@/lib/entity-mapping-service';
 import { rateLimitMiddleware, getRouteType } from '@/lib/rate-limit';
 import { TransactionCategory } from '@/types';
+import { globalCache } from '@/lib/cache-singleton';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 60; // Revalidate every minute
@@ -18,6 +19,15 @@ export async function GET(request: NextRequest) {
   const rateLimitResponse = rateLimitMiddleware(routeType, request);
   if (rateLimitResponse) {
     return rateLimitResponse;
+  }
+
+  // AI OPTIMIZATION: High-speed query caching
+  const fullUrl = request.nextUrl.toString();
+  const cacheKey = `transactions_query:${fullUrl}`;
+  const cachedResponse = globalCache.get(cacheKey);
+  if (cachedResponse) {
+    // console.log(`⚡ TRANSACTIONS CACHE HIT: ${fullUrl}`);
+    return NextResponse.json(cachedResponse);
   }
 
   try {
@@ -68,6 +78,7 @@ export async function GET(request: NextRequest) {
     const amountPreset = searchParams.get('amountPreset') as 'lt1k' | '1to10k' | '10to50k' | '50to100k' | 'gt100k' | null;
     const entityType = searchParams.get('entityType') as 'STORE' | 'PERSON' | null;
     const searchTerm = searchParams.get('search');
+    const range = searchParams.get('range');
     const includeDeleted = searchParams.get('includeDeleted') === 'true';
 
     // Sorting
@@ -99,8 +110,16 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // AI OPTIMIZATION: High-speed query caching
+    const cacheKey = `transactions_query:${fullUrl}`;
+    const cachedResponse = globalCache.get(cacheKey);
+    if (cachedResponse) {
+      return NextResponse.json(cachedResponse);
+    }
+
     // Date range filter
-    if (startDate || endDate) {
+    // AI OPTIMIZATION: If range is 'all', ignore defensive startDate/endDate to ensure consistency with Dashboard
+    if (range !== 'all' && (startDate || endDate)) {
       const start = startDate ? new Date(startDate) : null;
       const end = endDate ? new Date(endDate) : null;
       const isValidStart = start && !isNaN(start.getTime());
@@ -228,6 +247,7 @@ export async function GET(request: NextRequest) {
             debitAmount: true,
           },
         });
+
         totals = {
           income: Number(totalsQuery._sum.creditAmount || 0),
           expense: Number(totalsQuery._sum.debitAmount || 0),
@@ -374,6 +394,9 @@ export async function GET(request: NextRequest) {
     if (includeTotals && totals !== null) {
       response.totals = totals;
     }
+
+    // AI OPTIMIZATION: Update global cache (30s TTL for responsiveness)
+    globalCache.set(cacheKey, response, 30000);
 
     return NextResponse.json(response);
   } catch (error) {

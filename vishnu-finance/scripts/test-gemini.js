@@ -5,13 +5,13 @@ require('dotenv').config({ path: '.env.local' });
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY);
 
 const MODELS_TO_TEST = [
+    "gemma-3-27b-it",
+    "gemini-2.0-flash",
     "gemini-1.5-flash",
     "gemini-1.5-flash-latest",
     "gemini-1.5-flash-001",
     "gemini-pro",
-    "gemini-1.0-pro",
-    "gemini-2.0-flash",
-    "gemini-2.5-flash" // Testing the mystery model
+    "gemini-1.0-pro"
 ];
 
 async function main() {

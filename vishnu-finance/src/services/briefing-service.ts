@@ -96,7 +96,7 @@ Create a "Daily Financial Briefing" in JSON format with:
 
 Format: JSON only.`;
 
-            const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash', generationConfig: { responseMimeType: "application/json" } });
+            const model = genAI.getGenerativeModel({ model: 'gemma-3-27b-it', generationConfig: { responseMimeType: "application/json" } });
 
             const result = await retryWithBackoff(async () => {
                 return await model.generateContent(prompt);

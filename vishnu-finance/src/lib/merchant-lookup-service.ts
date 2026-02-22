@@ -51,7 +51,7 @@ async function lookupFromCache(
 
     if (cached && cached.length > 0) {
       const record = cached[0];
-      
+
       // Update hit count
       await (prisma as any).$executeRaw`
         UPDATE merchant_categories
@@ -109,7 +109,7 @@ async function lookupWithGoogleSearch(
 
     // Extract category from search results with better analysis
     // Combine all text from snippets, titles, and links
-    const allText = items.map((item: any) => 
+    const allText = items.map((item: any) =>
       [
         item.snippet || '',
         item.title || '',
@@ -120,45 +120,45 @@ async function lookupWithGoogleSearch(
 
     // Enhanced category keywords with more variations
     const categoryKeywords: Record<string, { keywords: string[]; confidence: number }> = {
-      'Groceries': { 
-        keywords: ['grocery', 'supermarket', 'food store', 'retail', 'kirana', 'provision', 'vegetable', 'fruit'], 
-        confidence: 0.85 
+      'Groceries': {
+        keywords: ['grocery', 'supermarket', 'food store', 'retail', 'kirana', 'provision', 'vegetable', 'fruit'],
+        confidence: 0.85
       },
-      'Food & Dining': { 
-        keywords: ['restaurant', 'cafe', 'food', 'dining', 'eatery', 'hotel', 'dhaba', 'tiffin', 'catering'], 
-        confidence: 0.85 
+      'Food & Dining': {
+        keywords: ['restaurant', 'cafe', 'food', 'dining', 'eatery', 'hotel', 'dhaba', 'tiffin', 'catering'],
+        confidence: 0.85
       },
-      'Shopping': { 
-        keywords: ['shop', 'store', 'retail', 'mall', 'outlet', 'boutique', 'showroom', 'market'], 
-        confidence: 0.80 
+      'Shopping': {
+        keywords: ['shop', 'store', 'retail', 'mall', 'outlet', 'boutique', 'showroom', 'market'],
+        confidence: 0.80
       },
-      'Healthcare': { 
-        keywords: ['pharmacy', 'medical', 'hospital', 'clinic', 'health', 'medicine', 'doctor', 'diagnostic'], 
-        confidence: 0.85 
+      'Healthcare': {
+        keywords: ['pharmacy', 'medical', 'hospital', 'clinic', 'health', 'medicine', 'doctor', 'diagnostic'],
+        confidence: 0.85
       },
-      'Transportation': { 
-        keywords: ['fuel', 'petrol', 'gas station', 'transport', 'taxi', 'auto', 'uber', 'ola'], 
-        confidence: 0.80 
+      'Transportation': {
+        keywords: ['fuel', 'petrol', 'gas station', 'transport', 'taxi', 'auto', 'uber', 'ola'],
+        confidence: 0.80
       },
-      'Entertainment': { 
-        keywords: ['cinema', 'movie', 'theater', 'entertainment', 'multiplex', 'amusement'], 
-        confidence: 0.80 
+      'Entertainment': {
+        keywords: ['cinema', 'movie', 'theater', 'entertainment', 'multiplex', 'amusement'],
+        confidence: 0.80
       },
-      'Utilities': { 
-        keywords: ['utility', 'bill', 'service', 'provider', 'recharge', 'mobile', 'internet', 'electricity'], 
-        confidence: 0.80 
+      'Utilities': {
+        keywords: ['utility', 'bill', 'service', 'provider', 'recharge', 'mobile', 'internet', 'electricity'],
+        confidence: 0.80
       },
-      'Education': { 
-        keywords: ['school', 'college', 'education', 'institute', 'university', 'tuition', 'coaching'], 
-        confidence: 0.85 
+      'Education': {
+        keywords: ['school', 'college', 'education', 'institute', 'university', 'tuition', 'coaching'],
+        confidence: 0.85
       },
-      'Insurance': { 
-        keywords: ['insurance', 'premium', 'policy', 'lic', 'health insurance'], 
-        confidence: 0.85 
+      'Insurance': {
+        keywords: ['insurance', 'premium', 'policy', 'lic', 'health insurance'],
+        confidence: 0.85
       },
-      'Investment': { 
-        keywords: ['investment', 'financial', 'mutual fund', 'stock', 'trading', 'broker'], 
-        confidence: 0.80 
+      'Investment': {
+        keywords: ['investment', 'financial', 'mutual fund', 'stock', 'trading', 'broker'],
+        confidence: 0.80
       },
       'Family': {
         keywords: ['family', 'relative', 'personal', 'friend'],
@@ -168,7 +168,7 @@ async function lookupWithGoogleSearch(
 
     // Find best matching category with highest confidence
     let bestMatch: { category: string; confidence: number } | null = null;
-    
+
     for (const [category, config] of Object.entries(categoryKeywords)) {
       const keywordMatches = config.keywords.filter(keyword => allText.includes(keyword));
       if (keywordMatches.length > 0) {
@@ -227,7 +227,7 @@ If you're not sure, respond with "null" for category.
 Format: {"categoryName": "string or null", "confidence": number}`;
 
     const model = genAI.getGenerativeModel({
-      model: 'gemini-2.5-flash',
+      model: 'gemma-3-27b-it',
       generationConfig: {
         temperature: 0.3,
         topK: 20,
@@ -272,7 +272,7 @@ async function saveToCache(
 ): Promise<void> {
   try {
     const id = `merchant_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
+
     // Use raw query for upsert
     await (prisma as any).$executeRaw`
       INSERT INTO merchant_categories (
@@ -349,7 +349,7 @@ export async function lookupMerchantCategory(
       console.log(`⏭️ Skipping Gemini merchant lookup for "${storeName}" - quota exceeded`);
       return null;
     }
-    
+
     try {
       result = await lookupWithGemini(storeName);
       if (result && result.categoryName && result.confidence >= MERCHANT_LOOKUP_CONFIG.CONFIDENCE_THRESHOLD) {

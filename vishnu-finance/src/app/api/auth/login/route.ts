@@ -2,11 +2,26 @@ import { NextRequest, NextResponse } from 'next/server';
 import { AuthService } from '@/lib/auth';
 import { writeAuditLog, extractRequestMeta } from '@/lib/audit';
 
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
+      'Access-Control-Max-Age': '86400',
+    },
+  });
+}
+
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
   console.log('🔐 LOGIN API - Starting login request');
+  let email = '';
   try {
-    const { email, password } = await request.json();
+    const body = await request.json();
+    email = body.email;
+    const { password } = body;
     console.log('🔐 LOGIN API - Login attempt for email:', email);
 
     if (!email || !password) {
@@ -28,8 +43,8 @@ export async function POST(request: NextRequest) {
     // Set the auth cookie
     response.cookies.set('auth-token', result.token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      secure: true, // Always secure for sameSite: none compatibility
+      sameSite: 'none', // Required for cross-site cookie usage in some webviews
       maxAge: 7 * 24 * 60 * 60 // 7 days
     });
 

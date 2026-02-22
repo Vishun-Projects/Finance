@@ -15,8 +15,26 @@ let globalGeminiQuotaExceeded = false;
 /**
  * Check if Gemini quota is exceeded
  */
-export function isGeminiQuotaExceeded(): boolean {
-  return globalGeminiQuotaExceeded;
+export function isGeminiQuotaExceeded(error?: any): boolean {
+  if (globalGeminiQuotaExceeded) return true;
+
+  if (error) {
+    const errorString = typeof error === 'string' ? error : JSON.stringify(error).toLowerCase();
+    const isQuotaError =
+      errorString.includes('429') ||
+      errorString.includes('quota') ||
+      errorString.includes('rate_limit') ||
+      errorString.includes('limit') ||
+      errorString.includes('too many requests') ||
+      errorString.includes('input_token_count');
+
+    if (isQuotaError) {
+      console.warn('🚫 Gemini API quota exceeded detected:', errorString.substring(0, 200));
+      globalGeminiQuotaExceeded = true;
+      return true;
+    }
+  }
+  return false;
 }
 
 /**
@@ -61,10 +79,10 @@ export async function searchDocuments(
   }
 
   try {
-    // Try gemini-2.5-flash first, fallback to gemini-1.5-flash if unavailable
+    // AI OPTIMIZATION: Use gemma-3-27b-it as requested (reverted from 2.0-flash)
     let model;
     try {
-      model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+      model = genAI.getGenerativeModel({ model: 'gemma-3-27b-it' });
     } catch {
       console.log('Falling back to gemini-1.5-flash for document search');
       model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
@@ -98,10 +116,10 @@ Format your response as JSON array:
 
 Only include documents with relevance score > 0.3.`;
 
-    // Use retry logic for API calls
+    // Use retry logic for API calls - Reduced for helper task speed
     const result = await retryWithBackoff(async () => {
       return await model.generateContent(prompt);
-    }, 3, 1000);
+    }, 1, 500);
 
     const response = result.response;
     const text = response.text();
@@ -264,15 +282,25 @@ export async function generateResponse(
     financialSummary?: string;
     relevantDocuments?: Array<{ id: string; title: string; content: string }>;
     conversationHistory?: Array<{ role: 'user' | 'assistant'; content: string }>;
+    filterContext?: {
+      searchTerm?: string;
+      dateRange?: { startDate?: Date; endDate?: Date };
+      appliedLimit?: number;
+    };
   }
 ): Promise<{ response: string; sources: Array<{ type: 'document' | 'internet'; id?: string; title?: string; url?: string }> }> {
   // Try models in order of preference with fallback
-  const models = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro'];
+  const models = ['gemma-3-27b-it', 'gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro'];
 
   let lastError: Error | null = null;
 
   for (const modelName of models) {
     try {
+      // AI OPTIMIZATION: Check quota before trying next model
+      if (globalGeminiQuotaExceeded) {
+        throw new Error('Gemini API quota already exceeded. Skipping models.');
+      }
+
       return await retryWithBackoff(async () => {
         const model = genAI.getGenerativeModel({
           model: modelName,
@@ -408,6 +436,19 @@ Always prioritize information from provided documents and the user's actual tran
 
         let contextText = '';
 
+        if (context.filterContext) {
+          const { searchTerm, dateRange, appliedLimit } = context.filterContext;
+          contextText += `\n\nACTIVE DATA FILTERS (CURRENT VIEW):`;
+          if (searchTerm) contextText += `\n- Search Term: "${searchTerm}" (Only showing transactions matching this term)`;
+          if (dateRange) {
+            const s = dateRange.startDate ? dateRange.startDate.toDateString() : 'Beginning';
+            const e = dateRange.endDate ? dateRange.endDate.toDateString() : 'Latest';
+            contextText += `\n- Date Range: ${s} to ${e}`;
+          }
+          if (appliedLimit) contextText += `\n- Transaction Limit: Showing up to ${appliedLimit} records`;
+          contextText += `\n\nALWAYS prioritize these search results and active filters when answering. If the user asks for a total for a specific entity, use the search totals provided below.`;
+        }
+
         if (context.financialSummary) {
           contextText += `\n\nUser's Financial Summary:\n${context.financialSummary}\n`;
         }
@@ -429,7 +470,9 @@ Always prioritize information from provided documents and the user's actual tran
 
         const prompt = `${systemPrompt}${contextText}\n\nUser Question: ${userMessage}\n\nProvide a helpful, accurate response based on the context above. If you reference a document, mention which one.`;
 
-        const result = await model.generateContent(prompt);
+        const result = await retryWithBackoff(async () => {
+          return await model.generateContent(prompt);
+        }, 1, 1000); // AI OPTIMIZATION: Reduced retries for speed
         const response = result.response;
         const text = response.text();
 
@@ -457,7 +500,13 @@ Always prioritize information from provided documents and the user's actual tran
       });
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
-      console.log(`Model ${modelName} failed, trying next model...`, lastError.message);
+      console.log(`Model ${modelName} failed:`, lastError.message);
+
+      // AI OPTIMIZATION: FAIL FAST if it's a quota error
+      if (isGeminiQuotaExceeded(error)) {
+        console.error('Model failed due to quota limit. Aborting all further models.');
+        break;
+      }
 
       // If it's not a model availability error, don't try other models
       if (!lastError.message.includes('not found') &&
@@ -495,9 +544,8 @@ Always prioritize information from provided documents and the user's actual tran
  */
 export async function searchInternet(query: string): Promise<InternetSearchResult[]> {
   try {
-    // For now, we'll use Gemini to suggest search terms and return structured format
-    // In production, you might want to use Google Custom Search API or similar
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    // AI OPTIMIZATION: Use gemma-3-27b-it as requested (reverted from 2.0-flash)
+    const model = genAI.getGenerativeModel({ model: 'gemma-3-27b-it' });
 
     const prompt = `Given this financial query: "${query}"
 
@@ -517,10 +565,10 @@ Focus on official sources like:
 - RBI (rbi.org.in)
 - Government financial portals`;
 
-    // Use retry logic for API calls
+    // Use retry logic for API calls - Reduced for helper task speed
     const result = await retryWithBackoff(async () => {
       return await model.generateContent(prompt);
-    }, 3, 1000);
+    }, 1, 500);
 
     const response = result.response;
     const text = response.text();
@@ -619,7 +667,7 @@ export async function categorizeTransactionsBatch(
   JSON ONLY, no markdown, no explanation.`;
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash', generationConfig: { responseMimeType: "application/json" } });
+    const model = genAI.getGenerativeModel({ model: 'gemma-3-27b-it', generationConfig: { responseMimeType: "application/json" } });
     const result = await retryWithBackoff(async () => {
       return await model.generateContent(prompt);
     }, 2, 2000);
@@ -644,11 +692,11 @@ export async function generateImage(prompt: string): Promise<string | null> {
   try {
     // Note: This requires the 'imagen-3.0-generate-001' model access
     const model = genAI.getGenerativeModel({ model: 'imagen-3.0-generate-001' });
-    
+
     // Add "minimalist, Notion-style linography" keywords to the prompt if not already present,
     // as per the user's aesthetic preference.
     const enhancedPrompt = `${prompt} . Minimalist, Notion-style linography, clean lines, white background, high contrast, symbolist, no text.`;
-    
+
     // Check if quota is exceeded before trying
     if (globalGeminiQuotaExceeded) {
       console.log('Skipping image generation due to quota limits');
@@ -659,39 +707,39 @@ export async function generateImage(prompt: string): Promise<string | null> {
       // @ts-ignore - The types definitions might not be up to date for image generation yet
       return await model.generateContent(enhancedPrompt);
     }, 2, 2000);
-    
+
     const response = result.response;
-    
+
     // Check if we have image candidates
     // The structure depends on the specific API version, but typically it contains 'images' or inline data
     // For the current Node SDK with Imagen, it might return parts with inlineData
-    
+
     // Inspecting response structure for images is tricky without exact types, 
     // but typically for Imagen it returns a blob or base64.
     // Let's assume standard generateContent response with inlineData for now, 
     // or we might need to use a specific property if the SDK exposes it differently.
-    
+
     // NOTE: As of current SDK, image generation might be valid via generateContent but the response handling is key.
     // However, if the model returns a standard text response stating it can't generate images, we need to handle that.
     // Assuming the user has access to Imagen 3 via the API key.
-    
+
     // The response.text() would be empty for image only response usually.
     // We look for parts.
-    
+
     // @ts-ignore
     if (response.candidates && response.candidates[0] && response.candidates[0].content && response.candidates[0].content.parts) {
-       // @ts-ignore
-       const parts = response.candidates[0].content.parts;
-       for (const part of parts) {
-         if (part.inlineData && part.inlineData.mimeType.startsWith('image/')) {
-           return part.inlineData.data; // This is the base64 string
-         }
-       }
+      // @ts-ignore
+      const parts = response.candidates[0].content.parts;
+      for (const part of parts) {
+        if (part.inlineData && part.inlineData.mimeType.startsWith('image/')) {
+          return part.inlineData.data; // This is the base64 string
+        }
+      }
     }
-    
+
     console.warn('Gemini image generation response did not contain image data');
     return null;
-    
+
   } catch (error) {
     console.error('Error generating image with Gemini:', error);
     // Determine if it's a model not found error (likely no access to Imagen)

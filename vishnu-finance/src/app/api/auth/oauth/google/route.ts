@@ -11,32 +11,27 @@ export async function GET(request: NextRequest) {
 
     // Store code_verifier and state in encrypted cookie (expires in 10 minutes)
     const cookieStore = await cookies();
-    cookieStore.set('oauth_code_verifier', codeVerifier, {
+    const cookieOptions = {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      secure: true,
+      sameSite: 'none' as const,
       maxAge: 10 * 60, // 10 minutes
       path: '/',
-    });
+    };
 
-    cookieStore.set('oauth_state', state, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 10 * 60, // 10 minutes
-      path: '/',
-    });
+    cookieStore.set('oauth_code_verifier', codeVerifier, cookieOptions);
+    cookieStore.set('oauth_state', state, cookieOptions);
+    cookieStore.set('oauth_provider', 'google', cookieOptions);
 
-    cookieStore.set('oauth_provider', 'google', {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 10 * 60, // 10 minutes
-      path: '/',
-    });
+    // Detect if requested from mobile (Capacitor)
+    const platform = request.nextUrl.searchParams.get('platform');
+
+    // Encode platform into state for reliability across redirects
+    // Standard state + ":platform"
+    const finalState = platform === 'mobile' ? `${state}:mobile` : state;
 
     // Generate OAuth URL
-    const authUrl = generateGoogleOAuthURL(codeChallenge, state);
+    const authUrl = generateGoogleOAuthURL(codeChallenge, finalState);
 
     console.log('✅ OAUTH INITIATE - Redirecting to Google OAuth');
     return NextResponse.redirect(authUrl);

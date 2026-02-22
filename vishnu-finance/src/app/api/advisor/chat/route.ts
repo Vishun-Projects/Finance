@@ -58,8 +58,8 @@ export async function POST(request: NextRequest) {
       isNewConversation = true;
     }
 
-    // Save user message
-    const userMessage = await (prisma as any).advisorMessage.create({
+    // Save user message (don't block the AI request)
+    const userMessagePromise = (prisma as any).advisorMessage.create({
       data: {
         conversationId: conversation.id,
         role: 'USER',
@@ -67,120 +67,23 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Process query and get AI response
-    let advisorResponse;
-    try {
-      advisorResponse = await processAdvisorQuery({
-        userId: user.id,
-        conversationId: conversation.id,
-        userMessage: message.trim(),
-      });
-    } catch (error) {
-      console.error('Error processing advisor query:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-
-      // Save error message as assistant response so user can see what went wrong
-      const errorResponse = `**Error:** ${errorMessage}\n\nThis could be due to:\n- API service temporarily unavailable\n- Model overload (please try again in a few moments)\n- Invalid query format\n- Missing required data\n\nPlease try rephrasing your question or try again later.`;
-
-      const assistantMessage = await (prisma as any).advisorMessage.create({
-        data: {
-          conversationId: conversation.id,
-          role: 'ASSISTANT',
-          content: errorResponse,
-          sources: JSON.stringify([]),
-        },
-      });
-
-      // Update conversation timestamp
-      await (prisma as any).advisorConversation.update({
-        where: { id: conversation.id },
-        data: { updatedAt: new Date() },
-      });
-
-      return NextResponse.json({
-        conversation: {
-          id: conversation.id,
-          title: conversation.title,
-          isNew: isNewConversation,
-        },
-        messages: [
-          {
-            id: userMessage.id,
-            role: 'USER',
-            content: userMessage.content,
-            createdAt: userMessage.createdAt,
-          },
-          {
-            id: assistantMessage.id,
-            role: 'ASSISTANT',
-            content: assistantMessage.content,
-            sources: [],
-            createdAt: assistantMessage.createdAt,
-          },
-        ],
-      });
-    }
-
-    // Validate that we got a response
-    if (!advisorResponse || !advisorResponse.response || advisorResponse.response.trim().length === 0) {
-      const errorMessage = 'The AI model did not generate a response. This could be due to:\n- Model overload (please try again in a few moments)\n- Empty response from the AI service\n- Timeout or connection issue\n\nPlease try rephrasing your question or try again later.';
-
-      const assistantMessage = await (prisma as any).advisorMessage.create({
-        data: {
-          conversationId: conversation.id,
-          role: 'ASSISTANT',
-          content: `**Error:** ${errorMessage}`,
-          sources: JSON.stringify([]),
-        },
-      });
-
-      // Update conversation timestamp
-      await (prisma as any).advisorConversation.update({
-        where: { id: conversation.id },
-        data: { updatedAt: new Date() },
-      });
-
-      return NextResponse.json({
-        conversation: {
-          id: conversation.id,
-          title: conversation.title,
-          isNew: isNewConversation,
-        },
-        messages: [
-          {
-            id: userMessage.id,
-            role: 'USER',
-            content: userMessage.content,
-            createdAt: userMessage.createdAt,
-          },
-          {
-            id: assistantMessage.id,
-            role: 'ASSISTANT',
-            content: assistantMessage.content,
-            sources: [],
-            createdAt: assistantMessage.createdAt,
-          },
-        ],
-      });
-    }
-
-    // Save assistant message
-    const assistantMessage = await (prisma as any).advisorMessage.create({
-      data: {
-        conversationId: conversation.id,
-        role: 'ASSISTANT',
-        content: advisorResponse.response,
-        sources: advisorResponse.sources as any,
-      },
+    // Start AI processing - this is the main bottleneck
+    const advisorResponsePromise = processAdvisorQuery({
+      userId: user.id,
+      conversationId: conversation.id,
+      userMessage: message.trim(),
     });
 
-    // Update conversation timestamp
-    await (prisma as any).advisorConversation.update({
-      where: { id: conversation.id },
-      data: { updatedAt: new Date() },
-    });
+    // We only NEED the advisor response to answer the user
+    // The userMessage.id is needed for the response, so we wait for that first message save.
+    // However, we can generate the userMessage ID locally if needed or just wait since it's fast.
+    const [userMessage, advisorResponse] = await Promise.all([
+      userMessagePromise,
+      advisorResponsePromise
+    ]);
 
-    return NextResponse.json({
+    // Construct the response
+    const jsonResponse = {
       conversation: {
         id: conversation.id,
         title: conversation.title,
@@ -194,14 +97,37 @@ export async function POST(request: NextRequest) {
           createdAt: userMessage.createdAt,
         },
         {
-          id: assistantMessage.id,
+          id: `temp-${Date.now()}`, // Temporary ID for immediate UI responsiveness
           role: 'ASSISTANT',
-          content: assistantMessage.content,
+          content: advisorResponse.response,
           sources: advisorResponse.sources,
-          createdAt: assistantMessage.createdAt,
+          createdAt: new Date(),
         },
       ],
-    });
+    };
+
+    // NON-BLOCKING: Save advisor's message and update conversation in the background
+    (async () => {
+      try {
+        await (prisma as any).advisorMessage.create({
+          data: {
+            conversationId: conversation!.id,
+            role: 'ASSISTANT',
+            content: advisorResponse.response,
+            sources: advisorResponse.sources as any,
+          },
+        });
+        await (prisma as any).advisorConversation.update({
+          where: { id: conversation!.id },
+          data: { updatedAt: new Date() },
+        });
+      } catch (err) {
+        console.error('Background DB save failed:', err);
+      }
+    })();
+
+    // Return response IMMEDIATELY
+    return NextResponse.json(jsonResponse);
   } catch (error) {
     console.error('Error processing chat message:', error);
     const errorMessage = error instanceof Error ? error.message : 'Failed to process message';

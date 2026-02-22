@@ -42,7 +42,7 @@ export async function parseTransactionWithGemini(
 
   try {
     const model = genAI.getGenerativeModel({
-      model: 'gemini-2.5-flash',
+      model: 'gemma-3-27b-it',
       generationConfig: {
         temperature: 0.1, // Low temperature for consistent extraction
         topK: 20,
@@ -101,7 +101,7 @@ Return ONLY valid JSON, no other text. Example:
     return null;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    
+
     // Check if quota exceeded
     if (
       errorMessage.includes('quota exceeded') ||
@@ -123,40 +123,16 @@ Return ONLY valid JSON, no other text. Example:
 export async function parseTransactionsBatchWithGemini(
   descriptions: string[]
 ): Promise<(ParsedTransactionData | null)[]> {
-  // Check if quota is exceeded
-  if (isGeminiQuotaExceeded()) {
+  // Process in parallel to reduce waiting time
+  // gemma-3-27b-it is fast and can handle concurrent requests better
+  try {
+    const results = await Promise.all(
+      descriptions.map((desc) => parseTransactionWithGemini(desc))
+    );
+    return results;
+  } catch (error) {
+    console.error(`Error in parallel batch parsing:`, error);
     return descriptions.map(() => null);
   }
-
-  // Process in smaller batches to avoid token limits
-  const batchSize = 10;
-  const results: (ParsedTransactionData | null)[] = [];
-
-  for (let i = 0; i < descriptions.length; i += batchSize) {
-    const batch = descriptions.slice(i, i + batchSize);
-    
-    // Check quota before each batch
-    if (isGeminiQuotaExceeded()) {
-      results.push(...batch.map(() => null));
-      continue;
-    }
-
-    try {
-      const batchResults = await Promise.all(
-        batch.map((desc) => parseTransactionWithGemini(desc))
-      );
-      results.push(...batchResults);
-    } catch (error) {
-      console.error(`Error parsing batch ${i / batchSize + 1}:`, error);
-      results.push(...batch.map(() => null));
-    }
-
-    // Small delay between batches
-    if (i + batchSize < descriptions.length) {
-      await new Promise((resolve) => setTimeout(resolve, 200));
-    }
-  }
-
-  return results;
 }
 

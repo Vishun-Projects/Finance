@@ -1,6 +1,9 @@
 import { prisma } from './db';
 import { getCachedData, setCachedData, CACHE_TTL } from './api-cache';
 
+// AI Context Optimization: Increased limit to 2000 for complete historical accuracy (e.g. searching across 1700+ transactions)
+export const MAX_CONTEXT_TRANSACTIONS = 2000;
+
 export interface DateRange {
   startDate?: Date;
   endDate?: Date;
@@ -36,17 +39,35 @@ export interface FinancialSummary {
   transactions: TransactionDetail[];
   totalTransactionCount: number;
   dateRange?: DateRange;
+  searchTerm?: string;
 }
 
 /**
  * Analyze user's financial data and generate summary for AI context
+ * searchTerm: Optional entity name or keyword to filter transactions (e.g. "Riz", "Amazon")
+ * limit: Optional limit on number of transactions to return (default 300 for general queries)
  */
-export async function analyzeUserFinances(userId: string, dateRange?: DateRange): Promise<FinancialSummary> {
+export async function analyzeUserFinances(
+  userId: string,
+  dateRange?: DateRange,
+  searchTerm?: string,
+  limit: number = 500
+): Promise<FinancialSummary> {
   try {
-
+    // Build search filter if provided
+    const searchFilter: any = searchTerm ? {
+      OR: [
+        { description: { contains: searchTerm, mode: 'insensitive' } },
+        { store: { contains: searchTerm, mode: 'insensitive' } },
+        { personName: { contains: searchTerm, mode: 'insensitive' } },
+        { upiId: { contains: searchTerm, mode: 'insensitive' } },
+        { notes: { contains: searchTerm, mode: 'insensitive' } },
+        { category: { name: { contains: searchTerm, mode: 'insensitive' } } }
+      ]
+    } : {};
 
     // Build date filter - use provided date range or default to all transactions
-    const dateFilter: any = { isDeleted: false };
+    const dateFilter: any = { isDeleted: false, ...searchFilter };
     if (dateRange?.startDate || dateRange?.endDate) {
       dateFilter.transactionDate = {};
       if (dateRange.startDate) {
@@ -57,40 +78,110 @@ export async function analyzeUserFinances(userId: string, dateRange?: DateRange)
       }
     }
 
-    // AI OPTIMIZATION: Try to fetch from JSON cache first
-    // Create a cache key based on user and date range
-    const cacheKey = `finance_summary:${userId}:${dateRange?.startDate?.toISOString() || 'all'}:${dateRange?.endDate?.toISOString() || 'all'}`;
-    let transactions: any[] | null = await getCachedData(cacheKey);
+    // AI OPTIMIZATION: Try to fetch the ENTIRE summary from cache first
+    // Cache key now includes searchTerm and limit to distinguish targeted queries
+    const cacheParams = `${dateRange?.startDate?.toISOString() || 'all'}:${dateRange?.endDate?.toISOString() || 'all'}:${searchTerm || 'none'}:${limit}`;
+    const fullSummaryCacheKey = `full_finance_summary:${userId}:${cacheParams}`;
 
-    if (!transactions) {
-      transactions = await prisma.transaction.findMany({
-        where: {
-          userId,
-          ...dateFilter,
-        },
-        include: {
-          category: true,
-        },
-        orderBy: {
-          transactionDate: 'asc',
-        },
-      });
-
-      // Cache this heavy query result
-      // Use a longer TTL (e.g. 5 minutes or 1 hour depending on needs, using USER_DATA as safe default)
-      await setCachedData(cacheKey, transactions, CACHE_TTL.USER_DATA);
-    } else {
-      // Hydrate dates from JSON (they come back as strings)
-      transactions = transactions.map(t => ({
-        ...t,
-        transactionDate: new Date(t.transactionDate),
-        createdAt: new Date(t.createdAt),
-        updatedAt: new Date(t.updatedAt),
-        // ensure other dates are hydrated if needed
-      }));
+    const cachedFullSummary = await getCachedData(fullSummaryCacheKey);
+    if (cachedFullSummary) {
+      console.log(`⚡ FULL SUMMARY CACHE HIT for ${userId} (Search: ${searchTerm || 'None'})`);
+      // Hydrate dates
+      return {
+        ...cachedFullSummary,
+        transactions: cachedFullSummary.transactions.map((t: any) => ({
+          ...t,
+          date: t.date ? new Date(t.date) : undefined,
+          transactionDate: t.transactionDate ? new Date(t.transactionDate) : undefined
+        })),
+        allGoals: (cachedFullSummary.allGoals || []).map((g: any) => ({
+          ...g,
+          targetDate: g.targetDate ? new Date(g.targetDate) : undefined
+        })),
+        allDeadlines: (cachedFullSummary.allDeadlines || []).map((d: any) => ({
+          ...d,
+          dueDate: new Date(d.dueDate)
+        })),
+        dateRange: cachedFullSummary.dateRange ? {
+          startDate: cachedFullSummary.dateRange.startDate ? new Date(cachedFullSummary.dateRange.startDate) : undefined,
+          endDate: cachedFullSummary.dateRange.endDate ? new Date(cachedFullSummary.dateRange.endDate) : undefined
+        } : undefined
+      };
     }
 
-    // Calculate totals
+    // AI OPTIMIZATION: Start all independent DB queries in parallel
+    const transactionsPromise = (async () => {
+      const cacheKey = `finance_summary:${userId}:${cacheParams}`;
+      let cached = await getCachedData(cacheKey);
+
+      if (!cached) {
+        // Targeted queries get more results if they exist, general queries are capped at 300
+        const fetched = await prisma.transaction.findMany({
+          where: { userId, ...dateFilter, ...searchFilter },
+          include: { category: true },
+          orderBy: { transactionDate: 'desc' }, // Latest first for context
+          take: limit,
+        });
+        // Sort back to chronological for AI reasoning
+        const sorted = fetched.sort((a, b) => a.transactionDate.getTime() - b.transactionDate.getTime());
+
+        await setCachedData(cacheKey, sorted, 300); // 5 min cache
+        return sorted;
+      } else {
+        return (cached as any[]).map(t => ({
+          ...t,
+          transactionDate: new Date(t.transactionDate),
+          createdAt: new Date(t.createdAt),
+          updatedAt: new Date(t.updatedAt),
+        }));
+      }
+    })();
+
+    const deadlinesPromise = prisma.deadline.findMany({
+      where: { userId },
+      orderBy: { dueDate: 'asc' },
+    });
+
+    const goalsPromise = prisma.goal.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const categoriesPromise = prisma.category.findMany({
+      where: { userId },
+      include: {
+        transactions: {
+          where: {
+            userId,
+            isDeleted: false,
+            ...(dateRange?.startDate || dateRange?.endDate
+              ? {
+                transactionDate: {
+                  ...(dateRange.startDate ? { gte: dateRange.startDate } : {}),
+                  ...(dateRange.endDate ? { lte: dateRange.endDate } : {}),
+                },
+              }
+              : {}),
+          },
+        },
+      },
+    });
+
+    const wishlistPromise = prisma.wishlistItem.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    // Wait for everything in parallel
+    const [transactions, allDeadlines, allGoals, categories, wishlistItems] = await Promise.all([
+      transactionsPromise,
+      deadlinesPromise,
+      goalsPromise,
+      categoriesPromise,
+      wishlistPromise
+    ]);
+
+    // Calculate totals based on the fetched transactions
     const totalIncome = transactions
       .filter((t) => t.financialCategory === 'INCOME')
       .reduce((sum, t) => sum + Number(t.creditAmount), 0);
@@ -148,29 +239,9 @@ export async function analyzeUserFinances(userId: string, dateRange?: DateRange)
     const averageMonthlyIncome = totalIncome / monthsCount;
     const averageMonthlyExpenses = totalExpenses / monthsCount;
 
-    // Get all deadlines (not just pending/overdue)
-    const allDeadlines = await prisma.deadline.findMany({
-      where: {
-        userId,
-      },
-      orderBy: {
-        dueDate: 'asc',
-      },
-    });
-
     const debtAmount = allDeadlines
       .filter((d) => !d.isCompleted && ['PENDING', 'OVERDUE'].includes(d.status))
       .reduce((sum, d) => sum + Number(d.amount || 0), 0);
-
-    // Get all goals (active and inactive)
-    const allGoals = await prisma.goal.findMany({
-      where: {
-        userId,
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    });
 
     const goalsProgress = allGoals
       .filter((g) => g.isActive)
@@ -178,29 +249,6 @@ export async function analyzeUserFinances(userId: string, dateRange?: DateRange)
         title: g.title,
         progress: Number(g.targetAmount) > 0 ? (Number(g.currentAmount) / Number(g.targetAmount)) * 100 : 0,
       }));
-
-    // Get all categories with transaction counts and totals
-    const categories = await prisma.category.findMany({
-      where: {
-        userId,
-      },
-      include: {
-        transactions: {
-          where: {
-            userId,
-            isDeleted: false,
-            ...(dateRange?.startDate || dateRange?.endDate
-              ? {
-                transactionDate: {
-                  ...(dateRange.startDate ? { gte: dateRange.startDate } : {}),
-                  ...(dateRange.endDate ? { lte: dateRange.endDate } : {}),
-                },
-              }
-              : {}),
-          },
-        },
-      },
-    });
 
     const categoriesWithStats = categories.map((cat) => {
       const categoryTransactions = cat.transactions || [];
@@ -219,16 +267,6 @@ export async function analyzeUserFinances(userId: string, dateRange?: DateRange)
         transactionCount: categoryTransactions.length,
         totalAmount,
       };
-    });
-
-    // Get all wishlist items
-    const wishlistItems = await prisma.wishlistItem.findMany({
-      where: {
-        userId,
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
     });
 
     // Convert transactions to detail format
@@ -253,7 +291,7 @@ export async function analyzeUserFinances(userId: string, dateRange?: DateRange)
       };
     });
 
-    return {
+    const result: FinancialSummary = {
       totalIncome,
       totalExpenses,
       netSavings,
@@ -269,7 +307,7 @@ export async function analyzeUserFinances(userId: string, dateRange?: DateRange)
       wishlistItems: wishlistItems.map((item) => ({
         title: item.title,
         estimatedCost: Number(item.estimatedCost),
-        priority: item.priority,
+        priority: item.priority === 'HIGH' ? 'High' : item.priority === 'MEDIUM' ? 'Medium' : 'Low',
         isCompleted: item.isCompleted,
       })),
       allGoals: allGoals.map((g) => ({
@@ -290,7 +328,13 @@ export async function analyzeUserFinances(userId: string, dateRange?: DateRange)
       transactions: transactionDetails,
       totalTransactionCount: transactions.length,
       dateRange,
+      searchTerm,
     };
+
+    // Cache the full results for advisor queries/context
+    await setCachedData(fullSummaryCacheKey, result, CACHE_TTL.LONG_LIVED);
+
+    return result;
   } catch (error) {
     console.error('Error analyzing user finances:', error);
     // Return empty/default summary if analysis fails
@@ -322,6 +366,15 @@ export async function analyzeUserFinances(userId: string, dateRange?: DateRange)
  */
 export function formatFinancialSummary(summary: FinancialSummary): string {
   let text = 'User Financial Summary:\n\n';
+
+  // AI OPTIMIZATION: If this is a targeted search, show the search-specific totals first
+  if (summary.searchTerm) {
+    text += `SEARCH RESULTS FOR: "${summary.searchTerm}"\n`;
+    text += `- Matching Income: ₹${summary.totalIncome.toLocaleString('en-IN')}\n`;
+    text += `- Matching Expenses: ₹${summary.totalExpenses.toLocaleString('en-IN')}\n`;
+    text += `- Match Count: ${summary.totalTransactionCount} transactions\n\n`;
+    text += `OVERALL FINANCIAL CONTEXT:\n`;
+  }
 
   // Add date range information if specified
   if (summary.dateRange?.startDate || summary.dateRange?.endDate) {
@@ -401,26 +454,17 @@ export function formatFinancialSummary(summary: FinancialSummary): string {
 
   // Transaction details
   if (summary.transactions.length > 0) {
-    // If a specific date range is requested, show ALL transactions (not limited)
-    // Otherwise, limit to prevent token overflow for very large datasets
-    const MAX_TRANSACTIONS_TO_SHOW = summary.dateRange ? summary.transactions.length : 1000;
+    // AI OPTIMIZATION: Show ALL relevant transactions chronologically for better AI reasoning
+    // We limit to MAX_CONTEXT_TRANSACTIONS globally at the constant level
+    let transactionsToShow = [...summary.transactions]
+      .sort((a, b) => a.date.getTime() - b.date.getTime());
 
-    // If date range is specified, show transactions chronologically (by date)
-    // Otherwise, sort by amount (descending) for overview
-    let transactionsToShow = [...summary.transactions];
-    if (summary.dateRange) {
-      // For specific date ranges, show chronologically (already sorted by date from DB)
-      // No need to re-sort or limit
-    } else {
-      // For general queries, sort by amount descending and limit
-      transactionsToShow = transactionsToShow
-        .sort((a, b) => b.amount - a.amount)
-        .slice(0, MAX_TRANSACTIONS_TO_SHOW);
-    }
+    const MAX_SHOWN = Math.min(transactionsToShow.length, MAX_CONTEXT_TRANSACTIONS);
+    transactionsToShow = transactionsToShow.slice(-MAX_SHOWN); // Keep most recent if over limit
 
     text += `Transaction Details (${summary.totalTransactionCount} total transactions`;
-    if (!summary.dateRange && summary.transactions.length > MAX_TRANSACTIONS_TO_SHOW) {
-      text += `, showing top ${MAX_TRANSACTIONS_TO_SHOW} by amount`;
+    if (!summary.dateRange && summary.transactions.length > MAX_CONTEXT_TRANSACTIONS) {
+      text += `, showing most recent ${MAX_CONTEXT_TRANSACTIONS}`;
     } else if (summary.dateRange && summary.dateRange.startDate && summary.dateRange.endDate) {
       const startStr = summary.dateRange.startDate.toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
       const endStr = summary.dateRange.endDate.toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
@@ -438,10 +482,10 @@ export function formatFinancialSummary(summary: FinancialSummary): string {
       const showCount = summary.dateRange || totalIncome === allIncome ? totalIncome : `${totalIncome} of ${allIncome}`;
       text += `Income Transactions (${showCount}):\n`;
       incomeTransactions.forEach((t) => {
-        const dateStr = t.date.toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' });
-        const desc = t.description || 'No description';
-        const category = t.category ? ` [Category: ${t.category.name}]` : '';
-        text += `- ${dateStr}: ₹${t.amount.toLocaleString('en-IN')} - ${desc}${category}\n`;
+        const dateStr = t.date.toISOString().split('T')[0];
+        const desc = (t.description || 'No desc').substring(0, 60).trim();
+        const category = t.category ? ` | ${t.category.name}` : '';
+        text += `- ${dateStr} | ₹${t.amount} | ${desc}${category}\n`;
       });
       text += '\n';
     }
@@ -452,14 +496,14 @@ export function formatFinancialSummary(summary: FinancialSummary): string {
       const showCount = summary.dateRange || totalExpense === allExpense ? totalExpense : `${totalExpense} of ${allExpense}`;
       text += `Expense Transactions (${showCount}):\n`;
       expenseTransactions.forEach((t) => {
-        const dateStr = t.date.toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' });
-        const desc = t.description || 'No description';
-        const category = t.category ? ` [Category: ${t.category.name}]` : '';
+        const dateStr = t.date.toISOString().split('T')[0];
+        const desc = (t.description || 'No desc').substring(0, 60).trim();
+        const category = t.category ? ` | ${t.category.name}` : '';
 
         // Clearly distinguish between store (business) and person
-        const store = t.store ? ` [Business/Store: ${t.store}]` : '';
-        const person = t.personName ? ` [Person: ${t.personName}]` : '';
-        text += `- ${dateStr}: ₹${t.amount.toLocaleString('en-IN')} - ${desc}${category}${store}${person}\n`;
+        const store = t.store ? ` | Store: ${t.store}` : '';
+        const person = t.personName ? ` | Person: ${t.personName}` : '';
+        text += `- ${dateStr} | ₹${t.amount} | ${desc}${category}${store}${person}\n`;
       });
       text += '\n';
     }

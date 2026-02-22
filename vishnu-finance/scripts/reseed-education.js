@@ -104,7 +104,7 @@ function slugify(text) {
 }
 
 async function generatePostContent(topic) {
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemma-3-27b-it" });
 
     // Explicitly ask for JSON to make parsing reliable
     const prompt = `

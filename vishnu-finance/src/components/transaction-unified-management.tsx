@@ -217,7 +217,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
         ];
       case 'all':
         return [
-          new Date(2020, 0, 1).toISOString().split('T')[0],
+          '2000-01-01',
           new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().split('T')[0],
         ];
       case 'custom':
@@ -436,7 +436,8 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
           includeTotals: true,
           startDate: startDate || undefined,
           endDate: endDate || undefined,
-          includeDeleted: true,
+          range: quickRange, // Pass range to enable 'all'-time bypass in API
+          includeDeleted: showDeleted, // Use current toggled state instead of hardcoded true
           sortField: 'transactionDate',
           sortDirection: 'desc',
         }),

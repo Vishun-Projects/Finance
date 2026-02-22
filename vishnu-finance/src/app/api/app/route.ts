@@ -51,6 +51,18 @@ function processCategoryBreakdown(expenses: any[]) {
     .sort((a, b) => b.amount - a.amount);
 }
 
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
+      'Access-Control-Max-Age': '86400',
+    },
+  });
+}
+
 export async function POST(request: NextRequest) {
   let body: any = {};
   try {
@@ -352,7 +364,16 @@ export async function POST(request: NextRequest) {
         amountPreset,
         minAmount,
         maxAmount,
+        range, // New parameter to detect 'all' range
       } = body || {};
+
+      // AI OPTIMIZATION: High-speed query caching for Dashboard/Transactions
+      const cacheKey = `transactions_list:${user.id}:${JSON.stringify(body)}`;
+      const { globalCache } = await import('@/lib/cache-singleton');
+      const cachedResponse = globalCache.get(cacheKey);
+      if (cachedResponse) {
+        return NextResponse.json(cachedResponse);
+      }
 
       const pageSize = pageSizeParam === 'all' ? 5000 : Math.min(parseInt(String(pageSizeParam || '50')), 5000);
       const skip = (Number(page) - 1) * pageSize;
@@ -372,7 +393,9 @@ export async function POST(request: NextRequest) {
           where.categoryId = categoryId;
         }
       }
-      if (startDate || endDate) {
+
+      // AI OPTIMIZATION: If range is 'all', ignore defensive startDate/endDate to ensure consistency with "Overall Time"
+      if (range !== 'all' && (startDate || endDate)) {
         const start = startDate ? new Date(startDate) : null;
         const end = endDate ? new Date(endDate) : null;
         const isValidStart = start && !isNaN(start.getTime());
@@ -505,7 +528,7 @@ export async function POST(request: NextRequest) {
         } : null,
       }));
 
-      return NextResponse.json({
+      const responseData = {
         transactions: transformed,
         pagination: {
           total: totalCount,
@@ -514,7 +537,12 @@ export async function POST(request: NextRequest) {
           totalPages: Math.ceil(totalCount / pageSize),
         },
         totals,
-      });
+      };
+
+      // Cache for 30 seconds to speed up navigation
+      globalCache.set(cacheKey, responseData, 30000);
+
+      return NextResponse.json(responseData);
     }
 
     // Transactions - Create
@@ -1259,9 +1287,10 @@ export async function POST(request: NextRequest) {
       });
       response.cookies.set('auth-token', result.token, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
+        secure: true,
+        sameSite: 'none',
         maxAge: 7 * 24 * 60 * 60,
+        path: '/',
       });
       const meta = extractRequestMeta(request);
       await writeAuditLog({
@@ -1300,9 +1329,9 @@ export async function POST(request: NextRequest) {
         if ((result as any).token) {
           response.cookies.set('auth-token', (result as any).token, {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict',
-            maxAge: 7 * 24 * 60 * 60 * 1000,
+            secure: true,
+            sameSite: 'none',
+            maxAge: 7 * 24 * 60 * 60, // 7 days in seconds
             path: '/',
           });
         }

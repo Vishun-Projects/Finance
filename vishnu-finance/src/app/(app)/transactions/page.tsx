@@ -7,16 +7,29 @@ import { loadTransactionsBootstrap, loadTransactionCategories } from '@/lib/load
 
 export const dynamic = 'force-dynamic';
 
-export default async function TransactionsPage() {
+export default async function TransactionsPage({ searchParams }: { searchParams: { [key: string]: string | string[] | undefined } }) {
   const user = await requireUser({ redirectTo: '/auth?tab=login' });
-  const range = getCurrentMonthRange();
+
+  // Extract params from URL or fallback to current month
+  const currentRange = getCurrentMonthRange();
+  const startDate = (searchParams.startDate as string) || currentRange.startDate;
+  const endDate = (searchParams.endDate as string) || currentRange.endDate;
+  const range = (searchParams.range as string) || 'month';
+  const type = (searchParams.type as any) || 'ALL';
+  const search = searchParams.search as string;
 
   let transactionsData: Awaited<ReturnType<typeof loadTransactionsBootstrap>> | null = null;
   let categories: Awaited<ReturnType<typeof loadTransactionCategories>> = [];
 
   try {
     const [transactionsResult, categoriesResult] = await Promise.all([
-      loadTransactionsBootstrap({ startDate: range.startDate, endDate: range.endDate }),
+      loadTransactionsBootstrap({
+        startDate,
+        endDate,
+        type,
+        search,
+        pageSize: 100 // Safe default for initial SSR
+      }),
       loadTransactionCategories(),
     ]);
 
@@ -31,7 +44,7 @@ export default async function TransactionsPage() {
     pagination: transactionsData?.pagination,
     totals: transactionsData?.totals ?? null,
     categories,
-    range,
+    range: { startDate, endDate, range } as any,
     userId: user.id,
   };
 

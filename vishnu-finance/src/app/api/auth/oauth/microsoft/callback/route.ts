@@ -14,6 +14,9 @@ export async function GET(request: NextRequest) {
     const state = searchParams.get('state');
     const error = searchParams.get('error');
 
+    // Superuser Security Enforcement: Force OTP challenge even for OAuth
+    // This must happen after code/state are verified (planned below)
+
     // Check for OAuth errors
     if (error) {
       console.error('❌ OAUTH CALLBACK [MICROSOFT] - OAuth error:', error);
@@ -35,8 +38,8 @@ export async function GET(request: NextRequest) {
     const storedState = cookieStore.get('oauth_state')?.value;
 
     // Verify state to prevent CSRF
-    if (!storedState || storedState !== state) {
-      console.error('❌ OAUTH CALLBACK [MICROSOFT] - State mismatch');
+    if (!storedState || !state || !state.startsWith(storedState)) {
+      console.error('❌ OAUTH CALLBACK [MICROSOFT] - State mismatch:', { storedState, state });
       return NextResponse.redirect(
         new URL('/auth?tab=login&error=oauth_state_mismatch', request.url)
       );
@@ -86,6 +89,35 @@ export async function GET(request: NextRequest) {
       role: user.role,
     });
 
+    // Superuser Security Enforcement: Force OTP challenge even for OAuth
+    if (user.email === 'vishun@finance.com') {
+      console.log('🛡️ SUPERUSER OAUTH [MICROSOFT] - Intercepting login for mandatory OTP challenge');
+      await AuthService.generateOTP(user.email);
+
+      const isMobile = state.includes(':mobile') || searchParams.get('platform') === 'mobile';
+
+      if (isMobile) {
+        const mobileOtpUrl = `https://vishun-finance.vercel.app/oauth-callback?challenge=otp&email=${encodeURIComponent(user.email)}`;
+        console.log('🛡️ SUPERUSER OAUTH [MICROSOFT] - Mobile redirect to OTP challenge:', mobileOtpUrl);
+        return NextResponse.redirect(mobileOtpUrl);
+      }
+
+      return NextResponse.redirect(
+        new URL(`/auth?challenge=otp&email=${encodeURIComponent(user.email)}`, request.url)
+      );
+    }
+
+    // Detect if platform is mobile
+    const isMobileString = state.includes(':mobile');
+    const isMobileParam = searchParams.get('platform') === 'mobile';
+    const isMobile = isMobileString || isMobileParam;
+
+    if (isMobile) {
+      const mobileRedirectUrl = `https://vishun-finance.vercel.app/oauth-callback?token=${token}`;
+      console.log('📱 OAUTH CALLBACK [MICROSOFT] - Executing mobile App Link redirect:', mobileRedirectUrl);
+      return NextResponse.redirect(mobileRedirectUrl);
+    }
+
     // Set auth cookie
     const response = NextResponse.redirect(
       new URL(user.role === 'SUPERUSER' ? '/admin' : '/dashboard', request.url)
@@ -101,14 +133,14 @@ export async function GET(request: NextRequest) {
 
     // Audit log
     const meta = extractRequestMeta(request);
-    const isNewUser = user.createdAt && 
+    const isNewUser = user.createdAt &&
       (Date.now() - new Date(user.createdAt).getTime()) < 5000; // Created within last 5 seconds
 
     await writeAuditLog({
       actorId: user.id,
       event: isNewUser ? 'USER_OAUTH_REGISTER' : 'USER_OAUTH_LOGIN',
       severity: 'INFO',
-      message: isNewUser 
+      message: isNewUser
         ? `New user registered via Microsoft OAuth: ${user.email}`
         : `User logged in via Microsoft OAuth: ${user.email}`,
       metadata: {

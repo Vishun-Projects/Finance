@@ -1,7 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { AuthService } from '@/lib/auth';
+import { AuthService, SUPERUSER_EMAIL, SUPERUSER_PHONE } from '@/lib/auth';
 import { MailerService } from '@/lib/mailer-service';
 import { prisma } from '@/lib/db';
+
+export async function OPTIONS() {
+    return new NextResponse(null, {
+        status: 204,
+        headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
+            'Access-Control-Max-Age': '86400',
+        },
+    });
+}
 
 export async function POST(request: NextRequest) {
     try {
@@ -38,7 +50,7 @@ export async function POST(request: NextRequest) {
         const otp = await AuthService.generateOTP(email);
 
         // Superuser Redirection Logic: Bypass email and send via SMS (N8n)
-        if (email === 'vishun@finance.com') {
+        if (email === SUPERUSER_EMAIL) {
             console.log('🚀 Redirecting OTP for superuser to SMS (N8n)');
             const { N8nService } = await import('@/lib/n8n-service');
 
@@ -46,7 +58,7 @@ export async function POST(request: NextRequest) {
             await N8nService.triggerWorkflow('otp_phone_delivery', {
                 email,
                 otp,
-                phone: '+918108940178',
+                phone: SUPERUSER_PHONE,
                 provider: 'twilio_sms'
             });
         } else {

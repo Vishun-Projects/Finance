@@ -40,7 +40,7 @@ async function tryPythonParser(pdfBuffer: Buffer, bankHint: string, bankParserCo
       baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
     }
 
-    const pythonFunctionUrl = `${baseUrl}/api/parser`;
+    const pythonFunctionUrl = `${baseUrl}/api/parse-pdf-python`;
 
     // Convert buffer to base64
     const pdfBase64 = pdfBuffer.toString('base64');
@@ -288,6 +288,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Strategy 2: Try local Python execution (development/local)
+    // NEVER run this on Vercel/Production as 'python' command is not available in standard Node runtimes there
+    if (isProduction) {
+      return NextResponse.json({
+        success: false,
+        error: 'Python serverless function failed and local execution is disabled in production.'
+      }, { status: 500 });
+    }
+
     console.log('🐍 PDF API: Starting local Python execution...');
     console.log('📁 PDF API: File path:', filepath);
     console.log('📁 PDF API: Tools directory:', toolsDir);

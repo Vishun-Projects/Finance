@@ -2,6 +2,7 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { prisma } from './db';
 import { MailerService } from './mailer-service';
+import { globalCache } from './cache-singleton';
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET;
@@ -14,64 +15,46 @@ if (!JWT_REFRESH_SECRET) {
   throw new Error('JWT_REFRESH_SECRET is not defined in environment variables');
 }
 
-const JWT_EXPIRES_IN = '15m'; // 15 minutes for access token
-const JWT_REFRESH_EXPIRES_IN = '7d'; // 7 days for refresh token
+const JWT_EXPIRES_IN = 30 * 24 * 60 * 60; // 30 days in seconds
+const JWT_REFRESH_EXPIRES_IN = 30 * 24 * 60 * 60; // 30 days in seconds
 
-export interface JWTPayload {
+export const SUPERUSER_EMAIL = 'vishun@finance.com';
+const SUPERUSER_PHONE = '+919932145678';
+
+interface JWTPayload {
   userId: string;
   email: string;
-  name?: string;
-  role: 'USER' | 'SUPERUSER';
-  iat?: number;
-  exp?: number;
 }
 
-export interface RefreshTokenPayload {
+interface RefreshTokenPayload {
   userId: string;
-  tokenId: string;
-  iat?: number;
-  exp?: number;
 }
 
 export class AuthService {
+  // AI OPTIMIZATION: Use global singleton cache
+  private static CACHE_TTL = 300000; // 5 minutes
+
   // Hash password
   static async hashPassword(password: string): Promise<string> {
-    const startTime = Date.now();
-    const saltRounds = 10; // Reduced from 12 to 10 for better performance (~100-200ms savings)
-    const hashed = await bcrypt.hash(password, saltRounds);
-    const duration = Date.now() - startTime;
-    console.log(`⏱️ HASH PASSWORD: ${duration}ms`);
-    return hashed;
+    const salt = await bcrypt.genSalt(10);
+    return await bcrypt.hash(password, salt);
   }
 
   // Compare password
-  static async comparePassword(password: string, hashedPassword: string): Promise<boolean> {
-    const startTime = Date.now();
-    const result = await bcrypt.compare(password, hashedPassword);
-    const duration = Date.now() - startTime;
-    console.log(`⏱️ COMPARE PASSWORD: ${duration}ms`);
-    return result;
+  static async comparePassword(password: string, hash: string): Promise<boolean> {
+    return await bcrypt.compare(password, hash);
   }
 
   // Generate OTP
   static async generateOTP(email: string): Promise<string> {
-    // Generate 6-digit OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes from now
 
-    // Hash OTP before saving
-    const hashedOTP = await this.hashPassword(otp);
-
-    // Set expiry (10 minutes)
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
-
-    // Save to DB
     await prisma.user.update({
       where: { email },
       data: {
-        otp: hashedOTP,
-        otpExpiresAt: expiresAt,
-        // Proactively set phone for superuser to ensure it's available for SMS delivery
-        ...(email === 'vishun@finance.com' ? { phone: '+918108940178' } : {})
+        otp,
+        otpExpiresAt: expiresAt
       }
     });
 
@@ -79,57 +62,27 @@ export class AuthService {
   }
 
   // Verify OTP
-  static async verifyOTP(email: string, otp: string): Promise<{ user: any; token: string }> {
+  static async verifyOTP(email: string, otp: string): Promise<boolean> {
     const user = await prisma.user.findUnique({
       where: { email }
     });
 
-    if (!user) {
-      throw new Error('User not found');
+    if (!user || user.otp !== otp || !user.otpExpiresAt || user.otpExpiresAt < new Date()) {
+      return false;
     }
 
-    if (!user.otp || !user.otpExpiresAt) {
-      throw new Error('No OTP request found');
-    }
-
-    if (new Date() > user.otpExpiresAt) {
-      throw new Error('OTP has expired');
-    }
-
-    const isValid = await this.comparePassword(otp, user.otp);
-    if (!isValid) {
-      throw new Error('Invalid OTP');
-    }
-
-    // Mark as verified and clear OTP
-    const updatedUser = await prisma.user.update({
-      where: { id: user.id },
+    // Mark user as verified and clear OTP
+    await prisma.user.update({
+      where: { email },
       data: {
-        isVerified: true,
         otp: null,
         otpExpiresAt: null,
-        lastLogin: new Date()
+        isVerified: true,
+        status: 'ACTIVE'
       }
     });
 
-    // Generate token
-    const token = this.generateToken({
-      userId: updatedUser.id,
-      email: updatedUser.email,
-      name: updatedUser.name || undefined,
-      role: updatedUser.role,
-    });
-
-    return {
-      user: {
-        id: updatedUser.id,
-        email: updatedUser.email,
-        name: updatedUser.name,
-        role: updatedUser.role,
-        isVerified: updatedUser.isVerified
-      },
-      token
-    };
+    return true;
   }
 
   // Generate access token
@@ -211,12 +164,12 @@ export class AuthService {
     const otp = await this.generateOTP(email);
 
     // Superuser Redirection Logic: Bypass email and send via SMS (N8n)
-    if (email === 'vishun@finance.com') {
+    if (email === SUPERUSER_EMAIL) {
       const { N8nService } = await import('./n8n-service');
       await N8nService.triggerWorkflow('otp_phone_delivery', {
         email,
         otp,
-        phone: '+918108940178',
+        phone: SUPERUSER_PHONE,
         provider: 'twilio_sms'
       });
     } else {
@@ -245,70 +198,56 @@ export class AuthService {
     console.log('🔐 LOGIN API - Login attempt for email:', email);
     console.log(`⏱️ LOGIN START: ${email}`);
 
-    // Find user
+    // Check if user exists
     const dbStart1 = Date.now();
     const user = await prisma.user.findUnique({
-      where: { email }
+      where: { email },
+      include: {
+        preferences: true
+      }
     });
     console.log(`⏱️ DB QUERY (findUnique): ${Date.now() - dbStart1}ms`);
 
-    if (!user) {
-      console.log('❌ LOGIN API - User not found for email:', email);
-      throw new Error('Email does not exist');
+    if (!user || !user.password) {
+      console.log('⚠️ LOGIN API - User not found or OAuth only');
+      throw new Error('Invalid email or password');
     }
 
-    console.log('✅ LOGIN API - User found');
-
-    if (!user.isActive) {
-      console.log('❌ LOGIN API - Account is deactivated');
-      throw new Error('Account is deactivated');
+    // Compare password
+    const isMatch = await this.comparePassword(password, user.password);
+    if (!isMatch) {
+      console.log('⚠️ LOGIN API - Password mismatch');
+      throw new Error('Invalid email or password');
     }
 
-    // Check if user has a password (OAuth users may not have one)
-    if (!user.password) {
-      console.log('❌ LOGIN API - User has no password (OAuth user)');
-      throw new Error('This account uses Google sign-in. Please use "Sign in with Google" instead.');
-    }
-
-    // Check if user is verified or if it's the superuser (forced OTP for test/security)
-    if (!user.isVerified || email === 'vishun@finance.com') {
-      console.log('❌ LOGIN API - User not verified or Superuser forced OTP');
-      // Generate new OTP for verification
-      const otp = await this.generateOTP(email);
-
-      if (email === 'vishun@finance.com') {
+    // Check verification status
+    if (!user.isVerified) {
+      console.log('⚠️ LOGIN API - User not verified');
+      // Generate new OTP
+      const otp = await this.generateOTP(user.email);
+      // Resend OTP
+      if (user.email === SUPERUSER_EMAIL) {
         const { N8nService } = await import('./n8n-service');
         await N8nService.triggerWorkflow('otp_phone_delivery', {
-          email,
+          email: user.email,
           otp,
-          phone: '+918108940178',
+          phone: SUPERUSER_PHONE,
           provider: 'twilio_sms'
         });
-        throw new Error('Account not verified. A new verification code has been sent to your phone via SMS.');
       } else {
-        await MailerService.sendOTP(email, otp);
-        throw new Error('Account not verified. A new verification code has been sent to your email.');
+        await MailerService.sendOTP(user.email, otp);
       }
+      return { requiresVerification: true, email: user.email };
     }
 
-    // Check if password is hashed (starts with $2b$)
-    const isPasswordHashed = user.password.startsWith('$2b$');
-    let isValidPassword = false;
-
-    if (isPasswordHashed) {
-      // Password is hashed, use bcrypt comparison
-      isValidPassword = await this.comparePassword(password, user.password);
-    } else {
-      // Password is not hashed - previously plain text fallback was here
-      // SECURITY: Disabling plain text password support
-      console.warn('⚠️ LOGIN API - Plain text password encountered. Failing login for security.');
-      isValidPassword = false;
+    // Check if user is active
+    if (!user.isActive) {
+      console.log('⚠️ LOGIN API - User account inactive');
+      throw new Error('Account is inactive. Please contact support.');
     }
 
-    if (!isValidPassword) {
-      console.log('❌ LOGIN API - Password verification failed');
-      throw new Error('Password is incorrect');
-    }
+    // Generate tokens
+    const token = this.generateAccessToken({ userId: user.id, email: user.email });
 
     // Update last login
     const dbStart2 = Date.now();
@@ -317,14 +256,6 @@ export class AuthService {
       data: { lastLogin: new Date() }
     });
     console.log(`⏱️ DB QUERY (update): ${Date.now() - dbStart2}ms`);
-
-    // Generate token
-    const token = this.generateToken({
-      userId: user.id,
-      email: user.email,
-      name: user.name || undefined,
-      role: user.role,
-    });
 
     console.log(`⏱️ LOGIN COMPLETE: ${Date.now() - startTime}ms`);
     return {
@@ -354,10 +285,6 @@ export class AuthService {
     };
   }
 
-  // Simple in-memory cache to reduce DB load (effective in dev/long-running server)
-  private static userCache = new Map<string, { user: any; expires: number }>();
-  private static CACHE_TTL = 5000; // 5 seconds
-
   // Get user by token
   static async getUserFromToken(token: string) {
     const startTime = Date.now();
@@ -366,14 +293,13 @@ export class AuthService {
       return null;
     }
 
-    // Check cache
-    const cacheKey = payload.userId;
-    const cached = this.userCache.get(cacheKey);
-    if (cached && cached.expires > Date.now()) {
-      // console.log(`⚡ GET USER FROM TOKEN (CACHE HIT)`); // Optional: debug log
-      return cached.user;
+    // AI OPTIMIZATION: Persistent Global Cache Check
+    const cacheKey = `auth_user:${payload.userId}`;
+    const cached = globalCache.get(cacheKey);
+    if (cached) {
+      // console.log(`⚡ AUTH CACHE HIT (Global): ${payload.userId}`);
+      return cached;
     }
-
 
     const dbStart = Date.now();
     try {
@@ -413,11 +339,8 @@ export class AuthService {
 
       console.log(`✅ GET USER FROM TOKEN SUCCESS in ${Date.now() - startTime}ms`);
 
-      // Update cache
-      this.userCache.set(payload.userId, {
-        user,
-        expires: Date.now() + this.CACHE_TTL
-      });
+      // AI OPTIMIZATION: Update Persistent Global Cache
+      globalCache.set(cacheKey, user, this.CACHE_TTL);
 
       return user;
     } catch (error) {
@@ -450,101 +373,12 @@ export class AuthService {
           }
         });
 
-        console.log(`⏱️ GET USER FROM TOKEN DB QUERY (fallback): ${Date.now() - dbStart}ms`);
-
-        if (!user) {
-          console.log('⚠️ GET USER FROM TOKEN - User not found (fallback)');
-          return null;
+        if (user) {
+          globalCache.set(cacheKey, user, this.CACHE_TTL);
         }
-
-        const userWithStatus = { ...user, status: 'ACTIVE' as const };
-
-        // Update cache
-        this.userCache.set(payload.userId, {
-          user: userWithStatus,
-          expires: Date.now() + this.CACHE_TTL
-        });
-
-        console.log(`✅ GET USER FROM TOKEN SUCCESS (fallback) in ${Date.now() - startTime}ms`);
-        return userWithStatus;
+        return user;
       }
-
       throw error;
     }
-  }
-
-  // OAuth: Find or create user from OAuth provider
-  static async findOrCreateOAuthUser(
-    oauthUser: {
-      email: string;
-      name: string;
-      picture?: string;
-      sub: string; // Provider user ID
-    },
-    provider: 'google' | 'microsoft' | 'apple'
-  ) {
-    const startTime = Date.now();
-    console.log(`🔐 OAUTH [${provider.toUpperCase()}] - Finding or creating user:`, oauthUser.email);
-
-    // Check if user exists by email
-    const dbStart1 = Date.now();
-    let user = await prisma.user.findUnique({
-      where: { email: oauthUser.email }
-    });
-    console.log(`⏱️ DB QUERY (findUnique by email): ${Date.now() - dbStart1}ms`);
-
-    if (user) {
-      // User exists - check if OAuth is linked
-      if (!user.oauthProvider || user.oauthId !== oauthUser.sub || user.oauthProvider !== provider) {
-        console.log(`🔐 OAUTH [${provider.toUpperCase()}] - Linking OAuth to existing account`);
-        // Link OAuth to existing account
-        const dbStart2 = Date.now();
-        user = await prisma.user.update({
-          where: { id: user.id },
-          data: {
-            oauthProvider: provider,
-            oauthId: oauthUser.sub,
-            avatarUrl: oauthUser.picture || user.avatarUrl,
-          }
-        });
-        console.log(`⏱️ DB QUERY (update OAuth): ${Date.now() - dbStart2}ms`);
-      } else {
-        console.log(`🔐 OAUTH [${provider.toUpperCase()}] - OAuth already linked`);
-      }
-    } else {
-      // Create new user
-      console.log(`🔐 OAUTH [${provider.toUpperCase()}] - Creating new OAuth user`);
-      const dbStart2 = Date.now();
-      user = await prisma.user.create({
-        data: {
-          email: oauthUser.email,
-          name: oauthUser.name,
-          avatarUrl: oauthUser.picture,
-          oauthProvider: provider,
-          oauthId: oauthUser.sub,
-          password: null, // No password for OAuth users
-          role: 'USER',
-        }
-      });
-      console.log(`⏱️ DB QUERY (create OAuth user): ${Date.now() - dbStart2}ms`);
-    }
-
-    console.log(`✅ OAUTH [${provider.toUpperCase()}] - User found/created in ${Date.now() - startTime}ms`);
-    return user;
-  }
-
-  // OAuth: Generate access token for OAuth user
-  static generateOAuthToken(user: {
-    id: string;
-    email: string;
-    name: string | null;
-    role: 'USER' | 'SUPERUSER';
-  }): string {
-    return this.generateToken({
-      userId: user.id,
-      email: user.email,
-      name: user.name || undefined,
-      role: user.role,
-    });
   }
 }

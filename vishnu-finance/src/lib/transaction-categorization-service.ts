@@ -106,7 +106,7 @@ function fuzzyMatchCategory(
   if (!categoryName) return null;
 
   const normalized = categoryName.toLowerCase().trim();
-  
+
   // First try exact match
   const exactMatch = availableCategories.find(
     (c) => c.name.toLowerCase().trim() === normalized
@@ -142,7 +142,7 @@ function fuzzyMatchCategory(
   for (const category of availableCategories) {
     const catName = category.name.toLowerCase().trim();
     const distance = levenshteinDistance(normalized, catName);
-    
+
     if (distance <= maxDistance) {
       if (!bestMatch || distance < bestMatch.distance) {
         bestMatch = { id: category.id, name: category.name, distance };
@@ -199,17 +199,9 @@ export async function categorizeTransactionsWithAI(
   }
 
   try {
-    // Get user's categories (including default categories)
-    const expenseCategories = await getUserCategories(userId, 'EXPENSE');
-    const incomeCategories = await getUserCategories(userId, 'INCOME');
-    
-    // Check if we have any categories at all
-    if (expenseCategories.length === 0 && incomeCategories.length === 0) {
-      console.warn(`⚠️ No categories found for user ${userId}. Cannot perform AI categorization.`);
-      console.warn('Please ensure default categories are seeded in the database.');
-      // Return rule-based categorization as fallback
-      return Promise.all(transactions.map((t) => categorizeWithRules(userId, t)));
-    }
+    // Start fetching categories and building context in parallel
+    const expenseCategoriesPromise = getUserCategories(userId, 'EXPENSE');
+    const incomeCategoriesPromise = getUserCategories(userId, 'INCOME');
 
     // Build context from transactions (include all relevant fields)
     const transactionContext = transactions
@@ -225,18 +217,23 @@ export async function categorizeTransactionsWithAI(
       )
       .join('\n');
 
+    const [expenseCategories, incomeCategories] = await Promise.all([
+      expenseCategoriesPromise,
+      incomeCategoriesPromise
+    ]);
+
     // Get categories for the transaction type
     const categoriesForType =
       transactions[0].financialCategory === 'INCOME'
         ? incomeCategories
         : expenseCategories;
-    
+
     // If no categories for this type, fall back to rule-based
     if (categoriesForType.length === 0) {
       console.warn(`⚠️ No ${transactions[0].financialCategory} categories found for user ${userId}. Using rule-based categorization.`);
       return Promise.all(transactions.map((t) => categorizeWithRules(userId, t)));
     }
-    
+
     const availableCategories = categoriesForType.map((c) => c.name).join(', ');
     console.log(`📋 Available ${transactions[0].financialCategory} categories (${categoriesForType.length}): ${availableCategories.substring(0, 150)}...`);
 
@@ -401,7 +398,7 @@ Example response:
 Return ONLY the JSON array, no other text.`;
 
     const model = genAI.getGenerativeModel({
-      model: 'gemini-2.5-flash',
+      model: 'gemma-3-27b-it',
       generationConfig: {
         temperature: 0.3, // Lower temperature for more consistent categorization
         topK: 20,
@@ -451,10 +448,10 @@ Return ONLY the JSON array, no other text.`;
           ];
           const category = fuzzyMatchCategory(suggestedCategoryName, allCategories) ||
             allCategories.find(
-            (c) =>
-              c.name.toLowerCase().trim() ===
-              suggestedCategoryName.toLowerCase()
-          );
+              (c) =>
+                c.name.toLowerCase().trim() ===
+                suggestedCategoryName.toLowerCase()
+            );
 
           if (category) {
             return {
@@ -488,7 +485,7 @@ Return ONLY the JSON array, no other text.`;
  */
 function extractSurname(fullName: string | null | undefined): string | null {
   if (!fullName) return null;
-  
+
   // If it's a UPI ID, extract name part before @
   if (fullName.includes('@')) {
     const namePart = fullName.split('@')[0];
@@ -506,18 +503,18 @@ function extractSurname(fullName: string | null | undefined): string | null {
       return potentialSurname;
     }
   }
-  
+
   const parts = fullName.trim().split(/\s+/);
   if (parts.length >= 2) {
     // Usually last name is the surname
     return parts[parts.length - 1].toLowerCase();
   }
-  
+
   // If single word, try to extract surname pattern (last 4-6 chars)
   if (parts.length === 1 && parts[0].length > 6) {
     return parts[0].slice(-6).toLowerCase();
   }
-  
+
   return null;
 }
 
@@ -550,14 +547,14 @@ function normalizeStoreName(storeName: string | null | undefined): string {
  */
 function normalizePersonName(personName: string | null | undefined): string {
   if (!personName) return '';
-  
+
   // Extract person name from UPI ID if present
   // e.g., "manishavishwakarma2463@okaxis" -> "manishavishwakarma2463"
   let name = personName;
   if (personName.includes('@')) {
     name = personName.split('@')[0];
   }
-  
+
   return name
     .toLowerCase()
     .replace(/[^\w\s]/g, ' ') // Remove special characters
@@ -574,28 +571,28 @@ async function categorizeLargeAmount(
 ): Promise<CategorizationResult | null> {
   const amount = transaction.amount;
   if (amount < 50000) return null; // Only handle large amounts
-  
+
   const text = cleanText(
     (transaction.description || '') +
-      ' ' +
-      (transaction.store || '') +
-      ' ' +
-      (transaction.commodity || '')
+    ' ' +
+    (transaction.store || '') +
+    ' ' +
+    (transaction.commodity || '')
   );
 
   // Large credit (>= ₹50,000)
   if (transaction.financialCategory === 'INCOME') {
     // If personName/UPI present → Transfer/Income, not Salary
     if (transaction.personName || (transaction as any).upiId) {
-    return {
-      categoryId: null,
+      return {
+        categoryId: null,
         categoryName: 'Transfer',
         confidence: 0.8,
-      source: 'rule',
+        source: 'rule',
         reasoning: `Large credit (₹${amount}) with personName/UPI indicates transfer, not salary`,
       };
     }
-    
+
     // Check if it's a recurring pattern (salary)
     const salaryCheck = await detectSalaryVsTransfer(userId, transaction);
     if (salaryCheck.isSalary) {
@@ -607,7 +604,7 @@ async function categorizeLargeAmount(
         reasoning: salaryCheck.reasoning,
       };
     }
-    
+
     // One-time large credit without personName → Investment Returns or Transfer
     // Distinguish investment returns (income) from investment expenses
     if (
@@ -625,7 +622,7 @@ async function categorizeLargeAmount(
         reasoning: `Large credit (₹${amount}) with investment return keywords`,
       };
     }
-    
+
     // Investment purchase (should be expense, but if credit might be refund/reversal)
     if (
       text.includes('mutual fund') ||
@@ -642,7 +639,7 @@ async function categorizeLargeAmount(
         reasoning: `Large credit (₹${amount}) with investment keywords - likely refund`,
       };
     }
-    
+
     // Default: Transfer or Income
     return {
       categoryId: null,
@@ -667,7 +664,7 @@ async function categorizeLargeAmount(
       emiResult.reasoning = `Large amount (₹${amount}) with ${emiResult.reasoning}`;
       return emiResult;
     }
-    
+
     // Check for investment expense keywords (SIP, mutual fund purchase, equity purchase)
     if (
       text.includes('mutual fund') ||
@@ -684,10 +681,10 @@ async function categorizeLargeAmount(
         reasoning: `Large debit (₹${amount}) with investment expense keywords`,
       };
     }
-    
+
     // Check if it's recurring (EMI/AutoPay)
     // This will be handled by recurring patterns and AutoPay detection
-    
+
     // Default: Major purchase (Housing or Shopping)
     if (
       text.includes('property') ||
@@ -703,7 +700,7 @@ async function categorizeLargeAmount(
         reasoning: `Large debit (₹${amount}) with property/housing keywords`,
       };
     }
-    
+
     return {
       categoryId: null,
       categoryName: 'Shopping',
@@ -950,12 +947,12 @@ function categorizeGiftDonation(
 ): CategorizationResult | null {
   const text = cleanText(
     (transaction.description || '') +
-      ' ' +
-      (transaction.store || '') +
-      ' ' +
-      (transaction.commodity || '') +
-      ' ' +
-      ((transaction as any).personName || '')
+    ' ' +
+    (transaction.store || '') +
+    ' ' +
+    (transaction.commodity || '') +
+    ' ' +
+    ((transaction as any).personName || '')
   );
 
   // For INCOME transactions - gifts/donations received
@@ -1008,10 +1005,10 @@ function categorizeTaxPayment(
 ): CategorizationResult | null {
   const text = cleanText(
     (transaction.description || '') +
-      ' ' +
-      (transaction.store || '') +
-      ' ' +
-      (transaction.commodity || '')
+    ' ' +
+    (transaction.store || '') +
+    ' ' +
+    (transaction.commodity || '')
   );
 
   // Income tax keywords
@@ -1097,10 +1094,10 @@ function categorizeByTransactionType(
 ): CategorizationResult | null {
   const text = cleanText(
     (transaction.description || '') +
-      ' ' +
-      (transaction.store || '') +
-      ' ' +
-      (transaction.commodity || '')
+    ' ' +
+    (transaction.store || '') +
+    ' ' +
+    (transaction.commodity || '')
   );
 
   // Tax payments (high priority - before other patterns)
@@ -1227,7 +1224,7 @@ async function detectSalaryVsTransfer(
 ): Promise<{ isSalary: boolean; confidence: number; reasoning: string }> {
   const amount = transaction.amount;
   const text = cleanText((transaction.description || '') + ' ' + (transaction.store || ''));
-  
+
   // Must be significant amount (>= ₹10,000)
   if (amount < 10000) {
     return {
@@ -1301,7 +1298,7 @@ async function detectSalaryVsTransfer(
       // Check date consistency (salary usually arrives around same date ±3 days)
       const currentDate = new Date(transaction.date);
       const currentDay = currentDate.getDate();
-      
+
       const dateMatches = similarTransactions.filter((txn: any) => {
         const txnDate = new Date(txn.transactionDate);
         const txnDay = txnDate.getDate();
@@ -1348,10 +1345,10 @@ async function detectSalaryVsTransfer(
 
   // Default: if bank transfer without personName, moderate confidence for salary
   const descUpper = (transaction.description || '').toUpperCase();
-  const isBankTransfer = descUpper.includes('NEFT') || 
-                        descUpper.includes('RTGS') || 
-                        descUpper.includes('IMPS');
-  
+  const isBankTransfer = descUpper.includes('NEFT') ||
+    descUpper.includes('RTGS') ||
+    descUpper.includes('IMPS');
+
   if (isBankTransfer && !transaction.personName && !transaction.upiId) {
     return {
       isSalary: true,
@@ -1386,13 +1383,13 @@ async function categorizeByBankTransfer(
     if (amount >= 10000) {
       // Verify if it's salary or transfer
       const salaryCheck = await detectSalaryVsTransfer(userId, transaction);
-      
+
       if (salaryCheck.isSalary) {
-      return {
-        categoryId: null,
-        categoryName: 'Salary',
+        return {
+          categoryId: null,
+          categoryName: 'Salary',
           confidence: salaryCheck.confidence,
-        source: 'rule',
+          source: 'rule',
           reasoning: salaryCheck.reasoning,
         };
       } else {
@@ -1464,7 +1461,7 @@ function categorizeByCommodity(
   }
 
   const commodity = transaction.commodity.toLowerCase().trim();
-  
+
   // Only check for EXPENSE transactions
   if (transaction.financialCategory !== 'EXPENSE') {
     return null;
@@ -1552,27 +1549,27 @@ async function categorizeWithRules(
   transaction: TransactionToCategorize
 ): Promise<CategorizationResult> {
   // Check edge cases first (before general patterns)
-  
+
   // 1. Large amount verification (>= ₹50,000)
   const largeAmountResult = await categorizeLargeAmount(userId, transaction);
   if (largeAmountResult) return largeAmountResult;
-  
+
   // 2. Amount-based heuristics (for smaller amounts)
   const amountResult = categorizeByAmount(transaction);
   if (amountResult) return amountResult;
-  
+
   // 3. UPI patterns
   const upiResult = categorizeByUPI(transaction);
   if (upiResult) return upiResult;
-  
+
   // 4. Transaction type keywords
   const typeResult = categorizeByTransactionType(transaction);
   if (typeResult) return typeResult;
-  
+
   // 5. Bank transfer patterns (with salary verification)
   const transferResult = await categorizeByBankTransfer(userId, transaction);
   if (transferResult) return transferResult;
-  
+
   // 5. Date validation (future dates - data error)
   const transactionDate = new Date(transaction.date);
   const today = new Date();
@@ -1581,13 +1578,13 @@ async function categorizeWithRules(
     // Future date - likely data error, but still categorize with lower confidence
     console.warn(`⚠️ Future date detected: ${transaction.date} (${daysDiff} days ahead)`);
   }
-  
+
   // 6. Partial/missing data handling
   const store = transaction.store?.trim() || '';
   if (store && (store.length < 3 || /^\d+$/.test(store))) {
     // Very short store name or only numbers - likely transaction ID, skip pattern matching
   }
-  
+
   const text = cleanText(
     (transaction.description || '') +
     ' ' +
@@ -1595,12 +1592,12 @@ async function categorizeWithRules(
     ' ' +
     (transaction.commodity || '')
   );
-  
+
   // FAMILY DETECTION (high priority) - Check if personName shares surname with account holder
   if (transaction.personName && transaction.accountHolderName) {
     const personSurname = extractSurname(transaction.personName);
     const accountSurname = extractSurname(transaction.accountHolderName);
-    
+
     if (personSurname && accountSurname && personSurname === accountSurname) {
       // Same surname = family member (not Utilities!)
       return {
@@ -1650,7 +1647,7 @@ async function categorizeWithRules(
         source: 'rule',
       };
     }
-    
+
     // Groceries - Known grocery vendors (like "Ramu")
     const groceryVendors = ['ramu'];
     const storeLower = transaction.store?.toLowerCase().trim() || '';
@@ -1663,7 +1660,7 @@ async function categorizeWithRules(
         source: 'rule',
       };
     }
-    
+
     // Groceries - Store/description patterns (only if commodity doesn't match)
     if (
       text.includes('grocery') ||
@@ -1690,7 +1687,7 @@ async function categorizeWithRules(
         source: 'rule',
       };
     }
-    
+
     // Food & Dining - Indian merchants (only if not groceries)
     if (
       text.includes('swiggy') ||
@@ -1720,7 +1717,7 @@ async function categorizeWithRules(
         source: 'rule',
       };
     }
-    
+
     // Shopping - Indian e-commerce
     if (
       text.includes('meesho') ||
@@ -1740,7 +1737,7 @@ async function categorizeWithRules(
         source: 'rule',
       };
     }
-    
+
     // Recharges & Bills - Telecom & Utilities
     if (
       text.includes('jio') ||
@@ -1766,7 +1763,7 @@ async function categorizeWithRules(
         source: 'rule',
       };
     }
-    
+
     // Transportation
     if (
       text.includes('uber') ||
@@ -1796,7 +1793,7 @@ async function categorizeWithRules(
         source: 'rule',
       };
     }
-    
+
     // Healthcare & Pharmacy
     if (
       text.includes('pharmacy') ||
@@ -1816,10 +1813,10 @@ async function categorizeWithRules(
         source: 'rule',
       };
     }
-    
+
     // Entertainment & Subscriptions
     // Check if it's a recurring subscription (monthly pattern) vs one-time entertainment
-    const isSubscriptionService = 
+    const isSubscriptionService =
       text.includes('spotify') ||
       text.includes('netflix') ||
       text.includes('prime') ||
@@ -1828,12 +1825,12 @@ async function categorizeWithRules(
       text.includes('sonyliv') ||
       text.includes('youtube premium') ||
       text.includes('disney');
-    
-    const isEntertainmentVenue = 
+
+    const isEntertainmentVenue =
       text.includes('movie') ||
       text.includes('cinema') ||
       text.includes('theater');
-    
+
     if (isSubscriptionService) {
       // Subscription services - check if recurring (will be handled by AutoPay patterns)
       // For now, default to "Subscriptions" if it's a known subscription service
@@ -1846,7 +1843,7 @@ async function categorizeWithRules(
         reasoning: 'Subscription service detected (Netflix, Spotify, etc.)',
       };
     }
-    
+
     if (isEntertainmentVenue) {
       // Entertainment venues - always "Entertainment"
       return {
@@ -1857,7 +1854,7 @@ async function categorizeWithRules(
         reasoning: 'Entertainment venue detected',
       };
     }
-    
+
     // Education
     if (
       text.includes('school') ||
@@ -1874,7 +1871,7 @@ async function categorizeWithRules(
         source: 'rule',
       };
     }
-    
+
     // Additional patterns continue below (duplicates removed)
     if (
       text.includes('hospital') ||
@@ -1888,7 +1885,7 @@ async function categorizeWithRules(
         source: 'rule',
       };
     }
-    
+
     // Additional Entertainment patterns (one-time entertainment, not subscriptions)
     if (
       text.includes('cinema') ||
@@ -1904,7 +1901,7 @@ async function categorizeWithRules(
         reasoning: 'Entertainment venue/activity detected',
       };
     }
-    
+
     // Investment (EXPENSE) - distinguish from Investment Returns (INCOME)
     // Investment expenses: SIP, mutual fund purchase, equity purchase, demat charges
     // Investment Returns: Dividends, capital gains, returns (handled in INCOME section)
@@ -1927,7 +1924,7 @@ async function categorizeWithRules(
         reasoning: 'Investment expense detected (SIP, mutual fund, equity purchase)',
       };
     }
-    
+
     // Education
     if (
       text.includes('school') ||
@@ -1946,7 +1943,7 @@ async function categorizeWithRules(
         source: 'rule',
       };
     }
-    
+
     // Insurance
     if (
       text.includes('insurance') ||
@@ -1963,26 +1960,26 @@ async function categorizeWithRules(
         source: 'rule',
       };
     }
-    
+
     // Rent vs EMI distinction
     // Check for EMI keywords first (more specific than rent)
-    const hasEMIKeywords = 
-      text.includes('emi') || 
-      text.includes('loan') || 
-      text.includes('installment') || 
+    const hasEMIKeywords =
+      text.includes('emi') ||
+      text.includes('loan') ||
+      text.includes('installment') ||
       text.includes('repayment');
-    
-    const hasRentKeywords = 
-      text.includes('rent') || 
+
+    const hasRentKeywords =
+      text.includes('rent') ||
       text.includes('rental') ||
       text.includes('house rent') ||
       text.includes('apartment rent');
-    
+
     // If both present, prioritize EMI (more specific)
     if (hasEMIKeywords && transaction.amount >= 5000) {
       return categorizeEMIByLoanType(transaction);
     }
-    
+
     // Rent should NOT have EMI/loan keywords
     if (hasRentKeywords && !hasEMIKeywords && transaction.amount >= 5000) {
       return {
@@ -1994,11 +1991,11 @@ async function categorizeWithRules(
       };
     }
   }
-  
+
   // INCOME CATEGORIES - Salary detection with verification
   if (transaction.financialCategory === 'INCOME') {
     const amount = transaction.amount;
-    
+
     // Investment Returns (INCOME) - distinguish from Investment (EXPENSE)
     // Keywords: dividend, return, capital gain, profit, interest from investments
     if (
@@ -2017,7 +2014,7 @@ async function categorizeWithRules(
         reasoning: 'Investment return/dividend detected',
       };
     }
-    
+
     // Salary patterns - only if amount is significant (>= ₹10,000)
     // Small amounts (₹20-30) are NOT salary
     if (amount >= 10000) {
@@ -2037,7 +2034,7 @@ async function categorizeWithRules(
           reasoning: 'Explicit salary keyword found',
         };
       }
-      
+
       // For large bank transfers, use salary verification
       // This will be handled by categorizeByBankTransfer which is called earlier
       // So we skip it here to avoid duplicate checks
@@ -2254,7 +2251,7 @@ async function detectRecurringPatterns(
   transactions: TransactionToCategorize[]
 ): Promise<Array<{ transactionIndex: number; categoryId: string | null; categoryName: string; confidence: number }>> {
   const results: Array<{ transactionIndex: number; categoryId: string | null; categoryName: string; confidence: number }> = [];
-  
+
   try {
     // Get existing income transactions to detect salary patterns
     // Only consider transactions >= ₹10,000 (salary is usually significant amounts)
@@ -2313,7 +2310,7 @@ async function detectRecurringPatterns(
         const rounded = Math.round(amount / 100) * 100;
         const key = `${rounded}`;
         const similarGroup = amountGroups.get(key);
-        
+
         if (similarGroup && similarGroup.length >= 2) {
           // Check if amounts are within 10% tolerance (for salary increases)
           const matchingItems = similarGroup.filter(item => {
@@ -2321,14 +2318,14 @@ async function detectRecurringPatterns(
             const tolerance = Math.max(item.amount, amount) * 0.1; // 10% tolerance
             return diff <= tolerance;
           });
-          
+
           if (matchingItems.length >= 2) {
             // Found recurring pattern - use most common category
             const categoryCounts = new Map<string, number>();
             for (const item of matchingItems) {
               categoryCounts.set(item.categoryId, (categoryCounts.get(item.categoryId) || 0) + 1);
             }
-            
+
             let maxCount = 0;
             let mostCommonCategory: { categoryId: string; categoryName: string } | null = null;
             for (const [catId, count] of categoryCounts.entries()) {
@@ -2340,7 +2337,7 @@ async function detectRecurringPatterns(
                 }
               }
             }
-            
+
             if (mostCommonCategory && maxCount >= 2) {
               results.push({
                 transactionIndex: idx,
@@ -2353,16 +2350,16 @@ async function detectRecurringPatterns(
         }
       }
     }
-    
+
     // Batch query for recurring expenses (FAST - one query for all)
     const expenseAmounts = transactions
       .filter(t => t.financialCategory === 'EXPENSE')
       .map(t => t.amount);
-    
+
     if (expenseAmounts.length > 0) {
       const minAmount = Math.min(...expenseAmounts) * 0.9;
       const maxAmount = Math.max(...expenseAmounts) * 1.1;
-      
+
       const existingExpenses = await (prisma as any).transaction.findMany({
         where: {
           userId,
@@ -2384,7 +2381,7 @@ async function detectRecurringPatterns(
         },
         take: 100, // Get more for better pattern matching
       });
-      
+
       // Build amount -> category map for fast lookup
       const expensePatternMap = new Map<string, Array<{ categoryId: string; categoryName: string }>>();
       for (const exp of existingExpenses) {
@@ -2401,7 +2398,7 @@ async function detectRecurringPatterns(
           });
         }
       }
-      
+
       // Check if new expense transactions match recurring patterns
       for (let idx = 0; idx < transactions.length; idx++) {
         const txn = transactions[idx];
@@ -2410,7 +2407,7 @@ async function detectRecurringPatterns(
           const rounded = Math.round(amount / 100) * 100;
           const key = `${rounded}`;
           const similarGroup = expensePatternMap.get(key);
-          
+
           if (similarGroup && similarGroup.length >= 2) {
             // Check if amounts are within 10% tolerance
             const matchingItems = similarGroup.filter(item => {
@@ -2421,20 +2418,20 @@ async function detectRecurringPatterns(
                 return roundedExp === rounded && e.categoryId === item.categoryId;
               });
               if (!matchingExp) return false;
-              
+
               const expAmount = Number(matchingExp.creditAmount || matchingExp.debitAmount || 0);
               const diff = Math.abs(expAmount - amount);
               const tolerance = Math.max(expAmount, amount) * 0.1;
               return diff <= tolerance;
             });
-            
+
             if (matchingItems.length >= 2) {
               // Found recurring pattern
               const categoryCounts = new Map<string, number>();
               for (const item of matchingItems) {
                 categoryCounts.set(item.categoryId, (categoryCounts.get(item.categoryId) || 0) + 1);
               }
-              
+
               let maxCount = 0;
               let mostCommonCategory: { categoryId: string; categoryName: string } | null = null;
               for (const [catId, count] of categoryCounts.entries()) {
@@ -2446,7 +2443,7 @@ async function detectRecurringPatterns(
                   }
                 }
               }
-              
+
               if (mostCommonCategory && maxCount >= 2) {
                 results.push({
                   transactionIndex: idx,
@@ -2463,7 +2460,7 @@ async function detectRecurringPatterns(
   } catch (error) {
     console.error('Error detecting recurring patterns:', error);
   }
-  
+
   return results;
 }
 
@@ -2498,15 +2495,15 @@ export async function detectAutoPayTransactions(
   }>
 ): Promise<AutoPayPattern[]> {
   const patterns: AutoPayPattern[] = [];
-  
+
   try {
     // Only analyze EXPENSE transactions (auto-pay is typically expenses)
     const expenses = transactions.filter(t => t.financialCategory === 'EXPENSE');
-    
+
     if (expenses.length === 0) {
       return patterns;
     }
-    
+
     // Get existing transactions from database to detect patterns
     const existingExpenses = await (prisma as any).transaction.findMany({
       where: {
@@ -2530,7 +2527,7 @@ export async function detectAutoPayTransactions(
       orderBy: { transactionDate: 'desc' },
       take: 500, // Get last 500 expenses for pattern detection
     });
-    
+
     // Combine new and existing transactions for pattern analysis
     const allTransactions = [
       ...expenses.map(t => ({
@@ -2554,7 +2551,7 @@ export async function detectAutoPayTransactions(
         categoryName: e.category?.name || null,
       })),
     ];
-    
+
     // Group transactions by merchant identifier (store > upiId > personName > description)
     const merchantGroups = new Map<string, Array<{
       amount: number;
@@ -2563,7 +2560,7 @@ export async function detectAutoPayTransactions(
       categoryName: string | null;
       description: string;
     }>>();
-    
+
     for (const txn of allTransactions) {
       // Determine merchant identifier (prefer store, then upiId, then personName, then description)
       // Use normalized names for consistency
@@ -2583,7 +2580,7 @@ export async function detectAutoPayTransactions(
           continue; // Skip if no reliable identifier
         }
       }
-      
+
       if (!merchantGroups.has(merchantId)) {
         merchantGroups.set(merchantId, []);
       }
@@ -2595,20 +2592,20 @@ export async function detectAutoPayTransactions(
         description: txn.description,
       });
     }
-    
+
     // Helper function to check for subscription/EMI keywords
     const hasSubscriptionKeywords = (description: string): boolean => {
       const descLower = description.toLowerCase();
       const subscriptionKeywords = ['spotify', 'netflix', 'prime', 'hotstar', 'zee5', 'sonyliv', 'youtube premium', 'disney', 'subscription'];
       return subscriptionKeywords.some(keyword => descLower.includes(keyword));
     };
-    
+
     const hasEMIKeywords = (description: string): boolean => {
       const descLower = description.toLowerCase();
       const emiKeywords = ['emi', 'loan', 'installment', 'repayment', 'equated'];
       return emiKeywords.some(keyword => descLower.includes(keyword));
     };
-    
+
     // Helper function to calculate average days between transactions
     const calculateAverageDaysDiff = (txns: Array<{
       amount: number;
@@ -2628,11 +2625,11 @@ export async function detectAutoPayTransactions(
       }
       return count > 0 ? totalDays / count : null;
     };
-    
+
     // Analyze each merchant group for recurring patterns
     for (const [merchantId, txns] of merchantGroups.entries()) {
       if (txns.length < 2) continue; // Need at least 2 transactions
-      
+
       // Skip personName groups unless subscription/EMI keywords are present
       if (merchantId.startsWith('person:')) {
         const hasSubscription = txns.some(t => hasSubscriptionKeywords(t.description));
@@ -2642,7 +2639,7 @@ export async function detectAutoPayTransactions(
           continue;
         }
       }
-      
+
       // Group by amount (within 5% tolerance)
       const amountGroups = new Map<string, typeof txns>();
       for (const txn of txns) {
@@ -2653,41 +2650,41 @@ export async function detectAutoPayTransactions(
         }
         amountGroups.get(key)!.push(txn);
       }
-      
+
       // Check each amount group for monthly recurrence
       for (const [, amountTxns] of amountGroups.entries()) {
         if (amountTxns.length < 2) continue; // Need at least 2 occurrences
-        
+
         // Sort by date
         amountTxns.sort((a, b) => a.date.getTime() - b.date.getTime());
-        
+
         // Calculate average amount
         const avgAmount = amountTxns.reduce((sum, t) => sum + t.amount, 0) / amountTxns.length;
-        
+
         // Calculate average days between transactions
         const avgDaysDiff = calculateAverageDaysDiff(amountTxns);
         if (!avgDaysDiff) continue;
-        
+
         // Exclude daily patterns (1-3 days apart)
         if (avgDaysDiff >= FREQUENCY_RANGES.DAILY.min && avgDaysDiff <= FREQUENCY_RANGES.DAILY.max) {
           continue; // Daily pattern - NOT auto-pay, just recurring expense
         }
-        
+
         // Exclude weekly patterns (5-12 days apart)
         if (avgDaysDiff >= FREQUENCY_RANGES.WEEKLY.min && avgDaysDiff <= FREQUENCY_RANGES.WEEKLY.max) {
           continue; // Weekly pattern - NOT auto-pay, just recurring expense
         }
-        
+
         // Only consider monthly patterns (25-35 days apart)
         if (avgDaysDiff < FREQUENCY_RANGES.MONTHLY.min || avgDaysDiff > FREQUENCY_RANGES.MONTHLY.max) {
           continue; // Not monthly - skip
         }
-        
+
         // Check for monthly pattern matches
         let monthlyMatches = 0;
         let totalDaysDiff = 0;
         let matchCount = 0;
-        
+
         for (let i = 1; i < amountTxns.length; i++) {
           const daysDiff = (amountTxns[i].date.getTime() - amountTxns[i - 1].date.getTime()) / (1000 * 60 * 60 * 24);
           // Monthly transactions are typically 25-35 days apart
@@ -2697,7 +2694,7 @@ export async function detectAutoPayTransactions(
             matchCount++;
           }
         }
-        
+
         // Calculate confidence based on pattern strength
         let confidence = 0;
         if (monthlyMatches >= 2 && matchCount > 0) {
@@ -2706,19 +2703,19 @@ export async function detectAutoPayTransactions(
           const dayAccuracy = 1 - Math.abs(calculatedAvgDays - 30) / 30;
           confidence = Math.min(0.95, 0.7 + (monthlyMatches / amountTxns.length) * 0.2 + dayAccuracy * 0.1);
         }
-        
+
         // Check for subscription keywords (Spotify, Netflix, etc.)
         const firstTxn = amountTxns[0];
         const isSubscription = hasSubscriptionKeywords(firstTxn.description);
-        
+
         // Check for EMI/loan keywords
         const isEMI = hasEMIKeywords(firstTxn.description);
-        
+
         // Boost confidence for known subscription/EMI patterns
         if (isSubscription || isEMI) {
           confidence = Math.min(0.95, confidence + 0.15);
         }
-        
+
         // Only return patterns with confidence >= 0.8 and monthly frequency
         if (confidence >= CONFIDENCE_THRESHOLDS.AUTO_PAY && amountTxns.length >= 2) {
           // Determine merchant name for title
@@ -2732,7 +2729,7 @@ export async function detectAutoPayTransactions(
           } else {
             merchantName = firstTxn.description.substring(0, 50);
           }
-          
+
           // Get most common category
           const categoryCounts = new Map<string, { count: number; name: string }>();
           for (const txn of amountTxns) {
@@ -2742,7 +2739,7 @@ export async function detectAutoPayTransactions(
               categoryCounts.set(txn.categoryId, existing);
             }
           }
-          
+
           let mostCommonCategory: { id: string | null; name: string | null } = { id: null, name: null };
           let maxCount = 0;
           for (const [catId, data] of categoryCounts.entries()) {
@@ -2751,13 +2748,13 @@ export async function detectAutoPayTransactions(
               mostCommonCategory = { id: catId, name: data.name };
             }
           }
-          
+
           // Get last transaction date
           const lastTxn = amountTxns[amountTxns.length - 1];
-          
+
           // Round amount to 2 decimal places to avoid precision issues
           const roundedAmount = Math.round(avgAmount * 100) / 100;
-          
+
           patterns.push({
             title: merchantName,
             amount: roundedAmount,
@@ -2772,7 +2769,7 @@ export async function detectAutoPayTransactions(
         }
       }
     }
-    
+
     // Remove duplicates (same merchant + similar amount)
     const uniquePatterns: AutoPayPattern[] = [];
     const seen = new Set<string>();
@@ -2783,7 +2780,7 @@ export async function detectAutoPayTransactions(
         uniquePatterns.push(pattern);
       }
     }
-    
+
     return uniquePatterns;
   } catch (error) {
     console.error('Error detecting auto-pay transactions:', error);
@@ -2806,7 +2803,7 @@ export async function categorizeTransactions(
   const cached = patternCache.get(cacheKey);
   const now = Date.now();
   let loadedPatterns: LoadedPatterns;
-  
+
   if (cached && (now - cached.timestamp) < CACHE_TTL) {
     loadedPatterns = cached.patterns;
   } else {
@@ -2817,13 +2814,13 @@ export async function categorizeTransactions(
 
   // Detect recurring patterns (salary, monthly bills) BEFORE pattern matching
   const recurringPatterns = await detectRecurringPatterns(userId, transactions);
-  
+
   // Detect AutoPay patterns for expense transactions
   let autoPayPatterns: AutoPayPattern[] = [];
   const expenseTransactions = transactions
     .map((t, idx) => ({ ...t, originalIndex: idx }))
     .filter(t => t.financialCategory === 'EXPENSE');
-  
+
   if (expenseTransactions.length > 0) {
     try {
       const transactionsForAutoPay = expenseTransactions.map(t => ({
@@ -2842,7 +2839,7 @@ export async function categorizeTransactions(
       console.error('Error detecting AutoPay patterns:', error);
     }
   }
-  
+
   // Pre-fetch categories for merchant lookup (to avoid repeated queries)
   let allCategoriesCache: Array<{ id: string; name: string }> | null = null;
   const getAllCategories = async () => {
@@ -2853,32 +2850,32 @@ export async function categorizeTransactions(
     }
     return allCategoriesCache;
   };
-  
+
   // Helper to check if transaction matches AutoPay pattern
   const getAutoPayMatch = (transaction: TransactionToCategorize): AutoPayPattern | null => {
     if (transaction.financialCategory !== 'EXPENSE') return null;
-    
+
     const store = transaction.store?.trim().toLowerCase() || '';
     const upiId = (transaction as any).upiId?.trim().toLowerCase() || '';
     const personName = (transaction as any).personName?.trim().toLowerCase() || '';
     const amount = transaction.amount;
-    
+
     for (const pattern of autoPayPatterns) {
       if (pattern.confidence < 0.8) continue; // Only high-confidence patterns
-      
+
       // Check merchant identifier match
       const merchantId = pattern.merchantIdentifier.toLowerCase();
       const matchesStore = store && merchantId.includes(`store:${store}`);
       const matchesUpi = upiId && merchantId.includes(`upi:${upiId}`);
       const matchesPerson = personName && merchantId.includes(`person:${personName}`);
-      
+
       if (!matchesStore && !matchesUpi && !matchesPerson) continue;
-      
+
       // Check amount match (within 5% tolerance)
       const amountDiff = Math.abs(pattern.amount - amount);
       const amountTolerance = Math.max(pattern.amount, amount) * 0.05;
       if (amountDiff > amountTolerance) continue;
-      
+
       return pattern;
     }
     return null;
@@ -2890,7 +2887,7 @@ export async function categorizeTransactions(
     const store = normalizeStoreName(transaction.store);
     const personName = normalizePersonName((transaction as any).personName);
     const upiId = normalizeStoreName((transaction as any).upiId);
-    
+
     // 1. COMMODITY-BASED RULES (HIGHEST PRIORITY)
     const commodityResult = categorizeByCommodity(transaction);
     if (commodityResult && commodityResult.categoryName) {
@@ -2899,8 +2896,8 @@ export async function categorizeTransactions(
         const allCategories = await getAllCategories();
         const matchedCategory = fuzzyMatchCategory(commodityResult.categoryName, allCategories) ||
           allCategories.find(
-          (c) => c.name.toLowerCase().trim() === commodityResult.categoryName?.toLowerCase().trim()
-        );
+            (c) => c.name.toLowerCase().trim() === commodityResult.categoryName?.toLowerCase().trim()
+          );
         if (matchedCategory) {
           commodityResult.categoryId = matchedCategory.id;
         }
@@ -2908,12 +2905,12 @@ export async function categorizeTransactions(
       results.push(commodityResult);
       continue; // Early return - commodity takes precedence
     }
-    
+
     // 2. FAMILY DETECTION (HIGH PRIORITY)
     if (transaction.personName && transaction.accountHolderName) {
       const personSurname = extractSurname(transaction.personName);
       const accountSurname = extractSurname(transaction.accountHolderName);
-      
+
       if (personSurname && accountSurname && personSurname === accountSurname) {
         // Look up Family category ID
         const allCategories = await getAllCategories();
@@ -2929,9 +2926,9 @@ export async function categorizeTransactions(
         continue; // Early return
       }
     }
-    
+
     // 3. RECURRING PATTERNS (salary, monthly bills)
-    const recurringMatch = recurringPatterns.find(p => 
+    const recurringMatch = recurringPatterns.find(p =>
       p.transactionIndex === idx && p.confidence >= 0.7
     );
     if (recurringMatch) {
@@ -2941,8 +2938,8 @@ export async function categorizeTransactions(
         const allCategories = await getAllCategories();
         const matchedCategory = fuzzyMatchCategory(recurringMatch.categoryName, allCategories) ||
           allCategories.find(
-          (c) => c.name.toLowerCase().trim() === recurringMatch.categoryName?.toLowerCase().trim()
-        );
+            (c) => c.name.toLowerCase().trim() === recurringMatch.categoryName?.toLowerCase().trim()
+          );
         if (matchedCategory) {
           categoryId = matchedCategory.id;
         }
@@ -2956,7 +2953,7 @@ export async function categorizeTransactions(
       });
       continue; // Early return
     }
-    
+
     // 3.5. AUTOPAY PATTERNS (for expense transactions)
     if (transaction.financialCategory === 'EXPENSE') {
       const autoPayMatch = getAutoPayMatch(transaction);
@@ -2983,16 +2980,16 @@ export async function categorizeTransactions(
         continue; // Early return
       }
     }
-    
+
     // 4. STORE-BASED PATTERNS (if store exists)
     let patternSuggestion: CategorizationSuggestion | null = null;
     if (store) {
       // Try with prefix first
-      patternSuggestion = loadedPatterns.storePatterns.get(`store:${store}`) || 
-                         loadedPatterns.storePatterns.get(store) || 
-                         null;
+      patternSuggestion = loadedPatterns.storePatterns.get(`store:${store}`) ||
+        loadedPatterns.storePatterns.get(store) ||
+        null;
     }
-    
+
     // 5. MERCHANT LOOKUP (if store exists but no pattern found) - async but we handle it
     // Skip if Gemini quota is exceeded to avoid wasted API calls
     let merchantLookupResult: CategorizationResult | null = null;
@@ -3003,60 +3000,60 @@ export async function categorizeTransactions(
         try {
           const merchantLookup = await lookupMerchantCategory(transaction.store, userId);
           if (merchantLookup && merchantLookup.categoryName && merchantLookup.confidence >= MERCHANT_LOOKUP_CONFIG.CONFIDENCE_THRESHOLD) {
-          // Find category ID from category name
-          const allCategories = await getAllCategories();
-          const matchedCategory = fuzzyMatchCategory(merchantLookup.categoryName || '', allCategories) ||
-            allCategories.find(
-            (c) => c.name.toLowerCase().trim() === merchantLookup.categoryName?.toLowerCase().trim()
-          );
-          
-          if (matchedCategory) {
-            merchantLookupResult = {
-              categoryId: matchedCategory.id,
-              categoryName: merchantLookup.categoryName,
-              confidence: merchantLookup.confidence,
-              source: 'pattern',
-              reasoning: `Merchant lookup: ${merchantLookup.source}`,
-            };
-          } else if (merchantLookup.categoryName) {
-            // Category name found but ID not matched - use name only
-            merchantLookupResult = {
-              categoryId: null,
-              categoryName: merchantLookup.categoryName,
-              confidence: merchantLookup.confidence,
-              source: 'pattern',
-              reasoning: `Merchant lookup: ${merchantLookup.source}`,
-            };
+            // Find category ID from category name
+            const allCategories = await getAllCategories();
+            const matchedCategory = fuzzyMatchCategory(merchantLookup.categoryName || '', allCategories) ||
+              allCategories.find(
+                (c) => c.name.toLowerCase().trim() === merchantLookup.categoryName?.toLowerCase().trim()
+              );
+
+            if (matchedCategory) {
+              merchantLookupResult = {
+                categoryId: matchedCategory.id,
+                categoryName: merchantLookup.categoryName,
+                confidence: merchantLookup.confidence,
+                source: 'pattern',
+                reasoning: `Merchant lookup: ${merchantLookup.source}`,
+              };
+            } else if (merchantLookup.categoryName) {
+              // Category name found but ID not matched - use name only
+              merchantLookupResult = {
+                categoryId: null,
+                categoryName: merchantLookup.categoryName,
+                confidence: merchantLookup.confidence,
+                source: 'pattern',
+                reasoning: `Merchant lookup: ${merchantLookup.source}`,
+              };
+            }
           }
+        } catch (error) {
+          // Check if quota was exceeded
+          const { isGeminiQuotaExceeded: checkQuota } = await import('./gemini');
+          if (checkQuota()) {
+            console.log(`⏭️ Skipping merchant lookup - Gemini quota exceeded`);
+          } else {
+            console.error('Error in merchant lookup:', error);
+          }
+          // Continue to next step
         }
-      } catch (error) {
-        // Check if quota was exceeded
-        const { isGeminiQuotaExceeded: checkQuota } = await import('./gemini');
-        if (checkQuota()) {
-          console.log(`⏭️ Skipping merchant lookup - Gemini quota exceeded`);
-        } else {
-          console.error('Error in merchant lookup:', error);
-        }
-        // Continue to next step
-      }
       } else {
         // Quota exceeded, skip merchant lookup
         console.log(`⏭️ Skipping merchant lookup for "${transaction.store}" - quota exceeded`);
       }
     }
-    
+
     if (merchantLookupResult) {
       results.push(merchantLookupResult);
       continue; // Early return
     }
-    
+
     // 6. UPI-BASED PATTERNS (use even if store exists if confidence is high enough)
     // Higher confidence = more repeated transactions = more reliable
     if (!patternSuggestion && upiId) {
-      const upiPattern = loadedPatterns.upiPatterns.get(`upi:${upiId}`) || 
-                        loadedPatterns.upiPatterns.get(upiId) || 
-                        null;
-      
+      const upiPattern = loadedPatterns.upiPatterns.get(`upi:${upiId}`) ||
+        loadedPatterns.upiPatterns.get(upiId) ||
+        null;
+
       // Use UPI pattern if:
       // - No store pattern found, OR
       // - UPI pattern has very high confidence (>= 0.85) indicating many repeated transactions
@@ -3064,14 +3061,14 @@ export async function categorizeTransactions(
         patternSuggestion = upiPattern;
       }
     }
-    
+
     // 7. PERSONNAME PATTERNS (use even if store exists if confidence is high enough)
     // Higher confidence = more repeated transactions = more reliable
     if (!patternSuggestion && personName) {
-      const personPattern = loadedPatterns.personPatterns.get(`person:${personName}`) || 
-                           loadedPatterns.personPatterns.get(personName) || 
-                           null;
-      
+      const personPattern = loadedPatterns.personPatterns.get(`person:${personName}`) ||
+        loadedPatterns.personPatterns.get(personName) ||
+        null;
+
       // Use person pattern if:
       // - No store pattern found, OR
       // - Person pattern has very high confidence (>= 0.9) indicating many repeated transactions
@@ -3093,7 +3090,7 @@ export async function categorizeTransactions(
           categoryId = matchedCategory.id;
         }
       }
-      
+
       results.push({
         categoryId: categoryId,
         categoryName: patternSuggestion.categoryName,
@@ -3110,8 +3107,8 @@ export async function categorizeTransactions(
           const allCategories = await getAllCategories();
           const matchedCategory = fuzzyMatchCategory(ruleBased.categoryName, allCategories) ||
             allCategories.find(
-            (c) => c.name.toLowerCase().trim() === ruleBased.categoryName?.toLowerCase().trim()
-          );
+              (c) => c.name.toLowerCase().trim() === ruleBased.categoryName?.toLowerCase().trim()
+            );
           if (matchedCategory) {
             ruleBased.categoryId = matchedCategory.id;
           }
@@ -3165,7 +3162,7 @@ export async function categorizeTransactions(
   // Check if Gemini quota is exceeded (skip AI if so)
   const { isGeminiQuotaExceeded } = await import('./gemini');
   const quotaExceeded = isGeminiQuotaExceeded();
-  
+
   // Smart AI usage conditions
   const shouldUseAI =
     !quotaExceeded && // Don't use AI if quota exceeded
@@ -3173,7 +3170,7 @@ export async function categorizeTransactions(
     uncachedAI.length >= transactions.length * AI_USAGE_CONFIG.MIN_UNCATEGORIZED_PERCENT &&
     uncachedAI.length >= AI_USAGE_CONFIG.MIN_BATCH_SIZE &&
     checkAIQuota(userId);
-  
+
   if (quotaExceeded) {
     console.log('⏭️ Skipping AI categorization - Gemini quota exceeded. Using pattern matching and rules only.');
   }

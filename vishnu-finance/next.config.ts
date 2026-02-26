@@ -9,6 +9,16 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: false,
   },
 
+  // API Rewrites for Python Parser
+  async rewrites() {
+    return [
+      {
+        source: '/api/parser',
+        destination: '/api/py_parser',
+      },
+    ];
+  },
+
   // Security Headers
   async headers() {
     return [

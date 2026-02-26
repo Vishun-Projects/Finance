@@ -2285,28 +2285,31 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                         }}
                         className={cn(
                           "p-4 active:bg-muted/30 transition-colors flex items-start gap-3",
-                          isSelected && "bg-primary/5"
+                          isSelected && "bg-primary/5 shadow-inner"
                         )}
                       >
                         {showSelectionMode && (
-                          <div className="pt-1">
+                          <div className="pt-0.5">
                             <button
                               onClick={(e) => { e.stopPropagation(); toggleSelect(transaction.id); }}
                               className={cn(
-                                "w-5 h-5 rounded-md border flex items-center justify-center transition-all",
+                                "w-6 h-6 sm:w-5 sm:h-5 rounded-md border flex items-center justify-center transition-all",
                                 isSelected ? "bg-foreground border-foreground text-background shadow-md" : "bg-background border-input"
                               )}
+                              aria-label={`Select ${transaction.description}`}
                             >
-                              {isSelected && <Check className="w-3.5 h-3.5" />}
+                              {isSelected && <Check className="w-4 h-4 sm:w-3.5 sm:h-3.5" />}
                             </button>
+                            {/* Visual hit area expansion */}
+                            <div className="absolute -inset-2 md:hidden" />
                           </div>
                         )}
-                        <div className="size-10 rounded-xl bg-muted/50 border border-border/50 flex items-center justify-center shrink-0">
+                        <div className="size-10 rounded-xl bg-muted/50 border border-border/50 flex items-center justify-center shrink-0 shadow-sm">
                           <CategoryIcon category={transaction.category?.name || ''} className="w-5 h-5" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-start justify-between gap-2 mb-1">
-                            <h4 className="font-bold text-sm text-foreground truncate">{transaction.personName || transaction.store || transaction.description}</h4>
+                            <h4 className="font-bold text-sm text-foreground truncate tracking-tight">{transaction.personName || transaction.store || transaction.description}</h4>
                             <span className={cn(
                               "font-black text-sm tracking-tight whitespace-nowrap",
                               isIncome ? "text-emerald-500" : isExpense ? "text-rose-500" : "text-foreground"
@@ -2319,15 +2322,15 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                               <span>{isValidDate ? format(transactionDate, 'MMM dd') : 'No Date'}</span>
                               <span className="w-1 h-1 rounded-full bg-border" />
                               <span className={cn(
-                                "uppercase tracking-wider font-bold text-[10px]",
+                                "uppercase tracking-widest font-bold text-[11px]",
                                 isIncome ? "text-emerald-500" : "text-muted-foreground"
                               )}>
                                 {transaction.category?.name || 'General'}
                               </span>
                             </div>
                             {transaction.accountStatementId && (
-                              <div className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-emerald-500">
-                                <div className="size-1.5 rounded-full bg-emerald-500" />
+                              <div className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-emerald-500 bg-emerald-500/5 px-1.5 py-0.5 rounded-full border border-emerald-500/10">
+                                <div className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
                                 Cleared
                               </div>
                             )}
@@ -2345,14 +2348,30 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                   <Button
                     variant="outline"
                     onClick={() => setVisibleCount(prev => prev + 100)}
-                    className="gap-2 px-8 font-bold text-[10px] uppercase tracking-widest h-10 rounded-xl"
+                    className="gap-2 px-8 font-bold text-[10px] uppercase tracking-widest h-12 w-full sm:w-auto rounded-xl shadow-sm"
                   >
-                    <Plus className="w-4 h-4" />
+                    <Plus className="w-5 h-5 sm:w-4 sm:h-4" />
                     Load more ({filteredTransactions.length - visibleCount} remaining)
                   </Button>
                 </div>
               )}
             </section>
+
+            {/* Mobile Floating Action Button (FAB) - Optimized for Thumb Zone */}
+            {!showForm && !showSelectionMode && (
+              <div className="fixed bottom-6 right-6 z-50 md:hidden">
+                <button
+                  onClick={() => {
+                    setEditingTransaction(null);
+                    setShowForm(true);
+                  }}
+                  className="size-14 rounded-full bg-foreground text-background shadow-[0_8px_30px_rgb(0,0,0,0.3)] flex items-center justify-center active:scale-95 transition-transform duration-200 border border-border/20"
+                  aria-label="Add Transaction"
+                >
+                  <Plus className="w-6 h-6 stroke-[3]" />
+                </button>
+              </div>
+            )}
           </div>
         </div>
         {/* Analytics Panel (Right Sidebar) - Permanent */}

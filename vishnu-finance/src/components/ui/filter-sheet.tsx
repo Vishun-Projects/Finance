@@ -47,7 +47,7 @@ export default function FilterSheet({ open, title = 'Filters', onClose, children
           <motion.div
             className={cn(
               "relative bg-background shadow-2xl z-10 w-full md:max-w-md",
-              "rounded-t-2xl md:rounded-2xl border border-border",
+              "rounded-t-3xl md:rounded-2xl border border-border",
               "overflow-hidden safe-bottom"
             )}
             role="dialog"
@@ -61,8 +61,13 @@ export default function FilterSheet({ open, title = 'Filters', onClose, children
               ease: [0.32, 0.72, 0, 1] // Custom ease-out
             }}
           >
-            <div className="px-4 py-3 border-b flex items-center justify-between">
-              <h3 className="text-sm font-semibold">{title}</h3>
+            {/* Grabber for Mobile */}
+            <div className="flex justify-center pt-2 pb-1 md:hidden">
+              <div className="w-10 h-1 rounded-full bg-muted/50" />
+            </div>
+
+            <div className="px-5 py-3 border-b flex items-center justify-between">
+              <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground">{title}</h3>
               <div className="flex items-center gap-3">
                 {activeFiltersCount !== undefined && activeFiltersCount > 0 && onClearFilters && (
                   <button

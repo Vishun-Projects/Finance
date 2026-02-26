@@ -33,33 +33,34 @@ export async function POST(request: NextRequest) {
     const result = await AuthService.loginUser(email, password);
     console.log('🔐 LOGIN API - Auth service result:', JSON.stringify(result, null, 2));
 
-    console.log('✅ LOGIN API - Login successful, setting cookie');
     const response = NextResponse.json({
       success: true,
       message: 'Login successful',
-      user: result.user
+      user: (result as any).user
     });
 
-    // Set the auth cookie
-    response.cookies.set('auth-token', result.token, {
-      httpOnly: true,
-      secure: true, // Always secure for sameSite: none compatibility
-      sameSite: 'none', // Required for cross-site cookie usage in some webviews
-      maxAge: 7 * 24 * 60 * 60 // 7 days
-    });
+    if (result.user && result.token) {
+      // Set the auth cookie
+      response.cookies.set('auth-token', result.token, {
+        httpOnly: true,
+        secure: true, // Always secure for sameSite: none compatibility
+        sameSite: 'none', // Required for cross-site cookie usage in some webviews
+        maxAge: 7 * 24 * 60 * 60 // 7 days
+      });
 
-    console.log(`✅ LOGIN API - Cookie set successfully in ${Date.now() - startTime}ms total`);
+      console.log(`✅ LOGIN API - Cookie set successfully in ${Date.now() - startTime}ms total`);
 
-    const meta = extractRequestMeta(request);
+      const meta = extractRequestMeta(request);
 
-    await writeAuditLog({
-      actorId: result.user.id,
-      event: 'USER_LOGIN',
-      severity: 'INFO',
-      ipAddress: meta.ipAddress,
-      userAgent: meta.userAgent,
-      message: `${result.user.email} signed in`,
-    });
+      await writeAuditLog({
+        actorId: result.user.id,
+        event: 'USER_LOGIN',
+        severity: 'INFO',
+        ipAddress: meta.ipAddress,
+        userAgent: meta.userAgent,
+        message: `${result.user.email} signed in`,
+      });
+    }
 
     return response;
   } catch (error) {

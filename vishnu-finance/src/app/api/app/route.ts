@@ -1298,25 +1298,30 @@ export async function POST(request: NextRequest) {
       const result = await AuthService.loginUser(email, password);
       const response = NextResponse.json({
         success: true,
-        message: 'Login successful',
-        user: result.user,
+        message: result.user ? 'Login successful' : 'Verification required',
+        user: (result as any).user,
+        requiresVerification: (result as any).requiresVerification
       });
-      response.cookies.set('auth-token', result.token, {
-        httpOnly: true,
-        secure: true,
-        sameSite: 'none',
-        maxAge: 7 * 24 * 60 * 60,
-        path: '/',
-      });
-      const meta = extractRequestMeta(request);
-      await writeAuditLog({
-        actorId: result.user.id,
-        event: 'USER_LOGIN',
-        severity: 'INFO',
-        ipAddress: meta.ipAddress,
-        userAgent: meta.userAgent,
-        message: `${result.user.email} signed in`,
-      });
+
+      if (result.user && result.token) {
+        response.cookies.set('auth-token', result.token, {
+          httpOnly: true,
+          secure: true,
+          sameSite: 'none',
+          maxAge: 7 * 24 * 60 * 60,
+          path: '/',
+        });
+
+        const meta = extractRequestMeta(request);
+        await writeAuditLog({
+          actorId: result.user.id,
+          event: 'USER_LOGIN',
+          severity: 'INFO',
+          ipAddress: meta.ipAddress,
+          userAgent: meta.userAgent,
+          message: `${result.user.email} signed in`,
+        });
+      }
       return response;
     }
 

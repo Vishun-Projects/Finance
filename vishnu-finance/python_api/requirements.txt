@@ -1,8 +1,0 @@
-pandas
-numpy
-tabula-py
-requests
-openpyxl
-fastapi
-uvicorn
-python-multipart

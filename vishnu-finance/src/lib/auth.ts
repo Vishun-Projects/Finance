@@ -19,11 +19,13 @@ const JWT_EXPIRES_IN = 30 * 24 * 60 * 60; // 30 days in seconds
 const JWT_REFRESH_EXPIRES_IN = 30 * 24 * 60 * 60; // 30 days in seconds
 
 export const SUPERUSER_EMAIL = 'vishun@finance.com';
-const SUPERUSER_PHONE = '+919932145678';
+export const SUPERUSER_PHONE = '+918108940178';
 
 interface JWTPayload {
   userId: string;
   email: string;
+  name?: string | null;
+  role?: string;
 }
 
 interface RefreshTokenPayload {
@@ -127,14 +129,14 @@ export class AuthService {
   // Register new user
   static async registerUser(email: string, password: string, name?: string) {
     const startTime = Date.now();
-    console.log(`⏱️ REGISTER START: ${email}`);
+    console.log(`\u23F1\uFE0F REGISTER START: ${email}`);
 
     // Check if user already exists
     const dbStart1 = Date.now();
     const existingUser = await prisma.user.findUnique({
       where: { email }
     });
-    console.log(`⏱️ DB QUERY (findUnique): ${Date.now() - dbStart1}ms`);
+    console.log(`\u23F1\uFE0F DB QUERY (findUnique): ${Date.now() - dbStart1}ms`);
 
     if (existingUser) {
       // Check if user is OAuth-only
@@ -158,7 +160,7 @@ export class AuthService {
         isVerified: false // Default to unverified
       }
     });
-    console.log(`⏱️ DB QUERY (create): ${Date.now() - dbStart2}ms`);
+    console.log(`\u23F1\uFE0F DB QUERY (create): ${Date.now() - dbStart2}ms`);
 
     // Generate OTP for the new user
     const otp = await this.generateOTP(email);
@@ -177,7 +179,7 @@ export class AuthService {
       await MailerService.sendOTP(email, otp);
     }
 
-    console.log(`⏱️ REGISTER COMPLETE: ${Date.now() - startTime}ms`);
+    console.log(`\u23F1\uFE0F REGISTER COMPLETE: ${Date.now() - startTime}ms`);
 
     // Return user info but NO token
     return {
@@ -194,9 +196,9 @@ export class AuthService {
   // Login user
   static async loginUser(email: string, password: string) {
     const startTime = Date.now();
-    console.log('🔐 LOGIN API - Starting login request');
-    console.log('🔐 LOGIN API - Login attempt for email:', email);
-    console.log(`⏱️ LOGIN START: ${email}`);
+    console.log('\uD83D\uDD12 LOGIN API - Starting login request');
+    console.log('\uD83D\uDD12 LOGIN API - Login attempt for email:', email);
+    console.log(`\u23F1\uFE0F LOGIN START: ${email}`);
 
     // Check if user exists
     const dbStart1 = Date.now();
@@ -206,23 +208,23 @@ export class AuthService {
         preferences: true
       }
     });
-    console.log(`⏱️ DB QUERY (findUnique): ${Date.now() - dbStart1}ms`);
+    console.log(`\u23F1\uFE0F DB QUERY (findUnique): ${Date.now() - dbStart1}ms`);
 
     if (!user || !user.password) {
-      console.log('⚠️ LOGIN API - User not found or OAuth only');
+      console.log('\u26A0\uFE0F LOGIN API - User not found or OAuth only');
       throw new Error('Invalid email or password');
     }
 
     // Compare password
     const isMatch = await this.comparePassword(password, user.password);
     if (!isMatch) {
-      console.log('⚠️ LOGIN API - Password mismatch');
+      console.log('\u26A0\uFE0F LOGIN API - Password mismatch');
       throw new Error('Invalid email or password');
     }
 
     // Check verification status
     if (!user.isVerified) {
-      console.log('⚠️ LOGIN API - User not verified');
+      console.log('\u26A0\uFE0F LOGIN API - User not verified');
       // Generate new OTP
       const otp = await this.generateOTP(user.email);
       // Resend OTP
@@ -242,7 +244,7 @@ export class AuthService {
 
     // Check if user is active
     if (!user.isActive) {
-      console.log('⚠️ LOGIN API - User account inactive');
+      console.log('\u26A0\uFE0F LOGIN API - User account inactive');
       throw new Error('Account is inactive. Please contact support.');
     }
 
@@ -255,9 +257,9 @@ export class AuthService {
       where: { id: user.id },
       data: { lastLogin: new Date() }
     });
-    console.log(`⏱️ DB QUERY (update): ${Date.now() - dbStart2}ms`);
+    console.log(`\u23F1\uFE0F DB QUERY (update): ${Date.now() - dbStart2}ms`);
 
-    console.log(`⏱️ LOGIN COMPLETE: ${Date.now() - startTime}ms`);
+    console.log(`\u23F1\uFE0F LOGIN COMPLETE: ${Date.now() - startTime}ms`);
     return {
       user: {
         id: user.id,
@@ -297,7 +299,7 @@ export class AuthService {
     const cacheKey = `auth_user:${payload.userId}`;
     const cached = globalCache.get(cacheKey);
     if (cached) {
-      // console.log(`⚡ AUTH CACHE HIT (Global): ${payload.userId}`);
+      // console.log(`\u26A1 AUTH CACHE HIT (Global): ${payload.userId}`);
       return cached;
     }
 
@@ -330,14 +332,14 @@ export class AuthService {
         }
       });
 
-      console.log(`⏱️ GET USER FROM TOKEN DB QUERY: ${Date.now() - dbStart}ms`);
+      console.log(`\u23F1\uFE0F GET USER FROM TOKEN DB QUERY: ${Date.now() - dbStart}ms`);
 
       if (!user) {
-        console.log('⚠️ GET USER FROM TOKEN - User not found');
+        console.log('\u26A0\uFE0F GET USER FROM TOKEN - User not found');
         return null;
       }
 
-      console.log(`✅ GET USER FROM TOKEN SUCCESS in ${Date.now() - startTime}ms`);
+      console.log(`\u2705 GET USER FROM TOKEN SUCCESS in ${Date.now() - startTime}ms`);
 
       // AI OPTIMIZATION: Update Persistent Global Cache
       globalCache.set(cacheKey, user, this.CACHE_TTL);
@@ -345,8 +347,8 @@ export class AuthService {
       return user;
     } catch (error) {
       const message = error instanceof Error ? error.message : '';
-      if (message.includes('Unknown field `status`')) {
-        console.warn('⚠️ GET USER FROM TOKEN - status column missing, falling back to legacy schema');
+      if (message.includes('Unknown field \`status\`')) {
+        console.warn('\u26A0\uFE0F GET USER FROM TOKEN - status column missing, falling back to legacy schema');
         const user = await prisma.user.findUnique({
           where: { id: payload.userId },
           select: {
@@ -380,5 +382,57 @@ export class AuthService {
       }
       throw error;
     }
+  }
+
+  // Find or create user via OAuth
+  static async findOrCreateOAuthUser(oAuthUser: { email: string; name: string; sub: string; picture?: string; }, provider: string) {
+    const { email, name, sub, picture } = oAuthUser;
+
+    // Try to find user by email
+    let user = await prisma.user.findUnique({
+      where: { email }
+    });
+
+    if (user) {
+      // If user exists but oauth info wasn't set, update it
+      if (!user.oauthProvider || !user.oauthId) {
+        user = await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            oauthProvider: provider,
+            oauthId: sub,
+            avatarUrl: user.avatarUrl || picture,
+            isVerified: true,
+            status: 'ACTIVE'
+          }
+        });
+      }
+      return user;
+    }
+
+    // Create new user
+    user = await prisma.user.create({
+      data: {
+        email,
+        name,
+        oauthProvider: provider,
+        oauthId: sub,
+        avatarUrl: picture,
+        isVerified: true,
+        status: 'ACTIVE',
+        role: 'USER'
+      }
+    });
+
+    return user;
+  }
+
+  // Generate a JWT token for OAuth user
+  static generateOAuthToken(payload: { id: string; email: string; name: string | null; role: string }) {
+    return jwt.sign(
+      { userId: payload.id, email: payload.email, name: payload.name, role: payload.role },
+      JWT_SECRET!,
+      { expiresIn: JWT_EXPIRES_IN }
+    );
   }
 }

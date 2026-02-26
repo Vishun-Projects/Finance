@@ -23,6 +23,8 @@ import {
   Repeat,
   Trash2,
 } from 'lucide-react';
+import FabButton from '@/components/ui/fab-button';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 
 interface DeadlinesPageClientProps {
   initialDeadlines: DeadlinesResponse;
@@ -313,7 +315,7 @@ export default function DeadlinesPageClient({ initialDeadlines, userId, layoutVa
                 <RefreshCw className={cn('h-4 w-4', isRefreshing && 'animate-spin')} />
                 Refresh
               </Button>
-              <Button className="gap-2" onClick={openCreateDialog}>
+              <Button className="gap-2 hidden sm:flex" onClick={openCreateDialog}>
                 <Plus className="h-4 w-4" />
                 New Deadline
               </Button>
@@ -335,13 +337,21 @@ export default function DeadlinesPageClient({ initialDeadlines, userId, layoutVa
                 <RefreshCw className={cn('h-3 w-3', isRefreshing && 'animate-spin')} />
                 Refresh
               </Button>
-              <Button size="sm" className="gap-2" onClick={openCreateDialog}>
+              <Button size="sm" className="gap-2 hidden sm:flex" onClick={openCreateDialog}>
                 <Plus className="h-3 w-3" />
                 Add
               </Button>
             </div>
           </div>
         )}
+
+        {/* Mobile FAB */}
+        <FabButton
+          label="New Deadline"
+          icon={<Plus className="h-5 w-5" />}
+          onClick={openCreateDialog}
+          className="bg-primary text-primary-foreground"
+        />
 
         {!isEmbedded && (
           <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -535,164 +545,184 @@ export default function DeadlinesPageClient({ initialDeadlines, userId, layoutVa
         </div>
       </div>
 
-      <Dialog open={dialogOpen} onOpenChange={(open) => {
+      <Sheet open={dialogOpen} onOpenChange={(open) => {
         setDialogOpen(open);
         if (!open) {
           resetForm();
         }
       }}>
-        <DialogContent className="max-w-xl">
-          <DialogHeader>
-            <DialogTitle>{editingDeadline ? 'Update deadline' : 'Add deadline'}</DialogTitle>
-            <DialogDescription>
-              Keep track of upcoming bills, EMIs, and other important payments.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground" htmlFor="deadline-title">
-                Title
-              </label>
-              <Input
-                id="deadline-title"
-                placeholder="e.g. Home loan EMI"
-                value={formState.title}
-                onChange={(event) => handleFormChange('title', event.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground" htmlFor="deadline-description">
-                Description
-              </label>
-              <Textarea
-                id="deadline-description"
-                rows={3}
-                placeholder="Optional notes"
-                value={formState.description}
-                onChange={(event) => handleFormChange('description', event.target.value)}
-              />
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
+        <SheetContent side="bottom" className="h-[92vh] sm:h-auto sm:max-w-xl rounded-t-[2.5rem] p-0 overflow-hidden border-t border-border/10">
+          <div className="flex justify-center pt-3 pb-1 sm:hidden">
+            <div className="w-12 h-1.5 rounded-full bg-muted/40" />
+          </div>
+          <div className="px-6 py-4 overflow-y-auto h-full pb-32 sm:pb-6">
+            <SheetHeader className="text-left mb-6">
+              <SheetTitle className="text-xl font-black uppercase tracking-widest">{editingDeadline ? 'Update deadline' : 'Add deadline'}</SheetTitle>
+              <SheetDescription className="text-xs font-semibold uppercase tracking-tight opacity-70">
+                Keep track of upcoming bills, EMIs, and other important payments.
+              </SheetDescription>
+            </SheetHeader>
+            <div className="space-y-5">
               <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground" htmlFor="deadline-amount">
-                  Amount (₹)
+                <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-70 ml-1" htmlFor="deadline-title">
+                  Title
                 </label>
                 <Input
-                  id="deadline-amount"
-                  type="number"
-                  min="0"
-                  value={formState.amount}
-                  onChange={(event) => handleFormChange('amount', event.target.value)}
+                  id="deadline-title"
+                  placeholder="e.g. Home loan EMI"
+                  value={formState.title}
+                  onChange={(event) => handleFormChange('title', event.target.value)}
+                  className="h-12 bg-muted/30 border-none focus-visible:ring-1 focus-visible:ring-primary/50"
+                  autoFocus
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground" htmlFor="deadline-date">
-                  Due date
+                <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-70 ml-1" htmlFor="deadline-description">
+                  Description
                 </label>
-                <Input
-                  id="deadline-date"
-                  type="date"
-                  value={formState.dueDate}
-                  onChange={(event) => handleFormChange('dueDate', event.target.value)}
+                <Textarea
+                  id="deadline-description"
+                  rows={3}
+                  placeholder="Optional notes"
+                  value={formState.description}
+                  onChange={(event) => handleFormChange('description', event.target.value)}
+                  className="bg-muted/30 border-none focus-visible:ring-1 focus-visible:ring-primary/50 resize-none"
                 />
               </div>
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-70 ml-1" htmlFor="deadline-amount">
+                    Amount (₹)
+                  </label>
+                  <Input
+                    id="deadline-amount"
+                    type="number"
+                    min="0"
+                    value={formState.amount}
+                    onChange={(event) => handleFormChange('amount', event.target.value)}
+                    className="h-12 bg-muted/30 border-none focus-visible:ring-1 focus-visible:ring-primary/50"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-70 ml-1" htmlFor="deadline-date">
+                    Due date
+                  </label>
+                  <Input
+                    id="deadline-date"
+                    type="date"
+                    value={formState.dueDate}
+                    onChange={(event) => handleFormChange('dueDate', event.target.value)}
+                    className="h-12 bg-muted/30 border-none focus-visible:ring-1 focus-visible:ring-primary/50"
+                  />
+                </div>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-70 ml-1" htmlFor="deadline-category">
+                    Category
+                  </label>
+                  <Input
+                    id="deadline-category"
+                    placeholder="e.g. housing, utilities"
+                    value={formState.category}
+                    onChange={(event) => handleFormChange('category', event.target.value)}
+                    className="h-12 bg-muted/30 border-none focus-visible:ring-1 focus-visible:ring-primary/50"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-70 ml-1" htmlFor="deadline-payment">
+                    Payment method
+                  </label>
+                  <Input
+                    id="deadline-payment"
+                    placeholder="e.g. UPI, credit card"
+                    value={formState.paymentMethod}
+                    onChange={(event) => handleFormChange('paymentMethod', event.target.value)}
+                    className="h-12 bg-muted/30 border-none focus-visible:ring-1 focus-visible:ring-primary/50"
+                  />
+                </div>
+              </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground" htmlFor="deadline-category">
-                  Category
+                <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-70 ml-1" htmlFor="deadline-account">
+                  Account details
                 </label>
                 <Input
-                  id="deadline-category"
-                  placeholder="e.g. housing, utilities"
-                  value={formState.category}
-                  onChange={(event) => handleFormChange('category', event.target.value)}
+                  id="deadline-account"
+                  placeholder="Optional account notes"
+                  value={formState.accountDetails}
+                  onChange={(event) => handleFormChange('accountDetails', event.target.value)}
+                  className="h-12 bg-muted/30 border-none focus-visible:ring-1 focus-visible:ring-primary/50"
                 />
               </div>
+              <div className="flex items-center justify-between rounded-lg border border-border/60 p-3 bg-muted/10">
+                <div className="space-y-1">
+                  <p className="text-xs font-black uppercase tracking-widest text-foreground">Recurring reminder</p>
+                  <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-tight opacity-70">Automatically resurface this deadline.</p>
+                </div>
+                <Switch
+                  checked={formState.isRecurring}
+                  onCheckedChange={(checked) => handleFormChange('isRecurring', checked)}
+                />
+              </div>
+              {formState.isRecurring && (
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-70 ml-1">Frequency</label>
+                  <Select
+                    value={formState.frequency}
+                    onValueChange={(value) => handleFormChange('frequency', value)}
+                  >
+                    <SelectTrigger className="h-12 bg-muted/30 border-none focus-visible:ring-1 focus-visible:ring-primary/50">
+                      <SelectValue placeholder="Select frequency" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {FREQUENCY_OPTIONS.map((option) => (
+                        <SelectItem key={option} value={option} className="capitalize">
+                          {option.toLowerCase()}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground" htmlFor="deadline-payment">
-                  Payment method
+                <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-70 ml-1" htmlFor="deadline-notes">
+                  Notes
                 </label>
-                <Input
-                  id="deadline-payment"
-                  placeholder="e.g. UPI, credit card"
-                  value={formState.paymentMethod}
-                  onChange={(event) => handleFormChange('paymentMethod', event.target.value)}
+                <Textarea
+                  id="deadline-notes"
+                  rows={2}
+                  placeholder="Any additional details you want to remember"
+                  value={formState.notes}
+                  onChange={(event) => handleFormChange('notes', event.target.value)}
+                  className="bg-muted/30 border-none focus-visible:ring-1 focus-visible:ring-primary/50 resize-none"
                 />
               </div>
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground" htmlFor="deadline-account">
-                Account details
-              </label>
-              <Input
-                id="deadline-account"
-                placeholder="Optional account notes"
-                value={formState.accountDetails}
-                onChange={(event) => handleFormChange('accountDetails', event.target.value)}
-              />
-            </div>
-            <div className="flex items-center justify-between rounded-lg border border-border/60 p-3">
-              <div className="space-y-1">
-                <p className="text-sm font-medium text-foreground">Recurring reminder</p>
-                <p className="text-xs text-muted-foreground">Automatically resurface this deadline at the chosen frequency.</p>
-              </div>
-              <Switch
-                checked={formState.isRecurring}
-                onCheckedChange={(checked) => handleFormChange('isRecurring', checked)}
-              />
-            </div>
-            {formState.isRecurring && (
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground">Frequency</label>
-                <Select
-                  value={formState.frequency}
-                  onValueChange={(value) => handleFormChange('frequency', value)}
+
+              <div className="flex flex-col gap-3 sm:flex-row sm:justify-end pt-4">
+                <Button
+                  variant="outline"
+                  className="h-12 border-border bg-card text-foreground hover:bg-muted font-bold uppercase tracking-widest text-[10px]"
+                  onClick={() => {
+                    setDialogOpen(false);
+                    resetForm();
+                  }}
+                  disabled={isSaving}
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select frequency" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {FREQUENCY_OPTIONS.map((option) => (
-                      <SelectItem key={option} value={option} className="capitalize">
-                        {option.toLowerCase()}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleSubmit}
+                  disabled={isSaving}
+                  className="h-12 gap-2 font-bold uppercase tracking-widest text-[10px] shadow-lg shadow-primary/20"
+                >
+                  {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <AlarmClock className="h-4 w-4" />}
+                  {editingDeadline ? 'Update deadline' : 'Create deadline'}
+                </Button>
               </div>
-            )}
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground" htmlFor="deadline-notes">
-                Notes
-              </label>
-              <Textarea
-                id="deadline-notes"
-                rows={2}
-                placeholder="Any additional details you want to remember"
-                value={formState.notes}
-                onChange={(event) => handleFormChange('notes', event.target.value)}
-              />
             </div>
           </div>
-          <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-            <Button
-              className="border border-border bg-card text-foreground hover:bg-muted"
-              onClick={() => {
-                setDialogOpen(false);
-                resetForm();
-              }}
-              disabled={isSaving}
-            >
-              Cancel
-            </Button>
-            <Button onClick={handleSubmit} disabled={isSaving} className="gap-2">
-              {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <AlarmClock className="h-4 w-4" />}
-              {editingDeadline ? 'Update deadline' : 'Create deadline'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

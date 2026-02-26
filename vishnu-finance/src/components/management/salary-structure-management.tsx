@@ -428,237 +428,241 @@ export default function SalaryStructureManagement() {
           if (!open) { setEditingStructure(null); resetForm(); }
         }}>
           <SheetTrigger asChild>
-            <Button size="lg" className="shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all">
-              <Plus className="mr-2 h-4 w-4" />
+            <Button size="lg" className="w-full md:w-auto shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all active:scale-[0.98] h-12 md:h-11">
+              <Plus className="mr-2 h-5 w-5 md:h-4 md:w-4" />
               {salaryStructures.length > 0 ? 'Update Structure' : 'Add Salary'}
             </Button>
           </SheetTrigger>
-          <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
-            <SheetHeader>
-              <SheetTitle>{editingStructure ? 'Edit Salary Structure' : 'New  Salary Structure'}</SheetTitle>
-              <SheetDescription>
-                {editingStructure ? 'Modify the details of your existing compensation plan.' : 'Add a new compensation plan to track your earnings.'}
-              </SheetDescription>
-            </SheetHeader>
-            <div className="mt-6 space-y-6 pb-20">
-              {/* Form implementation inline for simplicity in this artifact, ideally extracted */}
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Job Title</label>
-                    <input
-                      name="jobTitle"
-                      value={formData.jobTitle}
-                      onChange={handleInputChange}
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                      placeholder="e.g. Senior Engineer"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Company</label>
-                    <input
-                      name="company"
-                      value={formData.company}
-                      onChange={handleInputChange}
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                      placeholder="e.g. Acme Corp"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Annual Basic Salary (Total CTC if unsure, but preferably Basic)</label>
-                  <div className="relative">
-                    <DollarSign className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <input
-                      name="baseSalary"
-                      type="number"
-                      value={formData.baseSalary}
-                      onChange={handleInputChange}
-                      className="flex h-10 w-full rounded-md border border-input bg-background pl-9 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                      placeholder="0.00"
-                    />
-                  </div>
-                </div>
-
-                {/* Allowances Section */}
-                <div className="space-y-2 p-4 border rounded-lg bg-card/50">
-                  <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
-                    <TrendingUp className="h-4 w-4 text-green-500" /> Monthly Allowances
-                  </h3>
-                  <div className="flex gap-2">
-                    <input
-                      value={allowanceName}
-                      onChange={(e) => setAllowanceName(e.target.value)}
-                      className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors"
-                      placeholder="Name (e.g. HRA)"
-                    />
-                    <input
-                      type="number"
-                      value={allowanceAmount}
-                      onChange={(e) => setAllowanceAmount(e.target.value)}
-                      className="flex h-9 w-24 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors"
-                      placeholder="Amount"
-                    />
-                    <Button type="button" size="sm" variant="outline" onClick={handleAddAllowance}><Plus className="h-4 w-4" /></Button>
-                  </div>
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {Object.entries(formData.allowances).map(([key, val]) => (
-                      <Badge key={key} variant="secondary" className="pl-2 pr-1 py-1 flex items-center gap-2">
-                        {key}: {formatRupees(Number(val))}
-                        <X className="h-3 w-3 cursor-pointer hover:text-destructive" onClick={() => handleRemoveAllowance(key)} />
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Deductions Section */}
-                <div className="space-y-2 p-4 border rounded-lg bg-card/50">
-                  <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
-                    <ArrowDown className="h-4 w-4 text-red-500" /> Monthly Deductions
-                  </h3>
-                  <div className="flex gap-2">
-                    <input
-                      value={deductionName}
-                      onChange={(e) => setDeductionName(e.target.value)}
-                      className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors"
-                      placeholder="Name (e.g. PF)"
-                    />
-                    <input
-                      type="number"
-                      value={deductionAmount}
-                      onChange={(e) => setDeductionAmount(e.target.value)}
-                      className="flex h-9 w-24 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors"
-                      placeholder="Amount"
-                    />
-                    <Button type="button" size="sm" variant="outline" onClick={handleAddDeduction}><Plus className="h-4 w-4" /></Button>
-                  </div>
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {Object.entries(formData.deductions).map(([key, val]) => (
-                      <Badge key={key} variant="outline" className="pl-2 pr-1 py-1 flex items-center gap-2 border-red-200 text-red-700 dark:text-red-400 dark:border-red-900">
-                        {key}: {formatRupees(Number(val))}
-                        <X className="h-3 w-3 cursor-pointer hover:text-destructive" onClick={() => handleRemoveDeduction(key)} />
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Employer Contributions Section */}
-                <div className="space-y-2 p-4 border rounded-lg bg-card/50">
-                  <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
-                    <Building className="h-4 w-4 text-blue-500" /> Monthly Employer Contributions
-                  </h3>
-                  <div className="flex gap-2">
-                    <input
-                      value={employerContributionName}
-                      onChange={(e) => setEmployerContributionName(e.target.value)}
-                      className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors"
-                      placeholder="Name (e.g. Employer PF)"
-                    />
-                    <input
-                      type="number"
-                      value={employerContributionAmount}
-                      onChange={(e) => setEmployerContributionAmount(e.target.value)}
-                      className="flex h-9 w-24 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors"
-                      placeholder="Amount"
-                    />
-                    <Button type="button" size="sm" variant="outline" onClick={handleAddEmployerContribution}><Plus className="h-4 w-4" /></Button>
-                  </div>
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {Object.entries(formData.employerContributions).map(([key, val]) => (
-                      <Badge key={key} variant="outline" className="pl-2 pr-1 py-1 flex items-center gap-2 border-blue-200 text-blue-700 dark:text-blue-400 dark:border-blue-900">
-                        {key}: {formatRupees(Number(val))}
-                        <X className="h-3 w-3 cursor-pointer hover:text-destructive" onClick={() => handleRemoveEmployerContribution(key)} />
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Effective Date</label>
-                    <input
-                      type="date"
-                      name="effectiveDate"
-                      value={formData.effectiveDate}
-                      onChange={handleInputChange}
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Location</label>
-                    <input
-                      name="location"
-                      value={formData.location}
-                      onChange={handleInputChange}
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                      placeholder="e.g. Bangalore"
-                    />
-                  </div>
-                </div>
-
-                {/* Grade & Department */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Grade / Level</label>
-                    <input
-                      name="grade"
-                      value={formData.grade}
-                      onChange={handleInputChange}
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                      placeholder="e.g. L4, Senior"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Department</label>
-                    <input
-                      name="department"
-                      value={formData.department}
-                      onChange={handleInputChange}
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                      placeholder="e.g. Engineering"
-                    />
-                  </div>
-                </div>
-
-                {/* Change Type & Reason (for timeline) */}
-                <div className="space-y-2 p-4 border rounded-lg bg-muted/30">
-                  <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
-                    <History className="h-4 w-4 text-purple-500" /> Change Details (for Timeline)
-                  </h3>
+          <SheetContent side="bottom" className="h-[92vh] sm:h-[85vh] rounded-t-[2.5rem] p-0 overflow-hidden border-t border-border/10 focus-visible:outline-none">
+            <div className="flex justify-center pt-3 pb-1">
+              <div className="w-12 h-1.5 rounded-full bg-muted/40" />
+            </div>
+            <div className="px-6 py-4 overflow-y-auto h-full pb-32">
+              <SheetHeader className="text-left">
+                <SheetTitle className="text-xl font-black uppercase tracking-widest">{editingStructure ? 'Edit Salary' : 'New Salary'}</SheetTitle>
+                <SheetDescription className="text-xs font-semibold uppercase tracking-tight opacity-70">
+                  {editingStructure ? 'Modify your compensation plan.' : 'Add your new earnings structure.'}
+                </SheetDescription>
+              </SheetHeader>
+              <div className="mt-6 space-y-6 pb-20">
+                {/* Form implementation inline for simplicity in this artifact, ideally extracted */}
+                <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <label className="text-sm font-medium">Change Type</label>
-                      <select
-                        name="changeType"
-                        value={formData.changeType}
+                      <label className="text-sm font-medium">Job Title</label>
+                      <input
+                        name="jobTitle"
+                        value={formData.jobTitle}
                         onChange={handleInputChange}
-                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                      >
-                        <option value="NEW_JOB">New Job</option>
-                        <option value="PROMOTION">Promotion</option>
-                        <option value="SALARY_REVISION">Salary Revision</option>
-                        <option value="TRANSFER">Transfer</option>
-                        <option value="COMPANY_CHANGE">Company Change</option>
-                        <option value="LOCATION_CHANGE">Location Change</option>
-                        <option value="DEPARTMENT_CHANGE">Department Change</option>
-                        <option value="OTHER">Other</option>
-                      </select>
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        placeholder="e.g. Senior Engineer"
+                      />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-sm font-medium">Change Reason</label>
+                      <label className="text-sm font-medium">Company</label>
                       <input
-                        name="changeReason"
-                        value={formData.changeReason}
+                        name="company"
+                        value={formData.company}
                         onChange={handleInputChange}
-                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                        placeholder="e.g. Annual appraisal"
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        placeholder="e.g. Acme Corp"
                       />
                     </div>
                   </div>
-                </div>
 
-                <Button onClick={handleSubmit} className="w-full" size="lg">Save Structure</Button>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Annual Basic Salary (Total CTC if unsure, but preferably Basic)</label>
+                    <div className="relative">
+                      <DollarSign className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                      <input
+                        name="baseSalary"
+                        type="number"
+                        value={formData.baseSalary}
+                        onChange={handleInputChange}
+                        className="flex h-10 w-full rounded-md border border-input bg-background pl-9 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        placeholder="0.00"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Allowances Section */}
+                  <div className="space-y-2 p-4 border rounded-lg bg-card/50">
+                    <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
+                      <TrendingUp className="h-4 w-4 text-green-500" /> Monthly Allowances
+                    </h3>
+                    <div className="flex gap-2">
+                      <input
+                        value={allowanceName}
+                        onChange={(e) => setAllowanceName(e.target.value)}
+                        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors"
+                        placeholder="Name (e.g. HRA)"
+                      />
+                      <input
+                        type="number"
+                        value={allowanceAmount}
+                        onChange={(e) => setAllowanceAmount(e.target.value)}
+                        className="flex h-9 w-24 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors"
+                        placeholder="Amount"
+                      />
+                      <Button type="button" size="sm" variant="outline" onClick={handleAddAllowance}><Plus className="h-4 w-4" /></Button>
+                    </div>
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {Object.entries(formData.allowances).map(([key, val]) => (
+                        <Badge key={key} variant="secondary" className="pl-2 pr-1 py-1 flex items-center gap-2">
+                          {key}: {formatRupees(Number(val))}
+                          <X className="h-3 w-3 cursor-pointer hover:text-destructive" onClick={() => handleRemoveAllowance(key)} />
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Deductions Section */}
+                  <div className="space-y-2 p-4 border rounded-lg bg-card/50">
+                    <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
+                      <ArrowDown className="h-4 w-4 text-red-500" /> Monthly Deductions
+                    </h3>
+                    <div className="flex gap-2">
+                      <input
+                        value={deductionName}
+                        onChange={(e) => setDeductionName(e.target.value)}
+                        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors"
+                        placeholder="Name (e.g. PF)"
+                      />
+                      <input
+                        type="number"
+                        value={deductionAmount}
+                        onChange={(e) => setDeductionAmount(e.target.value)}
+                        className="flex h-9 w-24 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors"
+                        placeholder="Amount"
+                      />
+                      <Button type="button" size="sm" variant="outline" onClick={handleAddDeduction}><Plus className="h-4 w-4" /></Button>
+                    </div>
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {Object.entries(formData.deductions).map(([key, val]) => (
+                        <Badge key={key} variant="outline" className="pl-2 pr-1 py-1 flex items-center gap-2 border-red-200 text-red-700 dark:text-red-400 dark:border-red-900">
+                          {key}: {formatRupees(Number(val))}
+                          <X className="h-3 w-3 cursor-pointer hover:text-destructive" onClick={() => handleRemoveDeduction(key)} />
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Employer Contributions Section */}
+                  <div className="space-y-2 p-4 border rounded-lg bg-card/50">
+                    <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
+                      <Building className="h-4 w-4 text-blue-500" /> Monthly Employer Contributions
+                    </h3>
+                    <div className="flex gap-2">
+                      <input
+                        value={employerContributionName}
+                        onChange={(e) => setEmployerContributionName(e.target.value)}
+                        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors"
+                        placeholder="Name (e.g. Employer PF)"
+                      />
+                      <input
+                        type="number"
+                        value={employerContributionAmount}
+                        onChange={(e) => setEmployerContributionAmount(e.target.value)}
+                        className="flex h-9 w-24 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors"
+                        placeholder="Amount"
+                      />
+                      <Button type="button" size="sm" variant="outline" onClick={handleAddEmployerContribution}><Plus className="h-4 w-4" /></Button>
+                    </div>
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {Object.entries(formData.employerContributions).map(([key, val]) => (
+                        <Badge key={key} variant="outline" className="pl-2 pr-1 py-1 flex items-center gap-2 border-blue-200 text-blue-700 dark:text-blue-400 dark:border-blue-900">
+                          {key}: {formatRupees(Number(val))}
+                          <X className="h-3 w-3 cursor-pointer hover:text-destructive" onClick={() => handleRemoveEmployerContribution(key)} />
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Effective Date</label>
+                      <input
+                        type="date"
+                        name="effectiveDate"
+                        value={formData.effectiveDate}
+                        onChange={handleInputChange}
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Location</label>
+                      <input
+                        name="location"
+                        value={formData.location}
+                        onChange={handleInputChange}
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                        placeholder="e.g. Bangalore"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Grade & Department */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Grade / Level</label>
+                      <input
+                        name="grade"
+                        value={formData.grade}
+                        onChange={handleInputChange}
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                        placeholder="e.g. L4, Senior"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Department</label>
+                      <input
+                        name="department"
+                        value={formData.department}
+                        onChange={handleInputChange}
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                        placeholder="e.g. Engineering"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Change Type & Reason (for timeline) */}
+                  <div className="space-y-2 p-4 border rounded-lg bg-muted/30">
+                    <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
+                      <History className="h-4 w-4 text-purple-500" /> Change Details (for Timeline)
+                    </h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Change Type</label>
+                        <select
+                          name="changeType"
+                          value={formData.changeType}
+                          onChange={handleInputChange}
+                          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                        >
+                          <option value="NEW_JOB">New Job</option>
+                          <option value="PROMOTION">Promotion</option>
+                          <option value="SALARY_REVISION">Salary Revision</option>
+                          <option value="TRANSFER">Transfer</option>
+                          <option value="COMPANY_CHANGE">Company Change</option>
+                          <option value="LOCATION_CHANGE">Location Change</option>
+                          <option value="DEPARTMENT_CHANGE">Department Change</option>
+                          <option value="OTHER">Other</option>
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Change Reason</label>
+                        <input
+                          name="changeReason"
+                          value={formData.changeReason}
+                          onChange={handleInputChange}
+                          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                          placeholder="e.g. Annual appraisal"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <Button onClick={handleSubmit} className="w-full" size="lg">Save Structure</Button>
+                </div>
               </div>
             </div>
           </SheetContent>
@@ -672,44 +676,46 @@ export default function SalaryStructureManagement() {
             <div className="absolute inset-0 bg-grid-white/10 [mask-image:linear-gradient(0deg,white,rgba(255,255,255,0.6))] -z-10" />
 
             <CardHeader className="pb-2">
-              <div className="flex justify-between items-start">
+              <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
                 <div>
-                  <CardTitle className="text-2xl font-bold flex items-center gap-2">
+                  <CardTitle className="text-xl md:text-2xl font-black flex items-center gap-2 tracking-tight">
                     {activeStructure.jobTitle}
-                    <Badge variant="secondary" className="text-xs font-normal">Active</Badge>
+                    <Badge variant="secondary" className="text-[9px] font-black uppercase tracking-widest py-0.5">Active</Badge>
                   </CardTitle>
-                  <CardDescription className="text-base mt-1 flex items-center gap-2">
-                    <Briefcase className="w-4 h-4" /> {activeStructure.company}
-                    <span className="text-muted-foreground/50">•</span>
-                    <MapPin className="w-4 h-4" /> {activeStructure.location || 'Remote'}
+                  <CardDescription className="text-sm md:text-base mt-1 flex items-center gap-2 font-semibold">
+                    <Briefcase className="w-4 h-4 text-primary/70" /> {activeStructure.company}
+                    <span className="text-muted-foreground/30">•</span>
+                    <MapPin className="w-4 h-4 text-primary/70" /> {activeStructure.location || 'Remote'}
                   </CardDescription>
                 </div>
-                <div className="h-12 w-12 rounded-full border-2 border-background shadow-sm flex items-center justify-center overflow-hidden bg-primary/20 text-primary font-bold">
+                <div className="hidden sm:flex h-12 w-12 rounded-full border-2 border-background shadow-sm items-center justify-center overflow-hidden bg-primary/20 text-primary font-bold">
                   {activeStructure.company.substring(0, 2).toUpperCase()}
                 </div>
               </div>
             </CardHeader>
             <CardContent className="pt-4">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 rounded-xl bg-background/50 backdrop-blur-sm border border-border/50">
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Gross Annual</p>
-                  <p className="text-xl font-bold text-foreground">{formatRupees(grossAnnual)}</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 p-4 rounded-2xl bg-background/40 backdrop-blur-xl border border-border/40 shadow-inner">
+                <div className="space-y-1 p-2">
+                  <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest opacity-60">Gross Annual</p>
+                  <p className="text-xl font-black text-foreground tabular-nums">{formatRupees(grossAnnual)}</p>
                 </div>
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Annual CTC</p>
-                  <p className="text-xl font-bold text-blue-600 dark:text-blue-400">{formatRupees(annualCTC)}</p>
+                <div className="space-y-1 p-2">
+                  <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest opacity-60">Annual CTC</p>
+                  <p className="text-xl font-black text-blue-600 dark:text-blue-400 tabular-nums">{formatRupees(annualCTC)}</p>
                 </div>
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Monthly Allowances</p>
-                  <p className="text-xl font-bold text-green-600 dark:text-green-400">+{formatRupees(totalMonthlyAllowances)}</p>
+                <div className="space-y-1 p-2">
+                  <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest opacity-60">Monthly Net</p>
+                  <p className="text-xl font-black text-primary tabular-nums">{formatRupees(netMonthly)}</p>
                 </div>
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Monthly Deductions</p>
-                  <p className="text-xl font-bold text-red-600 dark:text-red-400">-{formatRupees(totalMonthlyDeductions)}</p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider text-primary">Net Monthly</p>
-                  <p className="text-xl font-bold text-primary">{formatRupees(netMonthly)}</p>
+                <div className="flex items-center gap-4 sm:hidden pt-2 border-t border-border/10">
+                  <div className="flex-1 space-y-1">
+                    <p className="text-[9px] text-muted-foreground font-black uppercase tracking-widest opacity-60">Allowances</p>
+                    <p className="text-sm font-bold text-green-600">+{formatRupees(totalMonthlyAllowances)}</p>
+                  </div>
+                  <div className="flex-1 space-y-1">
+                    <p className="text-[9px] text-muted-foreground font-black uppercase tracking-widest opacity-60">Deductions</p>
+                    <p className="text-sm font-bold text-red-600">-{formatRupees(totalMonthlyDeductions)}</p>
+                  </div>
                 </div>
               </div>
 
@@ -792,7 +798,7 @@ export default function SalaryStructureManagement() {
                 </div>
                 {activeStructure.notes && (
                   <div className="pt-4 text-sm text-muted-foreground italic">
-                    "{activeStructure.notes}"
+                    &quot;{activeStructure.notes}&quot;
                   </div>
                 )}
               </CardContent>

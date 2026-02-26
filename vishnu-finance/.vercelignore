@@ -1,4 +1,4 @@
-api/**
+# Allow api directory for serverless functions
 **/__pycache__/**
 **/*.pyc
 **/*.pyo

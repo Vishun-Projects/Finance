@@ -18,16 +18,18 @@ export async function POST(request: NextRequest) {
         const response = NextResponse.json({
             success: true,
             message: 'Email verified successfully',
-            user: result.user
+            user: (result as any).user
         });
 
         // Set auth cookie
-        response.cookies.set('auth-token', result.token, {
-            httpOnly: true,
-            secure: true,
-            sameSite: 'none',
-            maxAge: 7 * 24 * 60 * 60 // 7 days
-        });
+        if ((result as any).token) {
+            response.cookies.set('auth-token', (result as any).token, {
+                httpOnly: true,
+                secure: true,
+                sameSite: 'none',
+                maxAge: 7 * 24 * 60 * 60 // 7 days
+            });
+        }
 
         return response;
 

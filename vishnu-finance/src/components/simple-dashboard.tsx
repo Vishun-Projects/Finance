@@ -229,15 +229,18 @@ export default function SimpleDashboard({
         </div>
 
         {/* Action Buttons - Minimal Icons */}
-        <div className="flex items-center gap-3 ml-4">
+        <div className="flex items-center gap-1 sm:gap-3 ml-4">
           <button
             onClick={() => setTheme(isDark ? 'light' : 'dark')}
-            className="p-2 text-muted-foreground hover:text-foreground transition-colors rounded-full hover:bg-muted/50"
+            className="p-3 text-muted-foreground hover:text-foreground transition-colors rounded-full hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-primary outline-none"
             aria-label="Toggle Theme"
           >
             {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           </button>
-          <button className="p-2 text-muted-foreground hover:text-foreground transition-colors rounded-full hover:bg-muted/50">
+          <button
+            className="p-3 text-muted-foreground hover:text-foreground transition-colors rounded-full hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-primary outline-none"
+            aria-label="Notifications"
+          >
             <Bell className="w-4 h-4" />
           </button>
         </div>
@@ -433,23 +436,23 @@ export default function SimpleDashboard({
           <div className="lg:col-span-4 flex flex-col gap-4">
             <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">This Month</h3>
 
-            <div className="bg-card/30 border border-border/40 rounded-2xl p-0 backdrop-blur-md overflow-hidden grid grid-cols-3 md:flex md:flex-col">
-              <div className="p-3 md:p-5 flex flex-col md:flex-row md:items-center justify-between border-r md:border-r-0 md:border-b border-border/40 hover:bg-muted/10 transition-colors">
+            <div className="bg-card/30 border border-border/40 rounded-2xl p-0 backdrop-blur-md overflow-hidden grid grid-cols-1 sm:grid-cols-3 md:flex md:flex-col">
+              <div className="p-3 md:p-5 flex items-center justify-between border-b sm:border-b-0 sm:border-r md:border-r-0 md:border-b border-border/40 hover:bg-muted/10 transition-colors">
                 <div>
                   <p className="text-[8px] md:text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Income</p>
-                  <p className="text-xs md:text-lg font-display font-medium truncate">{formatRupees(monthlyIncome)}</p>
+                  <p className="text-sm md:text-lg font-display font-medium truncate">{formatRupees(monthlyIncome)}</p>
                 </div>
               </div>
-              <div className="p-3 md:p-5 flex flex-col md:flex-row md:items-center justify-between border-r md:border-r-0 md:border-b border-border/40 hover:bg-muted/10 transition-colors">
+              <div className="p-3 md:p-5 flex items-center justify-between border-b sm:border-b-0 sm:border-r md:border-r-0 md:border-b border-border/40 hover:bg-muted/10 transition-colors">
                 <div>
                   <p className="text-[8px] md:text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Spends</p>
-                  <p className="text-xs md:text-lg font-display font-medium truncate">{formatRupees(monthlyExpenses)}</p>
+                  <p className="text-sm md:text-lg font-display font-medium truncate">{formatRupees(monthlyExpenses)}</p>
                 </div>
               </div>
-              <div className="p-3 md:p-5 flex flex-col md:flex-row md:items-center justify-between bg-foreground/5 md:bg-foreground/5">
+              <div className="p-3 md:p-5 flex items-center justify-between bg-foreground/5 md:bg-foreground/5">
                 <div>
                   <p className="text-[8px] md:text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Net Flow</p>
-                  <p className={`text-xs md:text-xl font-display font-medium truncate ${netFlow >= 0 ? 'text-foreground' : 'text-rose-500'}`}>
+                  <p className={`text-sm md:text-xl font-display font-medium truncate ${netFlow >= 0 ? 'text-foreground' : 'text-rose-500'}`}>
                     {netFlow > 0 ? '+' : ''}{formatRupees(netFlow)}
                   </p>
                 </div>

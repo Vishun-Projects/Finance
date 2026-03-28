@@ -10,6 +10,7 @@ from .profiles.kotak import KKBKStyle
 from .profiles.axis import AxisStyle
 from .profiles.bkid import BKIDStyle
 from .profiles.yesb import YESBStyle
+from .profiles.karnataka import KarbStyle
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +35,9 @@ class NormalizationShim:
         "AXIS": AxisStyle,
         "BKID": BKIDStyle,
         "BOI": BKIDStyle,
-        "YESB": YESBStyle
+        "YESB": YESBStyle,
+        "KARB": KarbStyle,
+        "KARNATAKA": KarbStyle,
     }
     
     def normalize_transactions(self, ctx: JobContext, transactions: List[FinalTransaction]) -> List[FinalTransaction]:

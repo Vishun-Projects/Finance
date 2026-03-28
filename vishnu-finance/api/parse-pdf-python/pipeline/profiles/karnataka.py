@@ -1,84 +1,128 @@
 import re
 from typing import Tuple, Optional
-from .base import BankProfile
+from .base import BaseStyle
 
 # Karnataka Bank UPI format: UPI:REFNO:vpa@bank(HUMAN NAME):suffix
-# e.g. UPI:509113780828:q643564534@ybl(ALIUL HOQUE):UPI
-
-_UPI_COLON_RE = re.compile(r'UPI:\d+:[^(]+\(([^)]+)\)?', re.IGNORECASE)   # handles both (NAME) and (NAME
-_UPI_VPA_RE = re.compile(r'UPI:\d+:([^@]+@[^\s(]+)', re.IGNORECASE)
-_PAREN_NAME_RE = re.compile(r'\(([A-Za-z][^)]{2,})\)', re.IGNORECASE)
-_NEFT_IMPS_RE = re.compile(r'(?:NEFT|IMPS|RTGS)[-/\s]+([A-Z].*?)(?:\s*-\s*\d|\s*$)', re.IGNORECASE)
-_MBS_RE = re.compile(r'MBS/To\s+([^/]+?)(?:\s+[A-Z]\/|\s*\/)', re.IGNORECASE)
-_CASH_RE = re.compile(r'CASH\s+DEPOSIT', re.IGNORECASE)
+_UPI_KARB_RE = re.compile(r'UPI:\d+:[^(]+\(([^)]+)\)?', re.IGNORECASE)
+_UPI_VPA_RE  = re.compile(r'UPI:\d+:([^@]+@[^\s(]+)', re.IGNORECASE)
+_NEFT_RE     = re.compile(r'(?:NEFT|IMPS|RTGS)[-/\s]+([A-Z][^-\n]{2,})(?:\s*-\s*\d|$)', re.IGNORECASE)
+_MBS_RE      = re.compile(r'MBS/To\s+([^/]+?)(?:\s+[A-Z]\/|\s*\/)', re.IGNORECASE)
+_CASH_RE     = re.compile(r'CASH\s+DEPOSIT', re.IGNORECASE)
 _TRANSFER_RE = re.compile(r'Transfer\s+to\s+([\w\s]+)', re.IGNORECASE)
 
+# Brand normalization: normalize common VPA/merchant names to proper names
+BRAND_MAP = {
+    "blinkit": "Blinkit",
+    "blinkit.payu": "Blinkit",
+    "zomato": "Zomato",
+    "zomato4.payu": "Zomato",
+    "swiggy": "Swiggy",
+    "amazonupi": "Amazon",
+    "amazon": "Amazon",
+    "amazonpaygrocery": "Amazon Pay",
+    "amazon.refunds": "Amazon",
+    "gpayrecharge": "Google Pay Recharge",
+    "playstore": "Google Play",
+    "googlepay": "Google Pay",
+    "netflix.bd": "Netflix",
+    "jioinappdirect": "Jio",
+    "bajajfinanceieplqr": "Bajaj Finance",
+    "bajajfinancelimwl3": "Bajaj Finance",
+    "bajajfinserv.payu": "Bajaj Finserv",
+    "getsimpl": "Simpl",
+    "cf.simp": "Simpl",
+    "simpl": "Simpl",
+    "zepto.payu": "Zepto",
+    "vrlonline": "VRL Travels",
+    "vrl.bdpg": "VRL Travels",
+    "paytm-axiocf": "AXIO (Paytm)",
+    "pinelabs": "Pine Labs",
+    "amznlpa": "Amazon",
+}
 
-class KarnatakaBankProfile(BankProfile):
-    """Profile for Karnataka Bank (KARB) — optimized name extractor."""
-
-    @property
-    def bank_code(self) -> str:
-        return "KARB"
+class KarbStyle(BaseStyle):
+    """
+    Karnataka Bank (KARB) normalization style.
+    Handles the UPI:REFNO:vpa@bank(NAME):suffix format.
+    """
 
     def extract_entities(self, text: str) -> Tuple[Optional[str], Optional[str], float, str, Optional[str]]:
-        # Priority 1: Karnataka Bank UPI format — name in parentheses
-        # UPI:509113780828:q643564534@ybl(ALIUL HOQUE):UPI
-        m = _UPI_COLON_RE.search(text)
-        if m:
-            name = m.group(1).strip().title()
-            # Extract UPI VPA as the upi_id
-            vpa_m = _UPI_VPA_RE.search(text)
-            upi_id = vpa_m.group(1).strip() if vpa_m else None
-            # Determine store vs person
-            is_store = self._is_merchant(name)
-            if is_store:
-                return name, None, 0.95, text, upi_id
-            return None, name, 0.95, text, upi_id
+        from .categories import get_commodity
+        commodity = get_commodity(text)
 
-        # Priority 2: NEFT-ALLERN ENTERPRISES / IMPS transfer
-        neft_m = _NEFT_IMPS_RE.search(text)
+        # Priority 1: Extract name from UPI parentheses (main Karnataka format)
+        m = _UPI_KARB_RE.search(text)
+        if m:
+            raw_name = m.group(1).strip()
+            # Extract vpa for brand normalization
+            vpa_m = _UPI_VPA_RE.search(text)
+            upi_id = None
+            vpa_key = None
+            if vpa_m:
+                vpa = vpa_m.group(1).strip().lower()
+                upi_id = vpa
+                vpa_key = vpa.split('@')[0]  # part before @bank
+
+            # Try brand map using VPA key first
+            if vpa_key and vpa_key in BRAND_MAP:
+                brand = BRAND_MAP[vpa_key]
+                return brand, None, 0.99, commodity, upi_id
+
+            # Also try partial match in brand map
+            if vpa_key:
+                for key, brand in BRAND_MAP.items():
+                    if key in vpa_key or vpa_key.startswith(key.split('.')[0]):
+                        return brand, None, 0.98, commodity, upi_id
+
+            # Fall back to the human name in parentheses
+            name = raw_name.title()
+            is_merchant = self._is_merchant_name(name)
+            if is_merchant:
+                return name, None, 0.92, commodity, upi_id
+            return None, name, 0.92, commodity, upi_id
+
+        # Priority 2: NEFT / IMPS transfers with entity name
+        neft_m = _NEFT_RE.search(text)
         if neft_m:
             name = neft_m.group(1).strip().title()
             if len(name) >= 3:
-                return name, None, 0.85, text, None
+                return name, None, 0.85, commodity, None
 
-        # Priority 3: MBS/To <NAME>/
+        # Priority 3: MBS/To <merchant name>
         mbs_m = _MBS_RE.search(text)
         if mbs_m:
             name = mbs_m.group(1).strip().title()
-            return name, None, 0.8, text, None
+            return name, None, 0.8, commodity, None
 
         # Priority 4: Cash Deposit
         if _CASH_RE.search(text):
-            return "Cash Deposit", None, 0.9, text, None
+            return "Cash Deposit", None, 0.95, commodity, None
 
-        # Priority 5: IMPS Transfer to NAME
+        # Priority 5: IMPS/Transfer to
         transfer_m = _TRANSFER_RE.search(text)
         if transfer_m:
             name = transfer_m.group(1).strip().title()
-            return name, None, 0.8, text, None
-
-        # Priority 6: Any parenthesised name fallback
-        paren_m = _PAREN_NAME_RE.search(text)
-        if paren_m:
-            name = paren_m.group(1).strip().title()
             if len(name) >= 3:
-                is_store = self._is_merchant(name)
-                if is_store:
-                    return name, None, 0.6, text, None
-                return None, name, 0.6, text, None
+                return name, None, 0.8, commodity, None
 
-        # Fallback
-        return None, None, 0.0, text, None
+        # Base fallback
+        return None, None, 0.0, commodity, None
 
-    def _is_merchant(self, name: str) -> bool:
-        MERCHANT_KEYWORDS = {
+    def _is_merchant_name(self, name: str) -> bool:
+        MERCHANT_KWS = {
             "BLINKIT", "ZOMATO", "AMAZON", "FLIPKART", "SWIGGY", "NETFLIX",
             "GOOGLE", "BAJAJ", "SIMPL", "ZEPTO", "JIO", "PAYTM", "AIRTEL",
             "BROADBAND", "STORE", "MART", "SHOP", "PHARMACY", "MEDICAL",
             "ENTERPRISES", "TRAVELS", "SERVICES", "LIMITED", "PVT", "LTD",
-            "PLAY", "RECHARGE", "FINANCE"
+            "PLAY", "RECHARGE", "FINANCE", "AXIO", "GROFRU", "VRL", "PINE",
         }
         upper = name.upper()
-        return any(kw in upper for kw in MERCHANT_KEYWORDS)
+        return any(kw in upper for kw in MERCHANT_KWS)
+
+
+# Legacy BankProfile alias kept for backward compat
+BankProfile = object
+
+class KarnatakaBankProfile:
+    """Legacy alias — not used in pipeline. Use KarbStyle instead."""
+    pass

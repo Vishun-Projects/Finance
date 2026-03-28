@@ -19,7 +19,8 @@ class BankDetectorShim:
         "IDIB": [r"\bINDIAN BANK\b", r"\bIDIB\d+\b"],
         "INDIAN": [r"\bINDIAN BANK\b"],
         "CANARA": [r"\bCANARA BANK\b"],
-        "BOI": [r"\bBANK OF INDIA\b"]
+        "BOI": [r"\bBANK OF INDIA\b"],
+        "KARB": [r"\bKARNATAKA\s+BANK\b", r"\bKARB\b", r"\bKBL\b"]
     }
 
     def detect_bank(self, ctx: JobContext):
@@ -30,10 +31,13 @@ class BankDetectorShim:
         first_page_words = [w.text.upper() for w in ctx.pages[0].words]
         full_text = " ".join(first_page_words)
         
-        detected = "UNKNOWN"
-        
-        # 1. Try DB-backed profiles first
-        if ctx.bank_profiles:
+        # 0. Check if bank was already manually supplied by the UI
+        detected = getattr(ctx, 'bank_code', None)
+        if not detected:
+            detected = "UNKNOWN"
+            
+        # 1. Try DB-backed profiles first (only if UNKNOWN)
+        if detected == "UNKNOWN" and ctx.bank_profiles:
             for profile in ctx.bank_profiles:
                 kws = profile.get("detectionKeywords", [])
                 if isinstance(kws, str): # Handle string if single kw

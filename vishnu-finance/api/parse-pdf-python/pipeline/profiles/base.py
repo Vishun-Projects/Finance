@@ -115,3 +115,19 @@ class BaseStyle:
     def classify_commodity(self, text: str) -> str:
         from .categories import get_commodity
         return get_commodity(text)
+
+    def _is_likely_person(self, text: str) -> bool:
+        """Heuristic: does this fragment look like a personal name?"""
+        NOISE = {
+            "UPI", "NEFT", "RTGS", "IMPS", "ACH", "POS", "ATM",
+            "BANK", "TRANSFER", "PAYMENT", "DEBIT", "CREDIT",
+            "INR", "INDIA", "ACCOUNT", "SAVINGS", "CURRENT"
+        }
+        words = text.split()
+        if not words or len(words) > 5:
+            return False
+        # All words Title Case and none are noise words
+        return all(
+            w[0].isupper() and w.upper() not in NOISE
+            for w in words if w
+        )

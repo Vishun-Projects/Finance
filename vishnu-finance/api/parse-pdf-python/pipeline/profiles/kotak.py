@@ -18,6 +18,6 @@ class KKBKStyle(BaseStyle):
             entity = match_hyphen.group(1).strip()
             if len(entity) >= 3:
                 is_store = any(k in entity.upper() for k in self.STORE_KEYWORDS)
-                return (entity, None, 0.95, commodity) if is_store else (None, entity, 0.95, commodity)
+                return (entity, None, 0.95, commodity, None) if is_store else (None, entity, 0.95, commodity, None)
 
         return super().extract_entities(text)

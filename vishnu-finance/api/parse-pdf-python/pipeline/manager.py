@@ -38,12 +38,12 @@ class PipelineManager:
         self.validator = ValidatorShim()
         self.persistence = PersistenceShim()
 
-    def run_pipeline(self, file_path: str, statement_id: str, password: Optional[str] = None, bank_profiles: Optional[List[Dict[str, Any]]] = None, max_pages: Optional[int] = None) -> Dict[str, Any]:
+    def run_pipeline(self, file_path: str, statement_id: str, password: Optional[str] = None, bank_profiles: Optional[List[Dict[str, Any]]] = None, max_pages: Optional[int] = None, bank_code: Optional[str] = None) -> Dict[str, Any]:
         """
         Main entry point for the authoritative 14-stage pipeline.
         """
         # STAGE 0: Job Initialization
-        ctx = JobContext(statement_id=statement_id, file_path=file_path, password=password, bank_profiles=bank_profiles)
+        ctx = JobContext(statement_id=statement_id, file_path=file_path, password=password, bank_profiles=bank_profiles, bank_code=bank_code)
         logger.info(f"Starting Stage 0: Job Initialization for {statement_id}")
 
         try:

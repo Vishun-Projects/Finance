@@ -32,9 +32,9 @@ class MAHBStyle(BaseStyle):
                 is_store = any(k in entity.upper() for k in self.STORE_KEYWORDS)
                 # Since this match is bank-specific, we give it high confidence
                 if is_store:
-                    return entity, None, 0.95, commodity
+                    return entity, None, 0.95, commodity, None
                 else:
-                    return None, entity, 0.95, commodity
+                    return None, entity, 0.95, commodity, None
             
         # Fallback to general Scoring Engine
         return super().extract_entities(text)

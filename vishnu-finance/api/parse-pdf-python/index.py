@@ -114,10 +114,20 @@ def handler(request):
                     }
                 }
             
+            import math
+            def sanitize(obj):
+                if isinstance(obj, float) and (math.isnan(obj) or math.isinf(obj)):
+                    return None
+                if isinstance(obj, dict):
+                    return {k: sanitize(v) for k, v in obj.items()}
+                if isinstance(obj, list):
+                    return [sanitize(i) for i in obj]
+                return obj
+
             return {
                 'statusCode': 200,
                 'headers': {'Content-Type': 'application/json'},
-                'body': json.dumps(result, ensure_ascii=False, default=str)
+                'body': json.dumps(sanitize(result), ensure_ascii=False, default=str)
             }
             
         finally:

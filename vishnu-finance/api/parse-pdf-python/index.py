@@ -47,83 +47,71 @@ def handler(request):
         # Decode PDF
         pdf_bytes = base64.b64decode(pdf_base64)
         
-        # Save to temporary file in /tmp (only writable directory in Vercel)
-        tmp_dir = Path('/tmp')
-        tmp_file_path = tmp_dir / f'statement_{os.getpid()}_{id(pdf_bytes)}.pdf'
-        with open(tmp_file_path, 'wb') as tmp_file:
-            tmp_file.write(pdf_bytes)
-        pdf_path = tmp_file_path
-        
+        # Save to temporary file
+        import tempfile
+        fd, tmp_file_path = tempfile.mkstemp(suffix='.pdf', prefix='statement_')
+        pdf_path = Path(tmp_file_path)
         try:
-            # Prefer master parser (unified) and fallback to legacy if unavailable
-            try:
-                sys.path.insert(0, str(Path.cwd() / 'tools-master'))
-                from tools_master.master_parser import parse as master_parse  # type: ignore
-                print("✓ Using tools-master.master_parser", file=sys.stderr)
-                parsed = master_parse(pdf_path, bank_hint)
-                result = {
-                    'success': True,
-                    'transactions': parsed.get('transactions', []),
-                    'count': parsed.get('count', 0),
-                    'metadata': parsed.get('metadata', {}),
-                    'debug': parsed.get('debug', {}),
-                }
-            except Exception as master_err:
-                print(f"✗ Master parser unavailable, falling back to legacy: {master_err}", file=sys.stderr)
-                # Legacy path (preserve previous behavior)
-                import pandas as pd
-                from bank_statement_parser import parse_bank_statement  # type: ignore
-                from accurate_parser import parse_bank_statement_accurately  # type: ignore
-                try:
-                    from parsers.statement_metadata import StatementMetadataExtractor  # type: ignore
-                except Exception:
-                    from statement_metadata import StatementMetadataExtractor  # type: ignore
-
-                df = None
-                metadata = None
-                if bank_hint:
-                    try:
-                        res = parse_bank_statement(pdf_path, bank_hint.upper())
-                        if isinstance(res, tuple):
-                            df, metadata = res
-                        else:
-                            df = res
-                    except Exception:
-                        pass
-                if df is None or (hasattr(df, 'empty') and df.empty):
-                    try:
-                        tmp = parse_bank_statement_accurately(pdf_path)
-                        if tmp is not None and not tmp.empty:
-                            df = tmp
-                    except Exception:
-                        pass
-                if metadata is None and df is not None and not df.empty and StatementMetadataExtractor:
-                    try:
-                        metadata = StatementMetadataExtractor.extract_all_metadata(pdf_path, bank_hint or 'UNKNOWN', df)
-                    except Exception:
-                        metadata = {}
-                if df is None:
-                    df = pd.DataFrame()
+            with os.fdopen(fd, 'wb') as tmp_file:
+                tmp_file.write(pdf_bytes)
+            
+            # Use the unified parser
+            from bank_statement_parser import parse_bank_statement
+            
+            # Use the unified pipeline with auto-detection
+            # bank_hint is converted to uppercase as expected by get_parser_for_bank
+            bank_code_hint = bank_hint.upper() if bank_hint else None
+            df, metadata = parse_bank_statement(
+                pdf_path, 
+                bank_code=bank_code_hint,
+                bank_profiles=body.get('bank_profiles')
+            )
+            
+            # Format results
+            if df is not None and hasattr(df, 'empty') and not df.empty:
+                # Ensure date_iso exists
                 if 'date_iso' not in df.columns and 'date' in df.columns:
+                    import pandas as pd # type: ignore
                     def normalize_date(date_val):
-                        if pd.isna(date_val):
-                            return None
+                        if pd.isna(date_val): return None
                         try:
                             parsed = pd.to_datetime(str(date_val).strip(), dayfirst=True, errors='coerce')
-                            if pd.notna(parsed):
-                                return parsed.strftime('%Y-%m-%d')
-                            return None
-                        except:
-                            return None
+                            return parsed.strftime('%Y-%m-%d') if pd.notna(parsed) else None
+                        except: return None
                     df['date_iso'] = df['date'].apply(normalize_date)
-                if 'date_iso' in df.columns:
-                    df = df[df['date_iso'].notna()].copy()
-                transactions = df.to_dict('records') if hasattr(df, 'to_dict') else []
+                
+                transactions = df.to_dict('records')
                 result = {
                     'success': True,
                     'transactions': transactions,
                     'count': len(transactions),
-                    'metadata': metadata or {}
+                    'metadata': metadata or {},
+                    'bank': metadata.get('bank', 'Unknown') if metadata else 'Unknown',
+                    'debug': {
+                        'page_count': len(df) if df is not None else 0,
+                        'first_page_sample': metadata.get('raw_rows_sample')[:5] if metadata else []
+                    }
+                }
+            else:
+                # Diagnostics for empty result
+                try:
+                    import pdfplumber # type: ignore
+                    with pdfplumber.open(pdf_path) as pdf:
+                        debug_words = " ".join([str(w['text']) for w in pdf.pages[0].extract_words()[:20]])
+                except:
+                    debug_words = "Failed to extract words for debug"
+                
+                result = {
+                    'success': True,
+                    'transactions': [],
+                    'count': 0,
+                    'metadata': metadata or {},
+                    'error': 'No transactions found',
+                    'debug': {
+                        'first_20_words': debug_words,
+                        'pdf_path': str(pdf_path),
+                        'pdf_exists': pdf_path.exists()
+                    }
                 }
             
             return {

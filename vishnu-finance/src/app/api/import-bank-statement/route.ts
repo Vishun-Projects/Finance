@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { prisma } from '@/lib/db';
 import { AuthService } from '@/lib/auth';
 import { getCanonicalName } from '@/lib/entity-mapping-service';
@@ -599,45 +599,55 @@ export async function POST(request: NextRequest) {
         // Apply categories to normalized records
         for (let i = 0; i < normalized.length; i++) {
           const result = categorizationResults[i];
-          if (result && (result.categoryId || result.categoryName)) {
-            let finalCategoryId: string | null = null;
+          if (result) {
+            // Save brand info if found (for logos)
+            if (result.brand) {
+              normalized[i].rawData = {
+                ...(normalized[i].rawData as any || {}),
+                brand: result.brand
+              };
+            }
 
-            if (result.categoryId) {
-              finalCategoryId = result.categoryId;
-            } else if (result.categoryName) {
-              const categoryNameLower = result.categoryName.toLowerCase().trim();
-              finalCategoryId = categoryMap.get(categoryNameLower) ?? null;
+            if (result.categoryId || result.categoryName) {
+              let finalCategoryId: string | null = null;
 
-              // Try fuzzy matching if exact match fails
-              if (!finalCategoryId) {
-                const categoryVariations: Record<string, string[]> = {
-                  'food & dining': ['food', 'dining', 'restaurant'],
-                  'groceries': ['grocery', 'shopping'],
-                  'transportation': ['transport', 'travel'],
-                  'healthcare': ['health', 'medical'],
-                  'utilities': ['utility', 'bills'],
-                  'entertainment': ['entertain'],
-                  'shopping': ['shop', 'retail'],
-                };
+              if (result.categoryId) {
+                finalCategoryId = result.categoryId;
+              } else if (result.categoryName) {
+                const categoryNameLower = result.categoryName.toLowerCase().trim();
+                finalCategoryId = categoryMap.get(categoryNameLower) ?? null;
 
-                const variations = categoryVariations[categoryNameLower] ?? [];
-                for (const variation of variations) {
-                  const foundId = categoryMap.get(variation.toLowerCase().trim());
-                  finalCategoryId = foundId ?? null;
-                  if (finalCategoryId) break;
+                // Try fuzzy matching if exact match fails
+                if (!finalCategoryId) {
+                  const categoryVariations: Record<string, string[]> = {
+                    'food & dining': ['food', 'dining', 'restaurant'],
+                    'groceries': ['grocery', 'shopping'],
+                    'transportation': ['transport', 'travel'],
+                    'healthcare': ['health', 'medical'],
+                    'utilities': ['utility', 'bills'],
+                    'entertainment': ['entertain'],
+                    'shopping': ['shop', 'retail'],
+                  };
+
+                  const variations = categoryVariations[categoryNameLower] ?? [];
+                  for (const variation of variations) {
+                    const foundId = categoryMap.get(variation.toLowerCase().trim());
+                    finalCategoryId = foundId ?? null;
+                    if (finalCategoryId) break;
+                  }
+                }
+
+                if (!finalCategoryId) {
+                  console.warn(`⚠️ Category name "${result.categoryName}" not found in database for transaction ${i}`);
                 }
               }
 
-              if (!finalCategoryId) {
-                console.warn(`⚠️ Category name "${result.categoryName}" not found in database for transaction ${i}`);
+              if (finalCategoryId) {
+                (normalized[i] as any).categoryId = finalCategoryId;
+                categorizedCount++;
+              } else if (result.categoryName) {
+                console.warn(`⚠️ Failed to resolve category ID for "${result.categoryName}"`);
               }
-            }
-
-            if (finalCategoryId) {
-              (normalized[i] as any).categoryId = finalCategoryId;
-              categorizedCount++;
-            } else if (result.categoryName) {
-              console.warn(`⚠️ Failed to resolve category ID for "${result.categoryName}"`);
             }
           }
         }
@@ -1286,20 +1296,18 @@ export async function POST(request: NextRequest) {
         console.log(`📊 Found ${insertedTransactionIds.length} transaction IDs (expected: ${inserted})`);
 
         if (insertedTransactionIds.length > 0) {
-          // Trigger background categorization (direct function call to avoid Auth/Timeout issues)
-          console.log(`🚀 Starting background categorization for ${insertedTransactionIds.length} transactions via internal service...`);
-
-          // Fire and forget - don't await to avoid blocking response
-          // In production serverless (Vercel), this promise might be killed if function returns early.
-          // For robust background jobs, use Inngest/TaskQueue, but for now this fixes the 401 loopback issue.
-          import('@/lib/multi-pass-categorization').then(({ multiPassCategorization }) => {
-            multiPassCategorization(userId, insertedTransactionIds)
-              .then(result => {
-                console.log(`✅ Background categorization complete: ${result.categorized} categorized`);
-              })
-              .catch(error => {
-                console.error('❌ Background categorization failed:', error);
-              });
+          // Use Next.js after() for robust background processing on Vercel
+          after(() => {
+            console.log(`🚀 Starting background categorization for ${insertedTransactionIds.length} transactions via internal service...`);
+            import('@/lib/multi-pass-categorization').then(({ multiPassCategorization }) => {
+              multiPassCategorization(userId, insertedTransactionIds)
+                .then(result => {
+                  console.log(`✅ Background categorization complete: ${result.categorized} categorized`);
+                })
+                .catch(error => {
+                  console.error('❌ Background categorization failed:', error);
+                });
+            });
           });
 
           backgroundJobStarted = true;

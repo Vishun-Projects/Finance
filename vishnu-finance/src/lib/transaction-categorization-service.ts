@@ -2,7 +2,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { prisma } from './db';
 import { loadPatternsForUser, type CategorizationSuggestion, type LoadedPatterns } from './transaction-pattern-service';
 import { retryWithBackoff } from './gemini';
-import { lookupMerchantCategory } from './merchant-lookup-service';
+import { lookupMerchantCategory, batchLookupMerchantCategories } from './merchant-lookup-service';
 
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
 
@@ -38,6 +38,69 @@ const AI_USAGE_CONFIG = {
   MAX_DAILY_MERCHANT_LOOKUPS: 50,
 } as const;
 
+// Master Brand list for Indian merchants with logo identifiers
+const MASTER_BRANDS: Record<string, { category: string; logo: string; keywords: string[] }> = {
+  'swiggy': { category: 'Food & Dining', logo: 'swiggy', keywords: ['swiggy', 'bundl technologies'] },
+  'zomato': { category: 'Food & Dining', logo: 'zomato', keywords: ['zomato'] },
+  'amazon': { category: 'Shopping', logo: 'amazon', keywords: ['amazon', 'amzn'] },
+  'flipkart': { category: 'Shopping', logo: 'flipkart', keywords: ['flipkart'] },
+  'jio': { category: 'Utilities', logo: 'jio', keywords: ['jio', 'reliance jio', 'rjio'] },
+  'airtel': { category: 'Utilities', logo: 'airtel', keywords: ['airtel', 'bharti airtel'] },
+  'vi': { category: 'Utilities', logo: 'vi', keywords: ['vi ', 'vodafone', 'idea'] },
+  'uber': { category: 'Transportation', logo: 'uber', keywords: ['uber'] },
+  'ola': { category: 'Transportation', logo: 'ola', keywords: ['ola', 'ani technologies'] },
+  'blinkit': { category: 'Groceries', logo: 'blinkit', keywords: ['blinkit', 'grofers'] },
+  'zepto': { category: 'Groceries', logo: 'zepto', keywords: ['zepto'] },
+  'bigbasket': { category: 'Groceries', logo: 'bigbasket', keywords: ['bigbasket', 'innovative retail'] },
+  'netflix': { category: 'Subscriptions', logo: 'netflix', keywords: ['netflix'] },
+  'spotify': { category: 'Subscriptions', logo: 'spotify', keywords: ['spotify'] },
+  'hotstar': { category: 'Subscriptions', logo: 'hotstar', keywords: ['hotstar', 'disney'] },
+  'starbucks': { category: 'Food & Dining', logo: 'starbucks', keywords: ['starbucks', 'tata starbucks'] },
+  'mcdonalds': { category: 'Food & Dining', logo: 'mcdonalds', keywords: ['mcdonalds', 'hardcastle'] },
+  'kfc': { category: 'Food & Dining', logo: 'kfc', keywords: ['kfc', 'yum brands', 'sapphire foods', 'devyani'] },
+  'dominos': { category: 'Food & Dining', logo: 'dominos', keywords: ['domino', 'jubilant food'] },
+  'nykaa': { category: 'Shopping', logo: 'nykaa', keywords: ['nykaa', 'fsn e-commerce'] },
+  'meesho': { category: 'Shopping', logo: 'meesho', keywords: ['meesho'] },
+  'myntra': { category: 'Shopping', logo: 'myntra', keywords: ['myntra'] },
+  'ajio': { category: 'Shopping', logo: 'ajio', keywords: ['ajio', 'reliance retail'] },
+  'dmart': { category: 'Groceries', logo: 'dmart', keywords: ['dmart', 'avenue supermarts'] },
+  'reliance fresh': { category: 'Groceries', logo: 'reliance', keywords: ['reliance fresh', 'reliance retail'] },
+  'tata sky': { category: 'Utilities', logo: 'tata', keywords: ['tata sky', 'tata play'] },
+  'tata power': { category: 'Utilities', logo: 'tata', keywords: ['tata power'] },
+  'indane': { category: 'Utilities', logo: 'gas', keywords: ['indane', 'indian oil', ' ioc'] },
+  'bharat gas': { category: 'Utilities', logo: 'gas', keywords: ['bharat gas', ' bpcl'] },
+  'hp gas': { category: 'Utilities', logo: 'gas', keywords: ['hp gas', ' hpcl'] },
+  'bescom': { category: 'Utilities', logo: 'electricity', keywords: ['bescom'] },
+  'mseb': { category: 'Utilities', logo: 'mseb', keywords: ['mseb', 'mahadiscom'] },
+  'adani': { category: 'Utilities', logo: 'adani', keywords: ['adani electricity', 'adani power'] },
+  'lic': { category: 'Insurance', logo: 'lic', keywords: ['lic', 'life insurance corp'] },
+  'hdfc life': { category: 'Insurance', logo: 'hdfc', keywords: ['hdfc life', 'hdfc standard'] },
+  'sbi card': { category: 'Debt Payment', logo: 'sbi', keywords: ['sbi card', 'sbicard'] },
+  'bajaj finserv': { category: 'Debt Payment', logo: 'bajaj', keywords: ['bajaj finserv', 'bajaj finance'] },
+  'zerodha': { category: 'Investment', logo: 'zerodha', keywords: ['zerodha'] },
+  'groww': { category: 'Investment', logo: 'groww', keywords: ['groww', 'nextbillion'] },
+  'upstox': { category: 'Investment', logo: 'upstox', keywords: ['upstox', 'rksv'] },
+  'bookmyshow': { category: 'Entertainment', logo: 'bookmyshow', keywords: ['bookmyshow', 'bigtree'] },
+  'pvr': { category: 'Entertainment', logo: 'pvr', keywords: ['pvr'] },
+  'inox': { category: 'Entertainment', logo: 'inox', keywords: ['inox'] },
+  'makemytrip': { category: 'Transportation', logo: 'mmt', keywords: ['makemytrip', 'mmt'] },
+  'irctc': { category: 'Transportation', logo: 'irctc', keywords: ['irctc'] },
+  'phonepe': { category: 'Financial Services', logo: 'phonepe', keywords: ['phonepe'] },
+  'paytm': { category: 'Financial Services', logo: 'paytm', keywords: ['paytm', 'one97'] },
+  'gpay': { category: 'Financial Services', logo: 'gpay', keywords: ['gpay', 'google pay'] },
+  'cred': { category: 'Debt Payment', logo: 'cred', keywords: ['cred', 'dreamplug', 'dreamplug technologies'] },
+  'tata neu': { category: 'Shopping', logo: 'tata', keywords: ['tata neu', 'tata digital'] },
+  'star health': { category: 'Insurance', logo: 'star-health', keywords: ['star health'] },
+  'hdfc ergo': { category: 'Insurance', logo: 'hdfc', keywords: ['hdfc ergo'] },
+  'cleartrip': { category: 'Transportation', logo: 'cleartrip', keywords: ['cleartrip'] },
+  'indianoil': { category: 'Utilities', logo: 'indianoil', keywords: ['indianoil', 'iocl'] },
+  'fastag': { category: 'Transportation', logo: 'fastag', keywords: ['fastag', 'park+', 'netc'] },
+  'dunzo': { category: 'Groceries', logo: 'dunzo', keywords: ['dunzo'] },
+  'swiggy genie': { category: 'Groceries', logo: 'swiggy', keywords: ['swiggy genie'] },
+  'amazon pay': { category: 'Financial Services', logo: 'amazon', keywords: ['amazon pay'] },
+  'lic india': { category: 'Insurance', logo: 'lic', keywords: ['lic india', 'lic of india'] },
+};
+
 // Merchant lookup configuration
 const MERCHANT_LOOKUP_CONFIG = {
   ENABLED: process.env.ENABLE_MERCHANT_LOOKUP !== 'false',
@@ -64,8 +127,12 @@ export interface CategorizationResult {
   categoryId: string | null;
   categoryName: string | null;
   confidence: number;
-  source: 'pattern' | 'ai' | 'rule';
+  source: 'pattern' | 'ai' | 'rule' | 'master_brand';
   reasoning?: string;
+  brand?: {
+    name: string;
+    logo: string;
+  } | null;
 }
 
 /**
@@ -1541,6 +1608,63 @@ function categorizeByCommodity(
 }
 
 /**
+ * Match transaction against Master Brand list for instant high-confidence categorization
+ */
+function matchMasterBrand(
+  transaction: TransactionToCategorize
+): CategorizationResult | null {
+  const { description, store, upiId } = transaction;
+  const descLower = (description || '').toLowerCase();
+  const storeLower = (store || '').toLowerCase();
+  const upiIdLower = (upiId || '').toLowerCase();
+
+  // Try matching by UPI ID first (highest confidence)
+  if (upiIdLower) {
+    for (const [brandName, info] of Object.entries(MASTER_BRANDS)) {
+      for (const keyword of info.keywords) {
+        if (upiIdLower.includes(keyword.toLowerCase())) {
+          return {
+            categoryId: null,
+            categoryName: info.category,
+            confidence: 1.0, // Absolute confidence for UPI-based brand match
+            source: 'master_brand',
+            reasoning: `Direct UPI match for ${brandName.toUpperCase()}`,
+            brand: { name: brandName, logo: info.logo }
+          };
+        }
+      }
+    }
+  }
+
+  // Then try store and description matching
+  for (const [brandName, info] of Object.entries(MASTER_BRANDS)) {
+    for (const keyword of info.keywords) {
+      const kwLower = keyword.toLowerCase();
+      
+      // Use word boundaries for better accuracy
+      const escapedKeyword = kwLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const kwRegex = new RegExp(`\\b${escapedKeyword}\\b`, 'i');
+      
+      if (kwRegex.test(descLower) || kwRegex.test(storeLower)) {
+        return {
+          categoryId: null,
+          categoryName: info.category,
+          confidence: 0.99,
+          source: 'master_brand',
+          reasoning: `Matched Master Brand: ${brandName.toUpperCase()}`,
+          brand: {
+            name: brandName,
+            logo: info.logo
+          }
+        };
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
  * Rule-based categorization with comprehensive Indian merchant patterns
  * Enhanced with edge case handling
  */
@@ -1548,6 +1672,10 @@ async function categorizeWithRules(
   userId: string,
   transaction: TransactionToCategorize
 ): Promise<CategorizationResult> {
+  // 0. CHECK MASTER BRANDS (Highest priority after critical errors)
+  const masterBrandResult = matchMasterBrand(transaction);
+  if (masterBrandResult) return masterBrandResult;
+
   // Check edge cases first (before general patterns)
 
   // 1. Large amount verification (>= ₹50,000)
@@ -2630,11 +2758,13 @@ export async function detectAutoPayTransactions(
     for (const [merchantId, txns] of merchantGroups.entries()) {
       if (txns.length < 2) continue; // Need at least 2 transactions
 
-      // Skip personName groups unless subscription/EMI keywords are present
+      // Skip personName groups unless subscription/EMI/Utility keywords are present
       if (merchantId.startsWith('person:')) {
         const hasSubscription = txns.some(t => hasSubscriptionKeywords(t.description));
         const hasEMI = txns.some(t => hasEMIKeywords(t.description));
-        if (!hasSubscription && !hasEMI) {
+        const isUtility = txns.some(t => t.categoryName === 'Utilities' || t.categoryName === 'Bills');
+        
+        if (!hasSubscription && !hasEMI && !isUtility) {
           // Skip daily personName transactions (not auto-pay)
           continue;
         }
@@ -2797,6 +2927,12 @@ export async function categorizeTransactions(
   transactions: TransactionToCategorize[]
 ): Promise<CategorizationResult[]> {
   const results: CategorizationResult[] = [];
+
+  // 0. BATCH MERCHANT LOOKUP (Performance Optimization)
+  // Pre-fetch all merchant categories to avoid sequential DB/API calls in the loop
+  const storeNames = transactions.map(t => t.store).filter((s): s is string => !!s);
+  const merchantLookupMap = await batchLookupMerchantCategories(storeNames, userId);
+  console.log(`📦 Batch merchant lookup completed for ${storeNames.length} stores (${Object.keys(merchantLookupMap).length} unique)`);
 
   // Check cache first
   const cacheKey = userId;
@@ -2990,55 +3126,39 @@ export async function categorizeTransactions(
         null;
     }
 
-    // 5. MERCHANT LOOKUP (if store exists but no pattern found) - async but we handle it
-    // Skip if Gemini quota is exceeded to avoid wasted API calls
+    // 5. MERCHANT LOOKUP (if store exists but no pattern found)
     let merchantLookupResult: CategorizationResult | null = null;
+    
     if (!patternSuggestion && store && transaction.store && transaction.store.trim().length >= MERCHANT_LOOKUP_CONFIG.MIN_STORE_NAME_LENGTH) {
-      // Check quota before attempting lookup
-      const { isGeminiQuotaExceeded } = await import('./gemini');
-      if (!isGeminiQuotaExceeded()) {
-        try {
-          const merchantLookup = await lookupMerchantCategory(transaction.store, userId);
-          if (merchantLookup && merchantLookup.categoryName && merchantLookup.confidence >= MERCHANT_LOOKUP_CONFIG.CONFIDENCE_THRESHOLD) {
-            // Find category ID from category name
-            const allCategories = await getAllCategories();
-            const matchedCategory = fuzzyMatchCategory(merchantLookup.categoryName || '', allCategories) ||
-              allCategories.find(
-                (c) => c.name.toLowerCase().trim() === merchantLookup.categoryName?.toLowerCase().trim()
-              );
+      // Use pre-fetched batch merchant lookup result
+      const merchantLookup = merchantLookupMap[transaction.store];
+      
+      if (merchantLookup && merchantLookup.categoryName && merchantLookup.confidence >= MERCHANT_LOOKUP_CONFIG.CONFIDENCE_THRESHOLD) {
+        // Find category ID from category name
+        const allCategories = await getAllCategories();
+        const matchedCategory = fuzzyMatchCategory(merchantLookup.categoryName || '', allCategories) ||
+          allCategories.find(
+            (c) => c.name.toLowerCase().trim() === merchantLookup.categoryName?.toLowerCase().trim()
+          );
 
-            if (matchedCategory) {
-              merchantLookupResult = {
-                categoryId: matchedCategory.id,
-                categoryName: merchantLookup.categoryName,
-                confidence: merchantLookup.confidence,
-                source: 'pattern',
-                reasoning: `Merchant lookup: ${merchantLookup.source}`,
-              };
-            } else if (merchantLookup.categoryName) {
-              // Category name found but ID not matched - use name only
-              merchantLookupResult = {
-                categoryId: null,
-                categoryName: merchantLookup.categoryName,
-                confidence: merchantLookup.confidence,
-                source: 'pattern',
-                reasoning: `Merchant lookup: ${merchantLookup.source}`,
-              };
-            }
-          }
-        } catch (error) {
-          // Check if quota was exceeded
-          const { isGeminiQuotaExceeded: checkQuota } = await import('./gemini');
-          if (checkQuota()) {
-            console.log(`⏭️ Skipping merchant lookup - Gemini quota exceeded`);
-          } else {
-            console.error('Error in merchant lookup:', error);
-          }
-          // Continue to next step
+        if (matchedCategory) {
+          merchantLookupResult = {
+            categoryId: matchedCategory.id,
+            categoryName: merchantLookup.categoryName,
+            confidence: merchantLookup.confidence,
+            source: 'pattern',
+            reasoning: `Merchant lookup: ${merchantLookup.source}`,
+          };
+        } else if (merchantLookup.categoryName) {
+          // Category name found but ID not matched - use name only
+          merchantLookupResult = {
+            categoryId: null,
+            categoryName: merchantLookup.categoryName,
+            confidence: merchantLookup.confidence,
+            source: 'pattern',
+            reasoning: `Merchant lookup: ${merchantLookup.source}`,
+          };
         }
-      } else {
-        // Quota exceeded, skip merchant lookup
-        console.log(`⏭️ Skipping merchant lookup for "${transaction.store}" - quota exceeded`);
       }
     }
 
@@ -3216,34 +3336,59 @@ export async function categorizeTransactions(
   `;
   const patternsStr = JSON.stringify(patterns, null, 2);
 
-  // Process chunks sequentially with rate limiting
+  // Process chunks in parallel with a concurrency limit (Worker Pool Pattern)
+  console.log(`🚀 Processing ${chunks.length} AI chunks in parallel (max 3 at a time) for user ${userId}...`);
+  
   const aiResults: CategorizationResult[] = [];
+  const chunkResults: CategorizationResult[][] = new Array(chunks.length);
+  const CONCURRENCY_LIMIT = 3;
 
-  for (const chunk of chunks) {
+  const processChunk = async (chunkIdx: number) => {
+    const chunk = chunks[chunkIdx];
     if (!checkAIQuota(userId)) {
-      console.warn(`⚠️ AI quota exceeded for user ${userId}. Using rule-based fallback.`);
-      // Fallback to rules for remaining chunks
-      const ruleResults = await Promise.all(chunk.map((txn) => categorizeWithRules(userId, txn)));
-      aiResults.push(...ruleResults);
-      continue;
+      console.warn(`⚠️ AI quota exceeded for chunk ${chunkIdx}. Using rule-based fallback.`);
+      chunkResults[chunkIdx] = await Promise.all(chunk.map((txn) => categorizeWithRules(userId, txn)));
+      return;
     }
 
     try {
       incrementAIUsage(userId);
-      const chunkResults = await categorizeTransactionsWithAI(userId, chunk, patternsStr);
-
-      // Cache results
+      const results = await categorizeTransactionsWithAI(userId, chunk, patternsStr);
+      
+      // Cache results for future use
       for (let i = 0; i < chunk.length; i++) {
-        cacheAIResult(chunk[i], chunkResults[i]);
+        cacheAIResult(chunk[i], results[i]);
       }
-
-      aiResults.push(...chunkResults);
+      
+      chunkResults[chunkIdx] = results;
     } catch (error) {
-      console.error('AI categorization error for chunk:', error);
-      // Fallback to rules for this chunk
-      const ruleResults = await Promise.all(chunk.map((txn) => categorizeWithRules(userId, txn)));
-      aiResults.push(...ruleResults);
+      console.error(`❌ AI categorization error for chunk ${chunkIdx}:`, error);
+      chunkResults[chunkIdx] = await Promise.all(chunk.map((txn) => categorizeWithRules(userId, txn)));
     }
+  };
+
+  // Run chunks through a worker pool
+  const pool: Promise<void>[] = [];
+  const queue = [...Array(chunks.length).keys()];
+  
+  const workerPool = async () => {
+    while (queue.length > 0) {
+      const idx = queue.shift();
+      if (idx !== undefined) {
+        await processChunk(idx);
+      }
+    }
+  };
+
+  for (let i = 0; i < Math.min(CONCURRENCY_LIMIT, chunks.length); i++) {
+    pool.push(workerPool());
+  }
+
+  await Promise.all(pool);
+  
+  // Flatten results in correct order
+  for (const results of chunkResults) {
+    if (results) aiResults.push(...results);
   }
 
   // Map results back to original indices

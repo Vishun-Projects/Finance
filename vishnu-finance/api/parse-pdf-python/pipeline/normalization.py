@@ -48,13 +48,14 @@ class NormalizationShim:
         for txn in transactions:
             raw = txn.description
             
-            # 1. Extract Entities (Store/Person, Confidence, Commodity)
-            store, person, conf, comm = style.extract_entities(raw)
+            # 1. Extract Entities (Store/Person, Confidence, Commodity, upiId)
+            store, person, conf, comm, upi_id = style.extract_entities(raw)
             
             txn.store = store
             txn.personName = person
             txn.confidence = conf if conf > 0 else txn.confidence
             txn.commodity = comm
+            txn.upiId = upi_id
             
             # 2. Clean Final Narrative (keeps it readable in UI)
             txn.description = style.clean_description(raw)

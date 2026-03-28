@@ -13,10 +13,12 @@ async function tryPythonParser(pdfBuffer: Buffer, bankHint: string, bankParserCo
     if (isVercel) {
       baseUrl = `https://${process.env.VERCEL_URL || process.env.NEXT_PUBLIC_APP_URL}`;
     } else {
-      baseUrl = 'http://127.0.0.1:8000'; // Target local FastAPI microservice
+      baseUrl = 'http://127.0.0.1:8001'; // Target local FastAPI microservice
     }
 
-    const pythonFunctionUrl = `${baseUrl}/api/parser`;
+    const pythonFunctionUrl = isVercel 
+      ? `${baseUrl}/api/py_parser` // Vercel path mapping to api/py_parser.py
+      : `${baseUrl}/api/parser`; // Local FastAPI path
 
     // Convert buffer to base64
     const pdfBase64 = pdfBuffer.toString('base64');
@@ -81,7 +83,7 @@ async function tryPythonParser(pdfBuffer: Buffer, bankHint: string, bankParserCo
 export async function POST(request: NextRequest) {
   console.log('🔍 PDF API: Starting request processing');
   try {
-    const formData = await request.formData();
+    const formData = await request.formData() as unknown as globalThis.FormData;
     const file = formData.get('file') as File;
     const password = (formData.get('password') as string | null) || '';
     const bankHint = (formData.get('bankCode') as string || null)?.toLowerCase() || '';

@@ -2195,9 +2195,9 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
               <div className="overflow-x-auto hidden md:block">
                 <table className="w-full text-left border-collapse min-w-[800px]">
                   <thead>
-                    <tr className="border-b border-border bg-muted/20">
+                    <tr className="bg-muted/5">
                       {showSelectionMode && (
-                        <th className="w-14 px-6 py-5">
+                        <th className="w-14 px-6 py-6">
                           <button
                             onClick={handleSelectAll}
                             className={cn(
@@ -2212,17 +2212,16 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                           </button>
                         </th>
                       )}
-                      <th className="px-6 py-5 text-[10px] font-black text-muted-foreground uppercase tracking-widest">Date</th>
-                      <th className="px-6 py-5 text-[10px] font-black text-muted-foreground uppercase tracking-widest">Merchant / Description</th>
-                      <th className="px-6 py-5 text-[10px] font-black text-muted-foreground uppercase tracking-widest">Category</th>
-                      <th className="px-6 py-5 text-[10px] font-black text-muted-foreground uppercase tracking-widest">Status</th>
-                      <th className="px-6 py-5 text-[10px] font-black text-muted-foreground uppercase tracking-widest text-right">Amount</th>
+                      <th className="px-6 py-6 text-[10px] font-black text-muted-foreground/50 uppercase tracking-[0.2em]">Timeline</th>
+                      <th className="px-6 py-6 text-[10px] font-black text-muted-foreground/50 uppercase tracking-[0.2em]">Merchant & Description</th>
+                      <th className="px-6 py-6 text-[10px] font-black text-muted-foreground/50 uppercase tracking-[0.2em]">Label</th>
+                      <th className="px-6 py-6 text-[10px] font-black text-muted-foreground/50 uppercase tracking-[0.2em] text-right">Value</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-border/50">
+                  <tbody className="">
                     {isLoading && !transactions.length ? (
                       <tr>
-                        <td colSpan={showSelectionMode ? 6 : 5} className="px-6 py-5">
+                        <td colSpan={showSelectionMode ? 5 : 4} className="px-6 py-5">
                           <div className="space-y-4">
                             {[1, 2, 3, 4, 5].map((i) => (
                               <div key={i} className="flex items-center justify-between gap-4">
@@ -2239,26 +2238,57 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                         </td>
                       </tr>
                     ) : filteredTransactions.length === 0 ? (
-                      <tr><td colSpan={6} className="px-6 py-16 text-center text-muted-foreground italic font-medium">No transactions found matching criteria.</td></tr>
-                    ) : (
-                      visibleTransactions.map(transaction => (
-                        <TransactionRow
-                          key={transaction.id}
-                          transaction={transaction}
-                          isSelected={selectedIds.has(transaction.id)}
-                          showSelectionMode={showSelectionMode}
-                          toggleSelect={toggleSelect}
-                          formatAmount={formatAmount}
-                          onEdit={(t) => { setEditingTransaction(t); setShowForm(true); }}
-                        />
-                      ))
-                    )}
+                      <tr><td colSpan={showSelectionMode ? 5 : 4} className="px-6 py-24 text-center text-muted-foreground italic font-medium opacity-50">No activity found for this period.</td></tr>
+                    ) : (() => {
+                      // Group transactions by date
+                      const groups: { [date: string]: any[] } = {};
+                      visibleTransactions.forEach(t => {
+                        const d = t.transactionDate ? new Date(t.transactionDate).toISOString().split('T')[0] : 'undated';
+                        if (!groups[d]) groups[d] = [];
+                        groups[d].push(t);
+                      });
+                      const sortedDates = Object.keys(groups).sort((a, b) => b.localeCompare(a));
+
+                      return sortedDates.map(dateKey => (
+                        <React.Fragment key={dateKey}>
+                          {/* Section Header */}
+                          <tr className="bg-surface_container_low/30">
+                            <td colSpan={showSelectionMode ? 5 : 4} className="px-6 py-2">
+                              <div className="flex items-center gap-3">
+                                <div className="h-[1px] flex-1 bg-border/20" />
+                                <span className="text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground/40 whitespace-nowrap">
+                                  {dateKey === 'undated' ? 'Pending Timeline' : format(new Date(dateKey), 'EEEE, MMMM dd')}
+                                </span>
+                                <div className="h-[1px] flex-1 bg-border/20" />
+                              </div>
+                            </td>
+                          </tr>
+                          {/* Transactions for this date */}
+                          {groups[dateKey].map(transaction => (
+                            <TransactionRow
+                              key={transaction.id}
+                              transaction={transaction}
+                              isSelected={selectedIds.has(transaction.id)}
+                              showSelectionMode={showSelectionMode}
+                              toggleSelect={toggleSelect}
+                              formatAmount={formatAmount}
+                              onEdit={(t) => {
+                                setEditingTransaction(t);
+                                setShowForm(true);
+                              }}
+                            />
+                          ))}
+                          {/* Spacer row for multi-line visual */}
+                          <tr className="h-2"></tr>
+                        </React.Fragment>
+                      ));
+                    })()}
                   </tbody>
                 </table>
               </div>
 
               {/* Mobile Card List View */}
-              <div className="block md:hidden divide-y divide-border/50">
+              <div className="block md:hidden">
                 {isLoading && !transactions.length ? (
                   <div className="p-4 space-y-4">
                     {[1, 2, 3].map((i) => (
@@ -2266,80 +2296,64 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                     ))}
                   </div>
                 ) : filteredTransactions.length === 0 ? (
-                  <div className="p-8 text-center text-muted-foreground italic font-medium">No transactions found.</div>
-                ) : (
-                  visibleTransactions.map(transaction => {
-                    const isIncome = transaction.financialCategory === 'INCOME';
-                    const isExpense = transaction.financialCategory === 'EXPENSE';
-                    const amount = transaction.creditAmount || transaction.debitAmount || 0;
-                    const isSelected = selectedIds.has(transaction.id);
-                    const transactionDate = transaction.transactionDate ? new Date(transaction.transactionDate) : null;
-                    const isValidDate = transactionDate && !isNaN(transactionDate.getTime());
+                  <div className="p-12 text-center text-muted-foreground italic font-medium opacity-50">No activity found.</div>
+                ) : (() => {
+                  const groups: { [date: string]: any[] } = {};
+                  visibleTransactions.forEach(t => {
+                    const d = t.transactionDate ? new Date(t.transactionDate).toISOString().split('T')[0] : 'undated';
+                    if (!groups[d]) groups[d] = [];
+                    groups[d].push(t);
+                  });
+                  const sortedDates = Object.keys(groups).sort((a, b) => b.localeCompare(a));
 
-                    return (
-                      <div
-                        key={transaction.id}
-                        onClick={() => {
-                          if (showSelectionMode) toggleSelect(transaction.id);
-                          else { setEditingTransaction(transaction); setShowForm(true); }
-                        }}
-                        className={cn(
-                          "p-4 active:bg-muted/30 transition-colors flex items-start gap-3",
-                          isSelected && "bg-primary/5 shadow-inner"
-                        )}
-                      >
-                        {showSelectionMode && (
-                          <div className="pt-0.5">
-                            <button
-                              onClick={(e) => { e.stopPropagation(); toggleSelect(transaction.id); }}
-                              className={cn(
-                                "w-6 h-6 sm:w-5 sm:h-5 rounded-md border flex items-center justify-center transition-all",
-                                isSelected ? "bg-foreground border-foreground text-background shadow-md" : "bg-background border-input"
-                              )}
-                              aria-label={`Select ${transaction.description}`}
-                            >
-                              {isSelected && <Check className="w-4 h-4 sm:w-3.5 sm:h-3.5" />}
-                            </button>
-                            {/* Visual hit area expansion */}
-                            <div className="absolute -inset-2 md:hidden" />
-                          </div>
-                        )}
-                        <div className="size-10 rounded-xl bg-muted/50 border border-border/50 flex items-center justify-center shrink-0 shadow-sm">
-                          <CategoryIcon category={transaction.category?.name || ''} className="w-5 h-5" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between gap-2 mb-1">
-                            <h4 className="font-bold text-sm text-foreground truncate tracking-tight">{transaction.personName || transaction.store || transaction.description}</h4>
-                            <span className={cn(
-                              "font-black text-sm tracking-tight whitespace-nowrap",
-                              isIncome ? "text-emerald-500" : isExpense ? "text-rose-500" : "text-foreground"
-                            )}>
-                              {isIncome ? '+' : '-'}{formatAmount(amount)}
-                            </span>
-                          </div>
-                          <div className="flex items-center justify-between text-xs text-muted-foreground">
-                            <div className="flex items-center gap-2">
-                              <span>{isValidDate ? format(transactionDate, 'MMM dd') : 'No Date'}</span>
-                              <span className="w-1 h-1 rounded-full bg-border" />
-                              <span className={cn(
-                                "uppercase tracking-widest font-bold text-[11px]",
-                                isIncome ? "text-emerald-500" : "text-muted-foreground"
-                              )}>
-                                {transaction.category?.name || 'General'}
-                              </span>
-                            </div>
-                            {transaction.accountStatementId && (
-                              <div className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-emerald-500 bg-emerald-500/5 px-1.5 py-0.5 rounded-full border border-emerald-500/10">
-                                <div className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                Cleared
-                              </div>
-                            )}
-                          </div>
-                        </div>
+                  return sortedDates.map(dateKey => (
+                    <div key={dateKey} className="mb-2">
+                      <div className="px-4 py-2 bg-muted/5 flex items-center justify-between border-y border-border/5">
+                        <span className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
+                          {dateKey === 'undated' ? 'Pending Timeline' : format(new Date(dateKey), 'EEEE, MMM dd')}
+                        </span>
+                        <span className="text-[8px] font-bold text-muted-foreground/30">
+                          {groups[dateKey].length} txn
+                        </span>
                       </div>
-                    );
-                  })
-                )}
+                      <div className="">
+                        {groups[dateKey].map(transaction => {
+                          const isIncome = transaction.financialCategory === 'INCOME';
+                          const isExpense = transaction.financialCategory === 'EXPENSE';
+                          const amount = transaction.creditAmount || transaction.debitAmount || 0;
+                          const isSelected = selectedIds.has(transaction.id);
+                          const brand = (transaction as any).rawData?.brand;
+                          const brandName: string | undefined =
+                            brand?.name ||
+                            transaction.store ||
+                            transaction.personName ||
+                            undefined;
+                          // BrandLogo component handles logo resolution internally
+
+                          return (
+                            <MobileTransactionCard
+                              key={transaction.id}
+                              transaction={transaction}
+                              isIncome={isIncome}
+                              isExpense={isExpense}
+                              amount={amount}
+                              isSelected={isSelected}
+                              brandName={brandName}
+                              logoUrl={null}
+                              showSelectionMode={showSelectionMode}
+                              toggleSelect={toggleSelect}
+                              formatAmount={formatAmount}
+                              onPress={() => {
+                                if (showSelectionMode) toggleSelect(transaction.id);
+                                else { setEditingTransaction(transaction); setShowForm(true); }
+                              }}
+                            />
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ));
+                })()}
               </div>
 
               {/* Load More Button - Satisfies "overall data" request while preserving performance */}
@@ -3602,9 +3616,194 @@ function CategoryIcon({ category, className }: { category: string; className?: s
   return <ShoppingBag className={className} />;
 }
 
-// AI OPTIMIZATION: Memoized table row to prevent expensive re-renders
+// Domain map for Indian + global brands
+const BRAND_DOMAINS: Record<string, string> = {
+  'swiggy': 'swiggy.com',
+  'zomato': 'zomato.com',
+  'amazon': 'amazon.in',
+  'amazon india': 'amazon.in',
+  'flipkart': 'flipkart.com',
+  'myntra': 'myntra.com',
+  'ajio': 'ajio.com',
+  'meesho': 'meesho.com',
+  'nykaa': 'nykaa.com',
+  'blinkit': 'blinkit.com',
+  'zepto': 'zeptonow.com',
+  'bigbasket': 'bigbasket.com',
+  'dunzo': 'dunzo.com',
+  'uber': 'uber.com',
+  'ola': 'olacabs.com',
+  'rapido': 'rapido.bike',
+  'irctc': 'irctc.co.in',
+  'makemytrip': 'makemytrip.com',
+  'cleartrip': 'cleartrip.com',
+  'netflix': 'netflix.com',
+  'spotify': 'spotify.com',
+  'hotstar': 'hotstar.com',
+  'youtube': 'youtube.com',
+  'google': 'google.com',
+  'google pl': 'play.google.com',
+  'jio': 'jio.com',
+  'airtel': 'airtel.in',
+  'phonepe': 'phonepe.com',
+  'paytm': 'paytm.com',
+  'gpay': 'pay.google.com',
+  'cred': 'cred.club',
+  'zerodha': 'zerodha.com',
+  'groww': 'groww.in',
+  'upstox': 'upstox.com',
+  'bajaj': 'bajajfinserv.in',
+  'bajaj finserv': 'bajajfinserv.in',
+  'dmart': 'dmartindia.com',
+  'starbucks': 'starbucks.in',
+  'mcdonalds': 'mcdonalds.co.in',
+  'kfc': 'kfc.co.in',
+  'dominos': 'dominos.co.in',
+  'pvr': 'pvrcinemas.com',
+  'bookmyshow': 'bookmyshow.com',
+  'tataplay': 'tataplay.com',
+  'tata power': 'tatapower.com',
+};
+
+function resolveBrandDomain(name: string): string | null {
+  if (!name) return null;
+  const key = name.toLowerCase().trim();
+  if (BRAND_DOMAINS[key]) return BRAND_DOMAINS[key];
+  for (const [brandKey, domain] of Object.entries(BRAND_DOMAINS)) {
+    if (key.includes(brandKey)) return domain;
+  }
+  return null;
+}
+
+// 3-level fallback: Clearbit → Google Favicon → Colored Initials
+function BrandLogo({ name, size = 44 }: { name: string | undefined; size?: number }) {
+  const [stage, setStage] = React.useState(0); // 0=clearbit, 1=google, 2=initials
+  const domain = name ? resolveBrandDomain(name) : null;
+
+  const hue = name ? (name.charCodeAt(0) * 37 + name.charCodeAt(1 % name.length) * 13) % 360 : 200;
+  const initials = name ? name.replace(/[^a-zA-Z\s]/g, '').trim().split(/\s+/).map(w => w[0]).join('').substring(0, 2).toUpperCase() : '?';
+
+  if (!domain || stage === 2) {
+    return (
+      <div
+        className="w-full h-full flex items-center justify-center"
+        style={{ background: `hsl(${hue}, 55%, 90%)` }}
+      >
+        <span className="text-xs font-black" style={{ color: `hsl(${hue}, 55%, 28%)` }}>{initials}</span>
+      </div>
+    );
+  }
+
+  const src = stage === 0
+    ? `https://logo.clearbit.com/${domain}`
+    : `https://www.google.com/s2/favicons?domain=${domain}&sz=128`;
+
+  return (
+    <img
+      src={src}
+      alt={name}
+      width={size}
+      height={size}
+      className="object-contain w-full h-full p-1"
+      onError={() => setStage(s => s + 1)}
+    />
+  );
+}
+
+
+
+const MobileTransactionCard = React.memo(({
+  transaction,
+  isIncome,
+  isExpense,
+  amount,
+  isSelected,
+  brandName,
+  logoUrl,
+  showSelectionMode,
+  toggleSelect,
+  formatAmount,
+  onPress,
+}: {
+  transaction: any;
+  isIncome: boolean;
+  isExpense: boolean;
+  amount: number;
+  isSelected: boolean;
+  brandName: string | undefined;
+  logoUrl: string | null;
+  showSelectionMode: boolean;
+  toggleSelect: (id: string) => void;
+  formatAmount: (val: number) => string;
+  onPress: () => void;
+}) => {
+  // BrandLogo component handles fallback chain internally
+
+  return (
+    <div
+      onClick={onPress}
+      className={cn(
+        "p-4 transition-all active:bg-muted/30 flex items-center gap-4 relative",
+        isSelected && "bg-primary/5 shadow-inner"
+      )}
+    >
+      {showSelectionMode && (
+        <div className="shrink-0">
+          <button
+            onClick={(e) => { e.stopPropagation(); toggleSelect(transaction.id); }}
+            className={cn(
+              "w-6 h-6 rounded-md border flex items-center justify-center transition-all",
+              isSelected ? "bg-foreground border-foreground text-background shadow-md" : "bg-background border-input"
+            )}
+          >
+            {isSelected && <Check className="w-4 h-4" />}
+          </button>
+        </div>
+      )}
+
+      <div className="size-11 rounded-2xl bg-white border border-border/50 flex items-center justify-center shrink-0 shadow-sm relative overflow-hidden">
+        {brandName ? (
+          <BrandLogo name={brandName} size={44} />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center bg-muted/50">
+            <CategoryIcon category={transaction.category?.name || ''} className="w-5 h-5" />
+          </div>
+        )}
+      </div>
+
+      <div className="flex-1 min-w-0">
+        <div className="flex items-start justify-between gap-2 mb-0.5">
+          <h4 className="font-bold text-sm text-foreground truncate tracking-tight">
+            {brandName || transaction.personName || transaction.store || transaction.description}
+          </h4>
+          <span className={cn(
+            "font-black text-sm tracking-tight whitespace-nowrap",
+            isIncome ? "text-emerald-500" : isExpense ? "text-rose-500" : "text-foreground"
+          )}>
+            {isIncome ? '+' : '-'}{formatAmount(amount)}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className={cn(
+            "uppercase tracking-[0.1em] font-black text-[9px] px-1.5 py-0.5 rounded-md",
+            isIncome ? "bg-emerald-500/10 text-emerald-500" : "bg-muted text-muted-foreground"
+          )}>
+            {transaction.category?.name || 'General'}
+          </span>
+          {brandName && (
+            <span className="bg-primary/10 text-primary text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md">
+              ✓ Brand
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+});
+
 const TransactionRow = React.memo(({
   transaction,
+
   isSelected,
   showSelectionMode,
   toggleSelect,
@@ -3623,12 +3822,19 @@ const TransactionRow = React.memo(({
   const amount = transaction.creditAmount || transaction.debitAmount || 0;
   const transactionDate = transaction.transactionDate ? new Date(transaction.transactionDate) : null;
   const isValidDate = transactionDate && !isNaN(transactionDate.getTime());
+  // Resolve display name: rawData.brand → store → personName → description
+  const brand = (transaction as any).rawData?.brand;
+  const brandName: string | undefined =
+    brand?.name ||
+    transaction.store ||
+    transaction.personName ||
+    undefined;
 
   return (
     <tr
       className={cn(
-        "group border-b border-border/40 hover:bg-muted/30 transition-all duration-300",
-        isSelected && "bg-primary/5 active-row"
+        "group transition-all duration-300",
+        isSelected ? "bg-primary/10" : "hover:bg-muted/30"
       )}
       onClick={() => {
         if (showSelectionMode) toggleSelect(transaction.id);
@@ -3636,7 +3842,7 @@ const TransactionRow = React.memo(({
       }}
     >
       {showSelectionMode && (
-        <td className="px-6 py-5">
+        <td className="px-6 py-4">
           <button
             onClick={(e) => { e.stopPropagation(); toggleSelect(transaction.id); }}
             className={cn(
@@ -3648,7 +3854,7 @@ const TransactionRow = React.memo(({
           </button>
         </td>
       )}
-      <td className="px-6 py-5">
+      <td className="px-6 py-4">
         <div className="flex flex-col">
           <span className="text-sm font-bold text-foreground">
             {isValidDate ? format(transactionDate, 'MMM dd') : 'No Date'}
@@ -3658,18 +3864,29 @@ const TransactionRow = React.memo(({
           </span>
         </div>
       </td>
-      <td className="px-6 py-5">
+      <td className="px-6 py-4">
         <div className="flex items-center gap-4">
-          <div className="size-10 rounded-xl bg-muted/50 border border-border/50 flex items-center justify-center group-hover:bg-background transition-colors shadow-sm">
-            <CategoryIcon category={transaction.category?.name || ''} className="w-5 h-5" />
+          <div className="size-11 rounded-2xl bg-white border border-border/50 flex items-center justify-center group-hover:shadow-md transition-all shadow-sm overflow-hidden relative shrink-0">
+            {brandName ? (
+              <BrandLogo name={brandName} size={44} />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center bg-muted/50">
+                <CategoryIcon category={transaction.category?.name || ''} className="w-5 h-5" />
+              </div>
+            )}
           </div>
           <div className="min-w-0">
-            <p className="font-bold text-sm text-foreground truncate group-hover:text-primary transition-colors">
-              {transaction.personName || transaction.store || transaction.description}
+            <p className="font-bold text-sm text-foreground truncate group-hover:text-primary transition-colors flex items-center gap-1.5">
+              {brandName || transaction.personName || transaction.store || transaction.description}
+              {brandName && (
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-primary/10 text-primary text-[8px] font-black uppercase tracking-widest">
+                  Verified
+                </span>
+              )}
             </p>
-            {transaction.description && (transaction.personName || transaction.store) && (
-              <p className="text-[10px] text-muted-foreground truncate max-w-[200px] uppercase font-black tracking-widest mt-1 opacity-60">
-                {transaction.description}
+            {(transaction.description || transaction.store) && (
+              <p className="text-[10px] text-muted-foreground truncate max-w-[250px] uppercase font-black tracking-widest mt-1 opacity-50">
+                {transaction.store || transaction.description}
               </p>
             )}
           </div>
@@ -3682,12 +3899,6 @@ const TransactionRow = React.memo(({
         )}>
           {transaction.category?.name || 'General'}
         </span>
-      </td>
-      <td className="px-6 py-5">
-        <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 group-hover:text-muted-foreground transition-colors">
-          <div className={cn("size-2 rounded-full", transaction.accountStatementId ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.3)]" : "bg-amber-500 shadow-[0_0_8_8px_rgba(245,158,11,0.2)]")}></div>
-          {transaction.accountStatementId ? 'Cleared' : 'Pending'}
-        </div>
       </td>
       <td className={cn(
         "px-6 py-5 text-sm font-black text-right tracking-tight tabular-nums",

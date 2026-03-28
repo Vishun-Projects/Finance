@@ -371,6 +371,104 @@ export async function lookupMerchantCategory(
   return null;
 }
 
+/**
+ * Batch lookup merchant categories
+ */
+export async function batchLookupMerchantCategories(
+  storeNames: string[],
+  userId: string
+): Promise<Record<string, MerchantLookupResult | null>> {
+  if (!storeNames.length || !MERCHANT_LOOKUP_CONFIG.ENABLED) {
+    return {};
+  }
+
+  // Deduplicate and filter by length
+  const uniqueNames = Array.from(new Set(storeNames))
+    .filter(name => name && name.trim().length >= MERCHANT_LOOKUP_CONFIG.MIN_STORE_NAME_LENGTH);
+
+  if (uniqueNames.length === 0) return {};
+
+  const results: Record<string, MerchantLookupResult | null> = {};
+  const normalizedToOriginal: Record<string, string> = {};
+  const normalizedNames: string[] = [];
+
+  for (const name of uniqueNames) {
+    const normalized = normalizeMerchantName(name);
+    normalizedToOriginal[normalized] = name;
+    normalizedNames.push(normalized);
+  }
+
+  // 1. Batch check database cache
+  const cacheMap: Record<string, MerchantLookupResult> = {};
+  try {
+    const cachedRecords: any[] = await (prisma as any).$queryRaw`
+      SELECT 
+        "merchantName",
+        "normalizedName",
+        "categoryName",
+        "categoryId",
+        confidence,
+        source
+      FROM merchant_categories
+      WHERE "normalizedName" = ANY(${normalizedNames})
+    `;
+
+    for (const record of cachedRecords) {
+      cacheMap[record.normalizedName] = {
+        categoryName: record.categoryName,
+        categoryId: record.categoryId,
+        confidence: record.confidence ? Number(record.confidence) : 0.8,
+        source: 'cache',
+      };
+      // Map back to all original names that share this normalized name
+      for (const [norm, orig] of Object.entries(normalizedToOriginal)) {
+        if (norm === record.normalizedName) {
+          results[orig] = cacheMap[record.normalizedName];
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Error in batch cache lookup:', error);
+  }
+
+  // 2. Identify which names still need lookup
+  const missingNames = uniqueNames.filter(name => !results[name]);
+  if (missingNames.length === 0) return results;
+
+  // 3. Process missing names with concurrency limit
+  // Only process if under quota
+  const currentQuota = merchantLookupTracker.get(userId)?.count || 0;
+  const remainingQuota = Math.max(0, MERCHANT_LOOKUP_CONFIG.MAX_DAILY_LOOKUPS - currentQuota);
+  
+  const namesToLookup = missingNames.slice(0, remainingQuota);
+  
+  if (namesToLookup.length > 0) {
+    // Process in small parallel chunks to avoid overwhelming APIs
+    const CHUNK_SIZE = 5;
+    for (let i = 0; i < namesToLookup.length; i += CHUNK_SIZE) {
+      const chunk = namesToLookup.slice(i, i + CHUNK_SIZE);
+      await Promise.all(chunk.map(async (name) => {
+        try {
+          const result = await lookupMerchantCategory(name, userId);
+          results[name] = result;
+        } catch (error) {
+          console.error(`Error looking up ${name}:`, error);
+          results[name] = null;
+        }
+      }));
+    }
+  }
+
+  // Fill in nulls for anything else
+  for (const name of uniqueNames) {
+    if (results[name] === undefined) {
+      results[name] = null;
+    }
+  }
+
+  return results;
+}
+
 // Merchant lookup configuration
 const MERCHANT_LOOKUP_CONFIG = {
   ENABLED: process.env.ENABLE_MERCHANT_LOOKUP !== 'false',
@@ -379,7 +477,7 @@ const MERCHANT_LOOKUP_CONFIG = {
   CONFIDENCE_THRESHOLD: 0.8,
   USE_GOOGLE_SEARCH: process.env.GOOGLE_CUSTOM_SEARCH_API_KEY !== undefined,
   FALLBACK_TO_GEMINI: true,
-  MAX_DAILY_LOOKUPS: 50,
+  MAX_DAILY_LOOKUPS: 100, // Increased for batch support
 } as const;
 
 // Merchant lookup usage tracker
@@ -409,4 +507,3 @@ function incrementMerchantLookupUsage(userId: string): void {
     usage.count++;
   }
 }
-

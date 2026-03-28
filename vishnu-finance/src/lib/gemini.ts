@@ -667,7 +667,7 @@ export async function categorizeTransactionsBatch(
   JSON ONLY, no markdown, no explanation.`;
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemma-3-27b-it', generationConfig: { responseMimeType: "application/json" } });
+    const model = genAI.getGenerativeModel({ model: 'gemma-3-27b-it' });
     const result = await retryWithBackoff(async () => {
       return await model.generateContent(prompt);
     }, 2, 2000);

@@ -40,15 +40,21 @@ class BaseStyle:
         # 2. Collapse whitespace
         return " ".join(text.split()).strip()
 
-    def extract_entities(self, text: str) -> Tuple[Optional[str], Optional[str], float, str]:
+    def extract_entities(self, text: str) -> Tuple[Optional[str], Optional[str], float, str, Optional[str]]:
         """
         Approach B: Scoring Engine.
-        Returns (Store, Person, Confidence, Commodity)
+        Returns (Store, Person, Confidence, Commodity, upiId)
         """
         from .categories import get_commodity
         
         cleaned = self.clean_description(text)
         commodity = get_commodity(cleaned)
+        
+        # Extract UPI ID if present
+        upi_id = None
+        upi_match = re.search(r'upi/.*?/[^/]+/([^/]+)/', cleaned.lower())
+        if upi_match:
+            upi_id = upi_match.group(1).strip()
         
         # 1. Fragmentation: Split by semantic delimiters
         # We also split by "INR" or "UPI" if they are surrounded by delimiters
@@ -58,59 +64,53 @@ class BaseStyle:
         for frag in fragments:
             # NEW: Scrub noise tokens from WITHIN the fragment (e.g. "Indian INR Railways" -> "Indian Railways")
             # We do this BEFORE the anchor check so "Indian INR" isn't discarded
-            original_frag = frag
-            frag = re.sub(r'\b(INR|UPI|BRANCH|ATM\s+SERVICE)\b', '', frag, flags=re.IGNORECASE)
-            frag = " ".join(frag.split()).strip()
-            
-            if not frag: continue
+            scrubbed_fragArr = []
+            for w in frag.split():
+                if w.upper() not in {"INR", "UPI", "NEFT", "RTGS", "IMPS"}:
+                    scrubbed_fragArr.append(w)
+            scrubbed_frag = " ".join(scrubbed_fragArr)
+            if not scrubbed_frag:
+                continue
+                
+            frag = scrubbed_frag # replacing with the scrubbed version for anchor checks
 
-            # Identify if fragment matches any Negative Anchors
-            is_anchor = False
-            for name, pattern in self.ANCHORS.items():
-                if re.search(pattern, frag, re.IGNORECASE) or re.search(pattern, original_frag, re.IGNORECASE):
-                    is_anchor = True
-                    break
+            if len(frag) < 3: 
+                continue
+            if bool(re.search(r'\d{3,}', frag)): # Hash/ID
+                continue
+            if frag.upper() in {"UPI", "NEFT", "RTGS", "IMPS", "ACH", "POS"}:
+                continue
+                
+            # Discard fragments that are strictly informational anchors
+            if frag.lower() in [
+                "card", "branch", "atm", "cash", "deposit", 
+                "cheque", "fee", "tax", "charge", "to", "by"
+            ]:
+                continue
+                
+            score = 0.5
             
-            if is_anchor: continue
-
-            # Scrub isolated numbers/IDs
-            frag = re.sub(r'\b\d{10,}\b', '', frag) 
-            frag = re.sub(r'^\d+\s+|\s+\d+$', ' ', frag)
-            frag = " ".join(frag.split()).strip()
+            # Boost if it looks like a person's name
+            if self._is_likely_person(frag):
+                score += 0.3
+            # Boost if it has capitalization
+            if any(c.isupper() for c in frag):
+                score += 0.2
+            # Penalty if it looks like a location/date
+            if re.match(r'^(delhi|mumbai|bangalore|chennai|hyderabad)$', frag.lower()):
+                score -= 0.3
             
-            if not frag: continue
-
-            # Calculate Quality Score
-            alpha_chars = re.sub(r'[^a-zA-Z\s]', '', frag).strip()
-            if len(alpha_chars) < 3: continue
+            candidates.append((frag, score))
             
-            score = len(alpha_chars) 
-            if ' ' in alpha_chars: score += 10 # Strong preference for multi-word names
-            
-            is_store = any(k in alpha_chars.upper() for k in self.STORE_KEYWORDS)
-            if is_store: score += 15
-            
-            candidates.append({
-                "fragment": frag,
-                "score": score,
-                "is_store": is_store
-            })
-            
-        # 2. Selection
-        candidates.sort(key=lambda x: x['score'], reverse=True)
-        
         if not candidates:
-            return None, None, 0.0, commodity
+            return None, None, 0.0, commodity, upi_id
             
-        best = candidates[0]
-        # Adjust confidence denominator. 
-        # A 15-char multi-word name is score 25. A store is 40.
-        confidence = min(best['score'] / 30.0, 1.0) 
+        # 2. Selection: Pick highest score
+        best_candidate = max(candidates, key=lambda x: x[1])
+        name = best_candidate[0].title()
+        conf = min(best_candidate[1], 1.0)
         
-        if best['is_store']:
-            return best['fragment'], None, confidence, commodity
-        else:
-            return None, best['fragment'], confidence, commodity
+        return name, name, conf, commodity, upi_id
 
     def classify_commodity(self, text: str) -> str:
         from .categories import get_commodity

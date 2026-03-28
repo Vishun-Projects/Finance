@@ -91,6 +91,7 @@ export async function multiPassCategorization(
       financialCategory: true,
       categoryId: true,
       notes: true,
+      rawData: true,
     },
     orderBy: {
       transactionDate: 'desc',
@@ -207,12 +208,22 @@ export async function multiPassCategorization(
   const updates = transactionResults
     .filter((tr) => {
       const originalTxn = transactions.find((t) => t.id === tr.id);
-      return tr.result.categoryId && originalTxn?.categoryId !== tr.result.categoryId;
+      const originalRawData = (originalTxn as any)?.rawData || {};
+      const brandChanged = tr.result.brand && JSON.stringify(originalRawData?.brand) !== JSON.stringify(tr.result.brand);
+      return (tr.result.categoryId && originalTxn?.categoryId !== tr.result.categoryId) || brandChanged;
     })
-    .map((tr) => ({
-      id: tr.id,
-      categoryId: tr.result.categoryId!,
-    }));
+    .map((tr) => {
+      const originalTxn = transactions.find((t) => t.id === tr.id);
+      const originalRawData = (originalTxn as any)?.rawData || {};
+      return {
+        id: tr.id,
+        categoryId: tr.result.categoryId || (originalTxn?.categoryId as string) || null,
+        rawData: tr.result.brand ? {
+          ...originalRawData,
+          brand: tr.result.brand
+        } : undefined
+      };
+    });
 
   // Batch update all at once
   if (updates.length > 0) {
@@ -229,7 +240,10 @@ export async function multiPassCategorization(
         batch.map((update) =>
           prisma.transaction.update({
             where: { id: update.id },
-            data: { categoryId: update.categoryId },
+            data: { 
+              categoryId: update.categoryId,
+              ...(update.rawData ? { rawData: update.rawData } : {})
+            },
           })
         )
       );

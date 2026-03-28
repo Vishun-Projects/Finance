@@ -64,6 +64,7 @@ class TransactionCandidate:
     store: Optional[str] = None
     personName: Optional[str] = None
     commodity: Optional[str] = None
+    upiId: Optional[str] = None
     
     row_index: int = -1
     page_index: int = -1
@@ -81,5 +82,6 @@ class FinalTransaction:
     store: Optional[str] = None
     personName: Optional[str] = None
     commodity: Optional[str] = None
+    upiId: Optional[str] = None
     date_iso: Optional[str] = None
     reasons: List[str] = field(default_factory=list)

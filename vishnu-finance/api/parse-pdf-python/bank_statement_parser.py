@@ -79,7 +79,13 @@ def parse_bank_statement(file_path: Path, bank_code: Optional[str] = None, passw
         statement_id = file_path.stem 
         
         # Run Pipeline
-        result = manager.run_pipeline(str(file_path), statement_id=statement_id, password=password, bank_profiles=bank_profiles)
+        result = manager.run_pipeline(
+            str(file_path), 
+            statement_id=statement_id, 
+            password=password, 
+            bank_profiles=bank_profiles,
+            bank_code=bank_code
+        )
         
         if result.get("status") == "failed":
             print(f"Pipeline failed: {result.get('error')}", file=sys.stderr)
@@ -181,6 +187,8 @@ def get_parser_for_bank(bank_code: str) -> BaseBankParser:
         return HDFCBankParser()
     elif bank_code == 'MAHB':
         return SBMParser()
+    elif bank_code == 'KARB':
+        return MultiBankParser('KARB')
     else:
         return MultiBankParser(bank_code)
 
@@ -211,7 +219,7 @@ def main():
             print(f"Total credits: {df['credit'].sum():.2f}")
             
             # Save to CSV
-            output_file = f"parsed_{file_path.stem}.csv"
+            output_file = f"parsed_{args.file_path.stem}.csv"
             df.to_csv(output_file, index=False)
             print(f"\nResults saved to: {output_file}")
             

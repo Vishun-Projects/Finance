@@ -29,7 +29,8 @@ class PersistenceShim:
                 "accountNumber": ctx.metadata.get("accountNumber"),
                 "store": t.store,
                 "personName": t.personName,
-                "commodity": t.commodity
+                "commodity": t.commodity,
+                "upiId": t.upiId
             })
             
         # Extract some raw rows for debugging/display

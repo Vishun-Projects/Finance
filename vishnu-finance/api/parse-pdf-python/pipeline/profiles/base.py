@@ -191,6 +191,7 @@ class BaseStyle:
                 return found_brand, None, 0.95, get_commodity(found_brand), upi_id
 
             # NEW: Scrub noise tokens from WITHIN the fragment...
+            scrubbed_fragArr = []
             for w in frag.split():
                 if w.upper() not in {"INR", "UPI", "NEFT", "RTGS", "IMPS"}:
                     scrubbed_fragArr.append(w)

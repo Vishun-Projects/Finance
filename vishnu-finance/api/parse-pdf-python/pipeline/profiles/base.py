@@ -2,6 +2,76 @@ from ..models import JobContext
 import re
 from typing import List, Tuple, Optional
 
+# Brand map: VPA prefix → clean display name (used by all banks for UNKNOWN style)
+_BRAND_MAP = {
+    "blinkit.payu": "Blinkit",
+    "blinkit": "Blinkit",
+    "zomato4.payu": "Zomato",
+    "zomato": "Zomato",
+    "swiggy": "Swiggy",
+    "swiggyit": "Swiggy",
+    "amazonupi": "Amazon",
+    "amazon": "Amazon",
+    "amazon.refunds": "Amazon (Refund)",
+    "amazonpaygrocery": "Amazon Pay",
+    "amznlpa": "Amazon",
+    "gpayrecharge": "Google Pay",
+    "gpay": "Google Pay",
+    "googlepay": "Google Pay",
+    "playstore": "Google Play Store",
+    "google": "Google",
+    "netflix.bd": "Netflix",
+    "hotstar": "Disney+ Hotstar",
+    "jioinappdirect": "Jio Recharge",
+    "jio": "Jio",
+    "bajajfinanceieplqr": "Bajaj Finance",
+    "bajajfinancelimwl3": "Bajaj Finance",
+    "bajajfinserv.payu": "Bajaj Finserv",
+    "bajaj": "Bajaj Finance",
+    "getsimpl": "Simpl",
+    "cf.simp": "Simpl",
+    "simpl": "Simpl",
+    "zepto.payu": "Zepto",
+    "zepto": "Zepto",
+    "vrlonline": "VRL Travels",
+    "vrl.bdpg": "VRL Travels",
+    "vrl": "VRL Travels",
+    "paytm-axiocf": "AXIO",
+    "pinelabs": "Pine Labs",
+    "zomatopay": "Zomato Pay",
+    "cred.club": "CRED",
+    "credpay": "CRED",
+    "phonepe": "PhonePe",
+    "bharatpe": "BharatPe",
+    "payzapp": "PayZapp",
+    "mobikwik": "MobiKwik",
+    "ubereat": "Uber Eats",
+    "ola.money": "Ola Money",
+    "dunzo": "Dunzo",
+    "bigbasket": "BigBasket",
+    "jiomart": "JioMart",
+    "irctc": "IRCTC",
+    "nykaa": "Nykaa",
+    "ajio": "Ajio",
+    "tataneu": "Tata Neu",
+    "tatacliq": "Tata Cliq",
+    "myntra": "Myntra",
+    "blinkit": "Blinkit",
+    "zomato": "Zomato",
+    "swiggy": "Swiggy",
+    "bajaj": "Bajaj Finance",
+    "google": "Google Pay",
+    "simpl": "Simpl",
+    "zepto": "Zepto",
+    "vrl": "VRL Travels",
+    "axio": "AXIO",
+    "aj nursery": "A J Nursery",
+    "nirvi": "Nirvi Medicals",
+    "shree mahal": "Shree Mahalaxmi",
+}
+_UPI_COLON_RE = re.compile(r'UPI:\d+:([^@(]+)@[^@(]+\(([^)]+)\)?', re.IGNORECASE)
+_MERCHANT_FRAGS = {"ZOMATO", "SWIGGY", "BLINKIT", "ZEPTO", "AMAZON", "FLIPKART", "GOOGLE", "BAJAJ", "SIMPL", "JIO", "RECHARGE", "PAYTM", "VRL", "AXIO", "ZOMATO4", "BAJAJFINANCE", "BLINKIT.PAYU"}
+
 class BaseStyle:
     """
     Template for Bank-Specific Normalization & Cleaning.
@@ -14,7 +84,8 @@ class BaseStyle:
         "RESTAURANT", "PAYTM", "GOPAY", "ZOMATO", "SWIGGY", "RAILWAYS", "GROWW", 
         "ADDAT", "GAMING", "CHALO", "MMRDA", "MMRCL", "AMAZON", "FLIPKART", "BLINKIT", 
         "ZEPTO", "BIGBASKET", "RELIANCE", "JIOMART", "D MART", "NETFLIX", "SPOTIFY",
-        "TICKETING", "HOTEL", "MEDICO", "PHARMACY", "HOSPITAL"
+        "TICKETING", "HOTEL", "MEDICO", "PHARMACY", "HOSPITAL", "ENTERPRISES", "TRAVELS",
+        "TRADERS", "REFRIGERATION", "ELECTRONICS", "TELECOM", "MOBILE", "BAKERY", "DAIRY"
     ]
 
     # Negative Anchors: Fragments that are EXCLUSIVELY noise
@@ -26,7 +97,7 @@ class BaseStyle:
         "MASKED": r'.*XXXXX.*',
         "JUNK_ONLY": r'^\s*(UPI|IMPS|NEFT|IFSC|BRANCH|REMARKS|INR|REF|ID|DATE|TRANSACTION|DETAILS|DEBITS|CREDITS|BALANCE|ATM|SERVICE|BRANCH\s*:.*)\s*$',
         "SERIAL": r'^\s*\d{1,5}\s*$',
-        "BANK_CODE": r'^(BKID|SBIN|HDFC|ICIC|UTIB|YESB|MAHB|AXIS|TBSB|AIRP|UNBA|BARB|KKBK|IDFB|CNRB)$'
+        "BANK_CODE": r'^(BKID|SBIN|HDFC|ICIC|UTIB|YESB|MAHB|AXIS|TBSB|AIRP|UNBA|BARB|KKBK|IDFB|CNRB|KARB)$'
     }
 
     def __init__(self, ctx: Optional[JobContext] = None):
@@ -50,7 +121,54 @@ class BaseStyle:
         cleaned = self.clean_description(text)
         commodity = get_commodity(cleaned)
         
-        # Extract UPI ID if present
+        # ── Priority 0: Karnataka / Standard UPI colon format ──────────────
+        # Matches: UPI:REFNO:vpa@bank(HUMAN NAME) or UPI:REFNO:vpa@bank(NAME
+        upi_col = _UPI_COLON_RE.search(cleaned)
+        if upi_col:
+            vpa_user = upi_col.group(1).strip().lower()   # e.g. "blinkit.payu"
+            paren_name = upi_col.group(2).strip()           # e.g. "Blinkit" or "ALIUL HOQUE"
+            upi_id = upi_col.group(1) + '@' + cleaned.split('@')[1].split('(')[0] if '@' in cleaned else None
+            
+            # 1. Try brand map first
+            brand = None
+            if vpa_user in _BRAND_MAP:
+                brand = _BRAND_MAP[vpa_user]
+            else:
+                for key, val in _BRAND_MAP.items():
+                    if vpa_user.startswith(key):
+                        brand = val; break
+            
+            # 2. Try partial match on the human name if brand not found
+            if not brand:
+                u_name = paren_name.upper()
+                for kw in _MERCHANT_FRAGS:
+                    if kw in u_name:
+                        brand = _BRAND_MAP.get(kw.lower(), kw.title())
+                        break
+
+            if brand:
+                return brand, None, 0.99, get_commodity(brand), upi_id
+
+            # Fall back to the human name from parentheses
+            name = paren_name.strip()
+            # Remove trailing colon/extra keywords like :UPI or -KBLUP
+            name = re.sub(r'[:\-].*$', '', name).strip()
+            
+            # IMPROVEMENT: If name is truncated/junk, try VPA heuristic
+            if len(name) <= 3 and len(vpa_user) > 5:
+                # e.g. "raghavendrakaranth205" -> "Raghavendra Karanth"
+                possible = re.sub(r'[\d\-_.]', ' ', vpa_user).strip().title()
+                if len(possible.split()) >= 2:
+                    name = possible
+            
+            name = name.title()
+            
+            is_store = any(kw in name.upper() for kw in self.STORE_KEYWORDS)
+            if is_store:
+                return name, None, 0.9, commodity, upi_id
+            return None, name, 0.9, commodity, upi_id
+        
+        # Extract UPI ID if present (slash format for other banks)
         upi_id = None
         upi_match = re.search(r'upi/.*?/[^/]+/([^/]+)/', cleaned.lower())
         if upi_match:
@@ -62,9 +180,17 @@ class BaseStyle:
         
         candidates = []
         for frag in fragments:
-            # NEW: Scrub noise tokens from WITHIN the fragment (e.g. "Indian INR Railways" -> "Indian Railways")
-            # We do this BEFORE the anchor check so "Indian INR" isn't discarded
-            scrubbed_fragArr = []
+            # 1. Check brand map for this fragment
+            u_frag = frag.upper()
+            found_brand = None
+            for kw in _MERCHANT_FRAGS:
+                if kw in u_frag:
+                    found_brand = _BRAND_MAP.get(kw.lower(), kw.title())
+                    break
+            if found_brand:
+                return found_brand, None, 0.95, get_commodity(found_brand), upi_id
+
+            # NEW: Scrub noise tokens from WITHIN the fragment...
             for w in frag.split():
                 if w.upper() not in {"INR", "UPI", "NEFT", "RTGS", "IMPS"}:
                     scrubbed_fragArr.append(w)

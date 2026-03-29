@@ -13,7 +13,7 @@ export default function TransactionSkeleton() {
             </div>
 
             {/* Table Header */}
-            <div className="border rounded-xl overflow-hidden">
+            <div className="card-base overflow-hidden">
                 <div className="bg-muted/40 p-4 grid grid-cols-12 gap-4">
                     <Skeleton className="col-span-1 h-4 w-4" />
                     <Skeleton className="col-span-3 h-4 w-20" />

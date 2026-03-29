@@ -296,8 +296,8 @@ export default function GoalsPageClient({
       <div
         className={cn(
           isEmbedded
-            ? 'space-y-4'
-            : 'container-fluid space-y-6 pb-16 pt-6 md:pt-8 lg:pt-10',
+            ? 'space-y-3'
+            : 'container-fluid space-y-4 pb-12 pt-4 md:pt-6 lg:pt-8',
         )}
       >
         {!isEmbedded ? (
@@ -358,7 +358,7 @@ export default function GoalsPageClient({
             <Card>
               <CardHeader className="pb-2">
                 <CardDescription>Total goals</CardDescription>
-                <CardTitle className="text-3xl">
+                <CardTitle className="text-2xl">
                   {goalStats.total}
                 </CardTitle>
               </CardHeader>
@@ -372,7 +372,7 @@ export default function GoalsPageClient({
             <Card>
               <CardHeader className="pb-2">
                 <CardDescription>Active goals</CardDescription>
-                <CardTitle className="text-3xl">{goalStats.active}</CardTitle>
+                <CardTitle className="text-2xl">{goalStats.active}</CardTitle>
               </CardHeader>
               <CardContent className="pt-0 text-sm text-muted-foreground">
                 <div className="flex items-center gap-2">
@@ -384,7 +384,7 @@ export default function GoalsPageClient({
             <Card>
               <CardHeader className="pb-2">
                 <CardDescription>Invested amount</CardDescription>
-                <CardTitle className="text-3xl">{formatCurrency(goalStats.totalCurrent)}</CardTitle>
+                <CardTitle className="text-2xl">{formatCurrency(goalStats.totalCurrent)}</CardTitle>
               </CardHeader>
               <CardContent className="pt-0 text-sm text-muted-foreground">
                 toward ₹{goalStats.totalTarget.toLocaleString('en-IN')}
@@ -393,7 +393,7 @@ export default function GoalsPageClient({
             <Card>
               <CardHeader className="pb-2">
                 <CardDescription>Overall progress</CardDescription>
-                <CardTitle className="text-3xl">{goalStats.progressPercent}%</CardTitle>
+                <CardTitle className="text-2xl">{goalStats.progressPercent}%</CardTitle>
               </CardHeader>
               <CardContent className="pt-0 text-sm text-muted-foreground">
                 toward ₹{goalStats.totalTarget.toLocaleString('en-IN')} in targets
@@ -402,7 +402,7 @@ export default function GoalsPageClient({
           </div>
         )}
 
-        <div className="mt-8 space-y-4 rounded-2xl border border-border/60 bg-card p-4 shadow-sm sm:p-6">
+        <div className="mt-4 space-y-3 rounded-xl border border-border/60 bg-card p-3 shadow-sm sm:p-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <Tabs value={statusFilter} onValueChange={(value) => setStatusFilter(value as 'all' | GoalStatus)}>
               <TabsList className="flex flex-wrap gap-2">
@@ -467,8 +467,8 @@ export default function GoalsPageClient({
 
                   return (
                     <Card key={goal.id} className="matte-card bg-card border border-border shadow-none hover:border-foreground/20 transition-colors">
-                      <CardContent className="flex flex-col gap-4 py-6 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="flex-1 space-y-3">
+                      <CardContent className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex-1 space-y-2">
                           <div className="flex flex-wrap items-center gap-2">
                             <span
                               className={cn(
@@ -492,7 +492,7 @@ export default function GoalsPageClient({
                             )}
                           </div>
                           <div>
-                            <h3 className="text-xl font-bold text-foreground mb-1">
+                            <h3 className="text-lg font-bold text-foreground mb-1">
                               {goal.title}
                             </h3>
                             {goal.description && (

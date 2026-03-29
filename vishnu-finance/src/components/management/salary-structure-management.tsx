@@ -30,8 +30,6 @@ import {
   ArrowRight
 } from 'lucide-react';
 import {
-  AreaChart,
-  Area,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -40,7 +38,9 @@ import {
   PieChart,
   Pie,
   Cell,
-  Legend
+  Legend,
+  LineChart,
+  Line
 } from 'recharts';
 import { SalaryStructure, SalaryHistory } from '../../types';
 import { useAuth } from '../../contexts/AuthContext'; // Fixed import path
@@ -192,6 +192,16 @@ export default function SalaryStructureManagement() {
     }
     return data.filter(d => d.value > 0);
   }, [activeStructure]);
+  
+  const historyChartData = useMemo(() => {
+    return [...salaryHistory]
+      .sort((a, b) => new Date(a.effectiveDate).getTime() - new Date(b.effectiveDate).getTime())
+      .map(h => ({
+        date: new Date(h.effectiveDate).toLocaleDateString(undefined, { month: 'short', year: '2-digit' }),
+        salary: h.baseSalary,
+        fullDate: new Date(h.effectiveDate).toLocaleDateString()
+      }));
+  }, [salaryHistory]);
 
   // Search/Filter state which was used in render but not defined in state in snippets seen.
   // Assuming these states need to be added or were part of the closure.
@@ -405,18 +415,18 @@ export default function SalaryStructureManagement() {
 
   if (loading && salaryStructures.length === 0) {
     return (
-      <div className="flex items-center justify-center p-12">
+      <div className="flex items-center justify-center p-6">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500 max-w-7xl mx-auto">
+    <div className="space-y-4 animate-in fade-in duration-500 max-w-7xl mx-auto">
       {/* Header Section */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+          <h1 className="text-2xl font-bold tracking-tight bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
             My Compensation
           </h1>
           <p className="text-muted-foreground mt-1">
@@ -670,10 +680,9 @@ export default function SalaryStructureManagement() {
       </div>
 
       {activeStructure ? (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Main Info Card */}
-          <Card className="md:col-span-2 overflow-hidden border-none shadow-xl bg-gradient-to-br from-primary/10 via-background to-background relative isolate">
-            <div className="absolute inset-0 bg-grid-white/10 [mask-image:linear-gradient(0deg,white,rgba(255,255,255,0.6))] -z-10" />
+          <Card className="md:col-span-2 overflow-hidden border border-border bg-card">
 
             <CardHeader className="pb-2">
               <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
@@ -694,18 +703,18 @@ export default function SalaryStructureManagement() {
               </div>
             </CardHeader>
             <CardContent className="pt-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 p-4 rounded-2xl bg-background/40 backdrop-blur-xl border border-border/40 shadow-inner">
-                <div className="space-y-1 p-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2 p-3 rounded-lg bg-muted/30 border border-border shadow-sm">
+                <div className="space-y-1 p-1">
                   <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest opacity-60">Gross Annual</p>
-                  <p className="text-xl font-black text-foreground tabular-nums">{formatRupees(grossAnnual)}</p>
+                  <p className="text-lg font-black text-foreground tabular-nums">{formatRupees(grossAnnual)}</p>
                 </div>
-                <div className="space-y-1 p-2">
+                <div className="space-y-1 p-1">
                   <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest opacity-60">Annual CTC</p>
-                  <p className="text-xl font-black text-blue-600 dark:text-blue-400 tabular-nums">{formatRupees(annualCTC)}</p>
+                  <p className="text-lg font-black text-blue-600 dark:text-blue-400 tabular-nums">{formatRupees(annualCTC)}</p>
                 </div>
-                <div className="space-y-1 p-2">
+                <div className="space-y-1 p-1">
                   <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest opacity-60">Monthly Net</p>
-                  <p className="text-xl font-black text-primary tabular-nums">{formatRupees(netMonthly)}</p>
+                  <p className="text-lg font-black text-primary tabular-nums">{formatRupees(netMonthly)}</p>
                 </div>
                 <div className="flex items-center gap-4 sm:hidden pt-2 border-t border-border/10">
                   <div className="flex-1 space-y-1">
@@ -719,53 +728,75 @@ export default function SalaryStructureManagement() {
                 </div>
               </div>
 
-              {/* Visual Breakdown using Recharts Pie (Simplified) */}
-              <div className="mt-8 flex flex-col md:flex-row items-center gap-8">
-                <div className="h-48 w-48 relative">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={salaryComponents}
-                        innerRadius={35}
-                        outerRadius={60}
-                        paddingAngle={5}
-                        dataKey="value"
-                        stroke="none"
-                      >
-                        {salaryComponents.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                      </Pie>
-                    </PieChart>
-                  </ResponsiveContainer>
-                  <div className="absolute inset-0 flex items-center justify-center flex-col pointer-events-none">
-                    <span className="text-xs text-muted-foreground">Components</span>
-                    <span className="font-bold">{salaryComponents.length}</span>
+              {/* Salary Breakdown (Solid & Simple) */}
+              <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+                <div className="space-y-4">
+                  <h4 className="font-semibold text-sm mb-1">Monthly Breakdown</h4>
+                  <div className="space-y-2">
+                    {salaryComponents.map((comp, i) => (
+                      <div key={comp.name} className="flex items-center justify-between text-sm py-1 border-b border-border/50 last:border-0">
+                        <span className="text-muted-foreground capitalize">{comp.name}</span>
+                        <span className="font-mono font-bold">{formatRupees(comp.value)}</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
-                <div className="flex-1 w-full space-y-3">
-                  <h4 className="font-semibold text-sm mb-2">Salary Breakdown</h4>
-                  {salaryComponents.map((comp, i) => (
-                    <div key={comp.name} className="flex items-center justify-between text-sm">
-                      <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
-                        <span className="text-muted-foreground capitalize">{comp.name}</span>
-                      </div>
-                      <span className="font-mono font-medium">{formatRupees(comp.value)}</span>
+
+                {/* Salary Trend Chart */}
+                {historyChartData.length > 1 && (
+                  <div className="space-y-4">
+                    <div className="h-36 w-full border border-border rounded-lg p-3 bg-muted/10">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={historyChartData}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+                          <XAxis 
+                            dataKey="date" 
+                            axisLine={false} 
+                            tickLine={false} 
+                            tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+                            dy={10}
+                          />
+                          <YAxis 
+                            hide 
+                            domain={['auto', 'auto']}
+                          />
+                          <Tooltip 
+                            content={({ active, payload }) => {
+                              if (active && payload && payload.length) {
+                                return (
+                                  <div className="bg-card border border-border p-2 rounded shadow-sm">
+                                    <p className="text-[10px] text-muted-foreground uppercase font-bold">{payload[0].payload.fullDate}</p>
+                                    <p className="text-sm font-bold">{formatRupees(payload[0].value as number)}</p>
+                                  </div>
+                                );
+                              }
+                              return null;
+                            }}
+                          />
+                          <Line 
+                            type="monotone" 
+                            dataKey="salary" 
+                            stroke="hsl(var(--primary))" 
+                            strokeWidth={2.5} 
+                            dot={{ r: 4, fill: 'hsl(var(--primary))', strokeWidth: 2, stroke: 'hsl(var(--card))' }}
+                            activeDot={{ r: 6, strokeWidth: 0 }}
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
                     </div>
-                  ))}
-                </div>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
 
           {/* Quick Stats / Side Column */}
-          <div className="space-y-6">
+          <div className="space-y-4">
             {/* Net Pay Highlight */}
             <Card className="bg-primary text-primary-foreground border-none shadow-xl">
               <CardHeader className="pb-2">
                 <CardDescription className="text-primary-foreground/80">Monthly Take Home</CardDescription>
-                <CardTitle className="text-3xl font-bold tracking-tight">
+                <CardTitle className="text-2xl font-bold tracking-tight">
                   {formatRupees(netMonthly)}
                 </CardTitle>
               </CardHeader>
@@ -806,7 +837,7 @@ export default function SalaryStructureManagement() {
           </div>
         </div>
       ) : (
-        <div className="flex flex-col items-center justify-center p-12 border-2 border-dashed rounded-xl bg-muted/20">
+        <div className="flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-xl bg-muted/20">
           <div className="bg-primary/10 p-6 rounded-full mb-4">
             <DollarSign className="w-8 h-8 text-primary" />
           </div>

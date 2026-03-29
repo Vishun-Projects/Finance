@@ -247,32 +247,23 @@ export default function SimpleDashboard({
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 p-4 md:p-8 space-y-8 max-w-7xl mx-auto w-full">
+      <main className="flex-1 p-3 md:p-6 space-y-6 max-w-7xl mx-auto w-full">
 
         {/* Hero Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          <div className="lg:col-span-8 flex flex-col justify-center">
-            <h1 className="text-4xl md:text-5xl font-display font-medium text-foreground tracking-tight mb-2">
-              Financial Health
-            </h1>
-            <p className="text-muted-foreground text-sm md:text-base font-light max-w-2xl">
-              Your net worth is tracking <span className={dashboardData.savingsRate >= 0 ? "text-emerald-500 font-medium" : "text-rose-500 font-medium"}>{dashboardData.savingsRate >= 0 ? 'upwards' : 'downwards'}</span> this month.
-              Keep pushing towards your goals.
-            </p>
-          </div>
-          <div className="lg:col-span-4">
-            <DailyQuoteCard />
-          </div>
+        <div className="flex flex-col justify-center py-2">
+          <h1 className="text-2xl md:text-3xl font-display font-bold text-foreground tracking-tight">
+            Hello, {user?.name?.split(' ')[0] || 'User'}
+          </h1>
         </div>
 
         {/* Net Worth & Key Stats */}
-        <section className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
+        <section className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
           {/* Total Net Worth */}
-          <div className="col-span-2 rounded-2xl p-4 md:p-6 glass-card border-l-4 border-l-primary/50 hover:bg-primary/5 transition-all shadow-sm group relative overflow-hidden">
+          <div className="col-span-2 rounded-xl p-3 md:p-4 glass-card border-l-4 border-l-primary/50 hover:bg-primary/5 transition-all shadow-sm group relative overflow-hidden">
             <div className="relative z-10">
               <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2 group-hover:text-primary transition-colors">Net Worth</p>
               <div className="flex items-center justify-between">
-                <h3 className="text-xl md:text-3xl font-black text-foreground font-display tracking-tight">{formatRupees(netWorth)}</h3>
+                <h3 className="text-lg md:text-2xl font-black text-foreground font-display tracking-tight">{formatRupees(netWorth)}</h3>
               </div>
               <div className="mt-2 flex items-center gap-2">
                 <div className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 ${dashboardData.savingsRate >= 0 ? 'bg-emerald-500/10 text-emerald-600' : 'bg-rose-500/10 text-rose-600'}`}>
@@ -285,22 +276,22 @@ export default function SimpleDashboard({
           </div>
 
           {/* Monthly Income */}
-          <div className="rounded-2xl p-4 md:p-6 glass-card border-l-4 border-l-emerald-500 hover:bg-emerald-500/5 transition-all shadow-sm group">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2 group-hover:text-emerald-500 transition-colors">Income</p>
-            <h3 className="text-xl md:text-2xl font-black text-emerald-500 font-display tracking-tight">{formatRupees(filteredIncome)}</h3>
+          <div className="rounded-xl p-3 md:p-4 glass-card border-l-4 border-l-emerald-500 hover:bg-emerald-500/5 transition-all shadow-sm group">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1 group-hover:text-emerald-500 transition-colors">Income</p>
+            <h3 className="text-lg md:text-xl font-black text-emerald-500 font-display tracking-tight">{formatRupees(filteredIncome)}</h3>
             <p className="text-[10px] font-medium text-muted-foreground mt-2">In Range</p>
           </div>
 
           {/* Monthly Expenses */}
-          <div className="rounded-2xl p-4 md:p-6 glass-card border-l-4 border-l-rose-500 hover:bg-rose-500/5 transition-all shadow-sm group">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2 group-hover:text-rose-500 transition-colors">Expenses</p>
-            <h3 className="text-xl md:text-2xl font-black text-foreground font-display tracking-tight">{formatRupees(filteredExpenses)}</h3>
+          <div className="rounded-xl p-3 md:p-4 glass-card border-l-4 border-l-rose-500 hover:bg-rose-500/5 transition-all shadow-sm group">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1 group-hover:text-rose-500 transition-colors">Expenses</p>
+            <h3 className="text-lg md:text-xl font-black text-foreground font-display tracking-tight">{formatRupees(filteredExpenses)}</h3>
             <p className="text-[10px] font-medium text-muted-foreground mt-2">In Range</p>
           </div>
         </section>
 
         {/* Quick Access Grid - Horizontal Scroll on Mobile */}
-        <section className="flex overflow-x-auto snap-x gap-3 pb-4 md:grid md:grid-cols-3 lg:grid-cols-6 md:gap-4 md:pb-0 -mx-4 px-4 md:mx-0 md:px-0 hide-scrollbar">
+        <section className="flex overflow-x-auto snap-x gap-2 pb-2 md:grid md:grid-cols-3 lg:grid-cols-6 md:gap-3 md:pb-0 -mx-4 px-4 md:mx-0 md:px-0 hide-scrollbar">
           {[
             {
               label: 'Salary',
@@ -352,12 +343,12 @@ export default function SimpleDashboard({
             },
           ].map((item, i) => (
             <Link href={item.href} key={i} className="group min-w-[160px] md:min-w-0 snap-center">
-              <div className="h-full bg-card/30 border border-border/40 rounded-xl p-4 hover:bg-card/60 hover:border-primary/20 transition-all duration-300 flex flex-col justify-between backdrop-blur-sm">
+              <div className="h-full bg-card/30 border border-border/40 rounded-lg p-3 hover:bg-card/60 hover:border-primary/20 transition-all duration-300 flex flex-col justify-between backdrop-blur-sm">
                 <div className="flex justify-between items-start mb-2">
                   <item.icon className={`w-4 h-4 ${item.color} opacity-70 group-hover:opacity-100 transition-opacity`} />
                 </div>
                 <div>
-                  <p className="text-lg font-display font-medium text-foreground tabular-nums leading-tight">{item.value}</p>
+                  <p className="text-base font-display font-medium text-foreground tabular-nums leading-tight">{item.value}</p>
                   <p className="text-[10px] uppercase tracking-wider text-muted-foreground mt-1 group-hover:text-foreground/70 transition-colors">{item.label}</p>
                 </div>
               </div>
@@ -367,9 +358,9 @@ export default function SimpleDashboard({
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-8">
           {/* Chart */}
-          <div className="lg:col-span-8 bg-card/30 border border-border/40 rounded-2xl p-6 backdrop-blur-md">
+          <div className="lg:col-span-8 bg-card/30 border border-border/40 rounded-xl p-4 backdrop-blur-md">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Cashflow Trend</h3>
+              <h3 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Cashflow Trend</h3>
               <div className="flex gap-4">
                 <div className="flex items-center gap-2 text-[10px] uppercase font-bold text-muted-foreground/80">
                   <span className="w-2 h-2 rounded-full bg-foreground/80" /> Credit
@@ -380,7 +371,7 @@ export default function SimpleDashboard({
               </div>
             </div>
 
-            <div className="h-[300px] w-full">
+            <div className="h-[240px] w-full">
               {chartData.length === 0 ? (
                 <div className="h-full w-full flex items-center justify-center text-muted-foreground text-xs uppercase tracking-widest">
                   No Data Available
@@ -436,23 +427,23 @@ export default function SimpleDashboard({
           <div className="lg:col-span-4 flex flex-col gap-4">
             <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">This Month</h3>
 
-            <div className="bg-card/30 border border-border/40 rounded-2xl p-0 backdrop-blur-md overflow-hidden grid grid-cols-1 sm:grid-cols-3 md:flex md:flex-col">
+            <div className="bg-card/30 border border-border/40 rounded-xl p-0 backdrop-blur-md overflow-hidden grid grid-cols-1 sm:grid-cols-3 md:flex md:flex-col">
               <div className="p-3 md:p-5 flex items-center justify-between border-b sm:border-b-0 sm:border-r md:border-r-0 md:border-b border-border/40 hover:bg-muted/10 transition-colors">
                 <div>
                   <p className="text-[8px] md:text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Income</p>
-                  <p className="text-sm md:text-lg font-display font-medium truncate">{formatRupees(monthlyIncome)}</p>
+                  <p className="text-base font-display font-medium truncate">{formatRupees(monthlyIncome)}</p>
                 </div>
               </div>
               <div className="p-3 md:p-5 flex items-center justify-between border-b sm:border-b-0 sm:border-r md:border-r-0 md:border-b border-border/40 hover:bg-muted/10 transition-colors">
                 <div>
                   <p className="text-[8px] md:text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Spends</p>
-                  <p className="text-sm md:text-lg font-display font-medium truncate">{formatRupees(monthlyExpenses)}</p>
+                  <p className="text-base font-display font-medium truncate">{formatRupees(monthlyExpenses)}</p>
                 </div>
               </div>
               <div className="p-3 md:p-5 flex items-center justify-between bg-foreground/5 md:bg-foreground/5">
                 <div>
                   <p className="text-[8px] md:text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Net Flow</p>
-                  <p className={`text-sm md:text-xl font-display font-medium truncate ${netFlow >= 0 ? 'text-foreground' : 'text-rose-500'}`}>
+                  <p className={`text-base md:text-lg font-display font-medium truncate ${netFlow >= 0 ? 'text-foreground' : 'text-rose-500'}`}>
                     {netFlow > 0 ? '+' : ''}{formatRupees(netFlow)}
                   </p>
                 </div>
@@ -470,15 +461,15 @@ export default function SimpleDashboard({
             </Link>
           </div>
 
-          <div className="glass-card border-none shadow-none md:shadow-sm md:border md:border-border/40 md:rounded-2xl md:backdrop-blur-md overflow-hidden bg-transparent md:bg-card/30">
+          <div className="glass-card border-none shadow-none md:shadow-sm md:border md:border-border/40 md:rounded-xl md:backdrop-blur-md overflow-hidden bg-transparent md:bg-card/30">
             {dashboardData.recentTransactions.length > 0 ? (
               <div className="divide-y divide-border/50">
                 {dashboardData.recentTransactions.slice(0, 5).map((tx) => {
                   const isIncome = tx.type === 'income' || tx.type === 'credit';
                   const displayName = tx.store || tx.personName || tx.title;
                   return (
-                    <div key={tx.id} className="p-4 active:bg-muted/30 transition-colors flex items-start gap-3 group hover:bg-muted/10">
-                      <div className="size-10 rounded-xl bg-muted/50 border border-border/50 flex items-center justify-center shrink-0 group-hover:border-foreground/20 transition-colors">
+                    <div key={tx.id} className="p-3 active:bg-muted/30 transition-colors flex items-start gap-2 group hover:bg-muted/10">
+                      <div className="size-8 rounded-lg bg-muted/50 border border-border/50 flex items-center justify-center shrink-0 group-hover:border-foreground/20 transition-colors">
                         <ShoppingBag className="w-5 h-5 opacity-70" />
                       </div>
                       <div className="flex-1 min-w-0">

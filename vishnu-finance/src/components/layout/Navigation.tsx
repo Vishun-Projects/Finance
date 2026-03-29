@@ -140,7 +140,7 @@ export default function Navigation() {
         </div>
       </aside>
 
-      <nav className="safe-area-bottom fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-card/95 backdrop-blur lg:hidden">
+      <nav className="safe-area-bottom fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-card lg:hidden">
         <div className="mx-auto flex h-16 w-full max-w-screen-sm items-center justify-around gap-1 px-2 pb-[env(safe-area-inset-bottom)] sm:px-4">
           {mobilePrimaryNavItems.map((item) => {
             const Icon = item.icon;
@@ -158,7 +158,7 @@ export default function Navigation() {
                       <span className="text-[10px] font-medium">{item.label}</span>
                     </button>
                   </SheetTrigger>
-                  <SheetContent side="bottom" className="h-[80vh] rounded-t-xl bg-card/95 backdrop-blur-xl border-t border-border p-0">
+                  <SheetContent side="bottom" className="h-[80vh] rounded-t-xl bg-card border-t border-border p-0">
                     {/* Reusing the Drawer Content Logic but adapting for bottom sheet style */}
                     <SheetHeader className="p-6 text-left border-b border-border">
                       <SheetTitle className="text-lg font-bold flex items-center gap-3">
@@ -252,7 +252,7 @@ export default function Navigation() {
 
       {/* Mobile Top Bar (Clean) */}
       <div className={cn(
-        "fixed top-0 left-0 right-0 z-40 border-b border-border bg-background/80 backdrop-blur-md lg:hidden px-4 h-14 flex items-center justify-between transition-all duration-300",
+        "fixed top-0 left-0 right-0 z-40 border-b border-border bg-background lg:hidden px-4 h-14 flex items-center justify-between transition-all duration-300",
         pathname === '/dashboard' ? "opacity-0 invisible pointer-events-none h-0" : "opacity-100 visible h-14"
       )}>
         <div className="flex items-center gap-2">

@@ -226,37 +226,34 @@ export default function AdvisorPageClient() {
       {/* CENTER - CHAT */}
       <section className="flex-1 flex flex-col min-w-0 bg-background relative">
         {/* Header - Optimized for Mobile/Desktop */}
-        <header className="flex h-16 border-b border-border/40 items-center justify-between px-4 md:px-6 bg-background/60 backdrop-blur-xl sticky top-0 z-10">
-          <div className="flex items-center gap-3">
-            <div className="md:hidden">
-              {/* Mobile specific icon or brand if needed */}
-            </div>
+        <header className="flex h-14 border-b border-border items-center justify-between px-4 md:px-6 bg-card sticky top-0 z-10 font-sans shadow-sm">
+          <div className="flex items-center gap-2">
             <div>
-              <h1 className="text-[10px] md:text-sm font-black uppercase tracking-widest text-foreground font-display">AI Wealth Advisor</h1>
-              <div className="flex items-center gap-2 mt-0.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
-                <span className="text-[8px] md:text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Neural Engine Active</span>
+              <h1 className="text-[10px] md:text-xs font-black uppercase tracking-widest text-foreground font-display">Advisor</h1>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-primary opacity-80"></span>
+                <span className="text-[8px] md:text-[9px] text-muted-foreground font-bold uppercase tracking-wider">Active</span>
               </div>
             </div>
           </div>
           <div className="flex items-center gap-1 md:gap-2">
             <Sheet open={historyOpen} onOpenChange={setHistoryOpen}>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground gap-2 hover:bg-muted/50 rounded-xl px-2 md:px-3 h-9">
-                  <History className="h-4 w-4" />
-                  <span className="hidden sm:inline text-[10px] font-black uppercase tracking-widest">History</span>
+                <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground gap-2 hover:bg-muted/50 rounded-lg px-2 md:px-3 h-8">
+                  <History className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline text-[9px] font-black uppercase tracking-widest">History</span>
                 </Button>
               </SheetTrigger>
-              <SheetContent side="left" className="w-[300px] sm:w-[400px] bg-background/80 backdrop-blur-xl border-r border-border/40 p-0">
-                <SheetHeader className="p-4 border-b border-border/40">
-                  <SheetTitle className="text-sm font-black uppercase tracking-widest">Thought Archives</SheetTitle>
+              <SheetContent side="left" className="w-[300px] sm:w-[400px] bg-card border-r border-border p-0 shadow-xl">
+                <SheetHeader className="p-4 border-b border-border">
+                  <SheetTitle className="text-sm font-black uppercase tracking-widest">Archives</SheetTitle>
                 </SheetHeader>
                 <div className="p-4">
                   <Button
                     onClick={startNewConversation}
-                    className="w-full mb-4 bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl font-bold uppercase tracking-widest text-[10px]"
+                    className="w-full mb-4 bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg font-bold uppercase tracking-widest text-[9px] h-9"
                   >
-                    <Plus className="h-4 w-4 mr-2" /> New Interaction
+                    <Plus className="h-3.5 w-3.5 mr-2" /> New Interaction
                   </Button>
                   <div className="space-y-2 overflow-y-auto max-h-[calc(100vh-180px)] custom-scrollbar">
                     {conversations.length === 0 ? (
@@ -301,20 +298,20 @@ export default function AdvisorPageClient() {
               <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mt-4">Syncing with Archives...</p>
             </div>
           ) : messages.length === 0 ? (
-            <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-8 animate-in fade-in duration-1000 slide-in-from-bottom-4">
-              <div className="w-20 h-20 rounded-3xl glass-card flex items-center justify-center shadow-2xl shadow-primary/10 border-primary/20 group hover:scale-110 transition-transform duration-500">
-                <Bolt className="h-10 w-10 text-primary animate-pulse" />
+            <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-6">
+              <div className="w-16 h-16 rounded-2xl border border-border bg-card flex items-center justify-center shadow-lg group">
+                <Bolt className="h-8 w-8 text-primary" />
               </div>
-              <div className="max-w-md space-y-3">
-                <h2 className="text-3xl md:text-4xl font-black text-foreground font-display tracking-tight">How can I <br /><span className="text-primary italic">OPTIMIZE</span> your future?</h2>
-                <p className="text-xs md:text-sm text-muted-foreground font-medium max-w-xs mx-auto opacity-70">Wealth is engineered, not found. Let's analyze your trajectory.</p>
+              <div className="max-w-md space-y-2">
+                <h2 className="text-2xl md:text-3xl font-black text-foreground font-display tracking-tight uppercase">Advisor</h2>
+                <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest opacity-70">Analyze your wealth trajectory.</p>
               </div>
-              <div className="flex flex-wrap justify-center gap-3 max-w-xl">
-                {["Analyze Q1 Spending", "Project Net Worth", "Tax Harvest Opportunities", "Wealth Trajectory"].map((qs) => (
+              <div className="flex flex-wrap justify-center gap-2 max-w-xl">
+                {["Analyze Spending", "Project Net Worth", "Wealth Trajectory"].map((qs) => (
                   <button
                     key={qs}
                     onClick={() => { setInputMessage(qs); inputRef.current?.focus(); }}
-                    className="text-[10px] font-black uppercase tracking-widest px-6 py-3 rounded-xl glass-card text-muted-foreground hover:text-primary hover:border-primary/30 hover:scale-105 active:scale-95 transition-all shadow-sm"
+                    className="text-[9px] font-black uppercase tracking-widest px-4 py-2.5 rounded-lg border border-border bg-card text-muted-foreground hover:text-foreground hover:border-foreground/20 transition-all"
                   >
                     {qs}
                   </button>
@@ -328,9 +325,9 @@ export default function AdvisorPageClient() {
                 className={`flex w-full animate-in fade-in duration-500 ${message.role === 'USER' ? 'justify-end' : 'justify-start'}`}
               >
                 <div className={`space-y-4 max-w-[90%] md:max-w-xl ${message.role === 'USER' ? 'text-right' : ''}`}>
-                  <div className={`text-sm md:text-[15px] leading-relaxed relative break-words overflow-hidden ${message.role === 'USER'
-                    ? 'bg-primary text-primary-foreground px-6 py-4 rounded-3xl rounded-tr-none inline-block text-left shadow-xl shadow-primary/10 tracking-tight font-medium'
-                    : 'glass-card border-l-4 border-l-primary/40 p-5 md:p-6 rounded-3xl shadow-xl shadow-primary/5 text-foreground/90 font-medium'
+                  <div className={`text-sm leading-relaxed relative break-words overflow-hidden ${message.role === 'USER'
+                    ? 'bg-primary text-primary-foreground px-4 py-3 rounded-2xl rounded-tr-none inline-block text-left shadow-md tracking-tight font-medium'
+                    : 'border border-border bg-card border-l-4 border-l-primary p-4 rounded-2xl shadow-sm text-foreground/90 font-medium'
                     }`}>
                     {message.role === 'ASSISTANT' ? (
                       <MarkdownRenderer content={message.content} />
@@ -340,7 +337,7 @@ export default function AdvisorPageClient() {
                   </div>
 
                   {message.chartConfig && (
-                    <div className="mt-6 w-full h-[300px] glass-card rounded-3xl p-6 border-none shadow-2xl">
+                    <div className="mt-4 w-full h-[280px] border border-border bg-card rounded-2xl p-4 shadow-sm">
                       <ChartMessage config={message.chartConfig} />
                     </div>
                   )}
@@ -367,9 +364,9 @@ export default function AdvisorPageClient() {
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
               onKeyDown={handleKeyPress}
-              placeholder="Ask for financial intelligence..."
+              placeholder="Ask for intelligence..."
               disabled={loading}
-              className="w-full bg-card/40 border-border/40 hover:border-primary/20 rounded-3xl py-7 pl-7 pr-24 focus-visible:ring-1 focus-visible:ring-primary/20 text-sm md:text-base text-foreground placeholder:text-muted-foreground/50 shadow-2xl backdrop-blur-xl transition-all h-auto"
+              className="w-full bg-card border-border hover:border-primary/20 rounded-2xl py-5 pl-5 pr-20 text-sm text-foreground placeholder:text-muted-foreground/50 shadow-sm transition-all h-auto"
             />
             <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
               <Button

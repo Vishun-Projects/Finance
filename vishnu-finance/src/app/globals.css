@@ -154,10 +154,19 @@
 }
 
 /* Custom Dashboard Styles */
-.glass-card {
-  background: hsl(var(--card) / 0.4);
-  backdrop-filter: blur(16px);
-  border: 1px solid hsl(var(--border) / 0.2);
+/* Premium solid cards for clarity */
+.card-base {
+  background-color: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  box-shadow: var(--shadow-sm);
+}
+
+.card-compact {
+  padding: 0.75rem !important;
+}
+
+.gap-compact {
+  gap: 0.75rem !important;
 }
 
 .custom-scrollbar::-webkit-scrollbar {

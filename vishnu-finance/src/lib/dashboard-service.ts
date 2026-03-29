@@ -147,7 +147,13 @@ export class DashboardService {
             // 5. Salary
             (async () => {
                 try {
-                    const salary = await (prisma as any).salaryStructure.findFirst({ where: { userId, isActive: true } });
+                    const salary = await (prisma as any).salaryStructure.findFirst({
+                        where: { userId, isActive: true },
+                        orderBy: [
+                            { effectiveDate: 'desc' },
+                            { createdAt: 'desc' }
+                        ]
+                    });
                     if (!salary) return null;
                     const allowances = typeof salary.allowances === 'string' ? JSON.parse(salary.allowances || '{}') : (salary.allowances || {});
                     const deductions = typeof salary.deductions === 'string' ? JSON.parse(salary.deductions || '{}') : (salary.deductions || {});

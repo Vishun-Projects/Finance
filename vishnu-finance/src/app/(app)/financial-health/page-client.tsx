@@ -126,46 +126,46 @@ export default function FinancialHealthPageClient({
   return (
     <div className="flex flex-col h-full bg-background text-foreground overflow-y-auto custom-scrollbar">
       {/* Header */}
-      <header className="h-20 px-6 md:px-10 flex items-center justify-between border-b border-border/10 shrink-0 bg-background/60 backdrop-blur-2xl sticky top-0 z-50">
+      <header className="h-16 px-4 md:px-6 flex items-center justify-between border-b border-border bg-card sticky top-0 z-50">
         <div>
-          <h1 className="text-2xl md:text-3xl font-black uppercase tracking-tight text-foreground font-display">
-            Financial Health <span className="text-primary">Audit</span>
+          <h1 className="text-xl md:text-2xl font-black uppercase tracking-tight text-foreground font-display">
+            Financial Health Audit
           </h1>
-          <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">System Version 4.0.2</p>
+          <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Insight v4.0</p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           <button
             onClick={() => setTheme(isDark ? 'light' : 'dark')}
-            className="p-3 glass-card rounded-2xl text-muted-foreground hover:text-foreground transition-all hover:scale-105 active:scale-95"
+            className="p-2 border border-border bg-muted/50 rounded-xl text-muted-foreground hover:text-foreground transition-all"
           >
-            {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+            {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           </button>
-          <button className="hidden sm:flex items-center gap-2 bg-primary text-primary-foreground px-6 py-2.5 rounded-2xl font-black text-[10px] transition-all hover:scale-105 active:scale-95 uppercase tracking-widest shadow-xl shadow-primary/20">
-            <Sparkles className="w-4 h-4" />
-            <span>Regenerate AI Audit</span>
+          <button className="hidden sm:flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-xl font-bold text-[10px] transition-all hover:bg-primary/90 uppercase tracking-widest shadow-sm">
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>Regenerate Audit</span>
           </button>
         </div>
       </header>
 
       {/* Main Container */}
-      <div className="p-6 md:p-10 space-y-10 max-w-7xl mx-auto w-full pb-32">
+      <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto w-full pb-20">
 
         {/* Top Section: Vitality & Trajectory */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
 
           {/* Vitality Gauge */}
-          <div className="lg:col-span-5 glass-card p-10 rounded-[3rem] flex flex-col items-center justify-center text-center relative overflow-hidden group">
-            <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity">
-              <Heart className="w-32 h-32 text-primary" />
+          <div className="lg:col-span-5 border border-border bg-card p-6 rounded-3xl flex flex-col items-center justify-center text-center relative overflow-hidden group">
+            <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:opacity-20 transition-opacity">
+              <Heart className="w-24 h-24 text-primary" />
             </div>
 
-            <span className="text-[11px] font-black uppercase tracking-[0.4em] text-muted-foreground mb-10 z-10">Overall Vitality Score</span>
+            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground mb-6 z-10">Overall Vitality Score</span>
 
             <div className="relative z-10">
               <HealthGauge score={healthScore} />
             </div>
 
-            <div className="mt-12 grid grid-cols-2 w-full gap-8 border-t border-border/10 pt-10 z-10">
+            <div className="mt-8 grid grid-cols-2 w-full gap-4 border-t border-border/10 pt-6 z-10">
               <div className="text-left">
                 <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest mb-2 opacity-60">Global Stat</p>
                 <div className="flex items-baseline gap-1">
@@ -174,13 +174,13 @@ export default function FinancialHealthPageClient({
               </div>
               <div className="text-left border-l border-border/10 pl-8">
                 <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest mb-2 opacity-60">Peer Average</p>
-                <span className="text-2xl font-black font-display text-muted-foreground/60">{PEER_AVG_SCORE}</span>
+                <span className="text-xl font-black font-display text-muted-foreground/60">{PEER_AVG_SCORE}</span>
               </div>
             </div>
           </div>
 
           {/* Trajectory Area Chart */}
-          <div className="lg:col-span-7 glass-card p-10 rounded-[3rem] flex flex-col relative overflow-hidden">
+          <div className="lg:col-span-7 border border-border bg-card p-6 rounded-3xl flex flex-col relative overflow-hidden">
             <div className="flex items-center justify-between mb-10">
               <div>
                 <h3 className="text-[11px] font-black text-muted-foreground uppercase tracking-[0.4em]">Efficiency Trajectory</h3>
@@ -189,10 +189,10 @@ export default function FinancialHealthPageClient({
                 </p>
               </div>
               <Badge className={cn(
-                "px-4 py-2 rounded-xl border-none font-black text-[10px] uppercase tracking-widest",
+                "px-3 py-1.5 rounded-lg border-none font-black text-[9px] uppercase tracking-widest",
                 trendPercentage >= 0 ? "bg-emerald-500/10 text-emerald-500" : "bg-rose-500/10 text-rose-500"
               )}>
-                {trendPercentage >= 0 ? <TrendingUp className="w-4 h-4 mr-2" /> : <TrendingDown className="w-4 h-4 mr-2" />}
+                {trendPercentage >= 0 ? <TrendingUp className="w-3.5 h-3.5 mr-1.5" /> : <TrendingDown className="w-3.5 h-3.5 mr-1.5" />}
                 {trendPercentage >= 0 ? 'Surging' : 'Volatility Detected'}
               </Badge>
             </div>
@@ -247,9 +247,9 @@ export default function FinancialHealthPageClient({
             <span className="h-px flex-1 bg-border/10"></span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {/* Stability Card */}
-            <div className="glass-card p-8 rounded-[2.5rem] group hover:bg-primary/[0.02] transition-all duration-500 border-l-4 border-l-blue-500/40">
+            <div className="border border-border bg-card p-6 rounded-2xl group transition-all duration-500 border-l-4 border-l-blue-500/40">
               <div className="flex justify-between items-start mb-8">
                 <div className="p-4 rounded-2xl bg-blue-500/10 border border-blue-500/10 group-hover:scale-110 transition-transform">
                   <Wallet className="w-6 h-6 text-blue-500" />
@@ -274,7 +274,7 @@ export default function FinancialHealthPageClient({
             </div>
 
             {/* Growth Card */}
-            <div className="glass-card p-8 rounded-[2.5rem] group hover:bg-primary/[0.02] transition-all duration-500 border-l-4 border-l-emerald-500/40">
+            <div className="border border-border bg-card p-6 rounded-2xl group transition-all duration-500 border-l-4 border-l-emerald-500/40">
               <div className="flex justify-between items-start mb-8">
                 <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/10 group-hover:scale-110 transition-transform">
                   <TrendingUp className="w-6 h-6 text-emerald-500" />
@@ -299,7 +299,7 @@ export default function FinancialHealthPageClient({
             </div>
 
             {/* Security/Risk Card */}
-            <div className="glass-card p-8 rounded-[2.5rem] group hover:bg-primary/[0.02] transition-all duration-500 border-l-4 border-l-rose-500/40">
+            <div className="border border-border bg-card p-6 rounded-2xl group transition-all duration-500 border-l-4 border-l-rose-500/40">
               <div className="flex justify-between items-start mb-8">
                 <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/10 group-hover:scale-110 transition-transform">
                   <Shield className="w-6 h-6 text-rose-500" />
@@ -327,8 +327,8 @@ export default function FinancialHealthPageClient({
 
         {/* Strategic Roadmap (Bottom Section) */}
         <div className="relative group">
-          <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-transparent rounded-[3rem] -z-10 blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
-          <div className="glass-card p-10 md:p-14 rounded-[3rem] border-dashed border-primary/30 flex flex-col lg:flex-row items-center justify-between gap-10 overflow-hidden relative">
+          <div className="absolute inset-0 bg-primary/5 rounded-2xl -z-10 blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
+          <div className="border border-border bg-card p-6 md:p-8 rounded-2xl border-dashed border-primary/30 flex flex-col lg:flex-row items-center justify-between gap-6 overflow-hidden relative">
 
             <div className="flex items-start gap-8 z-10 w-full lg:max-w-3xl">
               <div className="w-20 h-20 rounded-[2rem] glass-card flex items-center justify-center shadow-2xl shadow-primary/20 border-primary/20 shrink-0 bg-primary/5">

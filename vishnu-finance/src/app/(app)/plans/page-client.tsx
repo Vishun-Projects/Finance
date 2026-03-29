@@ -86,36 +86,36 @@ export default function PlansPageClient({ bootstrap, userId, defaultTab = "overv
   }, [bootstrap.wishlist.data]);
 
   return (
-    <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-4 md:gap-8 px-4 py-4 md:py-12 sm:px-6 lg:px-8">
+    <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-4 md:gap-6 px-4 py-4 md:py-6 sm:px-6 lg:px-8">
       {/* Mobile Header Removed per user request */}
 
       {/* Main Navigation Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full space-y-6 md:space-y-12">
-        <div className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl -mx-4 px-4 py-4 mb-2 border-b border-border/10">
-          <TabsList className="bg-secondary/50 p-1 gap-1.5 h-12 overflow-x-auto w-full justify-start rounded-2xl border border-border/40 shadow-inner no-scrollbar">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full space-y-4 md:space-y-6">
+        <div className="sticky top-0 z-40 bg-background -mx-4 px-4 py-2 border-b border-border shadow-sm">
+          <TabsList className="bg-muted p-1 gap-1 h-10 overflow-x-auto w-full justify-start rounded-xl border border-border no-scrollbar">
             <TabsTrigger
               value="overview"
-              className="data-[state=active]:bg-foreground data-[state=active]:text-background data-[state=active]:shadow-xl rounded-xl px-5 md:px-8 py-2 md:py-3 bg-transparent text-muted-foreground font-black uppercase tracking-[0.2em] text-[9px] md:text-[10px] hover:text-foreground transition-all duration-300 shrink-0"
+              className="data-[state=active]:bg-foreground data-[state=active]:text-background data-[state=active]:shadow-md rounded-lg px-5 md:px-8 py-2 md:py-3 bg-transparent text-muted-foreground font-black uppercase tracking-[0.2em] text-[9px] md:text-[10px] hover:text-foreground transition-all duration-300 shrink-0"
             >
               Overview
             </TabsTrigger>
             <TabsTrigger
               value="goals"
-              className="data-[state=active]:bg-foreground data-[state=active]:text-background data-[state=active]:shadow-lg rounded-xl px-4 md:px-8 py-2 md:py-3 bg-transparent text-muted-foreground font-black uppercase tracking-[0.2em] text-[9px] md:text-[10px] hover:text-foreground transition-all duration-300 shrink-0"
+              className="data-[state=active]:bg-foreground data-[state=active]:text-background data-[state=active]:shadow-md rounded-lg px-4 md:px-8 py-2 md:py-3 bg-transparent text-muted-foreground font-black uppercase tracking-[0.2em] text-[9px] md:text-[10px] hover:text-foreground transition-all duration-300 shrink-0"
               onClick={() => setActiveTab('goals')}
             >
               Goals
             </TabsTrigger>
             <TabsTrigger
               value="deadlines"
-              className="data-[state=active]:bg-foreground data-[state=active]:text-background data-[state=active]:shadow-lg rounded-xl px-4 md:px-8 py-2 md:py-3 bg-transparent text-muted-foreground font-black uppercase tracking-[0.2em] text-[9px] md:text-[10px] hover:text-foreground transition-all duration-300 shrink-0"
+              className="data-[state=active]:bg-foreground data-[state=active]:text-background data-[state=active]:shadow-md rounded-lg px-4 md:px-8 py-2 md:py-3 bg-transparent text-muted-foreground font-black uppercase tracking-[0.2em] text-[10px] hover:text-foreground transition-all duration-300 shrink-0"
               onClick={() => setActiveTab('deadlines')}
             >
               Deadlines
             </TabsTrigger>
             <TabsTrigger
               value="wishlist"
-              className="data-[state=active]:bg-foreground data-[state=active]:text-background data-[state=active]:shadow-lg rounded-xl px-4 md:px-8 py-2 md:py-3 bg-transparent text-muted-foreground font-black uppercase tracking-[0.2em] text-[9px] md:text-[10px] hover:text-foreground transition-all duration-300 shrink-0"
+              className="data-[state=active]:bg-foreground data-[state=active]:text-background data-[state=active]:shadow-md rounded-lg px-4 md:px-8 py-2 md:py-3 bg-transparent text-muted-foreground font-black uppercase tracking-[0.2em] text-[10px] hover:text-foreground transition-all duration-300 shrink-0"
               onClick={() => setActiveTab('wishlist')}
             >
               Wishlist
@@ -130,7 +130,7 @@ export default function PlansPageClient({ bootstrap, userId, defaultTab = "overv
           <div className="flex flex-col lg:flex-row gap-8">
 
             {/* Left Column: Overview & Goals */}
-            <div className="flex-1 space-y-10">
+            <div className="flex-1 space-y-6">
 
               {/* Overview Cards */}
               <div className="flex flex-col md:flex-row gap-4">
@@ -150,7 +150,7 @@ export default function PlansPageClient({ bootstrap, userId, defaultTab = "overv
 
               {/* Active Goals Section */}
               <div>
-                <div className="flex items-center justify-between mb-8 border-b border-border pb-4">
+                <div className="flex items-center justify-between mb-4 border-b border-border pb-2">
                   <h2 className="text-xs font-black uppercase tracking-[0.3em] text-muted-foreground">Active Goals</h2>
                   <Button
                     variant="ghost"
@@ -163,7 +163,7 @@ export default function PlansPageClient({ bootstrap, userId, defaultTab = "overv
                   </Button>
                 </div>
 
-                <div className="grid grid-cols-1 gap-6">
+                <div className="grid grid-cols-1 gap-4">
                   {goals.map(goal => (
                     <MatteGoalCard
                       key={goal.id}
@@ -187,13 +187,13 @@ export default function PlansPageClient({ bootstrap, userId, defaultTab = "overv
               <div className="sticky top-8 space-y-6">
 
                 {/* Today's Focus Card */}
-                <Card className="glass-card rounded-xl p-6 shadow-xl">
-                  <div className="flex items-center gap-2 mb-8">
+                <Card className="rounded-xl p-4 border border-border bg-card shadow-sm">
+                  <div className="flex items-center gap-2 mb-4">
                     <CalendarDays className="text-foreground h-5 w-5" />
                     <h2 className="text-sm font-black uppercase tracking-[0.2em] text-foreground">Today&apos;s Focus</h2>
                   </div>
 
-                  <div className="space-y-8">
+                  <div className="space-y-4">
                     {/* Upcoming Deadlines */}
                     <div>
                       <div className="flex items-center justify-between mb-4">
@@ -239,7 +239,7 @@ export default function PlansPageClient({ bootstrap, userId, defaultTab = "overv
 
                   <Button
                     variant="outline"
-                    className="w-full mt-8 py-6 rounded-sm border-border text-[10px] font-black uppercase tracking-[0.2em] hover:bg-foreground hover:text-background transition-all"
+                    className="w-full mt-4 py-3 rounded-sm border-border text-[10px] font-black uppercase tracking-[0.2em] hover:bg-foreground hover:text-background transition-all"
                     onClick={() => setActiveTab("deadlines")}
                   >
                     View All Tasks
@@ -287,12 +287,12 @@ export default function PlansPageClient({ bootstrap, userId, defaultTab = "overv
 // --- Sub-Components ---
 
 function OverviewCard({ label, value, subtext, className, variant = 'primary' }: { label: string, value: string, subtext?: string, className?: string, variant?: 'primary' | 'secondary' }) {
-  const borderClass = variant === 'primary' ? 'border-l-primary/50 hover:bg-primary/5' : 'border-l-muted-foreground/30 hover:bg-muted/10';
+  const borderClass = variant === 'primary' ? 'border-l-primary hover:bg-primary/5' : 'border-l-muted-foreground hover:bg-muted/10';
   return (
-    <div className={cn("glass-card rounded-2xl p-6 shadow-sm border-l-4 transition-all group", borderClass, className)}>
+    <div className={cn("rounded-xl p-4 shadow-sm border border-border border-l-4 bg-card transition-all group", borderClass, className)}>
       <p className="text-muted-foreground text-[10px] font-bold uppercase tracking-widest mb-2 font-sans group-hover:text-foreground transition-colors">{label}</p>
       <div className="flex items-baseline gap-2">
-        <p className={cn("text-3xl md:text-4xl font-black tracking-tighter font-display", variant === 'primary' ? "text-primary" : "text-foreground")}>{value}</p>
+        <p className={cn("text-2xl md:text-3xl font-black tracking-tighter font-display", variant === 'primary' ? "text-primary" : "text-foreground")}>{value}</p>
         {subtext && <span className={cn("text-xs font-bold font-sans", variant === 'primary' ? "text-primary/80" : "text-muted-foreground")}>{subtext}</span>}
       </div>
     </div>
@@ -392,10 +392,10 @@ function MatteGoalCard({ goal, onUpdate }: { goal: Goal, onUpdate?: (updatedGoal
   };
 
   return (
-    <div className="group relative overflow-hidden rounded-2xl glass-card transition-all hover:border-foreground/20 border-l-4 border-l-primary/40">
-      <div className="flex flex-col md:flex-row gap-8 p-6 relative z-10">
+    <div className="group relative overflow-hidden rounded-xl border border-border bg-card transition-all hover:border-primary/50 border-l-4 border-l-primary">
+      <div className="flex flex-col md:flex-row gap-4 p-4 relative z-10">
         <div className="flex-1">
-          <div className="flex justify-between items-start mb-6">
+          <div className="flex justify-between items-start mb-4">
             <div>
               <h3 className="text-xl font-black text-foreground mb-1 font-display tracking-tight">{goal.title}</h3>
               <p className="text-muted-foreground text-[10px] font-bold uppercase tracking-widest flex items-center gap-2">
@@ -409,14 +409,14 @@ function MatteGoalCard({ goal, onUpdate }: { goal: Goal, onUpdate?: (updatedGoal
             </Badge>
           </div>
 
-          <div className="mb-6">
+          <div className="mb-4">
             <div className="flex justify-between items-end mb-3">
               <span className="text-3xl font-light tracking-tighter text-foreground font-display">
                 {formatCurrency(goal.currentAmount)} <span className="text-sm font-bold text-muted-foreground/60 tracking-normal font-sans">/ {formatCurrency(goal.targetAmount)}</span>
               </span>
               <span className="text-sm font-black text-foreground">{Math.round(progress)}%</span>
             </div>
-            <div className="h-2 w-full bg-muted/50 rounded-full overflow-hidden backdrop-blur-sm">
+            <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
               <div
                 className="h-full bg-primary rounded-full transition-all duration-1000 ease-out"
                 style={{ width: `${progress}%` }}
@@ -433,7 +433,7 @@ function MatteGoalCard({ goal, onUpdate }: { goal: Goal, onUpdate?: (updatedGoal
                   Add Funds
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-sm glass-card border-border">
+              <DialogContent className="max-w-sm border-border bg-card shadow-lg">
                 <DialogHeader>
                   <DialogTitle className="text-foreground">Add to Savings</DialogTitle>
                   <DialogDescription className="text-muted-foreground">
@@ -492,7 +492,7 @@ function MatteGoalCard({ goal, onUpdate }: { goal: Goal, onUpdate?: (updatedGoal
             {/* History Sheet */}
             <Sheet open={showHistory} onOpenChange={setShowHistory}>
               <SheetTrigger asChild>
-                <Button variant="outline" className="h-9 px-4 rounded-xl border-border bg-card/50 text-foreground hover:bg-muted text-[10px] font-black uppercase tracking-widest">
+                <Button variant="outline" className="h-9 px-4 rounded-xl border-border bg-muted/50 text-foreground hover:bg-muted text-[10px] font-black uppercase tracking-widest">
                   History
                 </Button>
               </SheetTrigger>
@@ -565,7 +565,7 @@ function MatteGoalCard({ goal, onUpdate }: { goal: Goal, onUpdate?: (updatedGoal
 
         {/* Image Section */}
         <div
-          className="md:w-64 h-40 md:h-auto bg-cover bg-center rounded-xl md:rounded-r-xl border border-border/50 relative overflow-hidden shrink-0 group-hover:opacity-100 transition-opacity opacity-80"
+          className="md:w-64 h-40 md:h-auto bg-cover bg-center rounded-lg border border-border/50 relative overflow-hidden shrink-0 group-hover:opacity-100 transition-opacity opacity-80"
           style={{
             backgroundImage: bgImage ? `url(${bgImage})` : undefined,
           }}
@@ -573,7 +573,7 @@ function MatteGoalCard({ goal, onUpdate }: { goal: Goal, onUpdate?: (updatedGoal
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent md:bg-gradient-to-l md:from-transparent md:to-black/10" />
 
           {isGeneratingImage ? (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+            <div className="absolute inset-0 flex items-center justify-center bg-black/60">
               <div className="flex flex-col items-center gap-2">
                 <Sparkles className="h-6 w-6 text-primary animate-pulse" />
                 <span className="text-[10px] font-black text-white uppercase tracking-widest">AI Working...</span>
@@ -594,7 +594,7 @@ function MatteGoalCard({ goal, onUpdate }: { goal: Goal, onUpdate?: (updatedGoal
               </Button>
             </div>
           ) : (
-            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center bg-black/40 backdrop-blur-[2px]">
+            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center bg-black/60">
               <Button
                 variant="ghost"
                 size="sm"

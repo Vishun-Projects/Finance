@@ -296,8 +296,8 @@ export default function DeadlinesPageClient({ initialDeadlines, userId, layoutVa
       <div
         className={cn(
           isEmbedded
-            ? 'space-y-4'
-            : 'container-fluid space-y-6 pb-16 pt-6 md:pt-8 lg:pt-10',
+            ? 'space-y-3'
+            : 'container-fluid space-y-4 pb-12 pt-4 md:pt-6 lg:pt-8',
         )}
       >
         {!isEmbedded ? (
@@ -358,7 +358,7 @@ export default function DeadlinesPageClient({ initialDeadlines, userId, layoutVa
             <Card>
               <CardHeader className="pb-2">
                 <CardDescription>Due this month</CardDescription>
-                <CardTitle className="text-3xl">{stats.upcoming}</CardTitle>
+                <CardTitle className="text-2xl">{stats.upcoming}</CardTitle>
               </CardHeader>
               <CardContent className="pt-0 text-sm text-muted-foreground">
                 Tracking {stats.monthLabel}
@@ -367,7 +367,7 @@ export default function DeadlinesPageClient({ initialDeadlines, userId, layoutVa
             <Card>
               <CardHeader className="pb-2">
                 <CardDescription>Overdue</CardDescription>
-                <CardTitle className="text-3xl text-destructive">{stats.overdue}</CardTitle>
+                <CardTitle className="text-2xl text-destructive">{stats.overdue}</CardTitle>
               </CardHeader>
               <CardContent className="pt-0 text-sm text-muted-foreground">
                 Make a plan to clear these soon
@@ -376,7 +376,7 @@ export default function DeadlinesPageClient({ initialDeadlines, userId, layoutVa
             <Card>
               <CardHeader className="pb-2">
                 <CardDescription>Total scheduled</CardDescription>
-                <CardTitle className="text-3xl">{stats.total}</CardTitle>
+                <CardTitle className="text-2xl">{stats.total}</CardTitle>
               </CardHeader>
               <CardContent className="pt-0 text-sm text-muted-foreground">
                 {stats.total ? 'Organised and under control' : 'Add your first reminder'}
@@ -385,7 +385,7 @@ export default function DeadlinesPageClient({ initialDeadlines, userId, layoutVa
             <Card>
               <CardHeader className="pb-2">
                 <CardDescription>Amount due</CardDescription>
-                <CardTitle className="text-3xl">{formatCurrency(stats.totalAmount)}</CardTitle>
+                <CardTitle className="text-2xl">{formatCurrency(stats.totalAmount)}</CardTitle>
               </CardHeader>
               <CardContent className="pt-0 text-sm text-muted-foreground">
                 Across all pending deadlines
@@ -394,7 +394,7 @@ export default function DeadlinesPageClient({ initialDeadlines, userId, layoutVa
           </div>
         )}
 
-        <div className="mt-8 space-y-4 rounded-2xl border border-border/60 bg-card p-4 shadow-sm sm:p-6">
+        <div className="mt-4 space-y-3 rounded-xl border border-border/60 bg-card p-3 shadow-sm sm:p-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <Tabs value={statusFilter} onValueChange={(value) => setStatusFilter(value as typeof statusFilter)}>
               <TabsList className="flex flex-wrap gap-2">
@@ -448,8 +448,8 @@ export default function DeadlinesPageClient({ initialDeadlines, userId, layoutVa
 
                   return (
                     <Card key={deadline.id} className="matte-card bg-card border border-border shadow-none hover:border-foreground/20 transition-colors">
-                      <CardContent className="flex flex-col gap-4 py-6 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="flex-1 space-y-3">
+                      <CardContent className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex-1 space-y-2">
                           <div className="flex flex-wrap items-center gap-2">
                             <span
                               className={cn(
@@ -474,7 +474,7 @@ export default function DeadlinesPageClient({ initialDeadlines, userId, layoutVa
                             )}
                           </div>
                           <div>
-                            <h3 className="text-xl font-bold text-foreground mb-1">
+                            <h3 className="text-lg font-bold text-foreground mb-1">
                               {deadline.title}
                             </h3>
                             {deadline.description && (

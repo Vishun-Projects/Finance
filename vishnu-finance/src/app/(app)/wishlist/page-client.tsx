@@ -238,11 +238,11 @@ export default function WishlistPageClient({ initialWishlist, userId }: Wishlist
   }, [items, statusFilter, priorityFilter, searchTerm]);
 
   return (
-    <div className="space-y-6 pb-20">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="space-y-4 pb-12 pt-4 md:pt-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between px-4 sm:px-6">
         <div>
-          <h1 className="text-2xl font-black uppercase tracking-widest text-foreground">Wishlist</h1>
-          <p className="text-xs font-semibold uppercase tracking-tight text-muted-foreground opacity-70">Dreams and future purchases.</p>
+          <h1 className="text-xl font-black uppercase tracking-widest text-foreground">Wishlist</h1>
+          <p className="text-[10px] font-semibold uppercase tracking-tight text-muted-foreground opacity-70">Dreams and future purchases.</p>
         </div>
         <div className="flex items-center gap-2">
           <Button
@@ -272,8 +272,8 @@ export default function WishlistPageClient({ initialWishlist, userId }: Wishlist
       />
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="md:col-span-1 space-y-4">
-          <Card className="border-none shadow-xl bg-card/50 backdrop-blur-xl">
+        <div className="md:col-span-1 space-y-3 px-4 sm:px-6">
+          <Card className="border border-border shadow-sm bg-card">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-black uppercase tracking-widest">Filters</CardTitle>
             </CardHeader>
@@ -304,12 +304,12 @@ export default function WishlistPageClient({ initialWishlist, userId }: Wishlist
           </Card>
         </div>
 
-        <div className="md:col-span-3">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="md:col-span-3 px-4 sm:px-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {filteredItems.map((item) => (
               <Card key={item.id} className={cn(
-                "overflow-hidden border-none shadow-lg transition-all hover:shadow-xl",
-                item.isCompleted ? "opacity-60 bg-muted/20" : "bg-card/50 backdrop-blur-xl"
+                "overflow-hidden border border-border shadow-sm transition-all hover:shadow-md",
+                item.isCompleted ? "opacity-60 bg-muted/20" : "bg-card"
               )}>
                 {item.imageUrl && (
                   <div className="aspect-video w-full overflow-hidden relative">

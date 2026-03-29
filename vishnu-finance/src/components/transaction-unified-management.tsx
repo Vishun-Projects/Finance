@@ -2042,7 +2042,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                 <Sparkles size={14} className={cn(isBulkUpdating && "animate-spin")} />
                 {isBulkUpdating ? 'Processing...' : 'Auto-Cat (Smart)'}
               </Button>
-              <div className="flex items-center bg-card/50 border border-border rounded-lg p-1 shadow-sm">
+              <div className="flex items-center bg-muted border border-border rounded-lg p-1 shadow-sm">
                 {(['daily', 'weekly', 'monthly'] as const).map((p) => (
                   <button
                     key={p}
@@ -2059,7 +2059,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
 
               <Popover open={dateRangePickerOpen} onOpenChange={setDateRangePickerOpen}>
                 <PopoverTrigger asChild>
-                  <Button variant="outline" className="gap-2 bg-card/50 border-border font-bold text-[10px] uppercase tracking-widest shadow-sm h-10 px-4">
+                  <Button variant="outline" className="gap-2 bg-muted border-border font-bold text-[10px] uppercase tracking-widest shadow-sm h-10 px-4">
                     <CalendarIcon size={14} />
                     {rangeLabel}
                     <ChevronDown size={12} />
@@ -2092,7 +2092,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-8 bg-background/50">
+          <div className="flex-1 overflow-y-auto custom-scrollbar p-3 md:p-4 space-y-4 bg-background/50">
             {/* Overview Section - Always Visible */}
             <div className="space-y-8 animate-in fade-in slide-in-from-top-4 duration-300">
               <section>
@@ -2101,7 +2101,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                     <Sparkles className="w-4 h-4 text-primary" />
                     <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Financial Overview</h2>
                   </div>
-                  <Badge variant="outline" className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground bg-card/50 px-2 py-0.5 backdrop-blur-sm">{rangeLabel}</Badge>
+                  <Badge variant="outline" className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground bg-muted px-2 py-0.5">{rangeLabel}</Badge>
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-6">
                   {isLoading ? (
@@ -2110,17 +2110,17 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                     ))
                   ) : (
                     <>
-                      <div className="glass-card p-4 md:p-6 rounded-2xl hover:bg-emerald-500/5 transition-all shadow-sm group border-l-4 border-l-emerald-500">
+                      <div className="card-base p-3 md:p-4 hover:bg-emerald-500/5 transition-all group border-l-4 border-l-emerald-500">
                         <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2 md:mb-4 group-hover:text-emerald-500 transition-colors">Total Income</p>
                         <h3 className="text-xl md:text-2xl font-black text-emerald-500 font-display">{formatAmount(income)}</h3>
                         <p className="text-[10px] text-muted-foreground mt-1 font-medium hidden md:block">Total inflow in this range</p>
                       </div>
-                      <div className="glass-card p-4 md:p-6 rounded-2xl hover:bg-rose-500/5 transition-all shadow-sm group border-l-4 border-l-rose-500">
+                      <div className="card-base p-3 md:p-4 hover:bg-rose-500/5 transition-all group border-l-4 border-l-rose-500">
                         <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2 md:mb-4 group-hover:text-rose-500 transition-colors">Total Spends</p>
                         <h3 className="text-xl md:text-2xl font-black text-foreground font-display">{formatAmount(expense)}</h3>
                         <p className="text-[10px] text-muted-foreground mt-1 font-medium hidden md:block">Total outflow in this range</p>
                       </div>
-                      <div className="glass-card p-4 md:p-6 rounded-2xl border-l-4 border-l-primary/50 hover:bg-primary/5 transition-all shadow-sm group col-span-2 md:col-span-1">
+                      <div className="card-base p-3 md:p-4 border-l-4 border-l-primary/50 hover:bg-primary/5 transition-all group col-span-2 md:col-span-1">
                         <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2 md:mb-4 group-hover:text-primary transition-colors">Net Flow</p>
                         <div className="flex items-center justify-between">
                           <h3 className="text-xl md:text-2xl font-black text-foreground font-display">{formatAmount(net)}</h3>
@@ -2138,7 +2138,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                   <Button
                     variant="outline"
                     onClick={() => setIsFilterOpen(true)}
-                    className="h-12 rounded-xl border-border bg-card/50 font-bold text-xs uppercase tracking-widest shadow-sm"
+                    className="h-12 rounded-xl border-border bg-muted font-bold text-xs uppercase tracking-widest shadow-sm"
                   >
                     <Filter className="w-4 h-4 mr-2" />
                     Filters
@@ -2151,7 +2151,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                     }}
                     className={cn(
                       "h-12 rounded-xl font-bold text-xs uppercase tracking-widest shadow-sm transition-all",
-                      showSelectionMode ? "bg-foreground text-background border-foreground" : "border-border bg-card/50"
+                      showSelectionMode ? "bg-foreground text-background border-foreground" : "border-border bg-muted"
                     )}
                   >
                     {showSelectionMode ? (
@@ -2169,7 +2169,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                   <Button
                     onClick={() => { setEditingTransaction(null); setShowForm(true); }}
                     variant="outline"
-                    className="h-10 rounded-xl font-bold text-[10px] uppercase tracking-widest border-border bg-card/50 shadow-sm"
+                    className="h-10 rounded-xl font-bold text-[10px] uppercase tracking-widest border-border bg-muted shadow-sm"
                   >
                     <Plus className="w-3.5 h-3.5 mr-1.5" />
                     Manual Entry
@@ -2184,20 +2184,20 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                 </div>
 
                 <div className="flex gap-4 mt-4 text-[10px] text-muted-foreground font-black uppercase tracking-widest">
-                  <span className="bg-muted/50 px-2 py-1 rounded-md backdrop-blur-sm">{count} records identified</span>
-                  {rangeSummary && <span className="bg-muted/50 px-2 py-1 rounded-md backdrop-blur-sm">{rangeSummary}</span>}
+                  <span className="bg-muted px-2 py-1 rounded-md">{count} records identified</span>
+                  {rangeSummary && <span className="bg-muted px-2 py-1 rounded-md">{rangeSummary}</span>}
                 </div>
               </section>
             </div>
 
             {/* Standardized Transaction Table */}
-            <section className="glass-card rounded-2xl shadow-xl overflow-hidden flex flex-col border-none">
+            <section className="card-base overflow-hidden flex flex-col border-none">
               <div className="overflow-x-auto hidden md:block">
                 <table className="w-full text-left border-collapse min-w-[800px]">
                   <thead>
                     <tr className="bg-muted/5">
                       {showSelectionMode && (
-                        <th className="w-14 px-6 py-6">
+                        <th className="w-12 px-3 py-3">
                           <button
                             onClick={handleSelectAll}
                             className={cn(
@@ -2212,10 +2212,10 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                           </button>
                         </th>
                       )}
-                      <th className="px-6 py-6 text-[10px] font-black text-muted-foreground/50 uppercase tracking-[0.2em]">Timeline</th>
-                      <th className="px-6 py-6 text-[10px] font-black text-muted-foreground/50 uppercase tracking-[0.2em]">Merchant & Description</th>
-                      <th className="px-6 py-6 text-[10px] font-black text-muted-foreground/50 uppercase tracking-[0.2em]">Label</th>
-                      <th className="px-6 py-6 text-[10px] font-black text-muted-foreground/50 uppercase tracking-[0.2em] text-right">Value</th>
+                      <th className="px-3 py-3 text-[10px] font-black text-muted-foreground/50 uppercase tracking-[0.2em]">Timeline</th>
+                      <th className="px-3 py-3 text-[10px] font-black text-muted-foreground/50 uppercase tracking-[0.2em]">Merchant & Description</th>
+                      <th className="px-3 py-3 text-[10px] font-black text-muted-foreground/50 uppercase tracking-[0.2em]">Label</th>
+                      <th className="px-3 py-3 text-[10px] font-black text-muted-foreground/50 uppercase tracking-[0.2em] text-right">Value</th>
                     </tr>
                   </thead>
                   <tbody className="">
@@ -2253,7 +2253,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                         <React.Fragment key={dateKey}>
                           {/* Section Header */}
                           <tr className="bg-surface_container_low/30">
-                            <td colSpan={showSelectionMode ? 5 : 4} className="px-6 py-2">
+                            <td colSpan={showSelectionMode ? 5 : 4} className="px-3 py-1">
                               <div className="flex items-center gap-3">
                                 <div className="h-[1px] flex-1 bg-border/20" />
                                 <span className="text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground/40 whitespace-nowrap">
@@ -2389,11 +2389,11 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
           </div>
         </div>
         {/* Analytics Panel (Right Sidebar) - Permanent */}
-        <aside className="w-80 lg:w-96 flex flex-col bg-background/50 border-l border-border overflow-y-auto custom-scrollbar shrink-0 hidden md:flex backdrop-blur-sm">
-          <div className="p-6">
+        <aside className="w-80 lg:w-96 flex flex-col bg-muted/30 border-l border-border overflow-y-auto custom-scrollbar shrink-0 hidden md:flex">
+          <div className="p-4">
             <div className="flex items-center justify-between mb-8">
               <h2 className="text-xl font-bold tracking-tight font-display">Analytics</h2>
-              <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs font-bold border-border bg-card/50 backdrop-blur-sm" onClick={() => {
+              <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs font-bold border-border bg-muted" onClick={() => {
                 // Basic export logic mockup
                 const csv = transactions.map(t => `${t.transactionDate},${t.description},${t.debitAmount || 0},${t.creditAmount || 0}`).join('\n');
                 const blob = new Blob([csv], { type: 'text/csv' });
@@ -2409,7 +2409,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
             </div>
 
             {/* Expenditure Chart Card */}
-            <div className="glass-card p-6 rounded-2xl mb-8 shadow-sm">
+            <div className="glass-card p-4 rounded-xl mb-6 shadow-sm">
               <div className="flex items-center justify-between mb-4">
                 <p className="text-muted-foreground text-[10px] font-bold uppercase tracking-widest">Expenditure Breakdown</p>
                 <div className="bg-emerald-500/10 text-emerald-500 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center border border-emerald-500/20">
@@ -2506,7 +2506,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                             </div>
                             <p className="text-xs font-bold">{formatAmount(stats.amount)}</p>
                           </div>
-                          <div className="w-full bg-muted/50 h-1.5 rounded-full overflow-hidden backdrop-blur-sm">
+                          <div className="w-full bg-muted h-1.5 rounded-full overflow-hidden">
                             <div className={cn("h-full transition-all duration-1000", i === 0 ? "bg-foreground" : "bg-muted-foreground/60")} style={{ width: `${percent}%` }}></div>
                           </div>
                         </div>
@@ -2756,7 +2756,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                 </Button>
                 <Button
                   variant="default"
-                  className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white border-0"
+                  className="w-full bg-primary hover:bg-primary/90 text-primary-foreground border-0"
                   onClick={handleAutoCategorizeSelected}
                   disabled={isBulkUpdating}
                 >
@@ -3539,7 +3539,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
           ref={selectionToolbarRef}
           className="fixed bottom-24 md:bottom-8 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-8 duration-300 w-[90%] md:w-auto"
         >
-          <div className="bg-foreground text-background shadow-2xl rounded-2xl px-4 py-3 md:px-6 md:py-4 flex items-center justify-between gap-3 md:gap-6 border border-background/20 backdrop-blur-xl w-full md:w-auto">
+          <div className="bg-foreground text-background shadow-2xl rounded-2xl px-4 py-3 md:px-6 md:py-4 flex items-center justify-between gap-3 md:gap-6 border border-border w-full md:w-auto">
             <div className="flex items-center gap-3 pr-3 md:pr-6 border-r border-background/20 shrink-0">
               <div className="size-8 rounded-full bg-background/10 flex items-center justify-center font-bold text-sm shrink-0">
                 {selectedIds.size}

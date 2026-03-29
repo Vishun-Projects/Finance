@@ -85,10 +85,9 @@ const TransactionCard = React.memo(({
   return (
     <motion.div
       className={cn(
-        "glass-card w-full cursor-pointer overflow-hidden rounded-2xl border-none shadow-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 active:scale-[0.98] hover:bg-card/40",
+        "card-base w-full cursor-pointer overflow-hidden rounded-2xl border-none transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
         isCredit ? "border-l-4 border-l-emerald-500" : "border-l-4 border-l-rose-500",
       )}
-      whileHover={reducedMotion ? undefined : { translateY: -2 }}
       onClick={toggleExpanded}
       onKeyDown={handleKeyDown}
       role="button"

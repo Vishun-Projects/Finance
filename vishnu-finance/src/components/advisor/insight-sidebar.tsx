@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { FileText, TrendingUp, TrendingDown, ArrowUpRight } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
 
 interface InsightSidebarProps {
     className?: string;
@@ -76,38 +78,53 @@ export function InsightSidebar({ className, userId }: InsightSidebarProps) {
     }, [userId]);
 
     return (
-        <aside className={`w-72 flex flex-col border-r border-border bg-card/30 p-6 overflow-y-auto custom-scrollbar ${className}`}>
-            <h2 className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground mb-6">Financial Insights</h2>
-
-            <div className="space-y-4 mb-10">
-                <Card className="p-4 bg-card border border-border hover:border-foreground/20 transition-colors cursor-pointer group">
-                    <p className="text-[10px] text-muted-foreground mb-2 font-bold uppercase tracking-wider">Current Month</p>
-                    <div className="flex items-center justify-between mb-1">
-                        <p className="text-sm font-medium text-foreground"> Spending Trend</p>
-                        {stats.monthOverMonth > 0 ? <TrendingUp className="h-4 w-4 text-red-500" /> : <TrendingDown className="h-4 w-4 text-emerald-500" />}
-                    </div>
-                    <p className="text-2xl font-light text-foreground tracking-tight">
-                        {isLoading ? <span className="animate-pulse">...</span> : `₹${stats.monthlySpend.toLocaleString()}`}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-2 line-clamp-1">
-                        <span className={stats.monthOverMonth > 0 ? "text-red-500" : "text-emerald-500"}>
-                            {stats.monthOverMonth > 0 ? "+" : ""}{stats.monthOverMonth}%
-                        </span> vs last month
-                    </p>
-                </Card>
-
-                <Card className="p-4 bg-card border border-border hover:border-foreground/20 transition-colors cursor-pointer">
-                    <p className="text-[10px] text-muted-foreground mb-1 font-bold uppercase tracking-wider">Top Category</p>
-                    <p className="text-sm font-medium text-foreground">{stats.topCategory}</p>
-                    <p className="text-xs text-muted-foreground mt-1">Highest discretionary spend</p>
-                </Card>
+        <aside className={cn("w-72 flex flex-col border-r border-border bg-card p-6 overflow-y-auto custom-scrollbar", className)}>
+            <div className="mb-8 px-2">
+                <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-theme-secondary">Intelligence Audit</h2>
+                <p className="text-[8px] font-bold text-muted-foreground uppercase tracking-widest mt-1 opacity-50">Real-time Data Synthesis</p>
             </div>
 
-            <h2 className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground mb-6">Monthly Audits</h2>
-            <div className="space-y-3">
-                {/* Placeholder for dynamic reports - in real app would fetch from /api/reports */}
-                <div className="text-xs text-muted-foreground italic px-2">
-                    No generated reports yet.
+            <div className="space-y-4 mb-10">
+                <div className="card-base p-4 border-l-4 border-l-primary/30 hover:border-l-primary transition-all cursor-pointer group">
+                    <p className="text-[9px] text-muted-foreground mb-2 font-black uppercase tracking-widest">Monthly Throughput</p>
+                    <div className="flex items-center justify-between mb-1">
+                        <p className="text-xs font-black uppercase tracking-tight text-foreground">Operational Spend</p>
+                        {stats.monthOverMonth > 0 ? <TrendingUp className="h-3.5 w-3.5 text-rose-500" /> : <TrendingDown className="h-3.5 w-3.5 text-emerald-500" />}
+                    </div>
+                    <p className="text-2xl font-black text-foreground tracking-tighter tabular-nums mt-2">
+                        {isLoading ? <span className="animate-pulse opacity-20">---</span> : `₹${stats.monthlySpend.toLocaleString()}`}
+                    </p>
+                    <div className="flex items-center gap-2 mt-3">
+                        <Badge variant="outline" className={cn(
+                            "text-[8px] font-black uppercase tracking-widest h-5 px-1.5",
+                            stats.monthOverMonth > 0 ? "bg-rose-500/5 text-rose-500 border-rose-500/20" : "bg-emerald-500/5 text-emerald-500 border-emerald-500/20"
+                        )}>
+                            {stats.monthOverMonth > 0 ? "+" : ""}{stats.monthOverMonth}%
+                        </Badge>
+                        <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-widest opacity-40">vs Prev Cycle</span>
+                    </div>
+                </div>
+
+                <div className="card-base p-4 border-l-4 border-l-border hover:border-l-primary/50 transition-all cursor-pointer">
+                    <p className="text-[9px] text-muted-foreground mb-1 font-black uppercase tracking-widest">Peak Allocation</p>
+                    <p className="text-xs font-black uppercase tracking-tight text-foreground">{stats.topCategory}</p>
+                    <div className="mt-2 h-1 w-full bg-muted rounded-full overflow-hidden">
+                        <div className="h-full bg-primary/30 w-2/3" />
+                    </div>
+                </div>
+            </div>
+
+            <div className="mt-auto pt-6 border-t border-border/50 px-2 leading-relaxed">
+                <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground mb-4">System Status</h2>
+                <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Models Synthesized</span>
+                    </div>
+                    <div className="flex items-center gap-2 opacity-40">
+                        <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground" />
+                        <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Neural Bridge Active</span>
+                    </div>
                 </div>
             </div>
         </aside>

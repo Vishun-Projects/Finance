@@ -7,7 +7,7 @@ class SBIStyle(BaseStyle):
     State Bank of India Style.
     """
     
-    def extract_entities(self, text: str) -> Tuple[Optional[str], Optional[str], float, str]:
+    def extract_entities(self, text: str) -> Tuple[Optional[str], Optional[str], float, str, Optional[str]]:
         # 1. SBI Pattern Special Case: TRANSFER-UPI/(?:.*?)/(.*?)/
         cleaned = self.clean_description(text)
         from .categories import get_commodity

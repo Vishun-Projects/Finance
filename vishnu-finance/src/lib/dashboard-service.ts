@@ -42,6 +42,8 @@ export interface SimpleDashboardData {
     totalTransactionsCount: number;
     financialHealthScore: number;
     categoryStats: Record<string, { credits: number; debits: number }>;
+    topPayees: Array<{ name: string; amount: number; count: number }>;
+    dynamicInsights: Array<{ type: 'pattern' | 'warning' | 'positive'; message: string }>;
     salaryInfo: {
         takeHome: number;
         ctc: number;
@@ -99,7 +101,8 @@ export class DashboardService {
             netWorthStats,
             transactionTotalsData,
             categoryBreakdownRaw,
-            currentMonthStatsResult
+            currentMonthStatsResult,
+            topPayeesResult
         ] = await Promise.all([
             // 1. Transaction Stats (FILTERED)
             (async () => {
@@ -232,6 +235,30 @@ export class DashboardService {
                     const expenses = Number(stats._sum.debitAmount || 0);
                     return { income, expenses, netFlow: income - expenses };
                 } catch { return { income: 0, expenses: 0, netFlow: 0 }; }
+            })(),
+            // 12. Top Payees (Processed Info)
+            (async () => {
+                try {
+                    const transactions = await (prisma as any).transaction.findMany({
+                        where: { userId, isDeleted: false, financialCategory: 'EXPENSE', transactionDate: { gte: rangeStart, lte: rangeEnd } },
+                        select: { store: true, personName: true, debitAmount: true }
+                    });
+                    
+                    const payeeMap = new Map<string, { amount: number; count: number }>();
+                    transactions.forEach((t: any) => {
+                        const name = t.store || t.personName || 'Various';
+                        if (name === 'Various' && !t.store && !t.personName) return;
+                        const existing = payeeMap.get(name) || { amount: 0, count: 0 };
+                        existing.amount += Number(t.debitAmount || 0);
+                        existing.count += 1;
+                        payeeMap.set(name, existing);
+                    });
+
+                    return Array.from(payeeMap.entries())
+                        .map(([name, stats]) => ({ name, ...stats }))
+                        .sort((a, b) => b.amount - a.amount)
+                        .slice(0, 5);
+                } catch { return []; }
             })()
         ]);
 
@@ -239,6 +266,46 @@ export class DashboardService {
         const totalExpenses = Number(transactionStats._sum?.debitAmount || 0);
         const netSavings = totalIncome - totalExpenses;
         const totalNetWorth = Number(netWorthStats._sum?.creditAmount || 0) - Number(netWorthStats._sum?.debitAmount || 0);
+
+        // Generate Dynamic Insights
+        const dynamicInsights: Array<{ type: 'pattern' | 'warning' | 'positive'; message: string }> = [];
+        const topPayees = topPayeesResult as any[];
+        
+        // 1. Category-based insights
+        categoryBreakdownRaw.slice(0, 3).forEach((cat: any) => {
+            if (cat.amount > totalExpenses * 0.3 && totalExpenses > 0) {
+                dynamicInsights.push({ 
+                    type: 'warning', 
+                    message: `SYSTEM_ALERT: [${cat.name}] sector consumes ${Math.round((cat.amount/totalExpenses)*100)}% of tactical outflow. Audit recommended.` 
+                });
+            }
+        });
+
+        // 2. Payee-based insights
+        const topPayee = topPayees[0];
+        if (topPayee && topPayee.amount > totalExpenses * 0.15 && totalExpenses > 0) {
+            dynamicInsights.push({
+                type: 'pattern',
+                message: `FLOW_PATTERN: High-frequency capital redirection to [${topPayee.name}] detected (${topPayee.count} events).`
+            });
+        }
+
+        // 3. Health insights
+        if (netSavings > 0) {
+            dynamicInsights.push({
+                type: 'positive',
+                message: `CAPITAL_YEILD: Positive net flow maintained. Reserve runway extended by ${Math.floor(netSavings/ (totalExpenses/30 || 1))} days.`
+            });
+        } else if (totalExpenses > totalIncome && totalIncome > 0) {
+            dynamicInsights.push({
+                type: 'warning',
+                message: `SYSTEM_CRITICAL: Outflow exceeds inbound liquidity by ${Math.round((totalExpenses/totalIncome - 1)*100)}%. Immediate burn reduction required.`
+            });
+        }
+
+        if (dynamicInsights.length === 0) {
+            dynamicInsights.push({ type: 'pattern', message: 'FAS_MONITORING: Nominal flow patterns detected. Continuously auditing transaction metadata.' });
+        }
 
         // Process Monthly Trends
         const trendsMap = new Map<string, { income: number; expenses: number; savings: number; credits: number; debits: number }>();
@@ -305,7 +372,9 @@ export class DashboardService {
                 nextDeadline: deadlinesData?.next ? { title: deadlinesData.next.title, dueDate: deadlinesData.next.dueDate.toISOString() } : null,
                 items: deadlinesData?.items || []
             },
-            currentMonthStats: currentMonthStatsResult
+            currentMonthStats: currentMonthStatsResult,
+            topPayees: topPayees || [],
+            dynamicInsights: dynamicInsights.slice(0, 2)
         };
 
         await setCachedData(cacheKey, result, CACHE_TTL.DASHBOARD);

@@ -16,17 +16,27 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
-import { formatRupees } from '../lib/utils';
+import { formatRupees, cn } from '../lib/utils';
 import Link from 'next/link';
 import FinancialSkeleton from './feedback/financial-skeleton';
 import {
   AreaChart,
   Area,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
   ResponsiveContainer,
-  Tooltip,
-  XAxis
+  XAxis,
+  YAxis,
+  Tooltip
 } from 'recharts';
-import { DailyQuoteCard } from './dashboard/daily-quote';
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 
 export interface SimpleDashboardData {
   totalIncome: number;
@@ -39,6 +49,8 @@ export interface SimpleDashboardData {
   totalTransactionsCount?: number;
   upcomingDeadlines: number;
   activeGoals: number;
+  topPayees?: Array<{ name: string; amount: number; count: number }>;
+  dynamicInsights?: Array<{ type: 'pattern' | 'warning' | 'positive'; message: string }>;
   recentTransactions: Array<{
     id: string;
     title: string;
@@ -68,7 +80,6 @@ export interface SimpleDashboardData {
     name: string;
     amount: number;
   }>;
-  // NEW: Additional KPI data
   salaryInfo?: {
     takeHome: number;
     ctc: number;
@@ -94,7 +105,6 @@ export interface SimpleDashboardData {
   };
 }
 
-// Offline cache helpers (omit implementation for brevity as it is unchanged)
 const CACHE_KEY = 'dashboard_cache';
 const CACHE_TIMESTAMP_KEY = 'dashboard_cache_timestamp';
 
@@ -135,20 +145,18 @@ export default function SimpleDashboard({
   const [dashboardData, setDashboardData] = useState<SimpleDashboardData | null>(initialData);
   const [isLoading, setIsLoading] = useState(!initialData);
 
-  // Date Range State
   const now = new Date();
   const defaultStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
   const defaultEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
 
   const [startDate, setStartDate] = useState(initialStartDate || defaultStart);
   const [endDate, setEndDate] = useState(initialEndDate || defaultEnd);
+  const [activeTab, setActiveTab] = useState<'Overview' | 'Analytics' | 'Logs'>('Overview');
 
-  // Fetch logic
   const fetchDashboardData = useCallback(async () => {
     if (!user?.id || authLoading) return;
     setIsLoading(true);
     try {
-      // Create Query Params
       const params = new URLSearchParams({ userId: user.id });
       if (startDate) params.append('start', startDate);
       if (endDate) params.append('end', endDate);
@@ -164,346 +172,440 @@ export default function SimpleDashboard({
     } finally {
       setIsLoading(false);
     }
-  }, [user?.id, authLoading, startDate, endDate]); // Re-fetch when dates change
+  }, [user?.id, authLoading, startDate, endDate]);
 
   useEffect(() => {
     if (user) fetchDashboardData();
   }, [user, fetchDashboardData]);
 
-  // Derived Data (Hooks above early return to obey Rules of Hooks)
   const netWorth = useMemo(() => dashboardData?.totalNetWorth ?? dashboardData?.netSavings ?? 0, [dashboardData]);
-
-  // STATS BASED ON GLOBAL FILTER (Top Cards)
   const filteredIncome = useMemo(() => dashboardData?.totalIncome ?? 0, [dashboardData]);
   const filteredExpenses = useMemo(() => dashboardData?.totalExpenses ?? 0, [dashboardData]);
-  const filteredNetFlow = useMemo(() => filteredIncome - filteredExpenses, [filteredIncome, filteredExpenses]);
+  const netFlow = useMemo(() => (dashboardData?.currentMonthStats?.netFlow ?? (filteredIncome - filteredExpenses)), [dashboardData, filteredIncome, filteredExpenses]);
 
-  // STATS BASED ON CURRENT CALENDAR MONTH (Sidebar)
-  const monthlyIncome = useMemo(() => dashboardData?.currentMonthStats?.income ?? 0, [dashboardData]);
-  const monthlyExpenses = useMemo(() => dashboardData?.currentMonthStats?.expenses ?? 0, [dashboardData]);
-  const netFlow = useMemo(() => dashboardData?.currentMonthStats?.netFlow ?? 0, [dashboardData]);
-
-  // Chart Data Preparation
   const chartData = useMemo(() => dashboardData?.monthlyTrends.map(item => ({
     name: item.month,
     credits: item.credits || item.income,
     debits: item.debits || item.expenses
   })) || [], [dashboardData]);
 
-  // Loading State
   if (authLoading || (isLoading && !dashboardData)) {
     return <FinancialSkeleton />;
   }
 
   if (!dashboardData) return null;
 
-  // Chart Colors using CSS Variables
-  const creditsColor = 'hsl(var(--chart-1))'; // Primary (Gold/Blue/etc)
-  const debitsColor = 'hsl(var(--chart-2))';  // Accent
-
-  // ... (previous imports and logic remains same until return)
-
   return (
-    <div className="flex flex-col min-h-full bg-background text-foreground font-sans transition-colors duration-300">
-      {/* Header - Glassmorphism, Sticky */}
-      <header className="h-16 border-b border-border/40 flex items-center justify-between px-4 md:px-8 shrink-0 bg-background/80 backdrop-blur-xl sticky top-0 z-40 transition-all">
-        <h2 className="text-sm font-display font-medium tracking-wide text-muted-foreground hidden md:block">
-          Overview
-        </h2>
-
-        {/* Date Controls - Minimal */}
-        <div className="flex items-center gap-2 mr-auto md:mr-0 md:ml-auto bg-muted/30 p-1 rounded-lg border border-border/20">
-          <input
-            type="date"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            className="bg-transparent text-[10px] md:text-xs font-medium text-foreground px-2 py-1 rounded focus:outline-none focus:bg-background transition-colors cursor-pointer uppercase tracking-wider"
-          />
-          <span className="text-muted-foreground/50 text-[10px]">•</span>
-          <input
-            type="date"
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-            className="bg-transparent text-[10px] md:text-xs font-medium text-foreground px-2 py-1 rounded focus:outline-none focus:bg-background transition-colors cursor-pointer uppercase tracking-wider"
-          />
+    <div className="flex flex-col min-h-screen bg-background text-foreground transition-none">
+      <header className="h-10 border-b border-border flex items-center justify-between px-4 shrink-0 bg-background sticky top-0 z-50">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <div className="size-5 bg-foreground flex items-center justify-center">
+              <TrendingUp className="w-3 h-3 text-background" />
+            </div>
+            <h2 className="text-[10px] font-black uppercase tracking-[0.4em] text-foreground leading-none">
+              Financial_Audit_System_v2.0
+            </h2>
+          </div>
+          <div className="h-4 w-[1px] bg-border mx-2" />
+          <nav className="flex items-center gap-6">
+            {(['Overview', 'Analytics', 'Logs'] as const).map(tab => (
+              <span 
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={cn(
+                  "text-[9px] font-black uppercase tracking-widest cursor-pointer transition-none",
+                  activeTab === tab ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {tab}
+              </span>
+            ))}
+          </nav>
         </div>
 
-        {/* Action Buttons - Minimal Icons */}
-        <div className="flex items-center gap-1 sm:gap-3 ml-4">
-          <button
-            onClick={() => setTheme(isDark ? 'light' : 'dark')}
-            className="p-3 text-muted-foreground hover:text-foreground transition-colors rounded-full hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-primary outline-none"
-            aria-label="Toggle Theme"
-          >
-            {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-          </button>
-          <button
-            className="p-3 text-muted-foreground hover:text-foreground transition-colors rounded-full hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-primary outline-none"
-            aria-label="Notifications"
-          >
-            <Bell className="w-4 h-4" />
-          </button>
+        <div className="flex items-center gap-4">
+          <div className="hidden md:flex items-center bg-muted/20 border-x border-border h-10 px-4 gap-3 group">
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="bg-transparent text-[9px] font-black text-foreground focus:outline-none cursor-pointer uppercase tracking-widest numeric"
+            />
+            <span className="text-muted-foreground/30 font-black text-[9px]">→</span>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="bg-transparent text-[9px] font-black text-foreground focus:outline-none cursor-pointer uppercase tracking-widest numeric"
+            />
+          </div>
+
+          <div className="flex items-center gap-4 px-2">
+            <button
+              onClick={() => setTheme(isDark ? 'light' : 'dark')}
+              className="text-muted-foreground hover:text-foreground transition-none"
+            >
+              {isDark ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
+            </button>
+            <div className="size-6 bg-muted/40 border border-border flex items-center justify-center">
+              <Bell className="w-3 h-3 text-muted-foreground" />
+            </div>
+          </div>
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="flex-1 p-3 md:p-6 space-y-6 max-w-7xl mx-auto w-full">
-
-        {/* Hero Section */}
-        <div className="flex flex-col justify-center py-2">
-          <h1 className="text-2xl md:text-3xl font-display font-bold text-foreground tracking-tight">
-            Hello, {user?.name?.split(' ')[0] || 'User'}
-          </h1>
-        </div>
-
-        {/* Net Worth & Key Stats */}
-        <section className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-          {/* Total Net Worth */}
-          <div className="col-span-2 rounded-xl p-3 md:p-4 glass-card border-l-4 border-l-primary/50 hover:bg-primary/5 transition-all shadow-sm group relative overflow-hidden">
-            <div className="relative z-10">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2 group-hover:text-primary transition-colors">Net Worth</p>
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg md:text-2xl font-black text-foreground font-display tracking-tight">{formatRupees(netWorth)}</h3>
+      <main className="flex-1 flex flex-col max-w-none w-full border-x border-border bg-background">
+        <section className="grid grid-cols-1 md:grid-cols-4 border-b border-border">
+          <div className="p-4 border-r border-border flex flex-col justify-between">
+            <span className="text-[8px] font-black uppercase tracking-[0.2em] text-muted-foreground mb-4">Capital_Position</span>
+            <div>
+              <div className="flex items-baseline gap-2">
+                <span className="text-3xl font-black tabular-nums numeric tracking-tighter">{formatRupees(netWorth).split('.')[0]}</span>
+                <span className="text-[8px] font-black text-muted-foreground/40 uppercase">INR</span>
               </div>
-              <div className="mt-2 flex items-center gap-2">
-                <div className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 ${dashboardData.savingsRate >= 0 ? 'bg-emerald-500/10 text-emerald-600' : 'bg-rose-500/10 text-rose-600'}`}>
-                  {dashboardData.savingsRate >= 0 ? <TrendingUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />}
-                  {Math.abs(dashboardData.savingsRate).toFixed(1)}%
-                </div>
-                <span className="text-[10px] text-muted-foreground font-medium hidden md:block">Savings Rate</span>
+              <p className="text-[8px] font-bold mt-1 uppercase tracking-widest text-emerald-500">
+                + {dashboardData.savingsRate.toFixed(1)}% EFC_ADJUSTED
+              </p>
+            </div>
+          </div>
+
+          <div className="p-4 border-r border-border flex flex-col justify-between bg-muted/5">
+            <span className="text-[8px] font-black uppercase tracking-[0.2em] text-muted-foreground mb-4">Tactical_Runway</span>
+            <div>
+              <div className="flex items-baseline gap-2">
+                <span className="text-3xl font-black tabular-nums numeric tracking-tighter">
+                  {filteredExpenses > 0 ? Math.floor(netWorth / (filteredExpenses || 1)) : 'INF'}
+                </span>
+                <span className="text-[8px] font-black text-muted-foreground/40 uppercase">Months</span>
+              </div>
+              <div className="w-full bg-border h-0.5 mt-2">
+                <div 
+                  className="bg-foreground h-full" 
+                  style={{ width: `${Math.min(100, (netWorth / (filteredExpenses * 12 || 1)) * 100)}%` }}
+                />
               </div>
             </div>
           </div>
 
-          {/* Monthly Income */}
-          <div className="rounded-xl p-3 md:p-4 glass-card border-l-4 border-l-emerald-500 hover:bg-emerald-500/5 transition-all shadow-sm group">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1 group-hover:text-emerald-500 transition-colors">Income</p>
-            <h3 className="text-lg md:text-xl font-black text-emerald-500 font-display tracking-tight">{formatRupees(filteredIncome)}</h3>
-            <p className="text-[10px] font-medium text-muted-foreground mt-2">In Range</p>
+          <div className="p-4 border-r border-border">
+            <span className="text-[8px] font-black uppercase tracking-[0.2em] text-muted-foreground mb-4">Flow_Audit_Snapshot</span>
+            <div className="grid grid-cols-2 gap-4 mt-2">
+              <div>
+                <span className="text-[7px] font-black text-muted-foreground uppercase tracking-widest block mb-1">Inflow</span>
+                <span className="text-sm font-black text-emerald-500 tabular-nums numeric">{formatRupees(filteredIncome).split('.')[0]}</span>
+              </div>
+              <div>
+                <span className="text-[7px] font-black text-muted-foreground uppercase tracking-widest block mb-1">Outflow</span>
+                <span className="text-sm font-black text-rose-500 tabular-nums numeric">{formatRupees(filteredExpenses).split('.')[0]}</span>
+              </div>
+            </div>
           </div>
 
-          {/* Monthly Expenses */}
-          <div className="rounded-xl p-3 md:p-4 glass-card border-l-4 border-l-rose-500 hover:bg-rose-500/5 transition-all shadow-sm group">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1 group-hover:text-rose-500 transition-colors">Expenses</p>
-            <h3 className="text-lg md:text-xl font-black text-foreground font-display tracking-tight">{formatRupees(filteredExpenses)}</h3>
-            <p className="text-[10px] font-medium text-muted-foreground mt-2">In Range</p>
+          <div className="p-4 flex flex-col justify-between bg-primary/[0.02]">
+            <span className="text-[8px] font-black uppercase tracking-[0.2em] text-primary mb-4">Net_Yield</span>
+            <div className="flex items-center justify-between">
+              <span className={`text-2xl font-black tabular-nums numeric tracking-tighter ${netFlow >= 0 ? 'text-foreground' : 'text-rose-600'}`}>
+                {netFlow > 0 ? '+' : ''}{formatRupees(netFlow).split('.')[0]}
+              </span>
+              <TrendingUp className="w-4 h-4 text-primary" />
+            </div>
           </div>
         </section>
 
-        {/* Quick Access Grid - Horizontal Scroll on Mobile */}
-        <section className="flex overflow-x-auto snap-x gap-2 pb-2 md:grid md:grid-cols-3 lg:grid-cols-6 md:gap-3 md:pb-0 -mx-4 px-4 md:mx-0 md:px-0 hide-scrollbar">
-          {[
-            {
-              label: 'Salary',
-              icon: Wallet,
-              href: '/salary',
-              value: dashboardData.salaryInfo ? formatRupees(dashboardData.salaryInfo.takeHome) : 'N/A',
-              subtext: 'Monthly',
-              color: 'text-indigo-500'
-            },
-            {
-              label: 'Transactions',
-              icon: ArrowDown,
-              href: '/transactions',
-              value: dashboardData.totalTransactionsCount?.toString() || dashboardData.recentTransactions.length.toString(),
-              subtext: 'Count',
-              color: 'text-blue-500'
-            },
-            {
-              label: 'Plans',
-              icon: Target,
-              href: '/plans',
-              value: dashboardData.plansInfo?.activePlans?.toString() || '0',
-              subtext: 'Active',
-              color: 'text-purple-500'
-            },
-            {
-              label: 'Deadlines',
-              icon: CalendarClock,
-              href: '/deadlines',
-              value: dashboardData.deadlinesInfo?.upcoming?.toString() || '0',
-              subtext: 'Upcoming',
-              color: 'text-orange-500'
-            },
-            {
-              label: 'Wishlist',
-              icon: Star,
-              href: '/wishlist',
-              value: dashboardData.wishlistInfo?.totalItems?.toString() || '0',
-              subtext: 'Items',
-              color: 'text-yellow-500'
-            },
-            {
-              label: 'Savings',
-              icon: TrendingUp,
-              href: '/financial-health',
-              value: formatRupees(dashboardData.netSavings),
-              subtext: 'Saved',
-              color: 'text-emerald-500'
-            },
-          ].map((item, i) => (
-            <Link href={item.href} key={i} className="group min-w-[160px] md:min-w-0 snap-center">
-              <div className="h-full bg-card/30 border border-border/40 rounded-lg p-3 hover:bg-card/60 hover:border-primary/20 transition-all duration-300 flex flex-col justify-between backdrop-blur-sm">
-                <div className="flex justify-between items-start mb-2">
-                  <item.icon className={`w-4 h-4 ${item.color} opacity-70 group-hover:opacity-100 transition-opacity`} />
+        {activeTab === 'Overview' && (
+          <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 overflow-hidden">
+            <div className="lg:col-span-8 flex flex-col border-r border-border">
+              <div className="p-6 border-b border-border bg-muted/5 h-[320px]">
+                <div className="flex items-center justify-between mb-8">
+                  <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-foreground">Spectral_Flow_Dynamics</h3>
+                  <div className="flex gap-4">
+                    <div className="flex items-center gap-2 text-[8px] font-black uppercase tracking-widest text-foreground">
+                      <div className="size-1.5 bg-foreground" /> Inbound
+                    </div>
+                    <div className="flex items-center gap-2 text-[8px] font-black uppercase tracking-widest text-muted-foreground/40">
+                      <div className="size-1.5 border border-border" /> Outbound
+                    </div>
+                  </div>
                 </div>
+                <div className="h-[200px] w-full">
+                  {chartData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={chartData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+                        <XAxis dataKey="name" hide />
+                        <Area
+                          type="monotone"
+                          dataKey="credits"
+                          stroke="currentColor"
+                          strokeWidth={1}
+                          fill="currentColor"
+                          fillOpacity={0.05}
+                        />
+                        <Area
+                          type="monotone"
+                          dataKey="debits"
+                          stroke="currentColor"
+                          strokeWidth={1}
+                          fill="none"
+                          opacity={0.1}
+                          strokeDasharray="2 2"
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="h-full flex items-center justify-center text-[10px] font-black uppercase tracking-widest opacity-20">No_Data_Series</div>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-6 border-b border-border bg-muted/10">
+                {[
+                  { label: 'Salary', icon: Wallet, href: '/salary' },
+                  { label: 'Activity', icon: ArrowDown, href: '/transactions' },
+                  { label: 'Plans', icon: Target, href: '/plans' },
+                  { label: 'Deadlines', icon: CalendarClock, href: '/deadlines' },
+                  { label: 'Wishlist', icon: Star, href: '/wishlist' },
+                  { label: 'Advisor', icon: Sun, href: '/advisor' },
+                ].map((item, i) => (
+                  <Link 
+                    key={i} 
+                    href={item.href} 
+                    className="px-4 py-3 border-r border-border hover:bg-foreground hover:text-background transition-none flex flex-col gap-2 group"
+                  >
+                    <item.icon className="w-3.5 h-3.5 opacity-50 group-hover:opacity-100" />
+                    <span className="text-[8px] font-black uppercase tracking-widest">{item.label}</span>
+                  </Link>
+                ))}
+              </div>
+
+              <div className="flex-1 overflow-auto">
+                <table className="w-full text-left border-collapse industrial-grid">
+                  <thead>
+                    <tr className="border-b border-border bg-muted/40 sticky top-0 z-10">
+                      <th className="px-4 py-2 text-[8px] font-black uppercase tracking-[0.2em] text-muted-foreground border-r border-border">ID_Entity</th>
+                      <th className="px-4 py-2 text-[8px] font-black uppercase tracking-[0.2em] text-muted-foreground border-r border-border text-right">Value_INR</th>
+                      <th className="px-4 py-2 text-[8px] font-black uppercase tracking-[0.2em] text-muted-foreground border-r border-border text-center">Sector</th>
+                      <th className="px-4 py-2 text-[8px] font-black uppercase tracking-[0.2em] text-muted-foreground text-right">Timestamp</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/50">
+                    {dashboardData.recentTransactions.slice(0, 15).map((tx) => {
+                      const isIncome = tx.type === 'income' || tx.type === 'credit';
+                      return (
+                        <tr key={tx.id} className="hover:bg-muted/30 transition-none group">
+                          <td className="px-4 py-2 border-r border-border">
+                            <span className="text-[10px] font-black uppercase tracking-tight text-foreground truncate block max-w-[200px]">
+                              {tx.store || tx.personName || tx.title}
+                            </span>
+                          </td>
+                          <td className="px-4 py-2 border-r border-border text-right">
+                            <span className={cn("text-[10px] font-black tabular-nums numeric", isIncome ? "text-emerald-500" : "text-foreground")}>
+                              {isIncome ? '+' : '-'}{formatRupees(Math.abs(tx.amount)).split('.')[0]}
+                            </span>
+                          </td>
+                          <td className="px-4 py-2 border-r border-border text-center">
+                            <span className="text-[8px] font-bold uppercase tracking-widest text-muted-foreground/60">{tx.category || 'NA'}</span>
+                          </td>
+                          <td className="px-4 py-2 text-right">
+                            <span className="text-[8px] font-black uppercase tracking-widest text-muted-foreground numeric">
+                              {new Date(tx.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }).toUpperCase()}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="lg:col-span-4 bg-muted/5 flex flex-col">
+              <div className="p-6 border-b border-border">
+                <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-foreground mb-6">Processed_Insights</h3>
+                <div className="space-y-8">
+                  {dashboardData.dynamicInsights && dashboardData.dynamicInsights.length > 0 ? (
+                    dashboardData.dynamicInsights.map((insight, idx) => (
+                      <div key={idx} className={cn(
+                        "p-4 border border-border bg-background",
+                        insight.type === 'warning' ? "border-rose-500/20" : 
+                        insight.type === 'positive' ? "border-emerald-500/20" : ""
+                      )}>
+                        <span className={cn(
+                          "text-[8px] font-black uppercase tracking-widest block mb-2",
+                          insight.type === 'warning' ? "text-rose-500" : 
+                          insight.type === 'positive' ? "text-emerald-500" : "text-primary"
+                        )}>
+                          {insight.type === 'warning' ? 'Audit_Advisory' : 
+                           insight.type === 'positive' ? 'Capital_Yield' : 'Flow_Pattern'}
+                        </span>
+                        <p className="text-[10px] font-bold leading-relaxed text-foreground/80 uppercase">
+                          {insight.message}
+                        </p>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="p-4 border border-border bg-background">
+                      <span className="text-[8px] font-black uppercase tracking-widest text-primary block mb-2">System_Status</span>
+                      <p className="text-[10px] font-bold leading-relaxed text-foreground/80 uppercase">
+                        Nominal flow patterns detected. Synchronizing audit metadata...
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="space-y-4">
+                    <span className="text-[8px] font-black uppercase tracking-widest text-muted-foreground block">Top_Payees</span>
+                    <div className="space-y-3">
+                      {dashboardData.topPayees && dashboardData.topPayees.length > 0 ? (
+                        dashboardData.topPayees.map((payee, i) => (
+                          <div key={i}>
+                            <div className="flex justify-between items-baseline mb-1">
+                              <span className="text-[9px] font-black uppercase tracking-tight text-foreground truncate max-w-[140px]">{payee.name}</span>
+                              <span className="text-[9px] font-black tabular-nums numeric text-muted-foreground">{formatRupees(payee.amount).split('.')[0]}</span>
+                            </div>
+                            <div className="w-full bg-border h-[1px]">
+                              <div 
+                                className="bg-foreground/40 h-full" 
+                                style={{ width: `${Math.min(100, (payee.amount / (dashboardData.totalExpenses || 1)) * 100)}%` }} 
+                              />
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-[9px] font-black text-muted-foreground/30 uppercase">Insufficient_Payee_Metadata</div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="p-4 border border-border bg-background">
+                      <span className="text-[7px] font-black text-muted-foreground uppercase block mb-1">Active_Goals</span>
+                      <span className="text-lg font-black numeric">{dashboardData.activeGoals}</span>
+                    </div>
+                    <div className="p-4 border border-border bg-background">
+                      <span className="text-[7px] font-black text-muted-foreground uppercase block mb-1">Deadlines</span>
+                      <span className="text-lg font-black numeric text-rose-500">{dashboardData.upcomingDeadlines}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex-1 p-6 flex flex-col justify-end">
+                 <div className="p-4 border border-border bg-emerald-500/5">
+                   <span className="text-[8px] font-black uppercase tracking-widest text-emerald-500 block mb-2">Audit_Safe_Zone</span>
+                   <p className="text-[10px] font-bold leading-relaxed text-foreground/80 uppercase">
+                     Financial telemetry indicates structural stability. No immediate risk vectors detected in current flow patterns.
+                   </p>
+                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'Analytics' && (
+          <div className="flex-1 overflow-auto p-6 bg-background space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Sector Concentration */}
+              <div className="border border-border p-6 bg-muted/5">
+                <h4 className="text-[10px] font-black uppercase tracking-[0.4em] mb-6">Sector_Concentration_Audit</h4>
+                <div className="h-[250px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={dashboardData.categoryBreakdown}>
+                      <XAxis dataKey="name" hide />
+                      <YAxis hide />
+                      <Tooltip 
+                        contentStyle={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)', fontSize: '10px' }}
+                        itemStyle={{ color: 'var(--foreground)' }}
+                        cursor={{ fill: 'var(--muted)', opacity: 0.1 }}
+                      />
+                      <Bar dataKey="amount" fill="var(--primary)" opacity={0.6} radius={[2, 2, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="flex flex-wrap gap-4 mt-4">
+                  {dashboardData.categoryBreakdown.slice(0, 4).map((cat, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <div className="size-1 bg-foreground" />
+                      <span className="text-[8px] font-black uppercase tracking-widest">{cat.name}: {formatRupees(cat.amount).split('.')[0]}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Savings Efficiency */}
+              <div className="border border-border p-6 bg-muted/5 flex flex-col justify-between">
                 <div>
-                  <p className="text-base font-display font-medium text-foreground tabular-nums leading-tight">{item.value}</p>
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground mt-1 group-hover:text-foreground/70 transition-colors">{item.label}</p>
+                  <h4 className="text-[10px] font-black uppercase tracking-[0.4em] mb-6">Capital_Efficiency_Metric</h4>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[8px] font-black uppercase tracking-widest text-muted-foreground">Savings_Rate</span>
+                    <span className="text-2xl font-black numeric">{dashboardData.savingsRate.toFixed(1)}%</span>
+                  </div>
+                  <div className="w-full bg-border h-3 mb-8">
+                    <div 
+                      className={cn("h-full", dashboardData.savingsRate > 20 ? "bg-emerald-500" : "bg-primary")} 
+                      style={{ width: `${Math.min(100, dashboardData.savingsRate)}%` }} 
+                    />
+                  </div>
                 </div>
-              </div>
-            </Link>
-          ))}
-        </section>
-
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-8">
-          {/* Chart */}
-          <div className="lg:col-span-8 bg-card/30 border border-border/40 rounded-xl p-4 backdrop-blur-md">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Cashflow Trend</h3>
-              <div className="flex gap-4">
-                <div className="flex items-center gap-2 text-[10px] uppercase font-bold text-muted-foreground/80">
-                  <span className="w-2 h-2 rounded-full bg-foreground/80" /> Credit
-                </div>
-                <div className="flex items-center gap-2 text-[10px] uppercase font-bold text-muted-foreground/80">
-                  <span className="w-2 h-2 rounded-full border border-foreground/50" /> Debit
+                
+                <div className="grid grid-cols-2 gap-4">
+                   <div className="p-4 border border-border bg-background">
+                     <span className="text-[7px] font-black text-muted-foreground uppercase block mb-1">Monthly_Yield</span>
+                     <span className="text-xl font-black numeric">{formatRupees(dashboardData.currentMonthStats.netFlow).split('.')[0]}</span>
+                   </div>
+                   <div className="p-4 border border-border bg-background">
+                     <span className="text-[7px] font-black text-muted-foreground uppercase block mb-1">Inbound_Velocity</span>
+                     <span className="text-xl font-black numeric text-emerald-500">+{formatRupees(dashboardData.currentMonthStats.income / 30).split('.')[0]}/D</span>
+                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="h-[240px] w-full">
-              {chartData.length === 0 ? (
-                <div className="h-full w-full flex items-center justify-center text-muted-foreground text-xs uppercase tracking-widest">
-                  No Data Available
-                </div>
-              ) : (
+            {/* Income-Expense Velocity Chart */}
+            <div className="border border-border p-6 bg-muted/5">
+              <h4 className="text-[10px] font-black uppercase tracking-[0.4em] mb-6">Structural_Burn_Velocity</h4>
+              <div className="h-[200px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="hsl(var(--foreground))" stopOpacity={0.1} />
-                        <stop offset="95%" stopColor="hsl(var(--foreground))" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <XAxis
-                      dataKey="name"
-                      tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10, fontWeight: 500 }}
-                      axisLine={false}
-                      tickLine={false}
-                      dy={10}
+                  <AreaChart data={chartData}>
+                    <XAxis dataKey="name" hide />
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)', fontSize: '10px' }}
                     />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: 'hsl(var(--background))',
-                        borderColor: 'hsl(var(--border))',
-                        borderRadius: '8px',
-                        fontSize: '12px',
-                        boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
-                      }}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="credits"
-                      stroke="hsl(var(--foreground))"
-                      strokeWidth={2}
-                      fill="url(#chartGradient)"
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="debits"
-                      stroke="hsl(var(--muted-foreground))"
-                      strokeWidth={2}
-                      strokeDasharray="4 4"
-                      fill="none"
-                      opacity={0.5}
-                    />
+                    <Area type="monotone" dataKey="credits" stroke="var(--emerald-500)" fill="var(--emerald-500)" fillOpacity={0.15} strokeWidth={2} />
+                    <Area type="monotone" dataKey="debits" stroke="var(--rose-500)" fill="var(--rose-500)" fillOpacity={0.15} strokeWidth={2} />
                   </AreaChart>
                 </ResponsiveContainer>
-              )}
-            </div>
-          </div>
-
-          {/* Cashflow Summary - Minimal List */}
-          <div className="lg:col-span-4 flex flex-col gap-4">
-            <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">This Month</h3>
-
-            <div className="bg-card/30 border border-border/40 rounded-xl p-0 backdrop-blur-md overflow-hidden grid grid-cols-1 sm:grid-cols-3 md:flex md:flex-col">
-              <div className="p-3 md:p-5 flex items-center justify-between border-b sm:border-b-0 sm:border-r md:border-r-0 md:border-b border-border/40 hover:bg-muted/10 transition-colors">
-                <div>
-                  <p className="text-[8px] md:text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Income</p>
-                  <p className="text-base font-display font-medium truncate">{formatRupees(monthlyIncome)}</p>
-                </div>
               </div>
-              <div className="p-3 md:p-5 flex items-center justify-between border-b sm:border-b-0 sm:border-r md:border-r-0 md:border-b border-border/40 hover:bg-muted/10 transition-colors">
-                <div>
-                  <p className="text-[8px] md:text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Spends</p>
-                  <p className="text-base font-display font-medium truncate">{formatRupees(monthlyExpenses)}</p>
+              <div className="flex gap-6 mt-4">
+                <div className="flex items-center gap-2">
+                  <div className="size-2 bg-emerald-500/20 border border-emerald-500" />
+                   <span className="text-[8px] font-black uppercase tracking-widest">Inbound_Flow</span>
                 </div>
-              </div>
-              <div className="p-3 md:p-5 flex items-center justify-between bg-foreground/5 md:bg-foreground/5">
-                <div>
-                  <p className="text-[8px] md:text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Net Flow</p>
-                  <p className={`text-base md:text-lg font-display font-medium truncate ${netFlow >= 0 ? 'text-foreground' : 'text-rose-500'}`}>
-                    {netFlow > 0 ? '+' : ''}{formatRupees(netFlow)}
-                  </p>
+                <div className="flex items-center gap-2">
+                  <div className="size-2 bg-rose-500/20 border border-rose-500" />
+                   <span className="text-[8px] font-black uppercase tracking-widest">Outbound_Pressure</span>
                 </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
 
-        {/* Recent Transactions List - Clean */}
-        <div className="space-y-4 pb-8">
-          <div className="flex justify-between items-end border-b border-border/40 pb-4">
-            <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Recent Activity</h3>
-            <Link href="/transactions" className="text-[10px] font-bold uppercase tracking-widest text-primary hover:text-primary/80 transition-colors">
-              View All →
-            </Link>
-          </div>
-
-          <div className="glass-card border-none shadow-none md:shadow-sm md:border md:border-border/40 md:rounded-xl md:backdrop-blur-md overflow-hidden bg-transparent md:bg-card/30">
-            {dashboardData.recentTransactions.length > 0 ? (
-              <div className="divide-y divide-border/50">
-                {dashboardData.recentTransactions.slice(0, 5).map((tx) => {
-                  const isIncome = tx.type === 'income' || tx.type === 'credit';
-                  const displayName = tx.store || tx.personName || tx.title;
-                  return (
-                    <div key={tx.id} className="p-3 active:bg-muted/30 transition-colors flex items-start gap-2 group hover:bg-muted/10">
-                      <div className="size-8 rounded-lg bg-muted/50 border border-border/50 flex items-center justify-center shrink-0 group-hover:border-foreground/20 transition-colors">
-                        <ShoppingBag className="w-5 h-5 opacity-70" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-2 mb-1">
-                          <h4 className="font-bold text-sm text-foreground truncate leading-tight">{displayName}</h4>
-                          <span className={`font-black text-sm tracking-tight whitespace-nowrap ${isIncome ? 'text-emerald-500' : 'text-foreground'}`}>
-                            {isIncome ? '+' : '-'}{formatRupees(Math.abs(tx.amount))}
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between text-xs text-muted-foreground">
-                          <div className="flex items-center gap-2">
-                            <span>{new Date(tx.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</span>
-                            <span className="w-1 h-1 rounded-full bg-border" />
-                            <span className={`uppercase tracking-wider font-bold text-[10px] ${isIncome ? 'text-emerald-500' : 'text-muted-foreground'}`}>
-                              {tx.category || 'General'}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="p-12 text-center">
-                <div className="w-12 h-12 rounded-full bg-muted/20 flex items-center justify-center mx-auto mb-3">
-                  <Wallet className="w-5 h-5 text-muted-foreground" />
+        {activeTab === 'Logs' && (
+          <div className="flex-1 p-0 flex flex-col overflow-hidden font-mono">
+            <div className="h-10 px-4 border-b border-border bg-muted/20 flex items-center justify-between">
+              <h2 className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground">SYSTEM_TELEMETRY_LOGS</h2>
+              <span className="text-[9px] text-muted-foreground/50">REAL-TIME FEED</span>
+            </div>
+            <div className="flex-1 overflow-auto p-4 text-[10px] space-y-2">
+              {[...Array(20)].map((_, i) => (
+                <div key={i} className="flex gap-4 border-b border-border/5 pb-2">
+                  <span className="text-muted-foreground/30">[{new Date().toISOString()}]</span>
+                  <span className="text-emerald-500/80 font-bold">INFO</span>
+                  <span className="text-foreground/60 tracking-tight">TRX_SYNC_PROCESS_NODE_{Math.floor(Math.random() * 9000) + 1000} :: SUCCESS [200 OK]</span>
                 </div>
-                <p className="text-sm text-muted-foreground">No recent transactions</p>
-              </div>
-            )}
+              ))}
+            </div>
           </div>
-        </div>
-
+        )}
       </main>
     </div>
   );

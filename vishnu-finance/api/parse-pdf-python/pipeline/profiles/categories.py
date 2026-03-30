@@ -5,23 +5,34 @@ COMMODITY_MAP: Dict[str, str] = {
     # Food & Dining
     "ZOMATO": "Food Delivery",
     "SWIGGY": "Food Delivery",
+    "MAGICPIN": "Food & Rewards",
+    "EATSURE": "Food Delivery",
     "CAFE": "Dining",
     "RESTAURANT": "Dining",
     "HOTEL": "Dining",
     "BAKERY": "Dining",
     "UDUPI": "Dining",
     "COFFEE": "Dining",
+    "STARBUCKS": "Drinks/Cafe",
+    "DOMINOS": "Fast Food",
+    "PIZZA": "Fast Food",
+    "BURGER": "Fast Food",
     
     # Shopping & Retail
     "AMAZON": "Online Shopping",
     "FLIPKART": "Online Shopping",
+    "AJIO": "Fashion",
+    "MYNTRA": "Fashion",
     "BLINKIT": "Quick Commerce",
     "ZEPTO": "Quick Commerce",
     "BIGBASKET": "Groceries",
     "JIOMART": "Groceries",
     "RELIANCE": "Shopping",
     "D MART": "Groceries",
+    "DMART": "Groceries",
     "STATIONERY": "Shopping",
+    "NYKAA": "Beauty",
+    "DECATHLON": "Sports",
     
     # Services & Bills
     "RECHARGE": "Mobile/DTH Recharge",
@@ -34,12 +45,16 @@ COMMODITY_MAP: Dict[str, str] = {
     "GAS": "Gas Bill",
     "INSURANCE": "Insurance",
     "PREMIUM": "Insurance",
+    "LIC": "Insurance",
     
     # Travel & Transport
     "UBER": "Cabs",
     "OLA": "Cabs",
     "RAPIDO": "Cabs",
     "IRCTC": "Railways",
+    "INDIGO": "Flights",
+    "AIR INDIA": "Flights",
+    "MAKEMYTRIP": "Travel",
     "METRO": "Metro",
     "PETROL": "Fuel",
     "PUMP": "Fuel",
@@ -53,12 +68,14 @@ COMMODITY_MAP: Dict[str, str] = {
     "HOSPITAL": "Healthcare/Pharmacy",
     "CLINIC": "Healthcare/Pharmacy",
     "APOLLO": "Healthcare/Pharmacy",
+    "PHARMEASY": "Healthcare/Pharmacy",
     
-    # Entertainment
+    # Entertainment & Subscriptions
     "SPOTIFY": "Subscription",
     "NETFLIX": "Subscription",
     "PRIME": "Subscription",
-    "BOOKMYSHOW": "Movies/Events"
+    "BOOKMYSHOW": "Movies/Events",
+    "YOUTUBE": "Subscription"
 }
 
 def get_commodity(text: str) -> Optional[str]:

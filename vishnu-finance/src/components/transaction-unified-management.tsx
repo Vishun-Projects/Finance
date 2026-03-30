@@ -101,6 +101,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
   const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
   const [bulkCategoryId, setBulkCategoryId] = useState<string>('');
   const [isBulkUpdating, setIsBulkUpdating] = useState(false);
+  const [applyToAllMatching, setApplyToAllMatching] = useState(false);
 
   const toggleSelect = useCallback((id: string) => {
     setSelectedIds((prev) => {
@@ -145,6 +146,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
     isActive: boolean;
   } | null>(null);
   const [parsingViewMode, setParsingViewMode] = useState<'transactions' | 'raw' | 'json'>('transactions');
+  const [autoCatCount, setAutoCatCount] = useState(0);
 
   const hasBootstrapTransactionsRef = useRef(Boolean(bootstrap?.transactions?.length));
   const hasBootstrapCategoriesRef = useRef(Boolean(bootstrap?.categories?.length));
@@ -1076,6 +1078,76 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
     }
   }, [selectedIds, transactions, user, fetchTransactions, success, showError]);
 
+  const handleGlobalAutoCategorize = useCallback(async () => {
+    if (isBulkUpdating) return;
+    setIsBulkUpdating(true);
+    setAutoCatCount(0);
+    setCategorizationProgress({ total: 100, categorized: 0, progress: 0, isActive: true });
+    
+    let totalUpdated = 0;
+    let iterations = 0;
+    const MAX_ITERATIONS = 50; // Safety cap (5000 trans max)
+
+    try {
+      while (iterations < MAX_ITERATIONS) {
+        const response = await fetch('/api/app', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'transactions_auto_categorize',
+            userId: user?.id,
+          }),
+        });
+
+        if (!response.ok) {
+          const error = await response.json().catch(() => ({ error: 'Auto-categorization failed' }));
+          throw new Error(error.error || 'Auto-categorization failed');
+        }
+
+        const result = await response.json();
+        
+        if (result.updated > 0) {
+          totalUpdated += result.updated;
+          setAutoCatCount(totalUpdated);
+          
+          const totalRemaining = result.remaining || 0;
+          const totalKnown = totalUpdated + totalRemaining;
+          const progress = Math.min(99, Math.round((totalUpdated / (totalKnown || 1)) * 100));
+          
+          setCategorizationProgress({ 
+            total: totalKnown, 
+            categorized: totalUpdated, 
+            progress, 
+            isActive: true 
+          });
+
+          // Wait a bit to show progress and avoid slamming the API
+          await new Promise(r => setTimeout(r, 600));
+          
+          if (totalRemaining === 0) break;
+          iterations++;
+        } else {
+          break;
+        }
+      }
+
+      if (totalUpdated > 0) {
+        success('Auto-Categorization Complete', 
+          `Successfully processed and updated ${totalUpdated} entries across the ledger.`
+        );
+        fetchTransactions();
+      } else {
+        showError('Info', 'No new categories could be automatically determined. Try labeling a few transactions manually first.');
+      }
+    } catch (error) {
+      console.error('Error in global auto-categorization:', error);
+      showError('Error', error instanceof Error ? error.message : 'Failed to run auto-categorization');
+    } finally {
+      setIsBulkUpdating(false);
+      setCategorizationProgress(null);
+    }
+  }, [user, isBulkUpdating, fetchTransactions, success, showError, setCategorizationProgress]);
+
   const handleBulkCategorize = useCallback(async () => {
     if (selectedIds.size === 0 || !bulkCategoryId) {
       showError('Error', 'Please select transactions and a category');
@@ -1084,31 +1156,66 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
 
     setIsBulkUpdating(true);
     try {
-      const updates = Array.from(selectedIds).map(id => ({
+      const selectedTransactions = transactions.filter(t => selectedIds.has(t.id));
+      
+      let updates = Array.from(selectedIds).map(id => ({
         id,
         categoryId: bulkCategoryId,
       }));
 
-      // Update transactions one by one (or create bulk endpoint)
-      const results = await Promise.allSettled(
-        updates.map(update =>
-          fetch('/api/app', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              action: 'transactions_update',
-              id: update.id,
-              categoryId: update.categoryId,
-            }),
-          })
-        )
-      );
+      // Cascade Labeling: Find all other transactions that match the identities of the selected ones
+      if (applyToAllMatching) {
+        const identities = new Set<string>();
+        selectedTransactions.forEach(t => {
+          if (t.upiId) identities.add(`upi:${t.upiId}`);
+          if (t.store) identities.add(`store:${t.store}`);
+          if (t.personName) identities.add(`person:${t.personName}`);
+        });
 
-      const successCount = results.filter(r => r.status === 'fulfilled').length;
-      success('Success', `Updated category for ${successCount} transaction(s)`);
+        if (identities.size > 0) {
+          const matchingTransactions = transactions.filter(t => {
+            if (selectedIds.has(t.id)) return false; // Already in updates
+            if (t.isDeleted) return false;
+            
+            if (t.upiId && identities.has(`upi:${t.upiId}`)) return true;
+            if (t.store && identities.has(`store:${t.store}`)) return true;
+            if (t.personName && identities.has(`person:${t.personName}`)) return true;
+            
+            return false;
+          });
+
+          matchingTransactions.forEach(t => {
+            updates.push({
+              id: t.id,
+              categoryId: bulkCategoryId,
+            });
+          });
+        }
+      }
+
+      // Use the batch update endpoint
+      const response = await fetch('/api/app', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'transactions_batch_update',
+          userId: user?.id,
+          updates,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update transactions');
+      }
+
+      const result = await response.json();
+      const successCount = result.succeeded || 0;
+      
+      success('Success', `Updated ${successCount} transaction(s) ${applyToAllMatching ? '(including matches)' : ''}`);
       setSelectedIds(new Set());
       setShowBulkCategorize(false);
       setBulkCategoryId('');
+      setApplyToAllMatching(false);
       fetchTransactions();
     } catch (error) {
       console.error('Error categorizing transactions:', error);
@@ -1116,7 +1223,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
     } finally {
       setIsBulkUpdating(false);
     }
-  }, [selectedIds, bulkCategoryId, fetchTransactions, success, showError]);
+  }, [selectedIds, bulkCategoryId, transactions, applyToAllMatching, user, fetchTransactions, success, showError]);
 
   const typeOptions = [
     { value: 'ALL', label: 'All Types' },
@@ -1626,6 +1733,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
             commodity: t.commodity || null,
             raw: t.raw || t.rawData || null,
             rawData: t.raw || t.rawData || null,
+            autoCategorized: t.autoCategorized === true,
             balance: t.balance ? (typeof t.balance === 'number' ? t.balance : parseFloat(String(t.balance))) : null,
           };
         } catch (error) {
@@ -1818,7 +1926,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
   }), [currentSearchTerm, selectedCategoryId, financialCategory, amountPreset, quickRange, startDateParam, endDateParam, categories, applyDraftFilters, resetDraftFilters, computeRange]);
 
   return (
-    <div className="flex flex-col min-w-0 bg-background overflow-hidden h-full flex-1">
+    <div className="flex flex-col min-w-0 bg-background overflow-hidden h-full flex-1 border-none rounded-none">
       {/* Mobile Header - Hidden on Desktop */}
       <div className="md:hidden">
         <MobileHeader
@@ -1847,64 +1955,64 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
             </div>
           }
         />
-        {categorizationProgress && categorizationProgress.isActive && (
-          <div className="bg-primary/10 border-b border-primary/20 p-2">
-            <div className="flex items-center gap-2 text-xs">
-              <Sparkles className="w-3 h-3 text-primary animate-pulse" />
-              <span className="flex-1 truncate">Categorizing... {categorizationProgress.progress}%</span>
-            </div>
-            <div className="h-1 bg-muted rounded-full mt-1 overflow-hidden">
-              <div className="h-full bg-primary transition-all duration-500" style={{ width: `${categorizationProgress.progress}%` }} />
-            </div>
-          </div>
-        )}
       </div>
+      {categorizationProgress && categorizationProgress.isActive && (
+        <div className="bg-primary/10 border-b border-primary/20 p-2">
+          <div className="flex items-center gap-2 text-xs">
+            <Sparkles className="w-3 h-3 text-primary animate-pulse" />
+            <span className="flex-1 truncate">Categorizing... {categorizationProgress.progress}%</span>
+          </div>
+          <div className="h-1 bg-muted rounded-full mt-1 overflow-hidden">
+            <div className="h-full bg-primary transition-all duration-500" style={{ width: `${categorizationProgress.progress}%` }} />
+          </div>
+        </div>
+      )}
 
-      {/* Desktop Header */}
-      <header className="hidden md:flex h-20 border-b border-border items-center justify-between px-8 shrink-0 bg-background/50 backdrop-blur sticky top-0 z-30">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
-            Transactions
-          </h1>
-          <p className="text-muted-foreground text-sm mt-0.5">
-            {totalRecords || 0} records found
+      {/* Desktop Header - Industrial Audit Bar */}
+      <header className="hidden md:flex h-10 border-b border-border items-center justify-between px-4 shrink-0 bg-background sticky top-0 z-30">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <div className="size-2 bg-foreground" />
+            <h1 className="text-[11px] font-black tracking-widest uppercase text-foreground">
+              LEDGER_AUDIT_SYSTEM_V2
+            </h1>
+          </div>
+          <div className="h-4 w-[1px] bg-border" />
+          <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-widest font-mono">
+            {totalRecords || 0} RECORDS_ACTIVE
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setTheme(isDark ? 'light' : 'dark')}
-            className="p-2 text-muted-foreground hover:text-foreground transition-colors"
-            aria-label="Toggle Theme"
-          >
-            {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-          </button>
+        <div className="flex items-center gap-1 h-full">
           <Button
-            variant="outline"
+            variant="ghost"
             size="sm"
             onClick={() => setIsFilterOpen(true)}
-            className={cn("gap-2 shadow-sm border-border bg-card/50", (financialCategory !== 'ALL' || selectedCategoryId || amountPreset !== 'all') && "bg-accent/50 border-primary/50 text-primary")}
+            className={cn("h-full px-4 rounded-none border-x border-border hover:bg-muted text-[10px] font-black uppercase tracking-widest gap-2", (financialCategory !== 'ALL' || selectedCategoryId || amountPreset !== 'all') && "bg-primary/5 text-primary")}
           >
-            <Filter className="w-4 h-4" />
-            Advanced Filters
+            <Filter className="w-3.5 h-3.5" />
+            FILTERS
           </Button>
-          <div className="h-4 w-[1px] bg-border mx-1 hidden lg:block"></div>
           <Button
-            variant="outline"
+            variant="ghost"
             size="sm"
             onClick={() => setShowSelectionMode(!showSelectionMode)}
-            className={cn("gap-2 shadow-sm border-border bg-card/50", showSelectionMode && "bg-accent/50 border-primary/50")}
+            className={cn("h-full px-4 rounded-none border-r border-border hover:bg-muted text-[10px] font-black uppercase tracking-widest gap-2", showSelectionMode && "bg-primary/5 text-primary")}
           >
-            <CheckSquare className="w-4 h-4" />
-            Selection mode
+            <CheckSquare className="w-3.5 h-3.5" />
+            SELECTION_MODE
           </Button>
-          <Button variant="outline" size="sm" onClick={openImportDialog} className="gap-2 shadow-sm border-border bg-card/50">
-            <FileText className="w-4 h-4" />
-            Open importer
+          <Button variant="ghost" size="sm" onClick={openImportDialog} className="h-full px-4 rounded-none border-r border-border hover:bg-muted text-[10px] font-black uppercase tracking-widest gap-2 text-muted-foreground">
+            <FileText className="w-3.5 h-3.5" />
+            IMPORT
           </Button>
-          <div className="h-4 w-[1px] bg-border mx-1"></div>
-          <Button size="sm" onClick={() => { setEditingTransaction(null); setShowForm(true); }} className="gap-2 font-bold bg-foreground text-background hover:bg-foreground/90 shadow-lg transition-all active:scale-95">
-            <Plus className="w-4 h-4" />
-            Add Transaction
+
+          <Button 
+            size="sm" 
+            onClick={() => { setEditingTransaction(null); setShowForm(true); }} 
+            className="h-full px-6 rounded-none bg-foreground text-background hover:bg-foreground/90 text-[10px] font-black uppercase tracking-widest gap-2"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            NEW_ENTRY
           </Button>
         </div>
       </header>
@@ -1912,144 +2020,43 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
       {/* Unified Main Layout with Optional Analytics */}
       <div className="flex-1 flex overflow-hidden">
         {/* Main Content Area */}
-        <div className="flex-1 flex flex-col overflow-hidden border-r border-border/50">
+        <div className="flex-1 flex flex-col overflow-hidden">
 
-          {/* Top Filter Bar (Always Visible on Desktop) */}
-          <div className="hidden md:flex p-6 py-4 items-center justify-between gap-4 border-b border-border/50 bg-card/10 backdrop-blur-sm">
-            <div className="flex-1 max-w-xl">
-              <div className="relative group">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground size-4 group-focus-within:text-foreground transition-colors" />
+          {/* Top Filter Bar - High Density Monospace */}
+          <div className="hidden md:flex h-12 items-center justify-between gap-0 border-b border-border bg-background">
+            <div className="flex-1 h-full">
+              <div className="relative h-full">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground size-3.5" />
                 <Input
                   type="text"
-                  placeholder="Search transactions, merchants, categories..."
-                  className="w-full bg-card/50 border-border rounded-lg pl-10 pr-4 py-2.5 text-sm focus-visible:ring-1 focus-visible:ring-foreground placeholder:text-muted-foreground/30 transition-all outline-none"
+                  placeholder="SEARCH_LEDGER..."
+                  className="w-full h-full bg-transparent border-none rounded-none pl-12 pr-4 text-[10px] font-mono focus-visible:ring-0 placeholder:text-muted-foreground/30 uppercase tracking-widest"
                   value={localSearch}
                   onChange={(e) => handleSearch(e.target.value)}
                 />
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center h-full">
               <Button
-                variant="outline"
-                className="hidden lg:flex items-center gap-2 bg-gradient-to-r from-violet-500/10 to-purple-500/10 hover:from-violet-500/20 hover:to-purple-500/20 border-purple-500/20 text-purple-600 dark:text-purple-400 font-bold text-[10px] uppercase tracking-widest h-10 px-4 transition-all"
-                onClick={async () => {
-                  if (isBulkUpdating) return;
-                  setIsBulkUpdating(true);
-                  let totalRules = 0;
-                  let totalAI = 0;
-
-                  try {
-                    success('Smart Categorization', 'Starting analysis (Hybrid Rules + AI)...');
-
-                    let hasMore = true;
-                    let safetyLimit = 100;
-                    const consecutiveFiles = 0;
-
-                    while (hasMore && safetyLimit > 0) {
-                      try {
-                        const res = await fetch('/api/app', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ action: 'transactions_auto_categorize' })
-                        });
-
-                        // Handle Rate Limiting (Status 429)
-                        if (res.status === 429) {
-                          success('Rate Limit', 'API Quota hit. Waiting 40s...');
-                          await new Promise(r => setTimeout(r, 40000));
-                          continue;
-                        }
-
-                        const text = await res.text();
-
-                        // Check for error in text body (sometimes 500 returns json with error)
-                        if (!res.ok) {
-                          if (text.includes('429') || text.includes('quota') || text.includes('Too Many Requests')) {
-                            success('Rate Limit', 'API Quota hit. Waiting 40s...');
-                            await new Promise(r => setTimeout(r, 40000));
-                            continue;
-                          }
-                          throw new Error('API Request Failed: ' + text);
-                        }
-
-                        const data = JSON.parse(text);
-
-                        // Check for error in JSON property
-                        if (data.error) {
-                          if (JSON.stringify(data.error).includes('429') || JSON.stringify(data.error).includes('quota')) {
-                            success('Rate Limit', 'API Quota hit. Waiting 40s...');
-                            await new Promise(r => setTimeout(r, 40000));
-                            continue;
-                          }
-                          // Warn but don't stop? Or stop?
-                          // Removed console.error
-                        }
-
-                        const batchRules = data.rulesMatched || 0;
-                        const batchAI = data.aiMatched || 0;
-                        // const batchUpdated = data.updated || 0; // Removed commented out code
-
-                        totalRules += batchRules;
-                        totalAI += batchAI;
-
-                        // Removed auto-pause logic as requested
-                        /*
-                        if (data.processed > 0 && batchUpdated === 0) {
-                          consecutiveFiles++;
-                        } else {
-                          consecutiveFiles = 0;
-                        }
-                        */
-
-                        success('Progress', `Updated: ${totalRules + totalAI} (Rules: ${totalRules}, AI: ${totalAI}). Remaining: ${data.remaining}`);
-
-                        if (data.processed === 0 || (data.remaining === 0 && data.processed < 50)) {
-                          hasMore = false;
-                        }
-                        // Removed auto-pause logic as requested
-                        /* else if (consecutiveFiles >= 5) {
-                          showError('Paused', 'Stopping loop: AI cannot categorize remaining items.');
-                          hasMore = false;
-                        } */
-
-                      } catch (err: any) {
-                        if (String(err).includes('quota') || String(err).includes('429')) {
-                          success('Rate Limit', 'API Quota hit. Waiting 40s...');
-                          await new Promise(r => setTimeout(r, 40000));
-                          continue;
-                        }
-                        throw err;
-                      }
-
-                      // Small delay to be nice to API
-                      await new Promise(r => registerTimer('autoCatDelay', setTimeout(r, 1500)));
-                      if (!isMountedRef.current) return;
-                      safetyLimit--;
-                    }
-
-                    success('Completed', `Finished! Total Updated: ${totalRules + totalAI} (Rules: ${totalRules}, AI: ${totalAI}).`);
-                    fetchTransactions();
-                  } catch (e) {
-                    // Removed console.error
-                    showError('Error', 'Auto-categorization process interrupted.');
-                  } finally {
-                    setIsBulkUpdating(false);
-                  }
-                }}
+                variant="ghost"
+                className="h-full px-4 rounded-none border-l border-border hover:bg-muted text-primary font-black text-[9px] uppercase tracking-widest transition-all gap-2"
+                onClick={handleGlobalAutoCategorize}
                 disabled={isBulkUpdating}
               >
-                <Sparkles size={14} className={cn(isBulkUpdating && "animate-spin")} />
-                {isBulkUpdating ? 'Processing...' : 'Auto-Cat (Smart)'}
+                <Sparkles size={12} className={cn(isBulkUpdating && "animate-spin")} />
+                {isBulkUpdating 
+                  ? (autoCatCount > 0 ? `SYNCING_${autoCatCount}...` : 'PROCESSING...') 
+                  : 'AUTO_CAT'}
               </Button>
-              <div className="flex items-center bg-muted border border-border rounded-lg p-1 shadow-sm">
+              <div className="flex h-full items-center bg-background border-l border-border px-4 transition-all">
                 {(['daily', 'weekly', 'monthly'] as const).map((p) => (
                   <button
                     key={p}
                     onClick={() => handlePeriodChange(p)}
                     className={cn(
-                      "p-1.5 px-3 text-[10px] font-black uppercase tracking-widest rounded transition-all",
-                      period === p ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                      "px-3 text-[9px] font-black uppercase tracking-widest transition-all h-full flex items-center border-x border-transparent",
+                      period === p ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"
                     )}
                   >
                     {p}
@@ -2059,10 +2066,10 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
 
               <Popover open={dateRangePickerOpen} onOpenChange={setDateRangePickerOpen}>
                 <PopoverTrigger asChild>
-                  <Button variant="outline" className="gap-2 bg-muted border-border font-bold text-[10px] uppercase tracking-widest shadow-sm h-10 px-4">
-                    <CalendarIcon size={14} />
+                  <Button variant="ghost" className="h-full px-6 rounded-none border-l border-border font-black text-[9px] uppercase tracking-widest gap-2 hover:bg-muted">
+                    <CalendarIcon size={12} />
                     {rangeLabel}
-                    <ChevronDown size={12} />
+                    <ChevronDown size={10} />
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0 shadow-2xl border-border" align="end">
@@ -2092,130 +2099,65 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto custom-scrollbar p-3 md:p-4 space-y-4 bg-background/50">
-            {/* Overview Section - Always Visible */}
-            <div className="space-y-8 animate-in fade-in slide-in-from-top-4 duration-300">
-              <section>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-primary" />
-                    <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Financial Overview</h2>
-                  </div>
-                  <Badge variant="outline" className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground bg-muted px-2 py-0.5">{rangeLabel}</Badge>
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-6">
-                  {isLoading ? (
-                    [1, 2, 3].map((i) => (
-                      <Skeleton key={i} className="h-32 w-full rounded-2xl" />
-                    ))
-                  ) : (
-                    <>
-                      <div className="card-base p-3 md:p-4 hover:bg-emerald-500/5 transition-all group border-l-4 border-l-emerald-500">
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2 md:mb-4 group-hover:text-emerald-500 transition-colors">Total Income</p>
-                        <h3 className="text-xl md:text-2xl font-black text-emerald-500 font-display">{formatAmount(income)}</h3>
-                        <p className="text-[10px] text-muted-foreground mt-1 font-medium hidden md:block">Total inflow in this range</p>
-                      </div>
-                      <div className="card-base p-3 md:p-4 hover:bg-rose-500/5 transition-all group border-l-4 border-l-rose-500">
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2 md:mb-4 group-hover:text-rose-500 transition-colors">Total Spends</p>
-                        <h3 className="text-xl md:text-2xl font-black text-foreground font-display">{formatAmount(expense)}</h3>
-                        <p className="text-[10px] text-muted-foreground mt-1 font-medium hidden md:block">Total outflow in this range</p>
-                      </div>
-                      <div className="card-base p-3 md:p-4 border-l-4 border-l-primary/50 hover:bg-primary/5 transition-all group col-span-2 md:col-span-1">
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2 md:mb-4 group-hover:text-primary transition-colors">Net Flow</p>
-                        <div className="flex items-center justify-between">
-                          <h3 className="text-xl md:text-2xl font-black text-foreground font-display">{formatAmount(net)}</h3>
-                          <p className="text-[10px] text-muted-foreground font-medium md:hidden">{net > 0 ? 'Saved' : 'Deficit'}</p>
-                        </div>
-                        <p className="text-[10px] text-muted-foreground mt-1 font-medium hidden md:block">Savings or deficit</p>
-                      </div>
-                    </>
-                  )}
-                </div>
-
-                {/* Mobile Action Buttons (Inline) */}
-                {/* Mobile Action Buttons (Inline) */}
-                <div className="grid grid-cols-2 gap-3 mt-6 md:hidden">
-                  <Button
-                    variant="outline"
-                    onClick={() => setIsFilterOpen(true)}
-                    className="h-12 rounded-xl border-border bg-muted font-bold text-xs uppercase tracking-widest shadow-sm"
-                  >
-                    <Filter className="w-4 h-4 mr-2" />
-                    Filters
-                  </Button>
-                  <Button
-                    variant={showSelectionMode ? "default" : "outline"}
-                    onClick={() => {
-                      setShowSelectionMode(!showSelectionMode);
-                      if (showSelectionMode) setSelectedIds(new Set());
-                    }}
-                    className={cn(
-                      "h-12 rounded-xl font-bold text-xs uppercase tracking-widest shadow-sm transition-all",
-                      showSelectionMode ? "bg-foreground text-background border-foreground" : "border-border bg-muted"
-                    )}
-                  >
-                    {showSelectionMode ? (
-                      <>
-                        <X className="w-4 h-4 mr-2" />
-                        Cancel
-                      </>
-                    ) : (
-                      <>
-                        <CheckSquare className="w-4 h-4 mr-2" />
-                        Select
-                      </>
-                    )}
-                  </Button>
-                  <Button
-                    onClick={() => { setEditingTransaction(null); setShowForm(true); }}
-                    variant="outline"
-                    className="h-10 rounded-xl font-bold text-[10px] uppercase tracking-widest border-border bg-muted shadow-sm"
-                  >
-                    <Plus className="w-3.5 h-3.5 mr-1.5" />
-                    Manual Entry
-                  </Button>
-                  <Button
-                    onClick={() => setShowFileDialog(true)}
-                    className="h-10 rounded-xl font-bold text-[10px] uppercase tracking-widest shadow-md bg-foreground text-background"
-                  >
-                    <Upload className="w-3.5 h-3.5 mr-1.5" />
-                    Open Importer
-                  </Button>
-                </div>
-
-                <div className="flex gap-4 mt-4 text-[10px] text-muted-foreground font-black uppercase tracking-widest">
-                  <span className="bg-muted px-2 py-1 rounded-md">{count} records identified</span>
-                  {rangeSummary && <span className="bg-muted px-2 py-1 rounded-md">{rangeSummary}</span>}
-                </div>
-              </section>
+          <div className="flex-1 overflow-y-auto custom-scrollbar p-0 space-y-0 bg-background">
+            {/* Overview Section - High Density Integrated Grid */}
+            <div className="border-b border-border">
+              <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-border">
+                {isLoading ? (
+                  [1, 2, 3, 4].map((i) => (
+                    <Skeleton key={i} className="h-20 w-full rounded-none" />
+                  ))
+                ) : (
+                  <>
+                    <div className="p-4 md:p-6 bg-emerald-500/5 group">
+                      <p className="text-[9px] font-black uppercase tracking-[0.2em] text-emerald-600/60 mb-2">CREDIT_FLOW</p>
+                      <h3 className="text-xl md:text-2xl font-black text-emerald-600 font-mono tabular-nums">{formatAmount(income)}</h3>
+                    </div>
+                    <div className="p-4 md:p-6 bg-rose-500/5 group border-l border-border">
+                      <p className="text-[9px] font-black uppercase tracking-[0.2em] text-rose-600/60 mb-2">DEBIT_FLOW</p>
+                      <h3 className="text-xl md:text-2xl font-black text-rose-600 font-mono tabular-nums">{formatAmount(expense)}</h3>
+                    </div>
+                    <div className="p-4 md:p-6 bg-primary/5 group border-l border-border">
+                      <p className="text-[9px] font-black uppercase tracking-[0.2em] text-primary/60 mb-2">NET_AUDIT</p>
+                      <h3 className={cn("text-xl md:text-2xl font-black font-mono tabular-nums", net >= 0 ? "text-emerald-600" : "text-rose-600")}>
+                        {net > 0 ? '+' : ''}{formatAmount(net)}
+                      </h3>
+                    </div>
+                    <div className="p-4 md:p-6 bg-muted/30 group hidden md:block">
+                      <p className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground/60 mb-2">LOG_COUNT</p>
+                      <h3 className="text-xl md:text-2xl font-black text-muted-foreground font-mono tabular-nums">{count}</h3>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
 
-            {/* Standardized Transaction Table */}
-            <section className="card-base overflow-hidden flex flex-col border-none">
+            {/* Standardized Transaction Table - Full Bleed Audit */}
+            <section className="flex flex-col border-none">
               <div className="overflow-x-auto hidden md:block">
                 <table className="w-full text-left border-collapse min-w-[800px]">
                   <thead>
-                    <tr className="bg-muted/5">
+                    <tr className="bg-muted/10 border-b border-border h-10">
                       {showSelectionMode && (
-                        <th className="w-12 px-3 py-3">
+                        <th className="w-10 px-4 border-r border-border">
                           <button
                             onClick={handleSelectAll}
                             className={cn(
-                              "w-5 h-5 rounded-md border flex items-center justify-center transition-all",
+                              "w-4 h-4 rounded-none border flex items-center justify-center transition-all",
                               selectedIds.size > 0 && selectedIds.size === filteredTransactions.length
-                                ? "bg-foreground border-foreground text-background shadow-md"
-                                : "bg-background border-input hover:border-foreground"
+                                ? "bg-foreground border-foreground text-background"
+                                : "bg-background border-border hover:border-foreground"
                             )}
                           >
-                            {selectedIds.size > 0 && selectedIds.size === filteredTransactions.length && <Check className="w-3.5 h-3.5" />}
-                            {selectedIds.size > 0 && selectedIds.size < filteredTransactions.length && <div className="w-2.5 h-0.5 bg-foreground" />}
+                            {selectedIds.size > 0 && selectedIds.size === filteredTransactions.length && <Check className="w-3 h-3" />}
+                            {selectedIds.size > 0 && selectedIds.size < filteredTransactions.length && <div className="w-2 h-0.5 bg-foreground" />}
                           </button>
                         </th>
                       )}
-                      <th className="px-3 py-3 text-[10px] font-black text-muted-foreground/50 uppercase tracking-[0.2em]">Timeline</th>
-                      <th className="px-3 py-3 text-[10px] font-black text-muted-foreground/50 uppercase tracking-[0.2em]">Merchant & Description</th>
-                      <th className="px-3 py-3 text-[10px] font-black text-muted-foreground/50 uppercase tracking-[0.2em]">Label</th>
-                      <th className="px-3 py-3 text-[10px] font-black text-muted-foreground/50 uppercase tracking-[0.2em] text-right">Value</th>
+                      <th className="px-4 text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em] border-r border-border font-mono">TIMELINE</th>
+                      <th className="px-4 text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em] border-r border-border font-mono">ENTITY_DESCRIPTOR</th>
+                      <th className="px-4 text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em] border-r border-border font-mono">CLASSIFICATION</th>
+                      <th className="px-4 text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em] text-right font-mono">VALUE_AUDIT</th>
                     </tr>
                   </thead>
                   <tbody className="">
@@ -2225,12 +2167,12 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                           <div className="space-y-4">
                             {[1, 2, 3, 4, 5].map((i) => (
                               <div key={i} className="flex items-center justify-between gap-4">
-                                <Skeleton className="h-12 w-12 rounded-xl" />
+                                <Skeleton className="h-12 w-12 rounded-none" />
                                 <div className="space-y-2 flex-1">
                                   <Skeleton className="h-4 w-[30%]" />
                                   <Skeleton className="h-3 w-[20%]" />
                                 </div>
-                                <Skeleton className="h-8 w-24 rounded-lg" />
+                                <Skeleton className="h-8 w-24 rounded-none" />
                                 <Skeleton className="h-4 w-24" />
                               </div>
                             ))}
@@ -2292,7 +2234,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                 {isLoading && !transactions.length ? (
                   <div className="p-4 space-y-4">
                     {[1, 2, 3].map((i) => (
-                      <Skeleton key={i} className="h-24 w-full rounded-xl" />
+                      <Skeleton key={i} className="h-24 w-full rounded-none" />
                     ))}
                   </div>
                 ) : filteredTransactions.length === 0 ? (
@@ -2358,14 +2300,14 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
 
               {/* Load More Button - Satisfies "overall data" request while preserving performance */}
               {visibleCount < filteredTransactions.length && (
-                <div className="flex justify-center p-8 border-t border-border bg-muted/5">
+                <div className="flex justify-center p-0 border-t border-border bg-muted/5">
                   <Button
-                    variant="outline"
+                    variant="ghost"
                     onClick={() => setVisibleCount(prev => prev + 100)}
-                    className="gap-2 px-8 font-bold text-[10px] uppercase tracking-widest h-12 w-full sm:w-auto rounded-xl shadow-sm"
+                    className="gap-2 px-8 font-black text-[10px] uppercase tracking-widest h-12 w-full rounded-none hover:bg-muted"
                   >
-                    <Plus className="w-5 h-5 sm:w-4 sm:h-4" />
-                    Load more ({filteredTransactions.length - visibleCount} remaining)
+                    <Plus className="w-4 h-4" />
+                    FETCH_NEXT_100_RECORDS ({filteredTransactions.length - visibleCount} REMAINING)
                   </Button>
                 </div>
               )}
@@ -2389,36 +2331,35 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
           </div>
         </div>
         {/* Analytics Panel (Right Sidebar) - Permanent */}
-        <aside className="w-80 lg:w-96 flex flex-col bg-muted/30 border-l border-border overflow-y-auto custom-scrollbar shrink-0 hidden md:flex">
-          <div className="p-4">
-            <div className="flex items-center justify-between mb-8">
-              <h2 className="text-xl font-bold tracking-tight font-display">Analytics</h2>
-              <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs font-bold border-border bg-muted" onClick={() => {
-                // Basic export logic mockup
+        <aside className="w-80 lg:w-96 flex flex-col bg-background border-l border-border overflow-y-auto custom-scrollbar shrink-0 hidden md:flex">
+          <div className="p-0">
+            <div className="flex h-10 items-center justify-between px-4 border-b border-border bg-muted/20">
+              <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground font-mono">AUDIT_INTELLIGENCE</h2>
+              <Button variant="ghost" size="sm" className="h-full px-4 rounded-none border-l border-border hover:bg-muted text-[10px] font-black uppercase tracking-widest gap-2" onClick={() => {
                 const csv = transactions.map(t => `${t.transactionDate},${t.description},${t.debitAmount || 0},${t.creditAmount || 0}`).join('\n');
                 const blob = new Blob([csv], { type: 'text/csv' });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = 'transactions.csv';
+                a.download = 'AUDIT_EXPORT.csv';
                 a.click();
               }}>
-                <Download size={14} />
-                Export
+                <Download size={12} />
+                EXPORT
               </Button>
             </div>
 
-            {/* Expenditure Chart Card */}
-            <div className="glass-card p-4 rounded-xl mb-6 shadow-sm">
-              <div className="flex items-center justify-between mb-4">
-                <p className="text-muted-foreground text-[10px] font-bold uppercase tracking-widest">Expenditure Breakdown</p>
-                <div className="bg-emerald-500/10 text-emerald-500 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center border border-emerald-500/20">
-                  <ArrowUp size={12} className="mr-0.5" />
-                  12%
+            {/* Expenditure Chart - Industrial Integrated */}
+            <div className="p-6 border-b border-border bg-rose-500/5">
+              <div className="flex items-center justify-between mb-6">
+                <p className="text-[9px] font-black uppercase tracking-[0.2em] text-rose-600/60 font-mono">EXPENDITURE_BREADOWN</p>
+                <div className="text-[9px] font-black text-rose-600 font-mono flex items-center gap-1 border border-rose-500/20 px-1.5 py-0.5">
+                  <ArrowUp size={10} />
+                  +12.4%
                 </div>
               </div>
-              <div className="flex items-end gap-3 mb-2">
-                <h3 className="text-3xl font-black tracking-tighter font-display">{formatAmount(expense)}</h3>
+              <div className="flex items-end gap-3 mb-6">
+                <h3 className="text-2xl font-black text-rose-600 font-mono tabular-nums">{formatAmount(expense)}</h3>
               </div>
 
               {/* Pie Chart Visual */}
@@ -2462,51 +2403,46 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
               </div>
             </div>
 
-            <div className="space-y-8">
-              {/* Radial Chart Visual */}
-              <div className="relative flex justify-center py-4">
-                <div className="relative size-48">
+            <div className="p-6 space-y-8 border-b border-border">
+              {/* Radial System Neutral Visual */}
+              <div className="relative flex justify-center py-2">
+                <div className="relative size-40">
                   <svg className="size-full -rotate-90">
-                    <circle cx="96" cy="96" r="88" fill="none" stroke="currentColor" strokeWidth="12" className="text-muted/10" />
+                    <circle cx="80" cy="80" r="74" fill="none" stroke="currentColor" strokeWidth="8" className="text-muted/10" />
                     <circle
-                      cx="96" cy="96" r="88" fill="none" stroke="currentColor" strokeWidth="12"
+                      cx="80" cy="80" r="74" fill="none" stroke="currentColor" strokeWidth="8"
                       className="text-foreground transition-all duration-1000 ease-in-out opacity-80"
-                      strokeDasharray={2 * Math.PI * 88}
-                      strokeDashoffset={2 * Math.PI * 88 * (1 - Math.min(1, expense / (income || 1)))}
-                      strokeLinecap="round"
+                      strokeDasharray={2 * Math.PI * 74}
+                      strokeDashoffset={2 * Math.PI * 74 * (1 - Math.min(1, expense / (income || 1)))}
+                      strokeLinecap="square"
                     />
                   </svg>
                   <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                    <p className="text-muted-foreground text-[10px] uppercase tracking-widest font-bold mb-0.5">Avg / Day</p>
-                    <p className="text-2xl font-black tracking-tight font-display">{formatAmount(expense / daysInRange)}</p>
+                    <p className="text-muted-foreground text-[9px] uppercase tracking-[0.2em] font-black font-mono mb-1">AVG_BURN</p>
+                    <p className="text-xl font-black text-foreground font-mono tabular-nums">{formatAmount(expense / daysInRange)}</p>
                   </div>
                 </div>
               </div>
 
-              {/* Category Progress */}
+              {/* Category Matrix */}
               <div className="space-y-6">
-                <div className="flex items-center justify-between mb-2">
-                  <h4 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Top Categories</h4>
-                  <Button variant="link" className="h-auto p-0 text-[10px] font-bold text-foreground">View All</Button>
+                <div className="flex items-center justify-between">
+                  <h4 className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground font-mono">SEGMENTATION</h4>
                 </div>
-
-                <div className="space-y-5">
+                <div className="space-y-4">
                   {sidebarAnalytics.topCategories.length === 0 ? (
-                    <p className="text-xs text-muted-foreground italic">No expense data</p>
+                    <p className="text-[10px] text-muted-foreground font-mono italic">EMPTY_SET</p>
                   ) : (
                     sidebarAnalytics.topCategories.map(([name, stats], i) => {
                       const totalExp = totals.expense || 1;
                       const percent = Math.round((stats.amount / totalExp) * 100);
                       return (
                         <div key={i} className="group">
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center gap-3">
-                              <div className={cn("size-2 rounded-full", i === 0 ? "bg-foreground" : "bg-muted-foreground/40")}></div>
-                              <span className="text-sm font-bold text-foreground capitalize">{name.toLowerCase()}</span>
-                            </div>
-                            <p className="text-xs font-bold">{formatAmount(stats.amount)}</p>
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-[10px] font-black text-foreground uppercase tracking-wider font-mono">{name}</span>
+                            <p className="text-[10px] font-black text-foreground font-mono tabular-nums">{formatAmount(stats.amount)}</p>
                           </div>
-                          <div className="w-full bg-muted h-1.5 rounded-full overflow-hidden">
+                          <div className="w-full bg-muted h-1 rounded-none overflow-hidden">
                             <div className={cn("h-full transition-all duration-1000", i === 0 ? "bg-foreground" : "bg-muted-foreground/60")} style={{ width: `${percent}%` }}></div>
                           </div>
                         </div>
@@ -2517,19 +2453,19 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
               </div>
             </div>
 
-            {/* Detailed Report CTA */}
-            <div className="mt-10 p-5 rounded-2xl bg-foreground text-background shadow-xl">
-              <div className="flex items-start gap-3 mb-4">
-                <div className="p-2 bg-background/10 rounded-lg">
-                  <FileText size={20} className="text-background" />
+            {/* System Log CTA */}
+            <div className="p-6 bg-foreground text-background">
+              <div className="flex items-start gap-4 mb-6">
+                <div className="p-2 border border-background/20 inline-block">
+                  <FileText size={16} />
                 </div>
                 <div>
-                  <p className="font-bold text-sm">Monthly Report</p>
-                  <p className="text-[10px] text-background/60 mt-0.5">Your financial summary is ready for review.</p>
+                  <p className="font-black text-[10px] uppercase tracking-widest">MONTHLY_REPORT_V2</p>
+                  <p className="text-[10px] text-background/50 font-mono mt-1">Audit summary compilation ready.</p>
                 </div>
               </div>
-              <Button className="w-full bg-background text-foreground hover:bg-background/90 text-xs font-bold h-9">
-                Generate Report
+              <Button className="w-full bg-background text-foreground hover:bg-background/90 text-[10px] font-black uppercase tracking-widest h-10 rounded-none border-none">
+                GENERATE_AUDIT
               </Button>
             </div>
           </div>
@@ -2555,7 +2491,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
             setShowBulkCategorize(false);
             setBulkCategoryId('');
           }}>
-            <div className="bg-card rounded-lg border shadow-lg max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="bg-card rounded-none border shadow-lg max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
               <div className="p-4 md:p-6 border-b flex items-center justify-between">
                 <h2 className="text-lg md:text-xl font-semibold">Categorize {selectedIds.size} Transaction{selectedIds.size !== 1 ? 's' : ''}</h2>
                 <button
@@ -2597,7 +2533,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                                   e.stopPropagation();
                                   setBulkCategoryId(category.id);
                                 }}
-                                className={`p-3 rounded-lg border text-left transition-all cursor-pointer ${bulkCategoryId === category.id
+                                className={`p-3 rounded-none border text-left transition-all cursor-pointer ${bulkCategoryId === category.id
                                   ? 'border-primary bg-primary/10 ring-2 ring-primary'
                                   : 'border-border hover:bg-muted hover:border-primary/50'
                                   }`}
@@ -2662,7 +2598,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                                   e.stopPropagation();
                                   setBulkCategoryId(category.id);
                                 }}
-                                className={`p-3 rounded-lg border text-left transition-all cursor-pointer ${bulkCategoryId === category.id
+                                className={`p-3 rounded-none border text-left transition-all cursor-pointer ${bulkCategoryId === category.id
                                   ? 'border-primary bg-primary/10 ring-2 ring-primary'
                                   : 'border-border hover:bg-muted hover:border-primary/50'
                                   }`}
@@ -2812,7 +2748,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
             setParsedTransactions([]);
             setShowCsvPreview(false);
           }}>
-            <div className="bg-card rounded-lg border shadow-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="bg-card rounded-none border shadow-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
               <div className="p-4 md:p-6 border-b flex items-center justify-between">
                 <h3 className="text-xl font-bold text-foreground">Parse Financial Documents</h3>
                 <button
@@ -2832,7 +2768,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
 
               <div className="p-4 md:p-6 space-y-6 overflow-y-auto">
                 {/* Instructions */}
-                <div className="bg-muted/50 rounded-lg p-4 border border-border">
+                <div className="bg-muted/50 rounded-none p-4 border border-border">
                   <div className="flex items-start space-x-3">
                     <FileText className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
                     <div className="flex-1">
@@ -2859,7 +2795,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                     onDragOver={handleDragOver}
                     onDragLeave={handleDragLeave}
                     onDrop={handleDrop}
-                    className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${isDragging
+                    className={`border-2 border-dashed rounded-none p-8 text-center transition-colors ${isDragging
                       ? 'border-primary bg-primary/10'
                       : 'border-border hover:border-primary/50'
                       }`}
@@ -2890,7 +2826,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
 
                 {/* Error Display */}
                 {fileError && (
-                  <div className="bg-destructive/10 border border-destructive rounded-lg p-4">
+                  <div className="bg-destructive/10 border border-destructive rounded-none p-4">
                     <div className="flex items-center space-x-3">
                       <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0" />
                       <span className="text-destructive text-sm">{fileError}</span>
@@ -2979,7 +2915,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
             setShowCsvPreview(false);
             setParsedTransactions([]);
           }}>
-            <div className="bg-card rounded-lg border shadow-lg max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="bg-card rounded-none border shadow-lg max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
               <div className="p-4 md:p-6 border-b flex items-center justify-between">
                 <h3 className="text-xl font-bold text-foreground">Review Parsed Transactions</h3>
                 <button
@@ -3022,7 +2958,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                 {parsingViewMode === 'transactions' && (
                   <>
                     {/* Summary */}
-                    <div className="bg-muted/50 rounded-lg p-4 border border-border">
+                    <div className="bg-muted/50 rounded-none p-4 border border-border">
                       <div className="flex items-center space-x-3">
                         <TrendingUp className="w-5 h-5 text-success flex-shrink-0" />
                         <div>
@@ -3046,7 +2982,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
 
                     {/* Credits & Debits Summary - Parser vs Actual */}
                     {parsedTransactions.length > 0 && (
-                      <div className="bg-gradient-to-br from-green-50 to-blue-50 dark:from-green-950/20 dark:to-blue-950/20 rounded-lg p-4 border border-green-200 dark:border-green-800">
+                      <div className="bg-gradient-to-br from-green-50 to-blue-50 dark:from-green-950/20 dark:to-blue-950/20 rounded-none p-4 border border-green-200 dark:border-green-800">
                         <div className="flex items-center space-x-3 mb-4">
                           <Sparkles className="w-5 h-5 text-primary flex-shrink-0" />
                           <h4 className="text-lg font-semibold text-foreground">Credits & Debits Summary</h4>
@@ -3054,7 +2990,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           {/* Parser Found (from PDF metadata) */}
-                          <div className="bg-background rounded-lg p-4 border border-border">
+                          <div className="bg-background rounded-none p-4 border border-border">
                             <div className="flex items-center space-x-2 mb-3">
                               <FileText className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                               <h5 className="text-sm font-semibold text-foreground">Parser Found (from PDF)</h5>
@@ -3098,7 +3034,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                           </div>
 
                           {/* Actual Parsed (calculated from transactions) */}
-                          <div className="bg-background rounded-lg p-4 border border-border">
+                          <div className="bg-background rounded-none p-4 border border-border">
                             <div className="flex items-center space-x-2 mb-3">
                               <Check className="w-4 h-4 text-success" />
                               <h5 className="text-sm font-semibold text-foreground">Actual Parsed (from transactions)</h5>
@@ -3167,7 +3103,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
 
                     {/* Account Details from PDF */}
                     {statementMetadata && (
-                      <div className="bg-blue-50 dark:bg-blue-950/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
+                      <div className="bg-blue-50 dark:bg-blue-950/20 rounded-none p-4 border border-blue-200 dark:border-blue-800">
                         <div className="flex items-center space-x-3 mb-4">
                           <FileText className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0" />
                           <h4 className="text-lg font-semibold text-foreground">Account Details from PDF</h4>
@@ -3288,7 +3224,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                           <FileText className="w-5 h-5 mr-2" />
                           Raw Transaction Data
                         </h4>
-                        <div className="max-h-96 overflow-y-auto border border-border rounded-lg">
+                        <div className="max-h-96 overflow-y-auto border border-border rounded-none">
                           <div className="bg-muted px-4 py-2 border-b border-border sticky top-0">
                             <p className="text-sm font-medium text-foreground">
                               {filteredParsed.length} transactions found
@@ -3336,7 +3272,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                           </div>
                           {/* Table (md+) */}
                           <div className="hidden md:block overflow-x-auto">
-                            <table className="min-w-full bg-card border border-border rounded-lg">
+                            <table className="min-w-full bg-card border border-border rounded-none">
                               <thead className="bg-muted">
                                 <tr>
                                   <th className="px-3 py-2 text-left text-xs font-medium text-foreground uppercase tracking-wider">Date</th>
@@ -3388,7 +3324,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                           </div>
 
                           {/* Mobile Card List */}
-                          <div className="md:hidden divide-y divide-border border border-border rounded-lg overflow-hidden">
+                          <div className="md:hidden divide-y divide-border border border-border rounded-none overflow-hidden">
                             {visibleParsed.length === 0 ? (
                               <div className="px-4 py-6 text-center text-sm text-muted-foreground">No records</div>
                             ) : (
@@ -3451,7 +3387,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
 
                 {parsingViewMode === 'raw' && (
                   <div className="space-y-6">
-                    <div className="bg-muted/50 rounded-lg p-6 border border-border">
+                    <div className="bg-muted/50 rounded-none p-6 border border-border">
                       <h4 className="text-lg font-semibold mb-4 flex items-center">
                         <FileText className="w-5 h-5 mr-2 text-primary" />
                         Stage 5-8: Raw Extraction Samples
@@ -3486,7 +3422,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
 
                 {parsingViewMode === 'json' && (
                   <div className="space-y-6">
-                    <div className="bg-muted/50 rounded-lg p-6 border border-border">
+                    <div className="bg-muted/50 rounded-none p-6 border border-border">
                       <h4 className="text-lg font-semibold mb-4 flex items-center">
                         <BrainCircuit className="w-5 h-5 mr-2 text-primary" />
                         Final Processed Pipeline Output
@@ -3539,7 +3475,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
           ref={selectionToolbarRef}
           className="fixed bottom-24 md:bottom-8 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-8 duration-300 w-[90%] md:w-auto"
         >
-          <div className="bg-foreground text-background shadow-2xl rounded-2xl px-4 py-3 md:px-6 md:py-4 flex items-center justify-between gap-3 md:gap-6 border border-border w-full md:w-auto">
+          <div className="bg-foreground text-background shadow-2xl rounded-none px-4 py-3 md:px-6 md:py-4 flex items-center justify-between gap-3 md:gap-6 border border-border w-full md:w-auto">
             <div className="flex items-center gap-3 pr-3 md:pr-6 border-r border-background/20 shrink-0">
               <div className="size-8 rounded-full bg-background/10 flex items-center justify-center font-bold text-sm shrink-0">
                 {selectedIds.size}
@@ -3761,7 +3697,7 @@ const MobileTransactionCard = React.memo(({
         </div>
       )}
 
-      <div className="size-11 rounded-2xl bg-white border border-border/50 flex items-center justify-center shrink-0 shadow-sm relative overflow-hidden">
+      <div className="size-11 rounded-none bg-white border border-border/50 flex items-center justify-center shrink-0 shadow-sm relative overflow-hidden">
         {brandName ? (
           <BrandLogo name={brandName} size={44} />
         ) : (
@@ -3793,6 +3729,12 @@ const MobileTransactionCard = React.memo(({
           {brandName && (
             <span className="bg-primary/10 text-primary text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md">
               ✓ Brand
+            </span>
+          )}
+          {transaction.autoCategorized && (
+            <span className="bg-emerald-500/10 text-emerald-500 text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md flex items-center gap-1">
+              <Sparkles className="w-2 h-2" />
+              Auto
             </span>
           )}
         </div>
@@ -3833,8 +3775,8 @@ const TransactionRow = React.memo(({
   return (
     <tr
       className={cn(
-        "group transition-all duration-300",
-        isSelected ? "bg-primary/10" : "hover:bg-muted/30"
+        "group border-b border-border/50 transition-colors cursor-pointer",
+        isSelected ? "bg-primary/5" : "hover:bg-muted/30"
       )}
       onClick={() => {
         if (showSelectionMode) toggleSelect(transaction.id);
@@ -3842,67 +3784,68 @@ const TransactionRow = React.memo(({
       }}
     >
       {showSelectionMode && (
-        <td className="px-6 py-4">
+        <td className="px-4 py-2 border-r border-border/50">
           <button
             onClick={(e) => { e.stopPropagation(); toggleSelect(transaction.id); }}
             className={cn(
-              "w-5 h-5 rounded-md border flex items-center justify-center transition-all",
-              isSelected ? "bg-foreground border-foreground text-background shadow-md" : "bg-background border-input"
+              "w-4 h-4 rounded-none border flex items-center justify-center transition-all",
+              isSelected ? "bg-foreground border-foreground text-background" : "bg-background border-border"
             )}
           >
-            {isSelected && <Check className="w-3.5 h-3.5" />}
+            {isSelected && <Check className="w-3 h-3" />}
           </button>
         </td>
       )}
-      <td className="px-6 py-4">
-        <div className="flex flex-col">
-          <span className="text-sm font-bold text-foreground">
-            {isValidDate ? format(transactionDate, 'MMM dd') : 'No Date'}
+      <td className="px-4 py-2 border-r border-border/50">
+        <div className="flex flex-col font-mono">
+          <span className="text-[11px] font-bold text-foreground tabular-nums">
+            {isValidDate ? format(transactionDate, 'dd_MMM').toUpperCase() : 'PENDING'}
           </span>
-          <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-tighter">
-            {isValidDate ? format(transactionDate, 'yyyy') : '-'}
+          <span className="text-[9px] text-muted-foreground font-medium opacity-50 tabular-nums">
+            {isValidDate ? format(transactionDate, 'yyyy') : '----'}
           </span>
         </div>
       </td>
-      <td className="px-6 py-4">
-        <div className="flex items-center gap-4">
-          <div className="size-11 rounded-2xl bg-white border border-border/50 flex items-center justify-center group-hover:shadow-md transition-all shadow-sm overflow-hidden relative shrink-0">
+      <td className="px-4 py-2 border-r border-border/50">
+        <div className="flex items-center gap-3">
+          <div className="size-8 rounded-none bg-background border border-border flex items-center justify-center overflow-hidden shrink-0">
             {brandName ? (
-              <BrandLogo name={brandName} size={44} />
+              <BrandLogo name={brandName} size={32} />
             ) : (
-              <div className="w-full h-full flex items-center justify-center bg-muted/50">
-                <CategoryIcon category={transaction.category?.name || ''} className="w-5 h-5" />
+              <div className="w-full h-full flex items-center justify-center bg-muted/20">
+                <CategoryIcon category={transaction.category?.name || ''} className="w-3.5 h-3.5 text-muted-foreground" />
               </div>
             )}
           </div>
           <div className="min-w-0">
-            <p className="font-bold text-sm text-foreground truncate group-hover:text-primary transition-colors flex items-center gap-1.5">
+            <p className="font-bold text-[11px] text-foreground truncate uppercase tracking-tight">
               {brandName || transaction.personName || transaction.store || transaction.description}
-              {brandName && (
-                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-primary/10 text-primary text-[8px] font-black uppercase tracking-widest">
-                  Verified
-                </span>
-              )}
             </p>
             {(transaction.description || transaction.store) && (
-              <p className="text-[10px] text-muted-foreground truncate max-w-[250px] uppercase font-black tracking-widest mt-1 opacity-50">
+              <p className="text-[9px] text-muted-foreground truncate max-w-[250px] uppercase font-mono opacity-50">
                 {transaction.store || transaction.description}
               </p>
             )}
           </div>
         </div>
       </td>
-      <td className="px-6 py-5">
-        <span className={cn(
-          "px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest",
-          isIncome ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20" : "bg-muted/50 text-muted-foreground border border-border"
-        )}>
-          {transaction.category?.name || 'General'}
-        </span>
-      </td>
+      <td className="px-4 py-2 border-r border-border/50">
+          <span className={cn(
+            "px-1.5 py-0.5 rounded-none text-[9px] font-black uppercase tracking-widest border",
+            isIncome ? "bg-emerald-500/5 text-emerald-600 border-emerald-500/20" : "bg-muted/30 text-muted-foreground border-border"
+          )}>
+            {transaction.category?.name || 'UNCLASSIFIED'}
+          </span>
+          {transaction.autoCategorized && (
+            <div className="mt-1 flex items-center gap-1 text-[8px] font-black text-emerald-600 uppercase tracking-[0.1em] opacity-80">
+              <Sparkles className="w-2 h-2" />
+              AUTO_RECON
+            </div>
+          )}
+        </td>
       <td className={cn(
-        "px-6 py-5 text-sm font-black text-right tracking-tight tabular-nums",
-        isIncome ? "text-emerald-500" : isExpense ? "text-rose-500" : "text-foreground"
+        "px-4 py-2 text-[11px] font-black text-right font-mono tabular-nums tracking-tighter",
+        isIncome ? "text-emerald-600" : isExpense ? "text-rose-600" : "text-foreground"
       )}>
         {isIncome ? '+' : '-'}{formatAmount(amount)}
       </td>
@@ -3968,7 +3911,7 @@ const TransactionFilterContent = React.memo(({
           <div className="pt-2">
             <Popover open={dateRangePickerOpen} onOpenChange={setDateRangePickerOpen}>
               <PopoverTrigger asChild>
-                <Button variant="outline" className="w-full justify-start gap-3 bg-muted/50 border-border font-bold text-xs h-12 px-4 rounded-xl">
+                <Button variant="outline" className="w-full justify-start gap-3 bg-muted/50 border-border font-bold text-xs h-12 px-4 rounded-none">
                   <CalendarIcon size={16} className="text-muted-foreground" />
                   {rangeLabel}
                   <ChevronDown size={14} className="ml-auto text-muted-foreground" />
@@ -4015,7 +3958,7 @@ const TransactionFilterContent = React.memo(({
             <Input
               type="text"
               placeholder="Search description, store, UPI..."
-              className="w-full bg-muted/50 border-border rounded-xl pl-10 pr-4 py-2 text-sm focus-visible:ring-1 focus-visible:ring-foreground transition-all outline-none"
+              className="w-full bg-muted/50 border-border rounded-none pl-10 pr-4 py-2 text-sm focus-visible:ring-1 focus-visible:ring-foreground transition-all outline-none"
               value={draft.search}
               onChange={(e) => {
                 const val = e.target.value;
@@ -4035,7 +3978,7 @@ const TransactionFilterContent = React.memo(({
                 const val = e.target.value;
                 setDraft((prev: any) => ({ ...prev, categoryId: val }));
               }}
-              className="w-full bg-muted/50 border border-border rounded-xl px-4 py-3 text-sm appearance-none focus:ring-1 focus:ring-ring transition-all text-foreground outline-none cursor-pointer"
+              className="w-full bg-muted/50 border border-border rounded-none px-4 py-3 text-sm appearance-none focus:ring-1 focus:ring-ring transition-all text-foreground outline-none cursor-pointer"
             >
               <option value="">All Categories</option>
               {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -4050,7 +3993,7 @@ const TransactionFilterContent = React.memo(({
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => setDraft((prev: any) => ({ ...prev, type: 'ALL' }))}
-              className={cn("px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all", (draft.type === 'ALL' || !draft.type) ? "bg-foreground text-background shadow-md" : "bg-muted/50 text-muted-foreground hover:bg-muted")}
+              className={cn("px-4 py-2 rounded-none text-[10px] font-black uppercase tracking-widest transition-all", (draft.type === 'ALL' || !draft.type) ? "bg-foreground text-background shadow-md" : "bg-muted/50 text-muted-foreground hover:bg-muted")}
             >
               All Types
             </button>
@@ -4058,7 +4001,7 @@ const TransactionFilterContent = React.memo(({
               <button
                 key={t}
                 onClick={() => setDraft((prev: any) => ({ ...prev, type: t as any }))}
-                className={cn("px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all", draft.type === t ? "bg-foreground text-background shadow-md" : "bg-muted/50 text-muted-foreground hover:bg-muted")}
+                className={cn("px-4 py-2 rounded-none text-[10px] font-black uppercase tracking-widest transition-all", draft.type === t ? "bg-foreground text-background shadow-md" : "bg-muted/50 text-muted-foreground hover:bg-muted")}
               >
                 {t}
               </button>
@@ -4074,7 +4017,7 @@ const TransactionFilterContent = React.memo(({
               <button
                 key={opt.value}
                 onClick={() => setDraft((prev: any) => ({ ...prev, amountPreset: opt.value as any }))}
-                className={cn("px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all", (draft.amountPreset === opt.value || (!draft.amountPreset && opt.value === 'all')) ? "bg-foreground text-background shadow-md" : "bg-muted/50 text-muted-foreground hover:bg-muted")}
+                className={cn("px-4 py-2 rounded-none text-[10px] font-black uppercase tracking-widest transition-all", (draft.amountPreset === opt.value || (!draft.amountPreset && opt.value === 'all')) ? "bg-foreground text-background shadow-md" : "bg-muted/50 text-muted-foreground hover:bg-muted")}
               >
                 {opt.label}
               </button>
@@ -4084,10 +4027,10 @@ const TransactionFilterContent = React.memo(({
       </div>
 
       <div className="pt-6 border-t mt-4 flex gap-3 pb-2">
-        <Button variant="outline" className="flex-1 font-bold text-xs uppercase tracking-widest h-12 rounded-xl" onClick={() => onReset()}>
+        <Button variant="outline" className="flex-1 font-bold text-xs uppercase tracking-widest h-12 rounded-none" onClick={() => onReset()}>
           Reset
         </Button>
-        <Button className="flex-1 font-bold text-xs uppercase tracking-widest h-12 rounded-xl" onClick={() => onApply(draft)}>
+        <Button className="flex-1 font-bold text-xs uppercase tracking-widest h-12 rounded-none" onClick={() => onApply(draft)}>
           Apply Filters
         </Button>
       </div>

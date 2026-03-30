@@ -271,92 +271,127 @@ export default function WishlistPageClient({ initialWishlist, userId }: Wishlist
         onClick={openCreateDialog}
       />
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="md:col-span-1 space-y-3 px-4 sm:px-6">
-          <Card className="border border-border shadow-sm bg-card">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-black uppercase tracking-widest">Filters</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Search</label>
-                <Input
-                  placeholder="Macbook Pro..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="bg-muted/30 border-none h-10"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Status</label>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="bg-muted/30 border-none h-10">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Items</SelectItem>
-                    <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="completed">Purchased</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </CardContent>
-          </Card>
+      {/* INDUSTRIAL_METRIC_GRID */}
+      <div className="mx-4 sm:mx-6 grid grid-cols-1 md:grid-cols-4 border border-border">
+        {[
+          { label: 'Pending_Acquisitions', value: items.filter(i => !i.isCompleted).length, sub: 'Queued_Nodes' },
+          { label: 'Fulfilled_Nodes', value: items.filter(i => i.isCompleted).length, sub: 'Terminal_State' },
+          { label: 'Projected_Capex', value: formatRupees(items.reduce((s, i) => s + (i.estimatedCost || 0), 0)), sub: 'Cumulative_Estimate' },
+          { label: 'High_Priority_Nodes', value: items.filter(i => i.priority === 'HIGH' || i.priority === 'CRITICAL').length, sub: 'Critical_Path' },
+        ].map((stat, i) => (
+          <div key={i} className={cn("p-4 flex flex-col justify-between h-24", i !== 3 && "border-r border-border")}>
+            <span className="text-[8px] font-black uppercase tracking-[0.2em] text-muted-foreground">{stat.label}</span>
+            <div>
+              <span className="text-xl font-black tabular-nums numeric tracking-tighter block">{stat.value}</span>
+              <span className="text-[7px] font-bold text-muted-foreground/40 uppercase tracking-widest">{stat.sub}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="mx-4 sm:mx-6 border border-border bg-background">
+        <div className="h-10 px-4 flex items-center justify-between border-b border-border bg-muted/20">
+          <div className="flex items-center gap-6">
+            <span className="text-[9px] font-black uppercase tracking-[0.2em] text-foreground">ACQUISITION_MATRIX_SYSTEM</span>
+            <div className="flex gap-2">
+              {['all', 'pending', 'completed'].map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setStatusFilter(s)}
+                  className={cn(
+                    "text-[8px] font-black uppercase tracking-widest px-2 py-1 transition-none",
+                    statusFilter === s ? "bg-foreground text-background" : "text-muted-foreground hover:bg-muted"
+                  )}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+             <Input
+              placeholder="PROBE_ID..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="h-6 w-32 rounded-none border-border bg-transparent text-[8px] font-black uppercase tracking-widest focus-visible:ring-0"
+            />
+          </div>
         </div>
 
-        <div className="md:col-span-3 px-4 sm:px-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {filteredItems.map((item) => (
-              <Card key={item.id} className={cn(
-                "overflow-hidden border border-border shadow-sm transition-all hover:shadow-md",
-                item.isCompleted ? "opacity-60 bg-muted/20" : "bg-card"
-              )}>
-                {item.imageUrl && (
-                  <div className="aspect-video w-full overflow-hidden relative">
-                    <img src={item.imageUrl} alt={item.title} className="w-full h-full object-cover" />
-                    <div className="absolute top-2 right-2">
-                      <Badge variant={item.priority === 'CRITICAL' ? 'destructive' : 'secondary'} className="text-[8px] font-black uppercase tracking-widest">
-                        {item.priority}
-                      </Badge>
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse">
+            <thead>
+              <tr className="border-b border-border bg-muted/5">
+                <th className="text-left p-3 text-[8px] font-black uppercase tracking-widest text-muted-foreground border-r border-border w-10">#</th>
+                <th className="text-left p-3 text-[8px] font-black uppercase tracking-widest text-muted-foreground border-r border-border">ASSET_SPECIFICATION</th>
+                <th className="text-left p-3 text-[8px] font-black uppercase tracking-widest text-muted-foreground border-r border-border">PRIORITY</th>
+                <th className="text-left p-3 text-[8px] font-black uppercase tracking-widest text-muted-foreground border-r border-border">TAGS</th>
+                <th className="text-right p-3 text-[8px] font-black uppercase tracking-widest text-muted-foreground border-r border-border">EST_COST</th>
+                <th className="text-right p-3 text-[8px] font-black uppercase tracking-widest text-muted-foreground">OPERATIONS</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {filteredItems.map((item, idx) => (
+                <tr key={item.id} className={cn("group hover:bg-muted/5 transition-none", item.isCompleted && "bg-muted/10 opacity-60")}>
+                  <td className="p-3 text-[9px] font-bold font-mono text-muted-foreground/40 border-r border-border align-middle">
+                    {(idx + 1).toString().padStart(2, '0')}
+                  </td>
+                  <td className="p-3 border-r border-border">
+                    <div className="flex flex-col">
+                      <span className={cn("text-[10px] font-black uppercase tracking-tight", item.isCompleted && "line-through")}>{item.title}</span>
+                      <span className="text-[8px] font-bold text-muted-foreground/60 uppercase">{item.category || 'UNCLASSIFIED'}</span>
                     </div>
-                  </div>
-                )}
-                <CardContent className="p-4 space-y-3">
-                  <div className="flex justify-between items-start gap-2">
-                    <h3 className={cn("font-black text-sm uppercase tracking-tight leading-none", item.isCompleted && "line-through")}>
-                      {item.title}
-                    </h3>
-                    {!item.imageUrl && (
-                      <Badge variant="outline" className="text-[8px] font-black uppercase tracking-widest">
-                        {item.priority}
-                      </Badge>
-                    )}
-                  </div>
-                  {item.estimatedCost && (
-                    <p className="text-lg font-black text-primary tabular-nums">
-                      {formatRupees(item.estimatedCost)}
-                    </p>
-                  )}
-                  <div className="flex gap-2 pt-2">
-                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={() => openEditDialog(item)}>
-                      <Pencil className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-red-500 hover:text-red-600 hover:bg-red-500/10" onClick={() => handleDelete(item.id)}>
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      variant={item.isCompleted ? "secondary" : "default"}
-                      size="sm"
-                      className="ml-auto h-8 px-3 font-black uppercase tracking-widest text-[9px]"
-                      onClick={() => handleToggleCompleted(item)}
-                    >
-                      {item.isCompleted ? 'Pending' : 'Buy'}
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                  </td>
+                  <td className="p-3 border-r border-border">
+                    <Badge variant="outline" className={cn(
+                      "rounded-none h-4 px-1.5 text-[7px] font-black uppercase tracking-widest border border-border/50",
+                      item.priority === 'CRITICAL' ? "bg-rose-500/10 text-rose-500 border-rose-500/20" : 
+                      item.priority === 'HIGH' ? "bg-amber-500/10 text-amber-500 border-amber-500/20" : "text-muted-foreground"
+                    )}>
+                      {item.priority}
+                    </Badge>
+                  </td>
+                  <td className="p-3 border-r border-border">
+                    <div className="flex flex-wrap gap-1">
+                      {item.tags?.map((tag, tIdx) => (
+                        <span key={tIdx} className="text-[7px] font-bold uppercase py-0.5 px-1 bg-muted border border-border text-muted-foreground tracking-tighter">
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  </td>
+                  <td className="p-3 border-r border-border text-right text-[10px] font-black tabular-nums numeric">
+                    {formatRupees(item.estimatedCost || 0)}
+                  </td>
+                  <td className="p-3 text-right">
+                    <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-none">
+                      <Button variant="outline" size="icon" className="size-6 rounded-none border-border" onClick={() => openEditDialog(item)}>
+                        <Pencil className="size-3" />
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="icon" 
+                        className={cn("size-6 rounded-none border-border", item.isCompleted ? "text-emerald-500 border-emerald-500/30" : "")} 
+                        onClick={() => handleToggleCompleted(item)}
+                      >
+                        <ShoppingBag className="size-3" />
+                      </Button>
+                      <Button variant="outline" size="icon" className="size-6 rounded-none border-border text-rose-500 hover:bg-rose-500/10" onClick={() => handleDelete(item.id)}>
+                        <Trash2 className="size-3" />
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {filteredItems.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="p-12 text-center text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                    NO_ACQUISITION_TARGETS
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
 

@@ -398,6 +398,7 @@ model Transaction {
   rawParsingData     Json?
   notes              String?
   receiptUrl         String?
+  autoCategorized    Boolean             @default(false)
   isDeleted          Boolean             @default(false)
   deletedAt          DateTime?
   createdAt          DateTime            @default(now())

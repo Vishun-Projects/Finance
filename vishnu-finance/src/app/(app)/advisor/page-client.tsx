@@ -225,16 +225,15 @@ export default function AdvisorPageClient() {
 
       {/* CENTER - CHAT */}
       <section className="flex-1 flex flex-col min-w-0 bg-background relative">
-        {/* Header - Optimized for Mobile/Desktop */}
-        <header className="flex h-14 border-b border-border items-center justify-between px-4 md:px-6 bg-card sticky top-0 z-10 font-sans shadow-sm">
-          <div className="flex items-center gap-2">
-            <div>
-              <h1 className="text-[10px] md:text-xs font-black uppercase tracking-widest text-foreground font-display">Advisor</h1>
-              <div className="flex items-center gap-1.5 mt-0.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-primary opacity-80"></span>
-                <span className="text-[8px] md:text-[9px] text-muted-foreground font-bold uppercase tracking-wider">Active</span>
-              </div>
+        {/* Header - Industrial Audit Style */}
+        <header className="flex h-12 border-b border-border items-center justify-between px-4 md:px-6 bg-card sticky top-0 z-20 shadow-none">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-primary" />
+              <h1 className="text-[10px] font-black uppercase tracking-[0.2em] text-foreground">Intelligence Hub</h1>
             </div>
+            <div className="h-4 w-px bg-border" />
+            <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest hidden sm:inline">Active Audit Session</span>
           </div>
           <div className="flex items-center gap-1 md:gap-2">
             <Sheet open={historyOpen} onOpenChange={setHistoryOpen}>
@@ -298,20 +297,21 @@ export default function AdvisorPageClient() {
               <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mt-4">Syncing with Archives...</p>
             </div>
           ) : messages.length === 0 ? (
-            <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-6">
-              <div className="w-16 h-16 rounded-2xl border border-border bg-card flex items-center justify-center shadow-lg group">
+            <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-8">
+              <div className="w-20 h-20 border border-border bg-muted/20 flex items-center justify-center shadow-none group">
                 <Bolt className="h-8 w-8 text-primary" />
               </div>
-              <div className="max-w-md space-y-2">
-                <h2 className="text-2xl md:text-3xl font-black text-foreground font-display tracking-tight uppercase">Advisor</h2>
-                <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest opacity-70">Analyze your wealth trajectory.</p>
+              <div className="max-w-md space-y-3">
+                <h2 className="text-2xl font-black text-foreground tracking-tighter uppercase">Advisor Terminal</h2>
+                <div className="h-px w-12 bg-primary mx-auto" />
+                <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest opacity-60">Strategic Wealth Synthesis & Audit Engine</p>
               </div>
-              <div className="flex flex-wrap justify-center gap-2 max-w-xl">
+              <div className="flex flex-wrap justify-center gap-3 max-w-xl">
                 {["Analyze Spending", "Project Net Worth", "Wealth Trajectory"].map((qs) => (
                   <button
                     key={qs}
                     onClick={() => { setInputMessage(qs); inputRef.current?.focus(); }}
-                    className="text-[9px] font-black uppercase tracking-widest px-4 py-2.5 rounded-lg border border-border bg-card text-muted-foreground hover:text-foreground hover:border-foreground/20 transition-all"
+                    className="text-[9px] font-black uppercase tracking-widest px-6 py-3 border border-border bg-muted/30 text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
                   >
                     {qs}
                   </button>
@@ -326,8 +326,8 @@ export default function AdvisorPageClient() {
               >
                 <div className={`space-y-4 max-w-[90%] md:max-w-xl ${message.role === 'USER' ? 'text-right' : ''}`}>
                   <div className={`text-sm leading-relaxed relative break-words overflow-hidden ${message.role === 'USER'
-                    ? 'bg-primary text-primary-foreground px-4 py-3 rounded-2xl rounded-tr-none inline-block text-left shadow-md tracking-tight font-medium'
-                    : 'border border-border bg-card border-l-4 border-l-primary p-4 rounded-2xl shadow-sm text-foreground/90 font-medium'
+                    ? 'bg-primary text-primary-foreground px-5 py-4 rounded-none border-none inline-block text-left tracking-tight font-black uppercase'
+                    : 'border border-border bg-card border-l-4 border-l-primary p-6 rounded-none shadow-none text-foreground/90 font-medium'
                     }`}>
                     {message.role === 'ASSISTANT' ? (
                       <MarkdownRenderer content={message.content} />
@@ -337,13 +337,13 @@ export default function AdvisorPageClient() {
                   </div>
 
                   {message.chartConfig && (
-                    <div className="mt-4 w-full h-[280px] border border-border bg-card rounded-2xl p-4 shadow-sm">
+                    <div className="mt-4 w-full h-[280px] border border-border bg-card rounded-none p-6 shadow-none">
                       <ChartMessage config={message.chartConfig} />
                     </div>
                   )}
 
                   <div className={`flex items-center gap-2 mt-2 px-1 ${message.role === 'USER' ? 'justify-end' : ''}`}>
-                    <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest opacity-40">
+                    <span className="text-[8px] font-black text-muted-foreground uppercase tracking-[0.2em] opacity-30">
                       {new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </div>
@@ -354,33 +354,31 @@ export default function AdvisorPageClient() {
           <div ref={messagesEndRef} className="h-10" />
         </div>
 
-        {/* Input area */}
-        <div className="p-4 md:p-8 bg-gradient-to-t from-background via-background/95 to-transparent backdrop-blur-sm">
-          <div className="relative max-w-4xl mx-auto group">
-            <div className="absolute inset-0 bg-primary/5 rounded-3xl blur-2xl group-focus-within:bg-primary/10 transition-all duration-500 -z-10" />
-
+        {/* Input area - Industrial Fixed Bar */}
+        <div className="p-6 md:p-10 border-t border-border bg-card">
+          <div className="relative max-w-4xl mx-auto">
             <Input
               ref={inputRef}
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
               onKeyDown={handleKeyPress}
-              placeholder="Ask for intelligence..."
+              placeholder="Inject strategic query..."
               disabled={loading}
-              className="w-full bg-card border-border hover:border-primary/20 rounded-2xl py-5 pl-5 pr-20 text-sm text-foreground placeholder:text-muted-foreground/50 shadow-sm transition-all h-auto"
+              className="w-full bg-muted/20 border-border hover:border-primary/50 rounded-none py-6 pl-6 pr-24 text-xs text-foreground placeholder:text-muted-foreground/30 shadow-none transition-all h-auto font-bold uppercase tracking-widest"
             />
             <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
               <Button
                 onClick={sendMessage}
                 disabled={loading || !inputMessage.trim()}
                 size="icon"
-                className="bg-primary text-primary-foreground h-11 w-11 rounded-2xl hover:bg-primary/90 shadow-lg shadow-primary/20 disabled:opacity-50 hover:scale-105 active:scale-95 transition-all"
+                className="bg-primary text-primary-foreground h-10 w-10 rounded-none hover:bg-primary/90 shadow-none hover:scale-100 active:scale-95 transition-all"
               >
-                {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <ArrowUp className="h-6 w-6 font-bold" />}
+                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUp className="h-5 w-5 font-black" />}
               </Button>
             </div>
           </div>
-          <p className="text-center text-[8px] md:text-[9px] text-muted-foreground/60 mt-4 uppercase tracking-[0.3em] font-black pointer-events-none select-none">
-            Encrypted End-to-End • Quantum-Grade Models Active • v5.0.1
+          <p className="text-center text-[8px] text-muted-foreground/40 mt-6 uppercase tracking-[0.4em] font-black pointer-events-none select-none">
+            Secure Audit Terminal Node • v5.0.2-INDUSTRIAL
           </p>
         </div>
       </section>

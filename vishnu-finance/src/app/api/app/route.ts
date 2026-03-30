@@ -624,6 +624,7 @@ export async function POST(request: NextRequest) {
           branch: branch || null,
           rawData: rawData || null,
           balance: balance ? parseFloat(String(balance)) : null,
+          autoCategorized: body.autoCategorized === true,
           isDeleted: false,
         },
         include: { category: true },
@@ -689,6 +690,7 @@ export async function POST(request: NextRequest) {
       if (updateData.branch !== undefined) data.branch = updateData.branch || null;
       if (updateData.rawData !== undefined) data.rawData = updateData.rawData || null;
       if (updateData.balance !== undefined) data.balance = updateData.balance ? parseFloat(String(updateData.balance)) : null;
+      if (updateData.autoCategorized !== undefined) data.autoCategorized = updateData.autoCategorized === true;
 
       const updated = await (prisma as any).transaction.update({
         where: { id },
@@ -894,6 +896,7 @@ export async function POST(request: NextRequest) {
             }
             if (update.description !== undefined) updateData.description = update.description;
             if (update.notes !== undefined) updateData.notes = update.notes || null;
+            if (update.autoCategorized !== undefined) updateData.autoCategorized = update.autoCategorized === true;
 
             if (update.store !== undefined) {
               const existing = existingMap.get(update.id);
@@ -1000,10 +1003,10 @@ export async function POST(request: NextRequest) {
           [['salary', 'credited'], 'salary'],
 
           // ===== GROCERIES & DAILY NEEDS → 'food' =====
-          [['milk', 'dud', 'dudh', 'aata', 'atta', 'grocery', 'kirana', 'vegetables', 'sabzi', 'fruits', 'eggs', 'anda', 'rice', 'dal', 'sugar', 'tel', 'oil', 'ghee', 'paneer', 'dahi', 'curd', 'aloo', 'pyaz', 'tamatar', 'soyabean'], 'food'],
+          [['milk', 'dud', 'dudh', 'aata', 'atta', 'grocery', 'kirana', 'vegetables', 'sabzi', 'fruits', 'eggs', 'anda', 'rice', 'dal', 'sugar', 'tel', 'oil', 'ghee', 'paneer', 'dahi', 'curd', 'aloo', 'pyaz', 'tamatar', 'soyabean', 'mother dairy', 'amul', 'country delight', 'bigbasket', 'blinkit'], 'food'],
 
           // ===== FOOD & SNACKS → 'food & dining' =====
-          [['paan', 'panipuri', 'chai', 'tea', 'samosa', 'snacks', 'vada', 'poha', 'nashta', 'breakfast', 'lunch', 'dinner', 'hotel', 'dhaba', 'restaurant', 'biryani', 'thali', 'meals', 'frooti', 'cold drink', 'juice', 'dhaniya', 'bhindi'], 'food & dining'],
+          [['paan', 'panipuri', 'chai', 'tea', 'samosa', 'snacks', 'vada', 'poha', 'nashta', 'breakfast', 'lunch', 'dinner', 'hotel', 'dhaba', 'restaurant', 'biryani', 'thali', 'meals', 'frooti', 'cold drink', 'juice', 'dhaniya', 'bhindi', 'momo', 'burger', 'roll', 'shawarma', 'pav bhaji'], 'food & dining'],
           [['swiggy', 'zomato', 'dominos', 'pizza', 'mcdonalds', 'kfc', 'burger king', 'starbucks', 'cafe', 'subway'], 'food & dining'],
 
           // ===== SWEETS & BAKERY → 'food & dining' =====
@@ -1128,7 +1131,7 @@ export async function POST(request: NextRequest) {
         const transactions = await (prisma as any).transaction.findMany({
           where: { userId: user.id, categoryId: null, isDeleted: false },
           take: batchSize,
-          select: { id: true, description: true, debitAmount: true, creditAmount: true, store: true }
+          select: { id: true, description: true, debitAmount: true, creditAmount: true, store: true, upiId: true, personName: true }
         });
 
         const totalRemaining = await (prisma as any).transaction.count({
@@ -1159,12 +1162,56 @@ export async function POST(request: NextRequest) {
 
         // Apply Pattern Matching FIRST (deterministic, no AI needed)
         const aiBatch: any[] = [];
-        const updates: Array<{ id: string, categoryId: string, method: 'RULE' | 'AI' }> = [];
+        const updates: Array<{ id: string, categoryId: string, notes?: string | null, method: 'HISTORY' | 'RULE' | 'AI' }> = [];
 
+        // 1. PRE-FETCH HISTORICAL MATCHES (BULK)
+        const upiIds = transactions.map(t => t.upiId).filter(Boolean) as string[];
+        const stores = transactions.map(t => t.store).filter(Boolean) as string[];
+        const personNames = transactions.map(t => t.personName).filter(Boolean) as string[];
+
+        const [upiHistory, storeHistory, personHistory] = await Promise.all([
+          upiIds.length > 0 ? (prisma as any).transaction.findMany({
+            where: { userId: user.id, upiId: { in: upiIds }, categoryId: { not: null }, isDeleted: false },
+            orderBy: { transactionDate: 'desc' },
+            select: { upiId: true, categoryId: true, notes: true }
+          }) : [],
+          stores.length > 0 ? (prisma as any).transaction.findMany({
+            where: { userId: user.id, store: { in: stores }, categoryId: { not: null }, isDeleted: false },
+            orderBy: { transactionDate: 'desc' },
+            select: { store: true, categoryId: true, notes: true }
+          }) : [],
+          personNames.length > 0 ? (prisma as any).transaction.findMany({
+            where: { userId: user.id, personName: { in: personNames }, categoryId: { not: null }, isDeleted: false },
+            orderBy: { transactionDate: 'desc' },
+            select: { personName: true, categoryId: true, notes: true }
+          }) : []
+        ]);
+
+        // Build lookup maps (keeping only the most recent/first match for each key)
+        const upiMap = new Map<string, { categoryId: string, notes?: string | null }>();
+        upiHistory.forEach((h: any) => { if (!upiMap.has(h.upiId)) upiMap.set(h.upiId, h); });
+
+        const storeMap = new Map<string, { categoryId: string, notes?: string | null }>();
+        storeHistory.forEach((h: any) => { if (!storeMap.has(h.store)) storeMap.set(h.store, h); });
+
+        const personMap = new Map<string, { categoryId: string, notes?: string | null }>();
+        personHistory.forEach((h: any) => { if (!personMap.has(h.personName)) personMap.set(h.personName, h); });
+
+        // Apply Logic Loop
         for (const t of transactions) {
-          const fullText = ((t.description || '') + ' ' + (t.store || '')).toLowerCase();
+          // 1. HISTORICAL MATCHING (Bulk Lookup)
+          let historicalMatch = null;
+          if (t.upiId) historicalMatch = upiMap.get(t.upiId);
+          if (!historicalMatch && t.store) historicalMatch = storeMap.get(t.store);
+          if (!historicalMatch && t.personName) historicalMatch = personMap.get(t.personName);
 
-          // Try pattern matching first
+          if (historicalMatch) {
+            updates.push({ id: t.id, categoryId: historicalMatch.categoryId, notes: historicalMatch.notes, method: 'HISTORY' });
+            continue;
+          }
+
+          // 2. PATTERN MATCHING (Brand Intelligence)
+          const fullText = ((t.description || '') + ' ' + (t.store || '') + ' ' + (t.personName || '')).toLowerCase();
           const matchedCategoryId = findCategoryByPattern(fullText);
 
           if (matchedCategoryId) {
@@ -1212,9 +1259,17 @@ export async function POST(request: NextRequest) {
 
         await Promise.all(updates.map(async (u) => {
           try {
-            await (prisma as any).transaction.update({ where: { id: u.id }, data: { categoryId: u.categoryId } });
+            await (prisma as any).transaction.update({ 
+               where: { id: u.id }, 
+               data: { 
+                 category: u.categoryId ? { connect: { id: u.categoryId } } : undefined,
+                 notes: u.notes !== undefined ? u.notes : undefined
+               } 
+             });
             updatedCount++;
-            if (u.method === 'RULE') rulesCount++; else aiCount++;
+            if (u.method === 'HISTORY') rulesCount++; // History is treated as high-confidence rule
+            else if (u.method === 'RULE') rulesCount++; 
+            else aiCount++;
           } catch (e) { }
         }));
 

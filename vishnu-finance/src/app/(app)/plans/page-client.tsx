@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,10 +24,16 @@ import {
   History,
   PieChart,
   Wallet,
-  RefreshCw
+  RefreshCw,
+  Target,
+  TrendingUp,
+  TrendingDown
 } from "lucide-react";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { normalizeGoals } from "@/lib/utils/goal-normalize";
 import {
   formatCurrency,
@@ -50,23 +58,35 @@ interface PlansPageClientProps {
   defaultTab?: string;
 }
 
-export default function PlansPageClient({ bootstrap, userId, defaultTab = "overview" }: PlansPageClientProps) {
+export default function PlansPageClient({ bootstrap, userId, defaultTab = "Overview" }: PlansPageClientProps) {
   const [activeTab, setActiveTab] = useState(defaultTab);
+  const router = useRouter();
 
   // Keep goals synced
   const [goals, setGoals] = useState<Goal[]>(() => normalizeGoals(bootstrap.goals));
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
   useEffect(() => {
     setGoals(normalizeGoals(bootstrap.goals));
   }, [bootstrap.goals]);
 
   // Insight hooks
   const {
-    goalStats,
+    goalStats
   } = usePlansInsights({
     goals,
     deadlines: bootstrap.deadlines,
     wishlist: bootstrap.wishlist,
   });
+
+  const totalTargetAmount = goalStats.target;
+  const totalCurrentAmount = goalStats.invested;
+
+  const refreshModule = async () => {
+    setIsRefreshing(true);
+    // In a real app, this would re-fetch bootstrap data
+    setTimeout(() => setIsRefreshing(false), 800);
+  };
 
   // Helpers for filtering
   const upcomingDeadlines = useMemo(() => {
@@ -76,558 +96,205 @@ export default function PlansPageClient({ bootstrap, userId, defaultTab = "overv
 
     return data
       .filter(d => !d.isCompleted && new Date(d.dueDate) >= today)
-      .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
-      .slice(0, 3);
+      .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
   }, [bootstrap.deadlines.data]);
 
-  const activeWishlist = useMemo(() => {
-    const data = bootstrap.wishlist.data || [];
-    return data.filter(i => !i.isCompleted).slice(0, 3);
-  }, [bootstrap.wishlist.data]);
+  const wishlistItems = useMemo(() => bootstrap.wishlist.data || [], [bootstrap.wishlist.data]);
 
   return (
-    <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-4 md:gap-6 px-4 py-4 md:py-6 sm:px-6 lg:px-8">
-      {/* Mobile Header Removed per user request */}
-
-      {/* Main Navigation Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full space-y-4 md:space-y-6">
-        <div className="sticky top-0 z-40 bg-background -mx-4 px-4 py-2 border-b border-border shadow-sm">
-          <TabsList className="bg-muted p-1 gap-1 h-10 overflow-x-auto w-full justify-start rounded-xl border border-border no-scrollbar">
-            <TabsTrigger
-              value="overview"
-              className="data-[state=active]:bg-foreground data-[state=active]:text-background data-[state=active]:shadow-md rounded-lg px-5 md:px-8 py-2 md:py-3 bg-transparent text-muted-foreground font-black uppercase tracking-[0.2em] text-[9px] md:text-[10px] hover:text-foreground transition-all duration-300 shrink-0"
-            >
-              Overview
-            </TabsTrigger>
-            <TabsTrigger
-              value="goals"
-              className="data-[state=active]:bg-foreground data-[state=active]:text-background data-[state=active]:shadow-md rounded-lg px-4 md:px-8 py-2 md:py-3 bg-transparent text-muted-foreground font-black uppercase tracking-[0.2em] text-[9px] md:text-[10px] hover:text-foreground transition-all duration-300 shrink-0"
-              onClick={() => setActiveTab('goals')}
-            >
-              Goals
-            </TabsTrigger>
-            <TabsTrigger
-              value="deadlines"
-              className="data-[state=active]:bg-foreground data-[state=active]:text-background data-[state=active]:shadow-md rounded-lg px-4 md:px-8 py-2 md:py-3 bg-transparent text-muted-foreground font-black uppercase tracking-[0.2em] text-[10px] hover:text-foreground transition-all duration-300 shrink-0"
-              onClick={() => setActiveTab('deadlines')}
-            >
-              Deadlines
-            </TabsTrigger>
-            <TabsTrigger
-              value="wishlist"
-              className="data-[state=active]:bg-foreground data-[state=active]:text-background data-[state=active]:shadow-md rounded-lg px-4 md:px-8 py-2 md:py-3 bg-transparent text-muted-foreground font-black uppercase tracking-[0.2em] text-[10px] hover:text-foreground transition-all duration-300 shrink-0"
-              onClick={() => setActiveTab('wishlist')}
-            >
-              Wishlist
-            </TabsTrigger>
-          </TabsList>
-
-          {/* Context Action Button removed per user request */}
-        </div>
-
-        {/* --- OVERVIEW TAB --- */}
-        <TabsContent value="overview" className="m-0 focus-visible:ring-0">
-          <div className="flex flex-col lg:flex-row gap-8">
-
-            {/* Left Column: Overview & Goals */}
-            <div className="flex-1 space-y-6">
-
-              {/* Overview Cards */}
-              <div className="flex flex-col md:flex-row gap-4">
-                <OverviewCard
-                  label="Total Saved"
-                  value={formatCurrency(goalStats.invested)}
-                  subtext={`+${goalStats.progressPercent}%`}
-                  className="md:flex-1"
-                />
-                <OverviewCard
-                  label="Total Target"
-                  value={formatCurrency(goalStats.target)}
-                  className="md:flex-1"
-                  variant="secondary"
-                />
-              </div>
-
-              {/* Active Goals Section */}
-              <div>
-                <div className="flex items-center justify-between mb-4 border-b border-border pb-2">
-                  <h2 className="text-xs font-black uppercase tracking-[0.3em] text-muted-foreground">Active Goals</h2>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-muted-foreground hover:text-foreground font-bold uppercase tracking-tighter h-8 text-[10px]"
-                    onClick={() => setActiveTab("goals")}
-                  >
-                    View All
-                    <ArrowRight className="ml-2 h-3 w-3" />
-                  </Button>
-                </div>
-
-                <div className="grid grid-cols-1 gap-4">
-                  {goals.map(goal => (
-                    <MatteGoalCard
-                      key={goal.id}
-                      goal={goal}
-                      onUpdate={(updatedGoal) => {
-                        setGoals(prev => prev.map(g => g.id === updatedGoal.id ? updatedGoal : g));
-                      }}
-                    />
-                  ))}
-                  {goals.length === 0 && (
-                    <div className="text-center py-12 border border-dashed border-border rounded-xl">
-                      <p className="text-muted-foreground">No active plans found. Create one to get started.</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Right Column: Sidebar (Today's Focus) */}
-            <aside className="lg:w-80 flex-shrink-0">
-              <div className="sticky top-8 space-y-6">
-
-                {/* Today's Focus Card */}
-                <Card className="rounded-xl p-4 border border-border bg-card shadow-sm">
-                  <div className="flex items-center gap-2 mb-4">
-                    <CalendarDays className="text-foreground h-5 w-5" />
-                    <h2 className="text-sm font-black uppercase tracking-[0.2em] text-foreground">Today&apos;s Focus</h2>
-                  </div>
-
-                  <div className="space-y-4">
-                    {/* Upcoming Deadlines */}
-                    <div>
-                      <div className="flex items-center justify-between mb-4">
-                        <p className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em]">Upcoming Deadlines</p>
-                        <Button variant="link" className="text-[9px] text-primary h-auto p-0" onClick={() => setActiveTab("deadlines")}>View</Button>
-                      </div>
-                      <div className="space-y-4">
-                        {upcomingDeadlines.map(deadline => (
-                          <div key={deadline.id} className="flex items-center gap-4 p-4 bg-background rounded-sm border border-border">
-                            <div className="w-10 h-10 rounded-sm bg-muted flex items-center justify-center text-foreground border border-border">
-                              <AlarmClock className="h-4 w-4" />
-                            </div>
-                            <div>
-                              <p className="text-xs font-bold text-foreground uppercase tracking-tighter truncate max-w-[120px]">{deadline.title}</p>
-                              <p className="text-[10px] text-muted-foreground font-medium">
-                                {deadline.dueDate ? formatDateLabel(deadline.dueDate) : 'No date'} • {formatCurrency(Number(deadline.amount || 0))}
-                              </p>
-                            </div>
-                          </div>
-                        ))}
-                        {upcomingDeadlines.length === 0 && (
-                          <p className="text-xs text-muted-foreground italic">No upcoming deadlines.</p>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Wishlist Highlights */}
-                    <div>
-                      <div className="flex items-center justify-between mb-4">
-                        <p className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em]">Wishlist Highlights</p>
-                        <Button variant="link" className="text-[9px] text-primary h-auto p-0" onClick={() => setActiveTab("wishlist")}>View</Button>
-                      </div>
-                      <div className="space-y-6">
-                        {activeWishlist.map(item => (
-                          <WishlistHighlightRow key={item.id} item={item} />
-                        ))}
-                        {activeWishlist.length === 0 && (
-                          <p className="text-xs text-muted-foreground italic">Wishlist empty.</p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  <Button
-                    variant="outline"
-                    className="w-full mt-4 py-3 rounded-sm border-border text-[10px] font-black uppercase tracking-[0.2em] hover:bg-foreground hover:text-background transition-all"
-                    onClick={() => setActiveTab("deadlines")}
-                  >
-                    View All Tasks
-                  </Button>
-                </Card>
-
-              </div>
-            </aside>
+    <div className="flex flex-col min-h-screen bg-background selection:bg-primary/10">
+      {/* INDUSTRIAL_HEADER_V2.0 */}
+      <header className="h-16 border-b border-border bg-background flex items-center justify-between px-6 shrink-0 z-50">
+        <div className="flex items-center gap-6">
+          <div className="flex flex-col">
+            <span className="text-[10px] font-black uppercase tracking-[0.4em] text-foreground leading-none">Financial_Intelligence</span>
+            <span className="text-[8px] font-black uppercase tracking-widest text-muted-foreground mt-1 opacity-40">NODE_PLANS_AUDIT_SYSTEM_v2.0</span>
           </div>
-        </TabsContent>
-
-        {/* --- GOALS TAB --- */}
-        <TabsContent value="goals" className="m-0 focus-visible:ring-0">
-          <GoalsPageClient
-            initialGoals={bootstrap.goals}
-            userId={userId}
-            layoutVariant="embedded"
-            onGoalsChange={(newGoals) => setGoals(newGoals)}
-          />
-        </TabsContent>
-
-        {/* --- DEADLINES TAB --- */}
-        <TabsContent value="deadlines" className="m-0 focus-visible:ring-0">
-          <DeadlinesPageClient
-            initialDeadlines={bootstrap.deadlines}
-            userId={userId}
-            layoutVariant="embedded"
-          />
-        </TabsContent>
-
-        {/* --- WISHLIST TAB --- */}
-        <TabsContent value="wishlist" className="m-0 focus-visible:ring-0">
-          <WishlistPageClient
-            initialWishlist={bootstrap.wishlist}
-            userId={userId}
-            layoutVariant="embedded"
-          />
-        </TabsContent>
-
-      </Tabs>
-    </div>
-  );
-}
-
-// --- Sub-Components ---
-
-function OverviewCard({ label, value, subtext, className, variant = 'primary' }: { label: string, value: string, subtext?: string, className?: string, variant?: 'primary' | 'secondary' }) {
-  const borderClass = variant === 'primary' ? 'border-l-primary hover:bg-primary/5' : 'border-l-muted-foreground hover:bg-muted/10';
-  return (
-    <div className={cn("rounded-xl p-4 shadow-sm border border-border border-l-4 bg-card transition-all group", borderClass, className)}>
-      <p className="text-muted-foreground text-[10px] font-bold uppercase tracking-widest mb-2 font-sans group-hover:text-foreground transition-colors">{label}</p>
-      <div className="flex items-baseline gap-2">
-        <p className={cn("text-2xl md:text-3xl font-black tracking-tighter font-display", variant === 'primary' ? "text-primary" : "text-foreground")}>{value}</p>
-        {subtext && <span className={cn("text-xs font-bold font-sans", variant === 'primary' ? "text-primary/80" : "text-muted-foreground")}>{subtext}</span>}
-      </div>
-    </div>
-  );
-}
-
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-
-function MatteGoalCard({ goal, onUpdate }: { goal: Goal, onUpdate?: (updatedGoal: Goal) => void }) {
-  const [bgImage, setBgImage] = useState<string | null>(goal.imageUrl || null);
-  const [isAddingFunds, setIsAddingFunds] = useState(false);
-  const [fundsAmount, setFundsAmount] = useState("");
-  const [fundsSource, setFundsSource] = useState("Salary");
-  const [fundsNote, setFundsNote] = useState("");
-  const [isSaving, setIsSaving] = useState(false);
-  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [showHistory, setShowHistory] = useState(false);
-
-  const progress = Math.min(100, Math.max(0, (goal.currentAmount / goal.targetAmount) * 100));
-
-  // Calculate breakdown from contributions if available
-  const contributions = (goal as any).contributions || [];
-  const hasHistory = contributions.length > 0;
-
-  const sourcesBreakdown = useMemo(() => {
-    if (!hasHistory) return null;
-    const breakdown: Record<string, number> = {};
-    contributions.forEach((c: any) => {
-      breakdown[c.source] = (breakdown[c.source] || 0) + Number(c.amount);
-    });
-    return Object.entries(breakdown).map(([name, amount]) => ({ name, amount: Number(amount) }));
-  }, [contributions, hasHistory]);
-
-  const handleRegenerateImage = useCallback(async () => {
-    if (isGeneratingImage) return;
-    setIsGeneratingImage(true);
-    try {
-      const res = await fetchAndSaveGoalImage(goal.id, goal.title);
-      if (res.success && res.path) {
-        setBgImage(res.path);
-        onUpdate?.({ ...goal, imageUrl: res.path });
-      }
-    } catch (error) {
-      console.error("Failed to regenerate image", error);
-    } finally {
-      setIsGeneratingImage(false);
-    }
-  }, [goal, onUpdate, isGeneratingImage]);
-
-  // Auto-fetch image if missing
-  useEffect(() => {
-    if (!bgImage && !isGeneratingImage) {
-      handleRegenerateImage();
-    }
-  }, [bgImage, isGeneratingImage, handleRegenerateImage]);
-
-  const handleAddFunds = async () => {
-    if (!fundsAmount || isNaN(Number(fundsAmount))) return;
-
-    setIsSaving(true);
-    try {
-      const addedAmount = parseFloat(fundsAmount);
-      // We calculate new amount locally for optimistic UI
-      const newAmount = (goal.currentAmount || 0) + addedAmount;
-
-      const response = await fetch('/api/goals', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: goal.id,
-          currentAmount: newAmount,
-          contributionAmount: addedAmount,
-          contributionSource: fundsSource,
-          contributionNote: fundsNote
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to update goal');
-      }
-
-      const updatedGoalData = await response.json();
-      onUpdate?.(updatedGoalData);
-
-      setDialogOpen(false);
-      setFundsAmount("");
-      setFundsNote("");
-      setFundsSource("Salary");
-    } catch (error) {
-      console.error("Failed to add funds", error);
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  return (
-    <div className="group relative overflow-hidden rounded-xl border border-border bg-card transition-all hover:border-primary/50 border-l-4 border-l-primary">
-      <div className="flex flex-col md:flex-row gap-4 p-4 relative z-10">
-        <div className="flex-1">
-          <div className="flex justify-between items-start mb-4">
-            <div>
-              <h3 className="text-xl font-black text-foreground mb-1 font-display tracking-tight">{goal.title}</h3>
-              <p className="text-muted-foreground text-[10px] font-bold uppercase tracking-widest flex items-center gap-2">
-                <span>Target: {goal.targetDate ? formatDateLabel(goal.targetDate) : 'Ongoing'}</span>
-                <span className="w-1 h-1 rounded-full bg-border" />
-                <span>Automated</span>
-              </p>
-            </div>
-            <Badge variant="outline" className={cn("border-border rounded-lg px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest bg-transparent", goal.status === 'COMPLETED' ? 'text-primary border-primary/50' : 'text-primary border-primary/20')}>
-              {goal.status === 'COMPLETED' ? 'Done' : 'On Track'}
-            </Badge>
-          </div>
-
-          <div className="mb-4">
-            <div className="flex justify-between items-end mb-3">
-              <span className="text-3xl font-light tracking-tighter text-foreground font-display">
-                {formatCurrency(goal.currentAmount)} <span className="text-sm font-bold text-muted-foreground/60 tracking-normal font-sans">/ {formatCurrency(goal.targetAmount)}</span>
+          
+          <nav className="hidden md:flex items-center gap-6 ml-4 border-l border-border pl-6 h-10">
+            {['Overview', 'Goals', 'Deadlines', 'Wishlist'].map((tab) => (
+              <span
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={cn(
+                  "text-[9px] font-black uppercase tracking-widest cursor-pointer mt-0.5 relative h-full flex items-center",
+                  activeTab === tab ? "text-foreground after:absolute after:bottom-0 after:left-0 after:w-full after:h-0.5 after:bg-foreground" : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {tab}
               </span>
-              <span className="text-sm font-black text-foreground">{Math.round(progress)}%</span>
-            </div>
-            <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
-              <div
-                className="h-full bg-primary rounded-full transition-all duration-1000 ease-out"
-                style={{ width: `${progress}%` }}
-              />
-            </div>
-          </div>
+            ))}
+          </nav>
+        </div>
 
-          <div className="flex items-center gap-3">
-            {/* Add Funds Dialog */}
-            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-              <DialogTrigger asChild>
-                <Button className="h-9 px-4 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 text-[10px] font-black uppercase tracking-widest shadow-lg shadow-primary/20">
-                  <Plus className="mr-2 h-3 w-3" />
-                  Add Funds
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-sm border-border bg-card shadow-lg">
-                <DialogHeader>
-                  <DialogTitle className="text-foreground">Add to Savings</DialogTitle>
-                  <DialogDescription className="text-muted-foreground">
-                    Record a contribution to <strong>{goal.title}</strong>.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="amount" className="text-muted-foreground">Amount (₹)</Label>
-                    <Input
-                      id="amount"
-                      type="number"
-                      placeholder="e.g. 5000"
-                      value={fundsAmount}
-                      onChange={(e) => setFundsAmount(e.target.value)}
-                      className="bg-muted border-border text-foreground placeholder:text-muted-foreground/40"
-                      autoFocus
-                    />
+        <div className="flex items-center gap-3">
+           <Button 
+            variant="outline" 
+            size="sm" 
+            className="rounded-none h-9 px-4 border-border bg-muted/20 font-black text-[9px] uppercase tracking-widest"
+            onClick={refreshModule}
+            disabled={isRefreshing}
+          >
+            <RefreshCw className={cn("w-3 h-3 mr-2", isRefreshing && "animate-spin")} />
+            REFRESH_SYNC
+          </Button>
+          <Button 
+            size="sm" 
+            className="rounded-none h-9 px-6 font-black text-[9px] uppercase tracking-widest shadow-lg shadow-primary/20"
+            onClick={() => {
+              if (activeTab === 'Goals') router.push('/goals?action=new');
+              else if (activeTab === 'Deadlines') router.push('/deadlines?action=new');
+              else if (activeTab === 'Wishlist') router.push('/wishlist?action=new');
+              else router.push('/goals?action=new');
+            }}
+          >
+            <Plus className="w-3 h-3 mr-2" />
+            INITIALIZE_ENTITY
+          </Button>
+        </div>
+      </header>
+
+      <main className="flex-1 flex flex-col max-w-none w-full border-x border-border bg-background">
+        {activeTab === 'Overview' && (
+          <div className="flex-1 flex flex-col">
+            {/* Metric Strip */}
+            <section className="grid grid-cols-1 md:grid-cols-4 border-b border-border">
+              <div className="p-4 border-r border-border flex flex-col justify-between">
+                <span className="text-[8px] font-black uppercase tracking-[0.2em] text-muted-foreground mb-4">Cumulative_Capital</span>
+                <div>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-3xl font-black tabular-nums numeric tracking-tighter">{formatCurrency(totalTargetAmount).split('.')[0]}</span>
+                    <span className="text-[8px] font-black text-muted-foreground/40 uppercase">INR</span>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="source" className="text-muted-foreground">Source</Label>
-                    <Select value={fundsSource} onValueChange={setFundsSource}>
-                      <SelectTrigger className="bg-muted border-border text-foreground">
-                        <SelectValue placeholder="Select source" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Salary">Salary</SelectItem>
-                        <SelectItem value="Bonus">Bonus</SelectItem>
-                        <SelectItem value="Savings">General Savings</SelectItem>
-                        <SelectItem value="Business">Business Profit</SelectItem>
-                        <SelectItem value="Gift">Gift</SelectItem>
-                        <SelectItem value="Other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
+                  <p className="text-[8px] font-bold mt-1 uppercase tracking-widest text-primary">
+                    TARGET_AGGREGATE
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-4 border-r border-border flex flex-col justify-between bg-muted/5">
+                <span className="text-[8px] font-black uppercase tracking-[0.2em] text-muted-foreground mb-4">Deployment_Velocity</span>
+                <div>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-3xl font-black tabular-nums numeric tracking-tighter">
+                      {((totalCurrentAmount / (totalTargetAmount || 1)) * 100).toFixed(1)}
+                    </span>
+                    <span className="text-[8px] font-black text-muted-foreground/40 uppercase">%_COMPLETED</span>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="note" className="text-muted-foreground">Note (Optional)</Label>
-                    <Input
-                      id="note"
-                      placeholder="e.g. November saving"
-                      value={fundsNote}
-                      onChange={(e) => setFundsNote(e.target.value)}
-                      className="bg-muted border-border text-foreground placeholder:text-muted-foreground/40"
+                  <div className="w-full bg-border h-0.5 mt-2">
+                    <div 
+                      className="bg-foreground h-full" 
+                      style={{ width: `${Math.min(100, (totalCurrentAmount / (totalTargetAmount || 1)) * 100)}%` }}
                     />
                   </div>
                 </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setDialogOpen(false)} className="border-border text-muted-foreground hover:bg-muted hover:text-foreground">Cancel</Button>
-                  <Button onClick={handleAddFunds} disabled={isSaving || !fundsAmount} className="bg-foreground text-background hover:bg-foreground/90">
-                    {isSaving ? 'Adding...' : 'Add Funds'}
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+              </div>
 
-            {/* History Sheet */}
-            <Sheet open={showHistory} onOpenChange={setShowHistory}>
-              <SheetTrigger asChild>
-                <Button variant="outline" className="h-9 px-4 rounded-xl border-border bg-muted/50 text-foreground hover:bg-muted text-[10px] font-black uppercase tracking-widest">
-                  History
-                </Button>
-              </SheetTrigger>
-              <SheetContent className="w-full sm:max-w-md overflow-y-auto">
-                <SheetHeader className="mb-6">
-                  <SheetTitle className="flex items-center gap-2">
-                    <History className="w-5 h-5" /> Savings History
-                  </SheetTitle>
-                  <SheetDescription>
-                    Track how you funded <strong>{goal.title}</strong>
-                  </SheetDescription>
-                </SheetHeader>
-
-                <div className="space-y-8">
-                  {/* Sources Breakdown */}
-                  {sourcesBreakdown && sourcesBreakdown.length > 0 && (
-                    <div className="bg-muted/30 p-4 rounded-lg border border-border">
-                      <h4 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-4 flex items-center gap-2">
-                        <PieChart className="w-4 h-4" /> Source Breakdown
-                      </h4>
-                      <div className="space-y-3">
-                        {sourcesBreakdown.map(source => (
-                          <div key={source.name}>
-                            <div className="flex justify-between text-xs mb-1">
-                              <span className="font-medium text-foreground">{source.name}</span>
-                              <span className="tabular-nums text-muted-foreground">{formatCurrency(source.amount)}</span>
-                            </div>
-                            <div className="h-1.5 w-full bg-background rounded-full overflow-hidden">
-                              <div
-                                className="h-full bg-primary/80 rounded-full"
-                                style={{ width: `${Math.min(100, (source.amount / goal.currentAmount) * 100)}%` }}
-                              />
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Transaction List */}
+              <div className="p-4 border-r border-border">
+                <span className="text-[8px] font-black uppercase tracking-[0.2em] text-muted-foreground mb-4">Active_Entities</span>
+                <div className="grid grid-cols-2 gap-4 mt-2">
                   <div>
-                    <h4 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-4 flex items-center gap-2">
-                      <Wallet className="w-4 h-4" /> Recent Contributions
-                    </h4>
-                    {hasHistory ? (
-                      <div className="space-y-3 relative border-l border-border ml-2 pl-4">
-                        {contributions.map((c: any, i: number) => (
-                          <div key={c.id || i} className="relative">
-                            <div className="absolute -left-[21px] top-1.5 w-2.5 h-2.5 rounded-full bg-muted border border-border" />
-                            <div className="flex justify-between items-start">
-                              <div>
-                                <p className="text-sm font-bold text-foreground">{c.source}</p>
-                                <p className="text-[10px] text-muted-foreground">{formatDateLabel(new Date(c.date))}</p>
-                                {c.note && <p className="text-xs text-muted-foreground mt-0.5 italic">"{c.note}"</p>}
-                              </div>
-                              <p className="text-sm font-bold text-primary tabular-nums">+{formatCurrency(Number(c.amount))}</p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-sm text-muted-foreground italic text-center py-4">No history available yet.</p>
-                    )}
+                    <span className="text-[7px] font-black text-muted-foreground uppercase tracking-widest block mb-1">Goals</span>
+                    <span className="text-sm font-black text-foreground tabular-nums numeric">{goals.length}</span>
+                  </div>
+                  <div>
+                    <span className="text-[7px] font-black text-muted-foreground uppercase tracking-widest block mb-1">Items</span>
+                    <span className="text-sm font-black text-foreground tabular-nums numeric">{wishlistItems.length}</span>
                   </div>
                 </div>
-              </SheetContent>
-            </Sheet>
+              </div>
+
+              <div className="p-4 flex flex-col justify-between bg-primary/[0.02]">
+                <span className="text-[8px] font-black uppercase tracking-[0.2em] text-primary mb-4">Shortfall_Index</span>
+                <div className="flex items-center justify-between">
+                  <span className="text-2xl font-black tabular-nums numeric tracking-tighter">
+                    {formatCurrency(totalTargetAmount - totalCurrentAmount).split('.')[0]}
+                  </span>
+                  <Target className="w-4 h-4 text-primary" />
+                </div>
+              </div>
+            </section>
+
+            <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 overflow-hidden">
+               {/* Left: Goals Audit */}
+               <div className="lg:col-span-8 border-r border-border flex flex-col overflow-hidden bg-background">
+                 <div className="h-10 px-6 border-b border-border bg-muted/20 flex items-center justify-between">
+                    <span className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground">CRITICAL_OBJ_MATRIX</span>
+                    <span onClick={() => setActiveTab('Goals')} className="text-[8px] font-black uppercase tracking-widest text-primary hover:underline cursor-pointer">VIEW_ALL_GOALS &rsaquo;</span>
+                 </div>
+                 
+                 <div className="flex-1 overflow-auto p-4 space-y-px bg-border/20">
+                    {goals.slice(0, 10).map(goal => (
+                      <div key={goal.id} className="bg-background border border-border/50 p-4 group hover:bg-muted/5 transition-none">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-3">
+                            <div className="size-2 rounded-full bg-primary" />
+                            <h4 className="text-[11px] font-black uppercase tracking-tight">{goal.title}</h4>
+                          </div>
+                          <span className="text-[8px] font-black font-mono text-muted-foreground uppercase tracking-widest">
+                            {((goal.currentAmount / goal.targetAmount) * 100).toFixed(0)}%_SYNC
+                          </span>
+                        </div>
+                        <div className="w-full bg-border h-1 rounded-none overflow-hidden">
+                          <div className="bg-foreground h-full transition-all" style={{ width: `${(goal.currentAmount / goal.targetAmount) * 100}%` }} />
+                        </div>
+                        <div className="flex justify-between mt-2">
+                          <span className="text-[9px] font-bold font-mono text-muted-foreground/60">{formatCurrency(goal.currentAmount)}</span>
+                          <span className="text-[9px] font-black font-mono">{formatCurrency(goal.targetAmount)}</span>
+                        </div>
+                      </div>
+                    ))}
+                    {goals.length === 0 && (
+                      <div className="h-full flex flex-col items-center justify-center p-12 text-center">
+                         <Target className="size-12 text-muted-foreground opacity-20 mb-4" />
+                         <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">NO_ACTIVE_TARGETS</span>
+                      </div>
+                    )}
+                 </div>
+               </div>
+
+               {/* Right: Insights & Focus */}
+               <div className="lg:col-span-4 flex flex-col bg-muted/5">
+                 <div className="p-6 border-b border-border">
+                    <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-foreground mb-6">Strategic_Focus</h3>
+                    <div className="space-y-6">
+                      {upcomingDeadlines.slice(0, 3).map(deadline => (
+                        <div key={deadline.id} className="p-4 border border-border bg-background relative overflow-hidden group">
+                           <div className="absolute top-0 left-0 w-1 h-full bg-rose-500" />
+                           <div className="flex justify-between items-start mb-2">
+                              <span className="text-[7px] font-black text-rose-500 uppercase tracking-widest">URGENT_DEADLINE</span>
+                              <span className="text-[8px] font-black font-mono text-muted-foreground opacity-50">{new Date(deadline.dueDate).toLocaleDateString().toUpperCase()}</span>
+                           </div>
+                           <h5 className="text-[10px] font-black uppercase tracking-tight mb-2">{deadline.title}</h5>
+                           <p className="text-[11px] font-black font-mono text-foreground">{formatCurrency(deadline.amount)}</p>
+                        </div>
+                      ))}
+                      {upcomingDeadlines.length === 0 && (
+                        <div className="p-8 border border-dashed border-border text-center">
+                           <span className="text-[8px] font-black uppercase tracking-widest text-muted-foreground opacity-40">CHRONO_MAP_CLEAR</span>
+                        </div>
+                      )}
+                    </div>
+                 </div>
+
+                 <div className="p-6 flex-1 bg-background/50">
+                    <span className="text-[8px] font-black uppercase tracking-widest text-muted-foreground mb-4 block">Deployment_Advice</span>
+                    <div className="p-4 border border-dashed border-border bg-muted/10">
+                      <p className="text-[9px] font-bold text-muted-foreground uppercase leading-relaxed tracking-tight">
+                        Aggregated planning indicates a {((totalCurrentAmount / (totalTargetAmount || 1)) * 100).toFixed(1)}% milestone completion. 
+                        Recommend stabilizing cash outflow to accelerate secondary objective acquisition.
+                      </p>
+                    </div>
+                 </div>
+               </div>
+            </div>
           </div>
-        </div>
+        )}
 
-        {/* Image Section */}
-        <div
-          className="md:w-64 h-40 md:h-auto bg-cover bg-center rounded-lg border border-border/50 relative overflow-hidden shrink-0 group-hover:opacity-100 transition-opacity opacity-80"
-          style={{
-            backgroundImage: bgImage ? `url(${bgImage})` : undefined,
-          }}
-        >
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent md:bg-gradient-to-l md:from-transparent md:to-black/10" />
-
-          {isGeneratingImage ? (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/60">
-              <div className="flex flex-col items-center gap-2">
-                <Sparkles className="h-6 w-6 text-primary animate-pulse" />
-                <span className="text-[10px] font-black text-white uppercase tracking-widest">AI Working...</span>
-              </div>
-            </div>
-          ) : !bgImage ? (
-            <div className="w-full h-full flex flex-col items-center justify-center bg-muted/50 gap-3 p-4 text-center">
-              <div className="bg-background/50 p-2 rounded-full border border-border">
-                <Sparkles className="text-primary/40 h-5 w-5" />
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleRegenerateImage}
-                className="text-[9px] h-7 px-3 font-black uppercase tracking-widest border border-border hover:bg-foreground hover:text-background transition-all"
-              >
-                Generate AI
-              </Button>
-            </div>
-          ) : (
-            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center bg-black/60">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleRegenerateImage}
-                className="text-[10px] h-9 px-4 font-black text-white uppercase tracking-widest border border-white/20 hover:bg-white hover:text-black transition-all"
-              >
-                <RefreshCw className={cn("mr-2 h-3.5 w-3.5", isGeneratingImage && "animate-spin")} />
-                Regenerate
-              </Button>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function WishlistHighlightRow({ item }: { item: import("@/types/wishlist").WishlistItem }) {
-  const fundedPercent = 0; // Current wishlist doesn't strictly track 'currentAmount', assumes pending/completed. Could extend later.
-  // For now, visualize 0% or allow manual override if model supported it.
-  // Wireframe shows funding %. Let's mock random or 0 for now until schema update.
-  const mockFunded = Math.floor(Math.random() * 80);
-
-  return (
-    <div>
-      <div className="flex justify-between mb-2">
-        <span className="text-[11px] font-bold uppercase tracking-tight text-muted-foreground truncate max-w-[150px]">{item.title}</span>
-        <span className="text-[11px] font-black text-foreground">{formatCurrency(Number(item.estimatedCost))}</span>
-      </div>
-      <div className="h-1 w-full bg-muted overflow-hidden rounded-full">
-        <div className="h-full bg-primary" style={{ width: `${mockFunded}%` }}></div>
-      </div>
-      <p className="text-[9px] font-bold text-primary/80 mt-2 uppercase">{mockFunded}% funded</p>
+        {activeTab === 'Goals' && <div className="flex-1 overflow-auto"><GoalsPageClient initialGoals={goals} userId={userId} layoutVariant="standalone" /></div>}
+        {activeTab === 'Deadlines' && <div className="flex-1 overflow-auto"><DeadlinesPageClient initialDeadlines={bootstrap.deadlines} userId={userId} layoutVariant="standalone" /></div>}
+        {activeTab === 'Wishlist' && <div className="flex-1 overflow-auto"><WishlistPageClient initialWishlist={bootstrap.wishlist} userId={userId} /></div>}
+      </main>
     </div>
   );
 }

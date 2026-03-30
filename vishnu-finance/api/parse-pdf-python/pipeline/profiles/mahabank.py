@@ -7,7 +7,7 @@ class MAHBStyle(BaseStyle):
     Bank of Maharashtra Style.
     """
     
-    def extract_entities(self, text: str) -> Tuple[Optional[str], Optional[str], float, str]:
+    def extract_entities(self, text: str) -> Tuple[Optional[str], Optional[str], float, str, Optional[str]]:
         # 1. Pre-clean using base logic
         cleaned = self.clean_description(text)
         from .categories import get_commodity

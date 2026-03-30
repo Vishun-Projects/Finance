@@ -7,5 +7,5 @@ class BKIDStyle(BaseStyle):
     Bank of India Style.
     """
     
-    def extract_entities(self, text: str) -> Tuple[Optional[str], Optional[str], float, str]:
+    def extract_entities(self, text: str) -> Tuple[Optional[str], Optional[str], float, str, Optional[str]]:
         return super().extract_entities(text)

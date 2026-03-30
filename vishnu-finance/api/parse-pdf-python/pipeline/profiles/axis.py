@@ -7,6 +7,6 @@ class AxisStyle(BaseStyle):
     Axis Bank Style.
     """
     
-    def extract_entities(self, text: str) -> Tuple[Optional[str], Optional[str], float, str]:
+    def extract_entities(self, text: str) -> Tuple[Optional[str], Optional[str], float, str, Optional[str]]:
         # Axis often uses standard delimiters handled by BaseStyle
         return super().extract_entities(text)

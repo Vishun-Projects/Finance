@@ -13,7 +13,7 @@ async function tryPythonParser(pdfBuffer: Buffer, bankHint: string, bankParserCo
     if (isVercel) {
       baseUrl = `https://${process.env.VERCEL_URL || process.env.NEXT_PUBLIC_APP_URL}`;
     } else {
-      baseUrl = 'http://127.0.0.1:8001'; // Target local FastAPI microservice
+      baseUrl = 'http://127.0.0.1:8000'; // Target local FastAPI microservice
     }
 
     const pythonFunctionUrl = isVercel 
@@ -136,15 +136,75 @@ export async function POST(request: NextRequest) {
     if (pythonResult.success && pythonResult.data) {
       console.log('✅ PDF API: Python parser succeeded');
       const result = pythonResult.data;
-
+      
       if (result.status === 'needs_password') {
         return NextResponse.json({ success: false, status: 'needs_password', error: 'Password required' }, { status: 401 });
       }
 
+      let transactions = result.transactions || [];
+      const userId = (formData.get('userId') as string) || '';
+
+      // Historical Intelligence: Enrich transactions using previous user behavior
+      if (userId && transactions.length > 0) {
+        console.log(`🤖 PDF API: Enriching ${transactions.length} transactions for userId: ${userId}`);
+        
+        // 1. Get unique identifiers for batch lookup
+        const upiIds = transactions.map((t: any) => t.upiId).filter(Boolean);
+        const stores = transactions.map((t: any) => t.store).filter(Boolean);
+        const personNames = transactions.map((t: any) => t.personName).filter(Boolean);
+
+        // 2. Perform lookups for each unique entity to find their latest categorization/notes
+        // Note: For large statements, we could optimize this with a single complex query, 
+        // but for now, we'll do targeted enrichment.
+        const enrichedTransactions = await Promise.all(transactions.map(async (txn: any) => {
+          let history = null;
+
+          // Sequential check: UPI ID has highest precision, then Store, then Person Name
+          if (txn.upiId) {
+            history = await prisma.transaction.findFirst({
+              where: { userId, upiId: txn.upiId, categoryId: { not: null } },
+              orderBy: { transactionDate: 'desc' },
+              select: { categoryId: true, subcategoryId: true, notes: true, store: true, financialCategory: true }
+            });
+          }
+
+          if (!history && txn.store) {
+            history = await prisma.transaction.findFirst({
+              where: { userId, store: txn.store, categoryId: { not: null } },
+              orderBy: { transactionDate: 'desc' },
+              select: { categoryId: true, subcategoryId: true, notes: true, store: true, financialCategory: true }
+            });
+          }
+
+          if (!history && txn.personName) {
+            history = await prisma.transaction.findFirst({
+              where: { userId, personName: txn.personName, categoryId: { not: null } },
+              orderBy: { transactionDate: 'desc' },
+              select: { categoryId: true, subcategoryId: true, notes: true, store: true, financialCategory: true }
+            });
+          }
+
+          if (history) {
+            return {
+              ...txn,
+              categoryId: history.categoryId,
+              subcategoryId: history.subcategoryId,
+              notes: history.notes,
+              // If the history has a specific store name and current txn is generic, use it
+              store: txn.store || history.store,
+              autoCategorized: true
+            };
+          }
+          return txn;
+        }));
+        
+        transactions = enrichedTransactions;
+      }
+
       return NextResponse.json({
         success: result.success || true,
-        transactions: result.transactions || [],
-        count: result.count || 0,
+        transactions: transactions,
+        count: result.count || transactions.length,
         metadata: result.metadata || {},
         remoteFile: remoteFilePath,
       });

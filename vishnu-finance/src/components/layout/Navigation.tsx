@@ -94,13 +94,15 @@ export default function Navigation() {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-lg transition-colors ${isActive
-                  ? 'text-primary bg-primary/10 border border-primary/20 shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                className={`flex items-center gap-4 w-full px-3 py-3 transition-all duration-200 border-l-4 ${isActive
+                  ? 'text-foreground bg-muted/50 border-l-primary'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/30 border-l-transparent'
                   }`}
               >
-                <Icon className="w-6 h-6 font-light stroke-[1.5]" />
-                <span className="text-sm font-medium">{item.label}</span>
+                <Icon className={cn("w-5 h-5", isActive ? "text-primary" : "text-muted-foreground/40")} />
+                <span className={cn("text-[11px] font-black uppercase tracking-widest", isActive ? "text-foreground" : "text-muted-foreground")}>
+                  {item.label}
+                </span>
               </Link>
             );
           })}
@@ -110,20 +112,20 @@ export default function Navigation() {
         <div className="mt-auto pt-6 border-t border-border">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="flex items-center gap-3 w-full text-left outline-none group">
-                <div className="size-10 rounded-full border border-border flex items-center justify-center overflow-hidden shrink-0 transition-all">
+              <button className="flex items-center gap-3 w-full text-left outline-none group bg-muted/20 p-3 border border-border/50">
+                <div className="size-9 border border-border flex items-center justify-center overflow-hidden shrink-0 transition-all bg-background">
                   {user?.avatarUrl ? (
                     <img alt="Profile" className="size-full object-cover" src={user.avatarUrl} />
                   ) : (
-                    <div className="size-full bg-muted flex items-center justify-center text-muted-foreground">
-                      <UserIcon className="w-5 h-5" />
+                    <div className="size-full flex items-center justify-center text-muted-foreground bg-muted">
+                      <UserIcon className="w-4 h-4" />
                     </div>
                   )}
                 </div>
                 <div className="flex flex-col min-w-0">
-                  <span className="text-sm font-semibold truncate text-foreground">{user?.name || 'User'}</span>
+                  <span className="text-[11px] font-black uppercase tracking-tight truncate text-foreground leading-none mb-1">{user?.name || 'User'}</span>
                   <div className="flex">
-                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-foreground text-background font-bold uppercase tracking-tighter">Premium Member</span>
+                    <span className="text-[8px] px-1.5 py-0.5 bg-primary/10 text-primary font-black uppercase tracking-widest border border-primary/20">Audit Tier: 1</span>
                   </div>
                 </div>
               </button>
@@ -158,7 +160,7 @@ export default function Navigation() {
                       <span className="text-[10px] font-medium">{item.label}</span>
                     </button>
                   </SheetTrigger>
-                  <SheetContent side="bottom" className="h-[80vh] rounded-t-xl bg-card border-t border-border p-0">
+                  <SheetContent side="bottom" className="h-[80vh] bg-card border-t border-border p-0 rounded-none">
                     {/* Reusing the Drawer Content Logic but adapting for bottom sheet style */}
                     <SheetHeader className="p-6 text-left border-b border-border">
                       <SheetTitle className="text-lg font-bold flex items-center gap-3">
@@ -252,16 +254,16 @@ export default function Navigation() {
 
       {/* Mobile Top Bar (Clean) */}
       <div className={cn(
-        "fixed top-0 left-0 right-0 z-40 border-b border-border bg-background lg:hidden px-4 h-14 flex items-center justify-between transition-all duration-300",
-        pathname === '/dashboard' ? "opacity-0 invisible pointer-events-none h-0" : "opacity-100 visible h-14"
+        "fixed top-0 left-0 right-0 z-40 border-b border-border bg-background lg:hidden px-4 h-12 flex items-center justify-between transition-all duration-300",
+        pathname === '/dashboard' ? "opacity-0 invisible pointer-events-none h-0" : "opacity-100 visible h-12"
       )}>
         <div className="flex items-center gap-2">
-          <div className="size-8 flex items-center justify-center shrink-0">
+          <div className="size-7 flex items-center justify-center shrink-0">
             <img src="/icon-removebg-preview.png" alt="Logo" className="w-full h-full object-contain" />
           </div>
-          <span className="text-sm font-bold tracking-widest uppercase text-foreground">Vishnu</span>
+          <span className="text-[10px] font-black tracking-[0.3em] uppercase text-foreground leading-none">Vishnu Finance</span>
         </div>
-        <div className="w-8"></div>
+        <div className="w-7"></div>
       </div>
     </>
   );

@@ -27,7 +27,9 @@ import {
   Briefcase,
   PieChart as PieChartIcon,
   ChevronRight,
-  ArrowRight
+  ArrowRight,
+  AlarmClock,
+  Loader2
 } from 'lucide-react';
 import {
   XAxis,
@@ -52,6 +54,8 @@ import { Progress } from '@/components/ui/progress';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 // Chart colors
 const COLORS = ['#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#3b82f6'];
@@ -422,708 +426,417 @@ export default function SalaryStructureManagement() {
   }
 
   return (
-    <div className="space-y-4 animate-in fade-in duration-500 max-w-7xl mx-auto">
-      {/* Header Section */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
-            My Compensation
+    <div className="flex flex-col h-[calc(100vh-64px)] overflow-hidden bg-background">
+      {/* Industrial Audit Header */}
+      <header className="h-10 shrink-0 border-b border-border bg-muted/20 flex items-center justify-between px-4">
+        <div className="flex items-center gap-4">
+          <h1 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground font-mono">
+            COMPENSATION_AUDIT_LOG_V2
           </h1>
-          <p className="text-muted-foreground mt-1">
-            Manage your salary structures, analyze breakdowns, and track history.
+          <div className="h-4 w-[1px] bg-border" />
+          <p className="text-[9px] font-bold text-muted-foreground/60 uppercase tracking-widest font-mono">
+            ESTABLISHED: {activeStructure ? new Date(activeStructure.effectiveDate).getFullYear() : '----'}
           </p>
         </div>
-        <Sheet open={showForm} onOpenChange={(open) => {
-          setShowForm(open);
-          if (!open) { setEditingStructure(null); resetForm(); }
-        }}>
-          <SheetTrigger asChild>
-            <Button size="lg" className="w-full md:w-auto shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all active:scale-[0.98] h-12 md:h-11">
-              <Plus className="mr-2 h-5 w-5 md:h-4 md:w-4" />
-              {salaryStructures.length > 0 ? 'Update Structure' : 'Add Salary'}
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="bottom" className="h-[92vh] sm:h-[85vh] rounded-t-[2.5rem] p-0 overflow-hidden border-t border-border/10 focus-visible:outline-none">
-            <div className="flex justify-center pt-3 pb-1">
-              <div className="w-12 h-1.5 rounded-full bg-muted/40" />
-            </div>
-            <div className="px-6 py-4 overflow-y-auto h-full pb-32">
-              <SheetHeader className="text-left">
-                <SheetTitle className="text-xl font-black uppercase tracking-widest">{editingStructure ? 'Edit Salary' : 'New Salary'}</SheetTitle>
-                <SheetDescription className="text-xs font-semibold uppercase tracking-tight opacity-70">
-                  {editingStructure ? 'Modify your compensation plan.' : 'Add your new earnings structure.'}
-                </SheetDescription>
-              </SheetHeader>
-              <div className="mt-6 space-y-6 pb-20">
-                {/* Form implementation inline for simplicity in this artifact, ideally extracted */}
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Job Title</label>
-                      <input
-                        name="jobTitle"
-                        value={formData.jobTitle}
-                        onChange={handleInputChange}
-                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                        placeholder="e.g. Senior Engineer"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Company</label>
-                      <input
-                        name="company"
-                        value={formData.company}
-                        onChange={handleInputChange}
-                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                        placeholder="e.g. Acme Corp"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Annual Basic Salary (Total CTC if unsure, but preferably Basic)</label>
-                    <div className="relative">
-                      <DollarSign className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                      <input
-                        name="baseSalary"
-                        type="number"
-                        value={formData.baseSalary}
-                        onChange={handleInputChange}
-                        className="flex h-10 w-full rounded-md border border-input bg-background pl-9 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                        placeholder="0.00"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Allowances Section */}
-                  <div className="space-y-2 p-4 border rounded-lg bg-card/50">
-                    <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
-                      <TrendingUp className="h-4 w-4 text-green-500" /> Monthly Allowances
-                    </h3>
-                    <div className="flex gap-2">
-                      <input
-                        value={allowanceName}
-                        onChange={(e) => setAllowanceName(e.target.value)}
-                        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors"
-                        placeholder="Name (e.g. HRA)"
-                      />
-                      <input
-                        type="number"
-                        value={allowanceAmount}
-                        onChange={(e) => setAllowanceAmount(e.target.value)}
-                        className="flex h-9 w-24 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors"
-                        placeholder="Amount"
-                      />
-                      <Button type="button" size="sm" variant="outline" onClick={handleAddAllowance}><Plus className="h-4 w-4" /></Button>
-                    </div>
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      {Object.entries(formData.allowances).map(([key, val]) => (
-                        <Badge key={key} variant="secondary" className="pl-2 pr-1 py-1 flex items-center gap-2">
-                          {key}: {formatRupees(Number(val))}
-                          <X className="h-3 w-3 cursor-pointer hover:text-destructive" onClick={() => handleRemoveAllowance(key)} />
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Deductions Section */}
-                  <div className="space-y-2 p-4 border rounded-lg bg-card/50">
-                    <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
-                      <ArrowDown className="h-4 w-4 text-red-500" /> Monthly Deductions
-                    </h3>
-                    <div className="flex gap-2">
-                      <input
-                        value={deductionName}
-                        onChange={(e) => setDeductionName(e.target.value)}
-                        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors"
-                        placeholder="Name (e.g. PF)"
-                      />
-                      <input
-                        type="number"
-                        value={deductionAmount}
-                        onChange={(e) => setDeductionAmount(e.target.value)}
-                        className="flex h-9 w-24 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors"
-                        placeholder="Amount"
-                      />
-                      <Button type="button" size="sm" variant="outline" onClick={handleAddDeduction}><Plus className="h-4 w-4" /></Button>
-                    </div>
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      {Object.entries(formData.deductions).map(([key, val]) => (
-                        <Badge key={key} variant="outline" className="pl-2 pr-1 py-1 flex items-center gap-2 border-red-200 text-red-700 dark:text-red-400 dark:border-red-900">
-                          {key}: {formatRupees(Number(val))}
-                          <X className="h-3 w-3 cursor-pointer hover:text-destructive" onClick={() => handleRemoveDeduction(key)} />
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Employer Contributions Section */}
-                  <div className="space-y-2 p-4 border rounded-lg bg-card/50">
-                    <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
-                      <Building className="h-4 w-4 text-blue-500" /> Monthly Employer Contributions
-                    </h3>
-                    <div className="flex gap-2">
-                      <input
-                        value={employerContributionName}
-                        onChange={(e) => setEmployerContributionName(e.target.value)}
-                        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors"
-                        placeholder="Name (e.g. Employer PF)"
-                      />
-                      <input
-                        type="number"
-                        value={employerContributionAmount}
-                        onChange={(e) => setEmployerContributionAmount(e.target.value)}
-                        className="flex h-9 w-24 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors"
-                        placeholder="Amount"
-                      />
-                      <Button type="button" size="sm" variant="outline" onClick={handleAddEmployerContribution}><Plus className="h-4 w-4" /></Button>
-                    </div>
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      {Object.entries(formData.employerContributions).map(([key, val]) => (
-                        <Badge key={key} variant="outline" className="pl-2 pr-1 py-1 flex items-center gap-2 border-blue-200 text-blue-700 dark:text-blue-400 dark:border-blue-900">
-                          {key}: {formatRupees(Number(val))}
-                          <X className="h-3 w-3 cursor-pointer hover:text-destructive" onClick={() => handleRemoveEmployerContribution(key)} />
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Effective Date</label>
-                      <input
-                        type="date"
-                        name="effectiveDate"
-                        value={formData.effectiveDate}
-                        onChange={handleInputChange}
-                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Location</label>
-                      <input
-                        name="location"
-                        value={formData.location}
-                        onChange={handleInputChange}
-                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                        placeholder="e.g. Bangalore"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Grade & Department */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Grade / Level</label>
-                      <input
-                        name="grade"
-                        value={formData.grade}
-                        onChange={handleInputChange}
-                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                        placeholder="e.g. L4, Senior"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Department</label>
-                      <input
-                        name="department"
-                        value={formData.department}
-                        onChange={handleInputChange}
-                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                        placeholder="e.g. Engineering"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Change Type & Reason (for timeline) */}
-                  <div className="space-y-2 p-4 border rounded-lg bg-muted/30">
-                    <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
-                      <History className="h-4 w-4 text-purple-500" /> Change Details (for Timeline)
-                    </h3>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">Change Type</label>
-                        <select
-                          name="changeType"
-                          value={formData.changeType}
-                          onChange={handleInputChange}
-                          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                        >
-                          <option value="NEW_JOB">New Job</option>
-                          <option value="PROMOTION">Promotion</option>
-                          <option value="SALARY_REVISION">Salary Revision</option>
-                          <option value="TRANSFER">Transfer</option>
-                          <option value="COMPANY_CHANGE">Company Change</option>
-                          <option value="LOCATION_CHANGE">Location Change</option>
-                          <option value="DEPARTMENT_CHANGE">Department Change</option>
-                          <option value="OTHER">Other</option>
-                        </select>
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">Change Reason</label>
-                        <input
-                          name="changeReason"
-                          value={formData.changeReason}
-                          onChange={handleInputChange}
-                          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                          placeholder="e.g. Annual appraisal"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                  <Button onClick={handleSubmit} className="w-full" size="lg">Save Structure</Button>
-                </div>
-              </div>
-            </div>
-          </SheetContent>
-        </Sheet>
-      </div>
+        <div className="flex items-center gap-px">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="h-10 px-4 rounded-none border-l border-border hover:bg-muted text-[10px] font-black uppercase tracking-widest gap-2"
+            onClick={() => setShowForm(true)}
+          >
+            <Plus size={14} />
+            UPDATE_PROTOCOL
+          </Button>
+        </div>
+      </header>
 
       {activeStructure ? (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Main Info Card */}
-          <Card className="md:col-span-2 overflow-hidden border border-border bg-card">
+        <div className="flex-1 flex overflow-hidden">
+          {/* Main Ledger Pane */}
+          <div className="flex-1 flex flex-col overflow-y-auto custom-scrollbar border-r border-border">
+            {/* High-Density Metric Strip */}
+            <div className="grid grid-cols-4 border-b border-border bg-muted/5">
+              <div className="p-4 border-r border-border">
+                <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest font-mono mb-1">GROSS_ANNUAL</p>
+                <p className="text-xl font-black text-foreground font-mono tabular-nums">{formatRupees(grossAnnual)}</p>
+              </div>
+              <div className="p-4 border-r border-border">
+                <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest font-mono mb-1">CTC_VALUATION</p>
+                <p className="text-xl font-black text-blue-600 font-mono tabular-nums">{formatRupees(annualCTC)}</p>
+              </div>
+              <div className="p-4 border-r border-border">
+                <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest font-mono mb-1">NET_MONTHLY</p>
+                <p className="text-xl font-black text-emerald-600 font-mono tabular-nums">{formatRupees(netMonthly)}</p>
+              </div>
+              <div className="p-4 bg-emerald-500/5">
+                <p className="text-[9px] font-black text-emerald-600/60 uppercase tracking-widest font-mono mb-1">RETENTION_COEFF</p>
+                <p className="text-xl font-black text-emerald-600 font-mono">
+                  {((netMonthly / grossMonthly) * 100).toFixed(2)}%
+                </p>
+              </div>
+            </div>
 
-            <CardHeader className="pb-2">
-              <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+            <div className="p-6 space-y-8">
+              {/* Active Entity Descriptor */}
+              <div className="flex items-start justify-between">
                 <div>
-                  <CardTitle className="text-xl md:text-2xl font-black flex items-center gap-2 tracking-tight">
-                    {activeStructure.jobTitle}
-                    <Badge variant="secondary" className="text-[9px] font-black uppercase tracking-widest py-0.5">Active</Badge>
-                  </CardTitle>
-                  <CardDescription className="text-sm md:text-base mt-1 flex items-center gap-2 font-semibold">
-                    <Briefcase className="w-4 h-4 text-primary/70" /> {activeStructure.company}
-                    <span className="text-muted-foreground/30">•</span>
-                    <MapPin className="w-4 h-4 text-primary/70" /> {activeStructure.location || 'Remote'}
-                  </CardDescription>
-                </div>
-                <div className="hidden sm:flex h-12 w-12 rounded-full border-2 border-background shadow-sm items-center justify-center overflow-hidden bg-primary/20 text-primary font-bold">
-                  {activeStructure.company.substring(0, 2).toUpperCase()}
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="pt-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2 p-3 rounded-lg bg-muted/30 border border-border shadow-sm">
-                <div className="space-y-1 p-1">
-                  <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest opacity-60">Gross Annual</p>
-                  <p className="text-lg font-black text-foreground tabular-nums">{formatRupees(grossAnnual)}</p>
-                </div>
-                <div className="space-y-1 p-1">
-                  <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest opacity-60">Annual CTC</p>
-                  <p className="text-lg font-black text-blue-600 dark:text-blue-400 tabular-nums">{formatRupees(annualCTC)}</p>
-                </div>
-                <div className="space-y-1 p-1">
-                  <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest opacity-60">Monthly Net</p>
-                  <p className="text-lg font-black text-primary tabular-nums">{formatRupees(netMonthly)}</p>
-                </div>
-                <div className="flex items-center gap-4 sm:hidden pt-2 border-t border-border/10">
-                  <div className="flex-1 space-y-1">
-                    <p className="text-[9px] text-muted-foreground font-black uppercase tracking-widest opacity-60">Allowances</p>
-                    <p className="text-sm font-bold text-green-600">+{formatRupees(totalMonthlyAllowances)}</p>
+                  <div className="flex items-center gap-3 mb-2">
+                    <h2 className="text-2xl font-black tracking-tighter uppercase">{activeStructure.jobTitle}</h2>
+                    <span className="px-1.5 py-0.5 border border-emerald-500/20 bg-emerald-500/10 text-emerald-600 text-[9px] font-black uppercase tracking-widest">ACTIVE_NODE</span>
                   </div>
-                  <div className="flex-1 space-y-1">
-                    <p className="text-[9px] text-muted-foreground font-black uppercase tracking-widest opacity-60">Deductions</p>
-                    <p className="text-sm font-bold text-red-600">-{formatRupees(totalMonthlyDeductions)}</p>
+                  <div className="flex items-center gap-4 text-[11px] font-bold text-muted-foreground uppercase tracking-tight">
+                    <span className="flex items-center gap-1.5"><Building size={14} /> {activeStructure.company}</span>
+                    <span className="text-border">|</span>
+                    <span className="flex items-center gap-1.5"><MapPin size={14} /> {activeStructure.location || 'REMOTE'}</span>
+                    <span className="text-border">|</span>
+                    <span className="flex items-center gap-1.5"><Calendar size={14} /> EF: {new Date(activeStructure.effectiveDate).toLocaleDateString()}</span>
                   </div>
                 </div>
               </div>
 
-              {/* Salary Breakdown (Solid & Simple) */}
-              <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
-                <div className="space-y-4">
-                  <h4 className="font-semibold text-sm mb-1">Monthly Breakdown</h4>
-                  <div className="space-y-2">
-                    {salaryComponents.map((comp, i) => (
-                      <div key={comp.name} className="flex items-center justify-between text-sm py-1 border-b border-border/50 last:border-0">
-                        <span className="text-muted-foreground capitalize">{comp.name}</span>
-                        <span className="font-mono font-bold">{formatRupees(comp.value)}</span>
+              {/* Composition Breakdown */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+                <div className="space-y-6">
+                  <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground font-mono flex items-center gap-2">
+                    <div className="size-1.5 bg-foreground" /> COMPONENT_AUDIT
+                  </h4>
+                  <div className="border border-border">
+                    <div className="grid grid-cols-[1fr_auto] bg-muted/30 border-b border-border h-8 items-center px-3">
+                      <span className="text-[9px] font-black uppercase tracking-widest font-mono text-muted-foreground">DESCRIPTOR</span>
+                      <span className="text-[9px] font-black uppercase tracking-widest font-mono text-muted-foreground text-right">VALUE_MONTHLY</span>
+                    </div>
+                    <div className="divide-y divide-border/50">
+                      <div className="grid grid-cols-[1fr_auto] h-10 items-center px-3 hover:bg-muted/10">
+                        <span className="text-[10px] font-bold uppercase font-mono">BASIC_PAY</span>
+                        <span className="text-[11px] font-black font-mono tabular-nums">{formatRupees(monthlyBasic)}</span>
                       </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Salary Trend Chart */}
-                {historyChartData.length > 1 && (
-                  <div className="space-y-4">
-                    <div className="h-36 w-full border border-border rounded-lg p-3 bg-muted/10">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={historyChartData}>
-                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
-                          <XAxis 
-                            dataKey="date" 
-                            axisLine={false} 
-                            tickLine={false} 
-                            tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
-                            dy={10}
-                          />
-                          <YAxis 
-                            hide 
-                            domain={['auto', 'auto']}
-                          />
-                          <Tooltip 
-                            content={({ active, payload }) => {
-                              if (active && payload && payload.length) {
-                                return (
-                                  <div className="bg-card border border-border p-2 rounded shadow-sm">
-                                    <p className="text-[10px] text-muted-foreground uppercase font-bold">{payload[0].payload.fullDate}</p>
-                                    <p className="text-sm font-bold">{formatRupees(payload[0].value as number)}</p>
-                                  </div>
-                                );
-                              }
-                              return null;
-                            }}
-                          />
-                          <Line 
-                            type="monotone" 
-                            dataKey="salary" 
-                            stroke="hsl(var(--primary))" 
-                            strokeWidth={2.5} 
-                            dot={{ r: 4, fill: 'hsl(var(--primary))', strokeWidth: 2, stroke: 'hsl(var(--card))' }}
-                            activeDot={{ r: 6, strokeWidth: 0 }}
-                          />
-                        </LineChart>
-                      </ResponsiveContainer>
+                      {salaryComponents.filter(c => c.name !== 'Basic Pay').map((comp) => (
+                        <div key={comp.name} className="grid grid-cols-[1fr_auto] h-10 items-center px-3 hover:bg-muted/10">
+                          <span className="text-[10px] font-bold uppercase font-mono">{comp.name}</span>
+                          <span className="text-[11px] font-black font-mono tabular-nums">{formatRupees(comp.value)}</span>
+                        </div>
+                      ))}
+                      <div className="grid grid-cols-[1fr_auto] h-10 items-center px-3 bg-muted/5">
+                        <span className="text-[10px] font-black uppercase font-mono text-rose-600">TOTAL_DEDUCTIONS</span>
+                        <span className="text-[11px] font-black font-mono tabular-nums text-rose-600">-{formatRupees(totalMonthlyDeductions)}</span>
+                      </div>
                     </div>
                   </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+                </div>
 
-          {/* Quick Stats / Side Column */}
-          <div className="space-y-4">
-            {/* Net Pay Highlight */}
-            <Card className="bg-primary text-primary-foreground border-none shadow-xl">
-              <CardHeader className="pb-2">
-                <CardDescription className="text-primary-foreground/80">Monthly Take Home</CardDescription>
-                <CardTitle className="text-2xl font-bold tracking-tight">
-                  {formatRupees(netMonthly)}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-xs text-primary-foreground/70 bg-primary-foreground/10 p-2 rounded inline-block">
-                  After all deductions
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Details List */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Details</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-muted-foreground flex items-center gap-2"><Calendar className="w-4 h-4" /> Effective Date</span>
-                  <span className="font-medium">{new Date(activeStructure.effectiveDate).toLocaleDateString()}</span>
-                </div>
-                <Separator />
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-muted-foreground flex items-center gap-2"><Award className="w-4 h-4" /> Grade</span>
-                  <span className="font-medium">{activeStructure.grade || '-'}</span>
-                </div>
-                <Separator />
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-muted-foreground flex items-center gap-2"><Users className="w-4 h-4" /> Department</span>
-                  <span className="font-medium">{activeStructure.department || '-'}</span>
-                </div>
-                {activeStructure.notes && (
-                  <div className="pt-4 text-sm text-muted-foreground italic">
-                    &quot;{activeStructure.notes}&quot;
+                {/* Telemetry Chart */}
+                <div className="space-y-6">
+                  <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground font-mono flex items-center gap-2">
+                    <div className="size-1.5 bg-primary" /> GROWTH_TELEMETRY
+                  </h4>
+                  <div className="h-64 w-full border border-border bg-muted/5 p-6 relative">
+                    <div className="absolute top-4 right-6 text-[9px] font-mono text-muted-foreground flex items-center gap-4">
+                      <span className="flex items-center gap-2"><div className="size-1.5 bg-primary" /> BASE_SALARY_V3</span>
+                    </div>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={historyChartData}>
+                        <CartesianGrid strokeDasharray="2 2" vertical={false} stroke="hsl(var(--border))" opacity={0.4} />
+                        <XAxis 
+                          dataKey="date" 
+                          axisLine={false} 
+                          tickLine={false} 
+                          tick={{ fontSize: 9, fill: 'hsl(var(--muted-foreground))', fontWeight: 'bold', fontFamily: 'var(--font-mono)' }}
+                          dy={10}
+                        />
+                        <YAxis 
+                          hide 
+                          domain={['auto', 'auto']}
+                        />
+                        <Tooltip 
+                          content={({ active, payload }) => {
+                            if (active && payload && payload.length) {
+                              return (
+                                <div className="bg-background border border-border p-3 rounded-none shadow-2xl">
+                                  <p className="text-[9px] text-muted-foreground uppercase font-black tracking-widest font-mono mb-1">{payload[0].payload.fullDate}</p>
+                                  <p className="text-[11px] font-black text-primary font-mono tabular-nums">{formatRupees(payload[0].value as number)}</p>
+                                </div>
+                              );
+                            }
+                            return null;
+                          }}
+                        />
+                        <Line 
+                          type="monotone" 
+                          dataKey="salary" 
+                          stroke="hsl(var(--primary))" 
+                          strokeWidth={2.5} 
+                          dot={{ r: 0 }}
+                          activeDot={{ r: 4, strokeWidth: 0, fill: 'hsl(var(--primary))' }}
+                          animationDuration={1500}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
                   </div>
-                )}
-              </CardContent>
-            </Card>
+                </div>
+              </div>
+            </div>
           </div>
+
+          {/* Historical Log Sidebar */}
+          <aside className="w-80 lg:w-96 shrink-0 flex flex-col bg-background border-l border-border overflow-y-auto custom-scrollbar">
+            <div className="h-10 px-4 border-b border-border bg-muted/20 flex items-center justify-between">
+              <h2 className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground font-mono">HISTORICAL_ARCHIVE</h2>
+              <span className="text-[9px] font-mono text-muted-foreground/50">{salaryHistory.length} ENTRIES</span>
+            </div>
+            
+            <div className="divide-y divide-border">
+              {salaryHistory.map((item) => {
+                const allowances = typeof item.allowances === 'string' ? JSON.parse(item.allowances || '{}') : (item.allowances || {});
+                const deductions = typeof item.deductions === 'string' ? JSON.parse(item.deductions || '{}') : (item.deductions || {});
+                const totalAllowances = Object.values(allowances).reduce((sum: number, val: any) => sum + (Number(val) || 0), 0);
+                const totalDeductions = Object.values(deductions).reduce((sum: number, val: any) => sum + (Number(val) || 0), 0);
+                const netMonthly = (Number(item.baseSalary) / 12) + totalAllowances - totalDeductions;
+
+                return (
+                  <div 
+                    key={item.id} 
+                    className="p-4 hover:bg-muted/30 cursor-pointer transition-colors group"
+                    onClick={() => setSelectedHistoryItem(item)}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[9px] font-black text-muted-foreground font-mono opacity-50">
+                          {new Date(item.effectiveDate).toLocaleDateString(undefined, { year: 'numeric', month: 'short' }).toUpperCase()}
+                        </span>
+                        <div className="flex-1" />
+                        <span className="px-1 py-0.5 border border-border bg-muted/50 text-[8px] font-black uppercase tracking-widest mr-2">
+                          {item.changeType}
+                        </span>
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-6 w-6 rounded-none border border-border hover:bg-muted"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEdit(item as any);
+                            }}
+                          >
+                            <Edit size={12} />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-6 w-6 rounded-none border border-border hover:bg-rose-500/10 text-rose-600"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDelete(item.id);
+                            }}
+                          >
+                            <Trash2 size={12} />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                    <h3 className="text-[11px] font-black uppercase tracking-tight mb-2 group-hover:text-primary transition-colors">
+                      {item.jobTitle} @ {item.company}
+                    </h3>
+                    <div className="flex items-end justify-between">
+                      <div className="space-y-0.5">
+                        <p className="text-[9px] text-muted-foreground font-mono uppercase">MONTHLY_NET</p>
+                        <p className="text-sm font-black text-foreground font-mono tabular-nums">{formatRupees(netMonthly)}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[9px] text-muted-foreground font-mono uppercase">ANNUAL_BASE</p>
+                        <p className="text-[11px] font-bold text-muted-foreground font-mono tabular-nums">{formatRupees(Number(item.baseSalary))}</p>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </aside>
         </div>
       ) : (
-        <div className="flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-xl bg-muted/20">
-          <div className="bg-primary/10 p-6 rounded-full mb-4">
-            <DollarSign className="w-8 h-8 text-primary" />
+        <div className="flex-1 flex flex-col items-center justify-center p-12 bg-muted/5">
+          <div className="size-16 border border-border flex items-center justify-center mb-6 bg-background">
+            <DollarSign className="w-8 h-8 text-muted-foreground/40" />
           </div>
-          <h3 className="text-lg font-semibold">No Salary Structure Setup</h3>
-          <p className="text-sm text-muted-foreground max-w-sm text-center mt-2 mb-6">
-            Add your current salary details to get insights into your earnings, deductions, and monthly take-home.
+          <h3 className="text-xs font-black uppercase tracking-[0.2em] mb-2">NO_ACTIVE_STRUCTURE</h3>
+          <p className="text-[11px] text-muted-foreground font-mono uppercase tracking-tight text-center max-w-xs mb-8">
+            System requires at least one compensation record to initiate financial modeling.
           </p>
-          <Button onClick={() => setShowForm(true)}>Add Compensation Plan</Button>
+          <Button 
+            className="rounded-none h-11 px-8 font-black text-[10px] uppercase tracking-widest"
+            onClick={() => setShowForm(true)}
+          >
+            INITIALIZE_COMPENSATION_PLAN
+          </Button>
         </div>
       )}
 
-      {/* History Section using Tabs */}
-      <div className="mt-12">
-        <Tabs defaultValue="history" className="w-full">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold flex items-center gap-2">
-              <History className="w-5 h-5 text-muted-foreground" />
-              History
-            </h2>
-            <TabsList>
-              <TabsTrigger value="history">Timeline</TabsTrigger>
-              <TabsTrigger value="list">All Structures</TabsTrigger>
-            </TabsList>
+      {/* --- FORMS & SHEETS --- */}
+      
+      {/* Update Protocol Sheet */}
+      <Sheet open={showForm} onOpenChange={(open) => { setShowForm(open); if (!open) setEditingStructure(null); }}>
+        <SheetContent side="right" className="w-full sm:max-w-xl h-full p-0 flex flex-col border-l border-border bg-background transition-none">
+          <SheetHeader className="h-12 border-b border-border bg-muted/20 px-6 flex flex-row items-center justify-between shrink-0">
+            <SheetTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-foreground font-mono">
+              {editingStructure ? 'STRUCTURE_REVISION_PROTOCOL' : 'INITIAL_STRUCTURE_PROTOCOL'}
+            </SheetTitle>
+          </SheetHeader>
+
+          <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-8">
+            <div className="space-y-6">
+              <h4 className="text-[9px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                <div className="size-1 bg-foreground" /> CORE_ENTITY_DATA
+              </h4>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground ml-1">Job_Title</label>
+                  <Input name="jobTitle" value={formData.jobTitle} onChange={handleInputChange} className="rounded-none border-border bg-muted/5 font-mono text-[11px]" placeholder="SYSTEM_ARCHITECT" />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground ml-1">Organization</label>
+                  <Input name="company" value={formData.company} onChange={handleInputChange} className="rounded-none border-border bg-muted/5 font-mono text-[11px]" placeholder="CORP_X" />
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-6">
+              <h4 className="text-[9px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                <div className="size-1 bg-foreground" /> FINANCIAL_VALUATION
+              </h4>
+              <div className="space-y-1.5">
+                <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground ml-1">Base_Annual_Salary (INR)</label>
+                <Input name="baseSalary" type="number" value={formData.baseSalary} onChange={handleInputChange} className="rounded-none border-border bg-muted/5 font-mono text-[11px]" />
+              </div>
+
+              {/* Allowances Section */}
+              <div className="space-y-3">
+                <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground ml-1">Monthly_Allowances</label>
+                <div className="flex gap-2">
+                  <Input value={allowanceName} onChange={(e) => setAllowanceName(e.target.value)} placeholder="Type" className="rounded-none border-border text-[10px] h-8" />
+                  <Input type="number" value={allowanceAmount} onChange={(e) => setAllowanceAmount(e.target.value)} placeholder="Value" className="rounded-none border-border text-[10px] h-8 w-24" />
+                  <Button onClick={handleAddAllowance} size="sm" variant="outline" className="rounded-none h-8 px-3 text-[9px] font-black uppercase">ADD</Button>
+                </div>
+                <div className="space-y-1">
+                  {Object.entries(formData.allowances).map(([key, val]) => (
+                    <div key={key} className="flex items-center justify-between text-[10px] font-mono border-b border-border/50 py-1">
+                      <span className="uppercase text-muted-foreground">{key}</span>
+                      <div className="flex items-center gap-4">
+                        <span className="font-black">{formatRupees(val as number)}</span>
+                        <button onClick={() => handleRemoveAllowance(key)} className="text-rose-500 hover:text-rose-700"><Trash2 size={10} /></button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Deductions Section */}
+              <div className="space-y-3">
+                <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground ml-1">Monthly_Deductions</label>
+                <div className="flex gap-2">
+                  <Input value={deductionName} onChange={(e) => setDeductionName(e.target.value)} placeholder="Type" className="rounded-none border-border text-[10px] h-8" />
+                  <Input type="number" value={deductionAmount} onChange={(e) => setDeductionAmount(e.target.value)} placeholder="Value" className="rounded-none border-border text-[10px] h-8 w-24" />
+                  <Button onClick={handleAddDeduction} size="sm" variant="outline" className="rounded-none h-8 px-3 text-[9px] font-black uppercase">ADD</Button>
+                </div>
+                <div className="space-y-1">
+                  {Object.entries(formData.deductions).map(([key, val]) => (
+                    <div key={key} className="flex items-center justify-between text-[10px] font-mono border-b border-border/50 py-1">
+                      <span className="uppercase text-rose-600/60">{key}</span>
+                      <div className="flex items-center gap-4">
+                        <span className="font-black text-rose-600">-{formatRupees(val as number)}</span>
+                        <button onClick={() => handleRemoveDeduction(key)} className="text-rose-500 hover:text-rose-700"><Trash2 size={10} /></button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-6">
+              <h4 className="text-[9px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                <div className="size-1 bg-foreground" /> CHRONO_PARAMETERS
+              </h4>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground ml-1">Effective_Date</label>
+                  <Input name="effectiveDate" type="date" value={formData.effectiveDate} onChange={handleInputChange} className="rounded-none border-border bg-muted/5 font-mono text-[11px]" />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground ml-1">Reason_for_Change</label>
+                  <Select value={formData.changeType} onValueChange={(val) => setFormData(prev => ({ ...prev, changeType: val as any }))}>
+                    <SelectTrigger className="rounded-none border-border bg-muted/5 font-mono text-[10px] h-10 px-3 uppercase tracking-widest">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-none border-border">
+                      <SelectItem value="NEW_JOB">NEW_JOB</SelectItem>
+                      <SelectItem value="SALARY_REVISION">SALARY_REVISION</SelectItem>
+                      <SelectItem value="PROMOTION">PROMOTION</SelectItem>
+                      <SelectItem value="OTHER">OTHER_REASON</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
           </div>
 
-          <TabsContent value="history" className="mt-0">
-            <Card>
-              <CardContent className="p-6">
-                {salaryHistory.length > 0 ? (
-                  <div className="relative border-l border-border ml-3 space-y-8 py-2">
-                    {salaryHistory.map((item, i) => {
-                      const prevItem = salaryHistory[i + 1]; // Previous entry (older)
-                      const allowances = typeof item.allowances === 'string' ? JSON.parse(item.allowances || '{}') : (item.allowances || {});
-                      const deductions = typeof item.deductions === 'string' ? JSON.parse(item.deductions || '{}') : (item.deductions || {});
-                      const contributions = typeof item.employerContributions === 'string' ? JSON.parse(item.employerContributions || '{}') : (item.employerContributions || {});
-                      const totalAllowances = Object.values(allowances).reduce((sum: number, val: any) => sum + (Number(val) || 0), 0);
-                      const totalDeductions = Object.values(deductions).reduce((sum: number, val: any) => sum + (Number(val) || 0), 0);
-                      const totalContributions = Object.values(contributions).reduce((sum: number, val: any) => sum + (Number(val) || 0), 0);
-                      const monthlyBase = Number(item.baseSalary) / 12;
-                      const grossMonthly = monthlyBase + totalAllowances;
-                      const netMonthly = grossMonthly - totalDeductions;
-                      const ctc = grossMonthly + totalContributions;
+          <div className="h-16 border-t border-border bg-muted/20 px-6 flex items-center justify-end shrink-0 gap-3">
+            <Button variant="ghost" onClick={() => setShowForm(false)} className="rounded-none h-10 px-6 text-[10px] font-black uppercase tracking-widest">CANCEL</Button>
+            <Button onClick={handleSubmit} className="rounded-none h-10 px-8 text-[10px] font-black uppercase tracking-widest shadow-lg shadow-primary/20">COMMIT_REVISION</Button>
+          </div>
+        </SheetContent>
+      </Sheet>
 
-                      return (
-                        <div
-                          key={item.id}
-                          className="ml-6 relative cursor-pointer group"
-                          onClick={() => setSelectedHistoryItem(item)}
-                        >
-                          <span className="absolute -left-[31px] top-1 h-4 w-4 rounded-full border-2 border-background bg-primary ring-4 ring-background group-hover:ring-primary/20 transition-all" />
-                          <div className="p-4 -m-4 rounded-lg hover:bg-accent/50 transition-colors">
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-1">
-                              <p className="text-sm font-medium text-muted-foreground">
-                                {new Date(item.effectiveDate).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
-                              </p>
-                              <Badge variant="outline" className="w-fit text-xs">{getChangeTypeLabel(item.changeType)}</Badge>
-                            </div>
-                            <h3 className="font-semibold text-lg group-hover:text-primary transition-colors">{item.jobTitle} at {item.company}</h3>
-                            <div className="mt-2 p-3 bg-muted/40 rounded-lg text-sm grid grid-cols-3 gap-4 max-w-lg">
-                              <div>
-                                <p className="text-muted-foreground text-xs uppercase">Base (Annual)</p>
-                                <p className="font-medium">{formatRupees(Number(item.baseSalary))}</p>
-                              </div>
-                              <div>
-                                <p className="text-muted-foreground text-xs uppercase">Take Home</p>
-                                <p className="font-medium text-green-600 dark:text-green-400">{formatRupees(netMonthly)}/mo</p>
-                              </div>
-                              <div>
-                                <p className="text-muted-foreground text-xs uppercase">CTC</p>
-                                <p className="font-medium text-primary">{formatRupees(ctc * 12)}</p>
-                              </div>
-                            </div>
-                            <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
-                              <ChevronRight className="w-3 h-3" /> Click to view full breakdown
-                            </p>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                ) : (
-                  <p className="text-center text-muted-foreground py-8">No history available yet.</p>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="list" className="mt-0">
-            <div className="grid gap-4">
-              {salaryStructures.map(structure => (
-                <Card key={structure.id} className={`transition-all hover:bg-accent/40 ${structure.isActive ? 'border-primary/50 bg-primary/5' : ''}`}>
-                  <CardContent className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h4 className="font-semibold">{structure.jobTitle}</h4>
-                        {structure.isActive && <Badge>Active</Badge>}
-                      </div>
-                      <p className="text-sm text-muted-foreground">{structure.company} • {new Date(structure.effectiveDate).getFullYear()}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-bold">{formatRupees(Number(structure.baseSalary))}</p>
-                      <p className="text-xs text-muted-foreground">Annual Base</p>
-                    </div>
-                    <div className="flex gap-2">
-                      {!structure.isActive && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="text-green-600 border-green-200 hover:bg-green-50 dark:hover:bg-green-900/20"
-                          onClick={() => handleSetActive(structure.id)}
-                        >
-                          <CheckCircle className="w-4 h-4 mr-2" />
-                          Make Active
-                        </Button>
-                      )}
-                      <Button variant="ghost" size="icon" onClick={() => handleEdit(structure)}>
-                        <Edit className="w-4 h-4 text-muted-foreground hover:text-foreground" />
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => handleDelete(structure.id)}>
-                        <Trash2 className="w-4 h-4 text-muted-foreground hover:text-destructive" />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </TabsContent>
-        </Tabs>
-      </div>
-
-      {/* History Detail Sheet */}
-      <Sheet open={!!selectedHistoryItem} onOpenChange={(open) => !open && setSelectedHistoryItem(null)}>
-        <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
-          {selectedHistoryItem && (() => {
-            const item = selectedHistoryItem;
-            const allowances = typeof item.allowances === 'string' ? JSON.parse(item.allowances || '{}') : (item.allowances || {});
-            const deductions = typeof item.deductions === 'string' ? JSON.parse(item.deductions || '{}') : (item.deductions || {});
-            const contributions = typeof item.employerContributions === 'string' ? JSON.parse(item.employerContributions || '{}') : (item.employerContributions || {});
-            const totalAllowances = Object.values(allowances).reduce((sum: number, val: any) => sum + (Number(val) || 0), 0);
-            const totalDeductions = Object.values(deductions).reduce((sum: number, val: any) => sum + (Number(val) || 0), 0);
-            const totalContributions = Object.values(contributions).reduce((sum: number, val: any) => sum + (Number(val) || 0), 0);
-            const monthlyBase = Number(item.baseSalary) / 12;
-            const grossMonthly = monthlyBase + totalAllowances;
-            const netMonthly = grossMonthly - totalDeductions;
-            const ctc = grossMonthly + totalContributions;
-
-            return (
-              <>
-                <SheetHeader className="pb-4 border-b">
-                  <div className="flex items-center justify-between">
-                    <Badge variant="outline">{getChangeTypeLabel(item.changeType)}</Badge>
-                    <span className="text-sm text-muted-foreground">
-                      {new Date(item.effectiveDate).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
-                    </span>
-                  </div>
-                  <SheetTitle className="text-2xl">{item.jobTitle}</SheetTitle>
-                  <SheetDescription className="flex items-center gap-2">
-                    <Building className="w-4 h-4" /> {item.company}
-                    {item.location && <><MapPin className="w-4 h-4 ml-2" /> {item.location}</>}
-                  </SheetDescription>
-                </SheetHeader>
-
-                <div className="py-6 space-y-6">
-                  {/* Key Metrics */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <Card className="bg-gradient-to-br from-green-500/10 to-emerald-500/10 border-green-500/20">
-                      <CardContent className="p-4 text-center">
-                        <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Take Home (Monthly)</p>
-                        <p className="text-2xl font-bold text-green-600 dark:text-green-400">{formatRupees(netMonthly)}</p>
-                      </CardContent>
-                    </Card>
-                    <Card className="bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
-                      <CardContent className="p-4 text-center">
-                        <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">CTC (Annual)</p>
-                        <p className="text-2xl font-bold text-primary">{formatRupees(ctc * 12)}</p>
-                      </CardContent>
-                    </Card>
-                  </div>
-
-                  {/* Base Salary */}
-                  <div className="bg-muted/40 rounded-lg p-4">
-                    <div className="flex justify-between items-center">
-                      <span className="font-medium">Base Salary (Annual)</span>
-                      <span className="font-bold">{formatRupees(Number(item.baseSalary))}</span>
-                    </div>
-                    <div className="flex justify-between items-center text-sm text-muted-foreground mt-1">
-                      <span>Monthly</span>
-                      <span>{formatRupees(monthlyBase)}</span>
-                    </div>
-                  </div>
-
-                  {/* Allowances */}
-                  {Object.keys(allowances).length > 0 && (
-                    <div>
-                      <h4 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
-                        <TrendingUp className="w-4 h-4 text-green-500" /> Allowances
-                      </h4>
-                      <div className="space-y-2 bg-green-500/5 rounded-lg p-3">
-                        {Object.entries(allowances).map(([name, amount]) => (
-                          <div key={name} className="flex justify-between text-sm">
-                            <span>{name}</span>
-                            <span className="text-green-600 dark:text-green-400">+{formatRupees(Number(amount))}</span>
-                          </div>
-                        ))}
-                        <Separator />
-                        <div className="flex justify-between font-semibold">
-                          <span>Total Allowances</span>
-                          <span className="text-green-600 dark:text-green-400">+{formatRupees(totalAllowances)}</span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Deductions */}
-                  {Object.keys(deductions).length > 0 && (
-                    <div>
-                      <h4 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
-                        <ArrowDown className="w-4 h-4 text-red-500" /> Deductions
-                      </h4>
-                      <div className="space-y-2 bg-red-500/5 rounded-lg p-3">
-                        {Object.entries(deductions).map(([name, amount]) => (
-                          <div key={name} className="flex justify-between text-sm">
-                            <span>{name}</span>
-                            <span className="text-red-500">-{formatRupees(Number(amount))}</span>
-                          </div>
-                        ))}
-                        <Separator />
-                        <div className="flex justify-between font-semibold">
-                          <span>Total Deductions</span>
-                          <span className="text-red-500">-{formatRupees(totalDeductions)}</span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Employer Contributions */}
-                  {Object.keys(contributions).length > 0 && (
-                    <div>
-                      <h4 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
-                        <Users className="w-4 h-4 text-blue-500" /> Employer Contributions
-                      </h4>
-                      <div className="space-y-2 bg-blue-500/5 rounded-lg p-3">
-                        {Object.entries(contributions).map(([name, amount]) => (
-                          <div key={name} className="flex justify-between text-sm">
-                            <span>{name}</span>
-                            <span className="text-blue-500">+{formatRupees(Number(amount))}</span>
-                          </div>
-                        ))}
-                        <Separator />
-                        <div className="flex justify-between font-semibold">
-                          <span>Total Employer Contributions</span>
-                          <span className="text-blue-500">+{formatRupees(totalContributions)}</span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Additional Info */}
-                  <div className="grid grid-cols-2 gap-4 pt-4 border-t">
-                    {item.department && (
-                      <div>
-                        <p className="text-xs text-muted-foreground uppercase">Department</p>
-                        <p className="font-medium">{item.department}</p>
-                      </div>
-                    )}
-                    {item.grade && (
-                      <div>
-                        <p className="text-xs text-muted-foreground uppercase">Grade / Level</p>
-                        <p className="font-medium">{item.grade}</p>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Change Reason */}
-                  {item.changeReason && (
-                    <div className="bg-muted/40 rounded-lg p-4">
-                      <p className="text-xs text-muted-foreground uppercase mb-1">Change Reason</p>
-                      <p className="font-medium">{item.changeReason}</p>
-                    </div>
-                  )}
+      {/* Detail Overlay Sheet */}
+      <Sheet open={!!selectedHistoryItem} onOpenChange={(open) => { if (!open) setSelectedHistoryItem(null); }}>
+        <SheetContent side="right" className="w-full sm:max-w-md h-full p-0 flex flex-col border-l border-border bg-background transition-none">
+          {selectedHistoryItem && (
+            <>
+              <SheetHeader className="h-12 border-b border-border bg-muted/20 px-6 flex flex-row items-center justify-between shrink-0">
+                <SheetTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-foreground font-mono">
+                  HISTORICAL_RECORD_EXTRACT
+                </SheetTitle>
+              </SheetHeader>
+              <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-8">
+                <div>
+                  <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest font-mono mb-2 opacity-50">RECORD_IDENTIFIER</p>
+                  <h3 className="text-xl font-black uppercase tracking-tighter">{selectedHistoryItem.jobTitle}</h3>
+                  <p className="text-sm font-bold text-muted-foreground/60 uppercase">{selectedHistoryItem.company}</p>
                 </div>
-              </>
-            );
-          })()}
+
+                <div className="grid grid-cols-2 gap-px border border-border bg-border">
+                  <div className="bg-background p-4">
+                    <p className="text-[8px] font-black text-muted-foreground uppercase tracking-widest mb-1">EFFECTIVE</p>
+                    <p className="text-xs font-black font-mono">{new Date(selectedHistoryItem.effectiveDate).toLocaleDateString()}</p>
+                  </div>
+                  <div className="bg-background p-4">
+                    <p className="text-[8px] font-black text-muted-foreground uppercase tracking-widest mb-1">REASON</p>
+                    <p className="text-xs font-black font-mono">{selectedHistoryItem.changeType}</p>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <h4 className="text-[9px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                    <div className="size-1 bg-foreground" /> VALUATION_DATA
+                  </h4>
+                  <div className="space-y-px border border-border bg-border">
+                    <div className="bg-background p-3 flex justify-between items-center">
+                      <span className="text-[10px] font-bold uppercase">ANNUAL_BASE</span>
+                      <span className="text-[11px] font-black font-mono">{formatRupees(selectedHistoryItem.baseSalary)}</span>
+                    </div>
+                    <div className="bg-muted/5 p-3 flex justify-between items-center">
+                      <span className="text-[10px] font-bold uppercase">MONTHLY_BASE</span>
+                      <span className="text-[11px] font-black font-mono">{formatRupees(selectedHistoryItem.baseSalary / 12)}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="h-16 border-t border-border bg-muted/20 px-6 flex items-center shrink-0">
+                 <Button variant="outline" onClick={() => setSelectedHistoryItem(null)} className="w-full rounded-none h-10 text-[10px] font-black uppercase tracking-widest border-border">CLOSE_EXTRACT</Button>
+              </div>
+            </>
+          )}
         </SheetContent>
       </Sheet>
     </div>
   );
 }
+

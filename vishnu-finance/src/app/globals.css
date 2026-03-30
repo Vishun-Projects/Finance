@@ -55,7 +55,8 @@
     --input: 240 5.9% 90%;
     --ring: 250 85% 40%;
 
-    --radius: 0.5rem;
+    --radius: 0;
+    --font-mono: 'JetBrains Mono', 'Roboto Mono', monospace;
     --sidebar: 0 0% 100%;
     /* #ffffff */
 
@@ -133,14 +134,34 @@
   }
 }
 
-@layer base {
-  * {
-    border-color: hsl(var(--border));
+@layer components {
+  .industrial-grid {
+    @apply border-collapse border-spacing-0;
+  }
+  
+  .numeric {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
   }
 
+  .audit-border {
+    @apply border-t border-l border-border/30;
+  }
+
+  .workspace-pane {
+    @apply bg-background border-r border-border/40 h-full overflow-hidden flex flex-col;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border outline-none transition-none !important;
+    border-radius: var(--radius) !important;
+  }
+  
   body {
-    background-color: hsl(var(--background));
-    color: hsl(var(--foreground));
+    @apply bg-background text-foreground antialiased selection:bg-foreground selection:text-background;
+    font-feature-settings: "tnum" 1, "kern" 1;
   }
 }
 

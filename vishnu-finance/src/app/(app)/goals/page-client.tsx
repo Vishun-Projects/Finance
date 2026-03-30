@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import {
   ArrowUpRight,
@@ -353,225 +354,129 @@ export default function GoalsPageClient({
           className="bg-primary text-primary-foreground"
         />
 
-        {!isEmbedded && (
-          <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardDescription>Total goals</CardDescription>
-                <CardTitle className="text-2xl">
-                  {goalStats.total}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0 text-sm text-muted-foreground">
-                <div className="flex items-center gap-2 text-success">
-                  <CheckCircle className="h-4 w-4" />
-                  {goalStats.completed} completed
+        {/* INDUSTRIAL_METRIC_GRID */}
+        {!isEmbedded ? (
+          <div className="grid grid-cols-1 md:grid-cols-4 border border-border">
+            {[
+              { label: 'Cumulative_Targets', value: formatCurrency(goalStats.totalTarget), sub: `${goalStats.total} Entities` },
+              { label: 'Deployed_Capital', value: formatCurrency(goalStats.totalCurrent), sub: `${goalStats.progressPercent}% Sync` },
+              { label: 'Active_Nodes', value: goalStats.active, sub: 'In_Progress' },
+              { label: 'Fulfilled_Nodes', value: goalStats.completed, sub: 'Terminal_State' },
+            ].map((stat, i) => (
+              <div key={i} className={cn("p-4 flex flex-col justify-between h-24", i !== 3 && "border-r border-border")}>
+                <span className="text-[8px] font-black uppercase tracking-[0.2em] text-muted-foreground">{stat.label}</span>
+                <div>
+                  <span className="text-xl font-black tabular-nums numeric tracking-tighter block">{stat.value}</span>
+                  <span className="text-[7px] font-bold text-muted-foreground/40 uppercase tracking-widest">{stat.sub}</span>
                 </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardDescription>Active goals</CardDescription>
-                <CardTitle className="text-2xl">{goalStats.active}</CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0 text-sm text-muted-foreground">
-                <div className="flex items-center gap-2">
-                  <ArrowUpRight className="h-4 w-4" />
-                  Momentum matters
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardDescription>Invested amount</CardDescription>
-                <CardTitle className="text-2xl">{formatCurrency(goalStats.totalCurrent)}</CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0 text-sm text-muted-foreground">
-                toward ₹{goalStats.totalTarget.toLocaleString('en-IN')}
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardDescription>Overall progress</CardDescription>
-                <CardTitle className="text-2xl">{goalStats.progressPercent}%</CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0 text-sm text-muted-foreground">
-                toward ₹{goalStats.totalTarget.toLocaleString('en-IN')} in targets
-              </CardContent>
-            </Card>
+              </div>
+            ))}
           </div>
-        )}
+        ) : null}
 
-        <div className="mt-4 space-y-3 rounded-xl border border-border/60 bg-card p-3 shadow-sm sm:p-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <Tabs value={statusFilter} onValueChange={(value) => setStatusFilter(value as 'all' | GoalStatus)}>
-              <TabsList className="flex flex-wrap gap-2">
-                {STATUS_FILTERS.map((status) => (
-                  <TabsTrigger key={status} value={status} className="capitalize">
-                    {status === 'all' ? 'All' : status.toLowerCase()}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-            </Tabs>
-
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  className={cn(
-                    'h-9 rounded-md border px-3 text-sm capitalize transition-colors',
-                    priorityFilter === 'all'
-                      ? 'border-transparent bg-primary text-primary-foreground hover:bg-primary/90'
-                      : 'border-border bg-card text-foreground hover:bg-muted'
-                  )}
-                  onClick={() => setPriorityFilter('all')}
-                >
-                  All priorities
-                </Button>
-                {PRIORITY_OPTIONS.map((priority) => (
-                  <Button
-                    key={priority}
-                    variant="outline"
+        {/* DATASHEET_LEDGER */}
+        <div className="border border-border bg-background">
+          <div className="h-10 px-4 flex items-center justify-between border-b border-border bg-muted/20">
+            <div className="flex items-center gap-6">
+              <span className="text-[9px] font-black uppercase tracking-[0.2em] text-foreground">GOAL_AUDIT_LEDGER</span>
+              <div className="flex gap-1">
+                {STATUS_FILTERS.map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => setStatusFilter(s)}
                     className={cn(
-                      'h-9 rounded-md border text-sm capitalize transition-colors',
-                      priorityFilter === priority
-                        ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-                        : 'border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground'
+                      "text-[8px] font-black uppercase tracking-widest px-2 py-1 transition-none",
+                      statusFilter === s ? "bg-foreground text-background" : "text-muted-foreground hover:bg-muted"
                     )}
-                    onClick={() => setPriorityFilter(priority)}
                   >
-                    {priority.toLowerCase()}
-                  </Button>
+                    {s}
+                  </button>
                 ))}
               </div>
-              <Input
-                placeholder="Search goals"
+            </div>
+            <div className="flex items-center gap-3">
+               <Input
+                placeholder="FILTER_ID..."
                 value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
-                className="w-full min-w-[200px] sm:w-64 bg-card border-border text-foreground placeholder:text-muted-foreground/50 focus-visible:ring-border"
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="h-6 w-32 rounded-none border-border bg-transparent text-[8px] font-black uppercase tracking-widest focus-visible:ring-0"
               />
             </div>
           </div>
 
-          <Tabs value="list">
-            <TabsContent value="list" className="mt-4 space-y-4">
-              {filteredGoals.length === 0 ? (
-                <Card className="border-dashed border-border bg-card">
-                  <CardContent className="py-12 text-center text-muted-foreground">
-                    {goals.length === 0 ? 'Create your first goal to get started.' : 'No goals match the current filters.'}
-                  </CardContent>
-                </Card>
-              ) : (
-                filteredGoals.map((goal) => {
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="border-b border-border bg-muted/5">
+                  <th className="text-left p-3 text-[8px] font-black uppercase tracking-widest text-muted-foreground border-r border-border w-10">#</th>
+                  <th className="text-left p-3 text-[8px] font-black uppercase tracking-widest text-muted-foreground border-r border-border">ENTITY_DESCRIPTOR</th>
+                  <th className="text-left p-3 text-[8px] font-black uppercase tracking-widest text-muted-foreground border-r border-border">PRIORITY</th>
+                  <th className="text-left p-3 text-[8px] font-black uppercase tracking-widest text-muted-foreground border-r border-border">PROGRESS_SYNC</th>
+                  <th className="text-right p-3 text-[8px] font-black uppercase tracking-widest text-muted-foreground border-r border-border">CAPITAL_DEPLOYED</th>
+                  <th className="text-right p-3 text-[8px] font-black uppercase tracking-widest text-muted-foreground border-r border-border">TARGET_CAPITAL</th>
+                  <th className="text-right p-3 text-[8px] font-black uppercase tracking-widest text-muted-foreground">ACTIONS</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {filteredGoals.map((goal, idx) => {
                   const progress = calculateGoalProgress(goal);
-                  const isCompleted = progress >= 100 || goal.status === 'COMPLETED';
-
                   return (
-                    <Card key={goal.id} className="matte-card bg-card border border-border shadow-none hover:border-foreground/20 transition-colors">
-                      <CardContent className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="flex-1 space-y-2">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span
-                              className={cn(
-                                'inline-flex items-center rounded-sm px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider',
-                                isCompleted
-                                  ? 'bg-emerald-950/30 text-emerald-500 border border-emerald-900/50'
-                                  : 'bg-muted text-muted-foreground border border-border'
-                              )}
-                            >
-                              {goal.priority.toLowerCase()}
-                            </span>
-                            {goal.category && (
-                              <span className="inline-flex items-center rounded-sm border border-neutral-800 bg-neutral-900/50 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-neutral-500">
-                                {goal.category.toLowerCase()}
-                              </span>
-                            )}
-                            {isCompleted && (
-                              <span className="inline-flex items-center rounded-sm px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-500">
-                                Completed
-                              </span>
-                            )}
-                          </div>
-                          <div>
-                            <h3 className="text-lg font-bold text-foreground mb-1">
-                              {goal.title}
-                            </h3>
-                            {goal.description && (
-                              <p className="text-xs text-muted-foreground font-medium">
-                                {goal.description}
-                              </p>
-                            )}
-                          </div>
-                          <div className="space-y-2 max-w-md">
-                            <div className="flex flex-wrap items-center gap-4 text-xs text-neutral-400 font-mono">
-                              <span>
-                                Target: <span className="text-foreground">{formatCurrency(goal.targetAmount ?? 0)}</span>
-                              </span>
-                              <span>
-                                Saved: <span className="text-foreground">{formatCurrency(goal.currentAmount ?? 0)}</span>
-                              </span>
-                              {goal.targetDate && (
-                                <span>
-                                  Due by {new Date(goal.targetDate).toLocaleDateString('en-IN', {
-                                    day: 'numeric',
-                                    month: 'short',
-                                    year: 'numeric',
-                                  })}
-                                </span>
-                              )}
-                            </div>
-                            <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
-                              <div
-                                className={cn(
-                                  'h-full rounded-full bg-foreground transition-all duration-1000',
-                                  progress >= 100 && 'bg-emerald-500'
-                                )}
-                                style={{ width: `${progress}%` }}
-                              />
-                            </div>
-                          </div>
+                    <tr key={goal.id} className="group hover:bg-muted/5 transition-none">
+                      <td className="p-3 text-[9px] font-bold font-mono text-muted-foreground/40 border-r border-border align-middle">
+                        {(idx + 1).toString().padStart(2, '0')}
+                      </td>
+                      <td className="p-3 border-r border-border">
+                        <div className="flex flex-col">
+                          <span className="text-[10px] font-black uppercase tracking-tight">{goal.title}</span>
+                          <span className="text-[8px] font-bold text-muted-foreground/60 uppercase">{goal.category || 'UNCLASSIFIED'}</span>
                         </div>
-
-                        <div className="flex flex-col items-stretch gap-2 sm:w-48">
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            className="justify-between border border-border bg-muted text-muted-foreground hover:bg-border hover:text-foreground h-8 text-[10px] uppercase font-bold tracking-wider"
-                            onClick={() => openEditDialog(goal)}
-                          >
-                            <span>Edit</span>
-                            <Target className="h-3 w-3" />
+                      </td>
+                      <td className="p-3 border-r border-border">
+                        <Badge variant="outline" className={cn(
+                          "rounded-none h-4 px-1.5 text-[7px] font-black uppercase tracking-widest border border-border/50",
+                          goal.priority === 'CRITICAL' ? "bg-rose-500/10 text-rose-500 border-rose-500/20" : 
+                          goal.priority === 'HIGH' ? "bg-amber-500/10 text-amber-500 border-amber-500/20" : "text-muted-foreground"
+                        )}>
+                          {goal.priority}
+                        </Badge>
+                      </td>
+                      <td className="p-3 border-r border-border">
+                         <div className="flex items-center gap-3">
+                            <div className="flex-1 h-1 bg-border rounded-none">
+                               <div className="bg-foreground h-full" style={{ width: `${progress}%` }} />
+                            </div>
+                            <span className="text-[9px] font-black font-mono w-8 text-right">{progress}%</span>
+                         </div>
+                      </td>
+                      <td className="p-3 border-r border-border text-right text-[10px] font-black tabular-nums numeric">
+                        {formatCurrency(goal.currentAmount)}
+                      </td>
+                      <td className="p-3 border-r border-border text-right text-[10px] font-black tabular-nums numeric">
+                        {formatCurrency(goal.targetAmount)}
+                      </td>
+                      <td className="p-3 text-right">
+                        <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-none">
+                          <Button variant="outline" size="icon" className="size-6 rounded-none border-border" onClick={() => openEditDialog(goal)}>
+                            <Target className="size-3" />
                           </Button>
-                          <Button
-                            size="sm"
-                            className={cn(
-                              'justify-between h-8 text-[10px] uppercase font-bold tracking-wider',
-                              isCompleted
-                                ? 'border border-emerald-900/50 bg-emerald-950/20 text-emerald-500'
-                                : 'bg-primary text-primary-foreground hover:bg-primary/90'
-                            )}
-                            disabled={isCompleted}
-                            onClick={() => handleMarkCompleted(goal)}
-                          >
-                            <span>{isCompleted ? 'Done' : 'Complete'}</span>
-                            <CheckCircle className="h-3 w-3" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            className="justify-between bg-red-950/20 text-red-700 border border-red-900/30 hover:bg-red-950/40 hover:text-red-500 h-8 text-[10px] uppercase font-bold tracking-wider"
-                            onClick={() => handleDelete(goal.id)}
-                            disabled={isDeleting === goal.id}
-                          >
-                            <span>{isDeleting === goal.id ? 'Deleting…' : 'Delete'}</span>
-                            <Trash2 className="h-3 w-3" />
+                          <Button variant="outline" size="icon" className="size-6 rounded-none border-border text-rose-500 hover:bg-rose-500/10" onClick={() => handleDelete(goal.id)}>
+                            <Trash2 className="size-3" />
                           </Button>
                         </div>
-                      </CardContent>
-                    </Card>
+                      </td>
+                    </tr>
                   );
-                })
-              )}
-            </TabsContent>
-          </Tabs>
+                })}
+                {filteredGoals.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="p-12 text-center text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                      NO_RECORDS_AVAILABLE
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 

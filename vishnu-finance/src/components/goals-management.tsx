@@ -17,6 +17,10 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import PageSkeleton from '@/components/feedback/page-skeleton';
+import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { format } from 'date-fns';
 import { Combobox } from './ui/combobox';
 
 interface Goal {
@@ -186,8 +190,8 @@ export default function GoalsManagement() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
         <div>
-          <h2 className="text-2xl font-bold text-primary">Goals Management</h2>
-          <p className="text-muted">Set and track your financial goals</p>
+          <h2 className="text-xl font-black tracking-tighter uppercase text-foreground">Strategic Allocation</h2>
+          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1">Capital Deployment & Goal Audit</p>
         </div>
         <div className="flex space-x-3">
           <button
@@ -224,55 +228,22 @@ export default function GoalsManagement() {
         </div>
       )}
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="minimal-stat">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-muted">Total Goals</p>
-              <p className="text-2xl font-bold text-primary">{totalGoals}</p>
+      {/* Stats - Industrial Grid */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {[
+          { label: 'Primary Targets', value: totalGoals, Icon: Target, color: 'text-primary' },
+          { label: 'Secured', value: completedGoals, Icon: CheckCircle, color: 'text-emerald-500' },
+          { label: 'Capital Required', value: formatCurrency(totalTargetAmount), Icon: DollarSign, color: 'text-blue-500' },
+          { label: 'Deployed', value: formatCurrency(totalCurrentAmount), Icon: TrendingUp, color: 'text-emerald-500' },
+        ].map((stat, i) => (
+          <div key={i} className="card-base p-4 border-l-4 border-l-border hover:border-l-primary transition-all">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{stat.label}</p>
+              <stat.Icon className={cn("w-4 h-4 opacity-50", stat.color)} />
             </div>
-            <div className="minimal-stat-inset">
-              <Target className="w-6 h-6 text-primary" />
-            </div>
+            <p className={cn("text-xl font-black tracking-tight tabular-nums", stat.color)}>{stat.value}</p>
           </div>
-        </div>
-
-        <div className="minimal-stat">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-muted">Completed</p>
-              <p className="text-2xl font-bold text-success">{completedGoals}</p>
-            </div>
-            <div className="minimal-stat-inset">
-              <CheckCircle className="w-6 h-6 text-success" />
-            </div>
-          </div>
-        </div>
-
-        <div className="minimal-stat">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-muted">Total Target</p>
-              <p className="text-2xl font-bold text-info currency-inr">{formatCurrency(totalTargetAmount)}</p>
-            </div>
-            <div className="minimal-stat-inset">
-              <DollarSign className="w-6 h-6 text-info" />
-            </div>
-          </div>
-        </div>
-
-        <div className="minimal-stat">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-muted">Total Saved</p>
-              <p className="text-2xl font-bold text-success currency-inr">{formatCurrency(totalCurrentAmount)}</p>
-            </div>
-            <div className="minimal-stat-inset">
-              <TrendingUp className="w-6 h-6 text-success" />
-            </div>
-          </div>
-        </div>
+        ))}
       </div>
 
       {/* Add Goal Form */}
@@ -441,11 +412,11 @@ export default function GoalsManagement() {
         </div>
       )}
 
-      {/* Goals List */}
-      <div className="minimal-card p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-semibold text-primary">Your Goals</h3>
-          <span className="text-sm text-muted">{goals.length} goals</span>
+      {/* Goals List - High Density Audit */}
+      <div className="card-base p-0 overflow-hidden border-none bg-transparent space-y-4">
+        <div className="flex items-center justify-between px-2">
+          <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-theme-secondary">Active Deployment Pipeline</h3>
+          <span className="text-[10px] font-black text-muted-foreground uppercase">{goals.length} Strategic Units</span>
         </div>
 
         {goals.length === 0 ? (
@@ -468,56 +439,62 @@ export default function GoalsManagement() {
               const isCompleted = goal.currentAmount >= goal.targetAmount;
 
               return (
-                <div key={goal.id} className="minimal-card-inset p-6 hover-lift transition-all">
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-3 mb-2">
-                        <h4 className="text-lg font-semibold text-primary">{goal.title}</h4>
+                <div key={goal.id} className="card-base p-6 border-l-4 border-l-primary/20 hover:border-l-primary transition-all">
+                  <div className="flex flex-col md:flex-row gap-6">
+                    <div className="flex-1 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-1">
+                          <h4 className="text-base font-black uppercase tracking-tight text-foreground">{goal.title}</h4>
+                          <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">{goal.category || 'General Capital'}</p>
+                        </div>
                         {isCompleted && (
-                          <span className="minimal-badge minimal-badge-success">
-                            Completed
-                          </span>
+                          <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 text-[9px] font-black uppercase tracking-widest">
+                            Strategic Goal Secured
+                          </Badge>
                         )}
                       </div>
-                      <p className="text-muted mb-3">{goal.description}</p>
 
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 p-3 rounded bg-muted/20 border border-border/50">
                         <div>
-                          <p className="text-sm text-muted">Target Amount</p>
-                          <p className="font-semibold text-primary currency-inr">{formatCurrency(goal.targetAmount)}</p>
+                          <p className="text-[9px] text-muted-foreground font-black uppercase tracking-widest mb-1">Target</p>
+                          <p className="text-sm font-black text-foreground tabular-nums">{formatCurrency(goal.targetAmount)}</p>
                         </div>
                         <div>
-                          <p className="text-sm text-muted">Current Amount</p>
-                          <p className="font-semibold text-success currency-inr">{formatCurrency(goal.currentAmount)}</p>
+                          <p className="text-[9px] text-muted-foreground font-black uppercase tracking-widest mb-1">Funded</p>
+                          <p className="text-sm font-black text-emerald-500 tabular-nums">{formatCurrency(goal.currentAmount)}</p>
                         </div>
-                        <div>
-                          <p className="text-sm text-muted">Target Date</p>
-                          <p className="font-semibold text-info">{goal.targetDate ? new Date(goal.targetDate).toLocaleDateString('en-IN') : 'Not set'}</p>
+                        <div className="col-span-2 md:col-span-1 border-t md:border-t-0 md:border-l border-border/50 pt-2 md:pt-0 md:pl-4">
+                          <p className="text-[9px] text-muted-foreground font-black uppercase tracking-widest mb-1">Deadline</p>
+                          <p className="text-sm font-black text-foreground uppercase">{goal.targetDate ? format(new Date(goal.targetDate), 'MMM yyyy') : 'No Limit'}</p>
                         </div>
                       </div>
 
-                      {/* Progress Bar */}
-                      <div className="mb-2">
-                        <div className="flex justify-between text-sm mb-1">
-                          <span className="text-muted">Progress</span>
-                          <span className="font-medium">{progress.toFixed(1)}%</span>
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-end">
+                          <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Allocation Progress</span>
+                          <span className="text-xs font-black text-primary tabular-nums">{progress.toFixed(1)}%</span>
                         </div>
-                        <div className="minimal-progress">
+                        <div className="h-2 w-full bg-muted rounded-full overflow-hidden border border-border/50">
                           <div
-                            className="minimal-progress-fill"
+                            className="h-full bg-primary transition-all duration-500 rounded-full"
                             style={{ width: `${progress}%` }}
-                          ></div>
+                          />
                         </div>
                       </div>
                     </div>
 
-                    <div className="flex items-center space-x-2 ml-4">
-                      <button
+                    <div className="flex md:flex-col justify-end gap-2 border-t md:border-t-0 md:border-l border-border/50 pt-4 md:pt-0 md:pl-6">
+                      <Button variant="outline" size="sm" className="h-9 px-3 border-border hover:bg-muted text-[10px] font-black uppercase tracking-widest">
+                        Update
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
                         onClick={() => handleDelete(goal.id)}
-                        className="minimal-button-small p-2 text-error hover:bg-error hover:text-white transition-all"
+                        className="h-9 px-3 border-border hover:bg-rose-500/10 hover:text-rose-500 text-[10px] font-black uppercase tracking-widest"
                       >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                        Abort
+                      </Button>
                     </div>
                   </div>
                 </div>

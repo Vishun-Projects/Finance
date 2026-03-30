@@ -1087,13 +1087,14 @@ export async function POST(request: NextRequest) {
             const dedupHash = (r as any).dedupHash ? `'${(r as any).dedupHash}'` : 'NULL';
             const parsingMethod = (r as any).parsingMethod ? `'${String((r as any).parsingMethod).replace(/'/g, "''")}'` : 'NULL';
             const parsingConfidence = (r as any).parsingConfidence !== null && (r as any).parsingConfidence !== undefined ? Number((r as any).parsingConfidence) : 'NULL';
+            const autoCategorized = (r as any).autoCategorized ? 1 : 0;
 
-            return `(${id},'${userId}',${date},'${desc}',${credit},${debit},'${r.financialCategory}',${categoryId},${accountStatementId},${bankCode},${transactionId},${accountNumber},${transferType},${personName},${upiId},${branch},${store},${rawData},${balance},${notes},${receiptUrl},0,${isPartialData},${hasInvalidDate},${hasZeroAmount},${parsingMethod},${parsingConfidence},${dedupHash},'${now}','${now}',${documentId})`;
+            return `(${id},'${userId}',${date},'${desc}',${credit},${debit},'${r.financialCategory}',${categoryId},${accountStatementId},${bankCode},${transactionId},${accountNumber},${transferType},${personName},${upiId},${branch},${store},${rawData},${balance},${notes},${receiptUrl},0,${isPartialData},${hasInvalidDate},${hasZeroAmount},${parsingMethod},${parsingConfidence},${dedupHash},'${now}','${now}',${documentId},${autoCategorized})`;
           }).join(',');
 
           await (prisma as any).$executeRawUnsafe(`
             INSERT INTO transactions 
-            (id, userId, transactionDate, description, creditAmount, debitAmount, financialCategory, categoryId, accountStatementId, bankCode, transactionId, accountNumber, transferType, personName, upiId, branch, store, rawData, balance, notes, receiptUrl, isDeleted, isPartialData, hasInvalidDate, hasZeroAmount, parsingMethod, parsingConfidence, dedupHash, createdAt, updatedAt, documentId)
+            (id, userId, transactionDate, description, creditAmount, debitAmount, financialCategory, categoryId, accountStatementId, bankCode, transactionId, accountNumber, transferType, personName, upiId, branch, store, rawData, balance, notes, receiptUrl, isDeleted, isPartialData, hasInvalidDate, hasZeroAmount, parsingMethod, parsingConfidence, dedupHash, createdAt, updatedAt, documentId, "autoCategorized")
             VALUES ${values}
             ON CONFLICT (dedupHash) DO NOTHING
           `);
@@ -1143,6 +1144,7 @@ export async function POST(request: NextRequest) {
               parsingMethod: (r as any).parsingMethod || null,
               parsingConfidence: (r as any).parsingConfidence || null,
               dedupHash: (r as any).dedupHash || null,
+              autoCategorized: (r as any).autoCategorized || false,
             }));
 
             const result = await (prisma as any).transaction.createMany({

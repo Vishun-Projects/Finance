@@ -31,6 +31,7 @@ import { formatRupees } from '@/lib/utils';
 import { useTheme } from '@/contexts/ThemeContext';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 
 interface FinancialHealthPageClientProps {
   initialData: FinancialSummary;
@@ -44,7 +45,7 @@ const HealthGauge = ({ score, size = 260 }: { score: number; size?: number }) =>
 
   return (
     <div className="relative flex items-center justify-center select-none" style={{ width: size, height: size }}>
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90 drop-shadow-[0_0_15px_rgba(var(--primary-rgb),0.2)]">
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90">
         <circle
           cx={size / 2}
           cy={size / 2}
@@ -52,7 +53,7 @@ const HealthGauge = ({ score, size = 260 }: { score: number; size?: number }) =>
           fill="none"
           stroke="currentColor"
           strokeWidth={strokeWidth}
-          className="text-muted/10"
+          className="text-muted/20"
         />
         <circle
           cx={size / 2}
@@ -64,14 +65,14 @@ const HealthGauge = ({ score, size = 260 }: { score: number; size?: number }) =>
           className="text-primary transition-all duration-1000 ease-in-out"
           strokeDasharray={circumference}
           strokeDashoffset={offset}
-          strokeLinecap="round"
+          strokeLinecap="square"
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-        <span className="text-7xl font-black text-foreground tracking-tighter leading-none font-display">
+        <span className="text-7xl font-black text-foreground tracking-tighter leading-none">
           {score}
         </span>
-        <span className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground mt-3 opacity-60">
+        <span className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground mt-4">
           Vitality Unit
         </span>
       </div>
@@ -126,24 +127,27 @@ export default function FinancialHealthPageClient({
   return (
     <div className="flex flex-col h-full bg-background text-foreground overflow-y-auto custom-scrollbar">
       {/* Header */}
-      <header className="h-16 px-4 md:px-6 flex items-center justify-between border-b border-border bg-card sticky top-0 z-50">
+      {/* Header - Industrial Audit */}
+      <header className="h-12 px-4 md:px-6 flex items-center justify-between border-b border-border bg-card sticky top-0 z-50">
         <div>
-          <h1 className="text-xl md:text-2xl font-black uppercase tracking-tight text-foreground font-display">
+          <h1 className="text-lg font-black uppercase tracking-tighter text-foreground">
             Financial Health Audit
           </h1>
-          <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Insight v4.0</p>
+          <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mt-1">Diagnostic Protocol v4.0.1</p>
         </div>
-        <div className="flex items-center gap-3">
-          <button
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => setTheme(isDark ? 'light' : 'dark')}
-            className="p-2 border border-border bg-muted/50 rounded-xl text-muted-foreground hover:text-foreground transition-all"
+            className="h-8 w-8 p-0 rounded-none border-border"
           >
-            {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-          </button>
-          <button className="hidden sm:flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-xl font-bold text-[10px] transition-all hover:bg-primary/90 uppercase tracking-widest shadow-sm">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Regenerate Audit</span>
-          </button>
+            {isDark ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
+          </Button>
+          <Button size="sm" className="hidden sm:flex h-8 bg-foreground text-background hover:bg-primary hover:text-primary-foreground rounded-none font-black text-[9px] uppercase tracking-widest">
+            <Sparkles className="w-3 h-3 mr-2" />
+            <span>Recalibrate Diagnostics</span>
+          </Button>
         </div>
       </header>
 
@@ -154,65 +158,55 @@ export default function FinancialHealthPageClient({
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
 
           {/* Vitality Gauge */}
-          <div className="lg:col-span-5 border border-border bg-card p-6 rounded-3xl flex flex-col items-center justify-center text-center relative overflow-hidden group">
-            <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:opacity-20 transition-opacity">
-              <Heart className="w-24 h-24 text-primary" />
-            </div>
+          <div className="lg:col-span-5 card-base p-8 flex flex-col items-center justify-center text-center relative overflow-hidden">
+            <span className="text-[10px] font-black uppercase tracking-[0.4em] text-theme-secondary mb-10">Unit Vitality Assessment</span>
 
-            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground mb-6 z-10">Overall Vitality Score</span>
-
-            <div className="relative z-10">
+            <div className="relative">
               <HealthGauge score={healthScore} />
             </div>
 
-            <div className="mt-8 grid grid-cols-2 w-full gap-4 border-t border-border/10 pt-6 z-10">
+            <div className="mt-10 grid grid-cols-2 w-full gap-8 border-t border-border pt-8">
               <div className="text-left">
-                <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest mb-2 opacity-60">Global Stat</p>
+                <p className="text-[9px] text-muted-foreground font-black uppercase tracking-widest mb-2">Global Ranking</p>
                 <div className="flex items-baseline gap-1">
-                  <span className="text-2xl font-black font-display">Top {healthScore > 80 ? '2%' : healthScore > 60 ? '12%' : '28%'}</span>
+                  <span className="text-2xl font-black tabular-nums">TOP {healthScore > 80 ? '2%' : healthScore > 60 ? '12%' : '28%'}</span>
                 </div>
               </div>
-              <div className="text-left border-l border-border/10 pl-8">
-                <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest mb-2 opacity-60">Peer Average</p>
-                <span className="text-xl font-black font-display text-muted-foreground/60">{PEER_AVG_SCORE}</span>
+              <div className="text-left border-ml border-border pl-8">
+                <p className="text-[9px] text-muted-foreground font-black uppercase tracking-widest mb-2">Sector Median</p>
+                <span className="text-2xl font-black tabular-nums text-muted-foreground/40">{PEER_AVG_SCORE}</span>
               </div>
             </div>
           </div>
 
-          {/* Trajectory Area Chart */}
-          <div className="lg:col-span-7 border border-border bg-card p-6 rounded-3xl flex flex-col relative overflow-hidden">
-            <div className="flex items-center justify-between mb-10">
+          {/* Trajectory Area Chart - Solid Industrial */}
+          <div className="lg:col-span-7 card-base p-8 flex flex-col relative overflow-hidden">
+            <div className="flex items-center justify-between mb-12">
               <div>
-                <h3 className="text-[11px] font-black text-muted-foreground uppercase tracking-[0.4em]">Efficiency Trajectory</h3>
-                <p className="text-4xl font-black mt-2 text-foreground font-display tracking-tighter">
+                <h3 className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.4em]">Efficiency Baseline</h3>
+                <p className="text-4xl font-black mt-2 text-foreground tracking-tighter tabular-nums">
                   {trendPercentage > 0 ? '+' : ''}{trendPercentage.toFixed(1)}%
                 </p>
               </div>
-              <Badge className={cn(
-                "px-3 py-1.5 rounded-lg border-none font-black text-[9px] uppercase tracking-widest",
-                trendPercentage >= 0 ? "bg-emerald-500/10 text-emerald-500" : "bg-rose-500/10 text-rose-500"
+              <Badge variant="outline" className={cn(
+                "px-3 py-1.5 rounded-none border font-black text-[9px] uppercase tracking-widest",
+                trendPercentage >= 0 ? "bg-emerald-500/5 text-emerald-500 border-emerald-500/20" : "bg-rose-500/5 text-rose-500 border-rose-500/20"
               )}>
-                {trendPercentage >= 0 ? <TrendingUp className="w-3.5 h-3.5 mr-1.5" /> : <TrendingDown className="w-3.5 h-3.5 mr-1.5" />}
-                {trendPercentage >= 0 ? 'Surging' : 'Volatility Detected'}
+                {trendPercentage >= 0 ? <TrendingUp className="w-3 h-3 mr-2" /> : <TrendingDown className="w-3 h-3 mr-2" />}
+                {trendPercentage >= 0 ? 'Surging' : 'Volatility'}
               </Badge>
             </div>
 
-            <div className="flex-1 w-full min-h-[250px] mt-4">
+            <div className="flex-1 w-full min-h-[250px]">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={chartData}>
-                  <defs>
-                    <linearGradient id="colorAmount" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="var(--primary)" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
                   <Tooltip
                     content={({ active, payload }) => {
                       if (active && payload && payload.length) {
                         return (
-                          <div className="glass-card p-4 rounded-2xl border-primary/20 shadow-2xl">
-                            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">{payload[0].payload.month}</p>
-                            <p className="text-lg font-black text-primary">{payload[0].payload.formattedAmount}</p>
+                          <div className="card-base p-4 border-primary/40 shadow-none">
+                            <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-2">{payload[0].payload.month}</p>
+                            <p className="text-lg font-black text-primary tabular-nums">{payload[0].payload.formattedAmount}</p>
                           </div>
                         );
                       }
@@ -224,15 +218,15 @@ export default function FinancialHealthPageClient({
                     dataKey="amount"
                     stroke="var(--primary)"
                     strokeWidth={4}
-                    fillOpacity={1}
-                    fill="url(#colorAmount)"
-                    animationDuration={2000}
+                    fillOpacity={0.1}
+                    fill="var(--primary)"
+                    animationDuration={1000}
                   />
                 </AreaChart>
               </ResponsiveContainer>
-              <div className="flex justify-between px-2 mt-4">
+              <div className="flex justify-between px-2 mt-6">
                 {chartData.map((d, i) => (
-                  <span key={i} className="text-[9px] font-black text-muted-foreground/40 uppercase tracking-widest">{d.month}</span>
+                  <span key={i} className="text-[9px] font-black text-muted-foreground/30 uppercase tracking-widest">{d.month}</span>
                 ))}
               </div>
             </div>
@@ -247,26 +241,26 @@ export default function FinancialHealthPageClient({
             <span className="h-px flex-1 bg-border/10"></span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {/* Stability Card */}
-            <div className="border border-border bg-card p-6 rounded-2xl group transition-all duration-500 border-l-4 border-l-blue-500/40">
-              <div className="flex justify-between items-start mb-8">
-                <div className="p-4 rounded-2xl bg-blue-500/10 border border-blue-500/10 group-hover:scale-110 transition-transform">
-                  <Wallet className="w-6 h-6 text-blue-500" />
+            <div className="card-base p-6 border-l-4 border-l-blue-500 hover:bg-muted/5 transition-all">
+              <div className="flex justify-between items-start mb-10">
+                <div className="p-3 bg-blue-500/10 border border-blue-500/20">
+                  <Wallet className="w-5 h-5 text-blue-500" />
                 </div>
                 <div className="text-right">
-                  <span className="text-4xl font-black font-display leading-none">{stability}</span>
-                  <span className="text-xs text-muted-foreground font-black ml-1">/100</span>
+                  <span className="text-4xl font-black leading-none tabular-nums">{stability}</span>
+                  <span className="text-[10px] text-muted-foreground font-black ml-1 uppercase">Unit</span>
                 </div>
               </div>
-              <h4 className="font-black text-lg uppercase tracking-tight mb-1">Financial Stability</h4>
-              <p className="text-[10px] text-muted-foreground uppercase font-black tracking-widest leading-relaxed opacity-60">Debt-to-Income Audit</p>
+              <h4 className="font-black text-base uppercase tracking-tight mb-1">Financial Stability</h4>
+              <p className="text-[9px] text-muted-foreground uppercase font-black tracking-widest opacity-50">Debt-to-Income Audit</p>
 
               <div className="mt-8 space-y-3">
-                <div className="w-full bg-muted/10 h-2 rounded-full overflow-hidden">
-                  <div className="bg-blue-500 h-full transition-all duration-1000 ease-out rounded-full shadow-[0_0_10px_rgba(59,130,246,0.5)]" style={{ width: `${stability}%` }}></div>
+                <div className="w-full bg-muted h-1 rounded-none overflow-hidden">
+                  <div className="bg-blue-500 h-full transition-all duration-1000" style={{ width: `${stability}%` }}></div>
                 </div>
-                <div className="flex justify-between text-[9px] font-black uppercase tracking-widest text-muted-foreground/60">
+                <div className="flex justify-between text-[8px] font-black uppercase tracking-widest text-muted-foreground/60">
                   <span>Fragile</span>
                   <span>Rock Solid</span>
                 </div>
@@ -274,24 +268,24 @@ export default function FinancialHealthPageClient({
             </div>
 
             {/* Growth Card */}
-            <div className="border border-border bg-card p-6 rounded-2xl group transition-all duration-500 border-l-4 border-l-emerald-500/40">
-              <div className="flex justify-between items-start mb-8">
-                <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/10 group-hover:scale-110 transition-transform">
-                  <TrendingUp className="w-6 h-6 text-emerald-500" />
+            <div className="card-base p-6 border-l-4 border-l-emerald-500 hover:bg-muted/5 transition-all">
+              <div className="flex justify-between items-start mb-10">
+                <div className="p-3 bg-emerald-500/10 border border-emerald-500/20">
+                  <TrendingUp className="w-5 h-5 text-emerald-500" />
                 </div>
                 <div className="text-right">
-                  <span className="text-4xl font-black font-display leading-none">{growth}</span>
-                  <span className="text-xs text-muted-foreground font-black ml-1">/100</span>
+                  <span className="text-4xl font-black leading-none tabular-nums">{growth}</span>
+                  <span className="text-[10px] text-muted-foreground font-black ml-1 uppercase">Unit</span>
                 </div>
               </div>
-              <h4 className="font-black text-lg uppercase tracking-tight mb-1">Growth Engine</h4>
-              <p className="text-[10px] text-muted-foreground uppercase font-black tracking-widest leading-relaxed opacity-60">Savings Efficiency Ratio</p>
+              <h4 className="font-black text-base uppercase tracking-tight mb-1">Growth Engine</h4>
+              <p className="text-[9px] text-muted-foreground uppercase font-black tracking-widest opacity-50">Savings Efficiency Ratio</p>
 
               <div className="mt-8 space-y-3">
-                <div className="w-full bg-muted/10 h-2 rounded-full overflow-hidden">
-                  <div className="bg-emerald-500 h-full transition-all duration-1000 ease-out rounded-full shadow-[0_0_10px_rgba(16,185,129,0.5)]" style={{ width: `${growth}%` }}></div>
+                <div className="w-full bg-muted h-1 rounded-none overflow-hidden">
+                  <div className="bg-emerald-500 h-full transition-all duration-1000" style={{ width: `${growth}%` }}></div>
                 </div>
-                <div className="flex justify-between text-[9px] font-black uppercase tracking-widest text-muted-foreground/60">
+                <div className="flex justify-between text-[8px] font-black uppercase tracking-widest text-muted-foreground/60">
                   <span>Stagnant</span>
                   <span>Exponential</span>
                 </div>
@@ -299,24 +293,24 @@ export default function FinancialHealthPageClient({
             </div>
 
             {/* Security/Risk Card */}
-            <div className="border border-border bg-card p-6 rounded-2xl group transition-all duration-500 border-l-4 border-l-rose-500/40">
-              <div className="flex justify-between items-start mb-8">
-                <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/10 group-hover:scale-110 transition-transform">
-                  <Shield className="w-6 h-6 text-rose-500" />
+            <div className="card-base p-6 border-l-4 border-l-rose-500 hover:bg-muted/5 transition-all">
+              <div className="flex justify-between items-start mb-10">
+                <div className="p-3 bg-rose-500/10 border border-rose-500/20">
+                  <Shield className="w-5 h-5 text-rose-500" />
                 </div>
                 <div className="text-right">
-                  <span className="text-4xl font-black font-display leading-none">{100 - risk}</span>
-                  <span className="text-xs text-muted-foreground font-black ml-1">/100</span>
+                  <span className="text-4xl font-black leading-none tabular-nums">{100 - risk}</span>
+                  <span className="text-[10px] text-muted-foreground font-black ml-1 uppercase">Unit</span>
                 </div>
               </div>
-              <h4 className="font-black text-lg uppercase tracking-tight mb-1">System Security</h4>
-              <p className="text-[10px] text-muted-foreground uppercase font-black tracking-widest leading-relaxed opacity-60">Capital Risk Exposure</p>
+              <h4 className="font-black text-base uppercase tracking-tight mb-1">System Security</h4>
+              <p className="text-[9px] text-muted-foreground uppercase font-black tracking-widest opacity-50">Capital Risk Exposure</p>
 
               <div className="mt-8 space-y-3">
-                <div className="w-full bg-muted/10 h-2 rounded-full overflow-hidden">
-                  <div className="bg-rose-500 h-full transition-all duration-1000 ease-out rounded-full shadow-[0_0_10px_rgba(244,63,94,0.5)]" style={{ width: `${100 - risk}%` }}></div>
+                <div className="w-full bg-muted h-1 rounded-none overflow-hidden">
+                  <div className="bg-rose-500 h-full transition-all duration-1000" style={{ width: `${100 - risk}%` }}></div>
                 </div>
-                <div className="flex justify-between text-[9px] font-black uppercase tracking-widest text-muted-foreground/60">
+                <div className="flex justify-between text-[8px] font-black uppercase tracking-widest text-muted-foreground/60">
                   <span>Exposed</span>
                   <span>Fortified</span>
                 </div>
@@ -325,43 +319,39 @@ export default function FinancialHealthPageClient({
           </div>
         </div>
 
-        {/* Strategic Roadmap (Bottom Section) */}
-        <div className="relative group">
-          <div className="absolute inset-0 bg-primary/5 rounded-2xl -z-10 blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
-          <div className="border border-border bg-card p-6 md:p-8 rounded-2xl border-dashed border-primary/30 flex flex-col lg:flex-row items-center justify-between gap-6 overflow-hidden relative">
-
-            <div className="flex items-start gap-8 z-10 w-full lg:max-w-3xl">
-              <div className="w-20 h-20 rounded-[2rem] glass-card flex items-center justify-center shadow-2xl shadow-primary/20 border-primary/20 shrink-0 bg-primary/5">
-                <Lightbulb className="w-10 h-10 text-primary" />
+        {/* Strategic Roadmap - Solid Terminal */}
+        <div className="card-base p-8 md:p-12 border-dashed border-primary/40 bg-muted/5 flex flex-col lg:flex-row items-center justify-between gap-10 overflow-hidden relative">
+          <div className="flex items-start gap-10 w-full lg:max-w-4xl">
+            <div className="w-20 h-20 bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
+              <Lightbulb className="w-10 h-10 text-primary" />
+            </div>
+            <div className="space-y-6">
+              <div className="inline-flex items-center gap-3">
+                <div className="w-2 h-2 rounded-full bg-primary" />
+                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Strategic Directive Active</span>
               </div>
-              <div className="space-y-4">
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/10 text-primary">
-                  <span className="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
-                  <span className="text-[10px] font-black uppercase tracking-widest">Live Strategic Insight</span>
+              <p className="text-2xl md:text-3xl text-foreground font-black leading-tight tracking-tighter uppercase">
+                {initialData.topExpenseCategories.length > 0
+                  ? `Optimize capital efficiency by auditing the ${initialData.topExpenseCategories[0].percentage.toFixed(1)}% concentration in ${initialData.topExpenseCategories[0].category}.`
+                  : 'System data required for advanced strategic reallocation mapping.'}
+              </p>
+              <div className="flex flex-wrap items-center gap-8 pt-4">
+                <div className="flex items-center gap-3">
+                  <Target className="w-4 h-4 text-primary opacity-40" />
+                  <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Target: 85+ Vitality</span>
                 </div>
-                <p className="text-xl md:text-2xl text-foreground font-medium leading-tight font-display">
-                  {initialData.topExpenseCategories.length > 0
-                    ? `Optimize capital efficiency by auditing the ${initialData.topExpenseCategories[0].percentage.toFixed(1)}% concentration in ${initialData.topExpenseCategories[0].category}.`
-                    : 'System data required for advanced strategic reallocation mapping.'}
-                </p>
-                <div className="flex items-center gap-6 mt-6">
-                  <div className="flex items-center gap-2">
-                    <Target className="w-4 h-4 text-primary opacity-60" />
-                    <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Target: 85+ Vitality</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4 text-primary opacity-60" />
-                    <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Updated Now</span>
-                  </div>
+                <div className="flex items-center gap-3">
+                  <AlertCircle className="w-4 h-4 text-primary opacity-40" />
+                  <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Status: Integrated</span>
                 </div>
               </div>
             </div>
-
-            <button className="w-full lg:w-auto text-[11px] font-black uppercase tracking-widest bg-foreground text-background px-12 py-5 rounded-2xl hover:bg-primary hover:text-primary-foreground hover:scale-105 active:scale-95 transition-all shadow-2xl shadow-foreground/10 z-10 group/btn">
-              <span>Execute AI Strategy</span>
-              <ArrowRight className="inline-block ml-3 w-4 h-4 group-hover/btn:translate-x-2 transition-transform" />
-            </button>
           </div>
+
+          <Button size="lg" className="w-full lg:w-auto h-16 px-12 bg-foreground text-background hover:bg-primary hover:text-primary-foreground rounded-none font-black text-[11px] uppercase tracking-[0.2em] transition-all">
+            <span>Execute AI Strategy</span>
+            <ArrowRight className="ml-4 w-5 h-5" />
+          </Button>
         </div>
 
       </div>

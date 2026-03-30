@@ -143,7 +143,8 @@ Format: JSON only.`;
 
         } catch (error) {
             console.error('[BriefingService] Error:', error);
-            return null;
+            // Return fallback instead of null to prevent 500 errors in the API
+            return this.createFallback(date, location, "An error occurred while generating the daily briefing.");
         }
     }
 

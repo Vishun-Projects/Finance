@@ -7,7 +7,7 @@ class KKBKStyle(BaseStyle):
     Kotak Mahindra Bank Style.
     """
     
-    def extract_entities(self, text: str) -> Tuple[Optional[str], Optional[str], float, str]:
+    def extract_entities(self, text: str) -> Tuple[Optional[str], Optional[str], float, str, Optional[str]]:
         # Kotak pattern: [ID] - [ENTITY]
         cleaned = self.clean_description(text)
         from .categories import get_commodity

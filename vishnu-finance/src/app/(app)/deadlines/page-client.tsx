@@ -353,195 +353,144 @@ export default function DeadlinesPageClient({ initialDeadlines, userId, layoutVa
           className="bg-primary text-primary-foreground"
         />
 
-        {!isEmbedded && (
-          <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardDescription>Due this month</CardDescription>
-                <CardTitle className="text-2xl">{stats.upcoming}</CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0 text-sm text-muted-foreground">
-                Tracking {stats.monthLabel}
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardDescription>Overdue</CardDescription>
-                <CardTitle className="text-2xl text-destructive">{stats.overdue}</CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0 text-sm text-muted-foreground">
-                Make a plan to clear these soon
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardDescription>Total scheduled</CardDescription>
-                <CardTitle className="text-2xl">{stats.total}</CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0 text-sm text-muted-foreground">
-                {stats.total ? 'Organised and under control' : 'Add your first reminder'}
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardDescription>Amount due</CardDescription>
-                <CardTitle className="text-2xl">{formatCurrency(stats.totalAmount)}</CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0 text-sm text-muted-foreground">
-                Across all pending deadlines
-              </CardContent>
-            </Card>
+        {/* INDUSTRIAL_METRIC_GRID */}
+        {!isEmbedded ? (
+          <div className="grid grid-cols-1 md:grid-cols-4 border border-border">
+            {[
+              { label: 'Pending_Protocol', value: stats.upcoming, sub: `${stats.monthLabel} Context` },
+              { label: 'Overdue_Criticality', value: stats.overdue, sub: 'Requires_Immediate_Sync', critical: stats.overdue > 0 },
+              { label: 'Total_Node_Count', value: stats.total, sub: 'System_Tracking' },
+              { label: 'Cumulative_Liability', value: formatCurrency(stats.totalAmount), sub: 'Across_All_Nodes' },
+            ].map((stat, i) => (
+              <div key={i} className={cn("p-4 flex flex-col justify-between h-24", i !== 3 && "border-r border-border")}>
+                <span className="text-[8px] font-black uppercase tracking-[0.2em] text-muted-foreground">{stat.label}</span>
+                <div>
+                  <span className={cn("text-xl font-black tabular-nums numeric tracking-tighter block", stat.critical && "text-rose-500")}>{stat.value}</span>
+                  <span className="text-[7px] font-bold text-muted-foreground/40 uppercase tracking-widest">{stat.sub}</span>
+                </div>
+              </div>
+            ))}
           </div>
-        )}
+        ) : null}
 
-        <div className="mt-4 space-y-3 rounded-xl border border-border/60 bg-card p-3 shadow-sm sm:p-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <Tabs value={statusFilter} onValueChange={(value) => setStatusFilter(value as typeof statusFilter)}>
-              <TabsList className="flex flex-wrap gap-2">
-                {STATUS_FILTERS.map((status) => (
-                  <TabsTrigger key={status} value={status} className="capitalize">
-                    {status === 'all' ? 'All' : status.toLowerCase()}
-                  </TabsTrigger>
+        {/* AUDIT_LEDGER_SYSTEM */}
+        <div className="border border-border bg-background">
+          <div className="h-10 px-4 flex items-center justify-between border-b border-border bg-muted/20">
+            <div className="flex items-center gap-6">
+              <span className="text-[9px] font-black uppercase tracking-[0.2em] text-foreground">DEADLINE_AUDIT_LEDGER</span>
+              <div className="flex gap-1">
+                {STATUS_FILTERS.map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => setStatusFilter(s)}
+                    className={cn(
+                      "text-[8px] font-black uppercase tracking-widest px-2 py-1 transition-none",
+                      statusFilter === s ? "bg-foreground text-background" : "text-muted-foreground hover:bg-muted"
+                    )}
+                  >
+                    {s}
+                  </button>
                 ))}
-              </TabsList>
-            </Tabs>
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              <Select
-                value={categoryFilter}
-                onValueChange={(value) => setCategoryFilter(value)}
-              >
-                <SelectTrigger className="w-full sm:w-48 bg-card border-border text-foreground">
-                  <SelectValue placeholder="Filter by category" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All categories</SelectItem>
-                  {categories.map((category) => (
-                    <SelectItem key={category} value={category} className="capitalize">
-                      {category.toLowerCase()}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Input
-                placeholder="Search deadlines"
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+               <Input
+                placeholder="PROBE_ID..."
                 value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
-                className="w-full min-w-[200px] sm:w-64 bg-card border-border text-foreground placeholder:text-muted-foreground/50 focus-visible:ring-border"
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="h-6 w-32 rounded-none border-border bg-transparent text-[8px] font-black uppercase tracking-widest focus-visible:ring-0"
               />
             </div>
           </div>
 
-          <Tabs value="list">
-            <TabsContent value="list" className="mt-4 space-y-4">
-              {filteredDeadlines.length === 0 ? (
-                <Card className="border-dashed border-border bg-card">
-                  <CardContent className="py-12 text-center text-muted-foreground">
-                    {deadlines.length === 0 ? 'No reminders yet. Add your first deadline.' : 'No deadlines match the current filters.'}
-                  </CardContent>
-                </Card>
-              ) : (
-                filteredDeadlines.map((deadline) => {
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="border-b border-border bg-muted/5">
+                  <th className="text-left p-3 text-[8px] font-black uppercase tracking-widest text-muted-foreground border-r border-border w-10">#</th>
+                  <th className="text-left p-3 text-[8px] font-black uppercase tracking-widest text-muted-foreground border-r border-border">TRANSACTION_PROTOCOL</th>
+                  <th className="text-left p-3 text-[8px] font-black uppercase tracking-widest text-muted-foreground border-r border-border">STATUS</th>
+                  <th className="text-left p-3 text-[8px] font-black uppercase tracking-widest text-muted-foreground border-r border-border">TEMPORAL_MARKER</th>
+                  <th className="text-left p-3 text-[8px] font-black uppercase tracking-widest text-muted-foreground border-r border-border">SYNC_STATE</th>
+                  <th className="text-right p-3 text-[8px] font-black uppercase tracking-widest text-muted-foreground border-r border-border">AMOUNT</th>
+                  <th className="text-right p-3 text-[8px] font-black uppercase tracking-widest text-muted-foreground">CONTROLS</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {filteredDeadlines.map((deadline, idx) => {
                   const statusMeta = computeStatus(deadline);
                   const dueDate = new Date(deadline.dueDate);
                   const daysLeft = Math.ceil((dueDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
                   const isOverdue = statusMeta.status === 'OVERDUE';
-
+                  
                   return (
-                    <Card key={deadline.id} className="matte-card bg-card border border-border shadow-none hover:border-foreground/20 transition-colors">
-                      <CardContent className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="flex-1 space-y-2">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span
-                              className={cn(
-                                'inline-flex items-center rounded-sm px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider',
-                                statusMeta.tone === 'destructive' && 'bg-destructive/10 text-destructive border border-destructive/20',
-                                statusMeta.tone === 'secondary' && 'bg-emerald-950/30 text-emerald-500 border border-emerald-900/50',
-                                statusMeta.tone === 'default' && 'bg-muted text-muted-foreground border border-border'
-                              )}
-                            >
-                              {statusMeta.label}
-                            </span>
-                            {deadline.category && (
-                              <span className="inline-flex items-center rounded-sm border border-border bg-muted/50 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                                {deadline.category.toLowerCase()}
-                              </span>
-                            )}
-                            {deadline.isRecurring && (
-                              <span className="inline-flex items-center gap-1 rounded-sm border border-border px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                                <Repeat className="h-3 w-3" />
-                                {deadline.frequency?.toLowerCase()}
-                              </span>
-                            )}
-                          </div>
-                          <div>
-                            <h3 className="text-lg font-bold text-foreground mb-1">
-                              {deadline.title}
-                            </h3>
-                            {deadline.description && (
-                              <p className="text-xs text-muted-foreground font-medium">
-                                {deadline.description}
-                              </p>
-                            )}
-                          </div>
-                          <div className="flex flex-wrap items-center gap-4 text-xs text-neutral-400 font-mono">
-                            <span className="flex items-center gap-2">
-                              <Calendar className="h-3 w-3" />
-                              Due {toLocalDate(deadline.dueDate)}
-                            </span>
-                            <span className="flex items-center gap-2">
-                              <AlarmClock className={cn("h-3 w-3", isOverdue && "text-destructive")} />
-                              {isOverdue
-                                ? <span className="text-destructive">{Math.abs(daysLeft)} day{Math.abs(daysLeft) === 1 ? '' : 's'} overdue</span>
-                                : daysLeft >= 0
-                                  ? `${daysLeft} day${daysLeft === 1 ? '' : 's'} remaining`
-                                  : 'Due today'}
-                            </span>
-                            <span className="flex items-center gap-2">
-                              <Clock className="h-3 w-3" />
-                              <span className="text-foreground">{formatCurrency(deadline.amount)}</span>
-                            </span>
-                          </div>
+                    <tr key={deadline.id} className="group hover:bg-muted/5 transition-none">
+                      <td className="p-3 text-[9px] font-bold font-mono text-muted-foreground/40 border-r border-border align-middle">
+                        {(idx + 1).toString().padStart(2, '0')}
+                      </td>
+                      <td className="p-3 border-r border-border">
+                        <div className="flex flex-col">
+                          <span className="text-[10px] font-black uppercase tracking-tight">{deadline.title}</span>
+                          <span className="text-[8px] font-bold text-muted-foreground/60 uppercase">{deadline.category || 'UNCLASSIFIED'}</span>
                         </div>
-                        <div className="flex flex-col items-stretch gap-2 sm:w-48">
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            className="justify-between border border-border bg-muted text-muted-foreground hover:bg-border hover:text-foreground h-8 text-[10px] uppercase font-bold tracking-wider"
-                            onClick={() => openEditDialog(deadline)}
-                          >
-                            <span>Edit</span>
-                            <Calendar className="h-3 w-3" />
+                      </td>
+                      <td className="p-3 border-r border-border">
+                         <div className={cn(
+                            "inline-flex items-center h-4 px-1.5 text-[7px] font-black uppercase tracking-widest border",
+                            statusMeta.tone === 'destructive' ? "bg-rose-500/10 text-rose-500 border-rose-500/20" : 
+                            statusMeta.tone === 'secondary' ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" : "bg-muted text-muted-foreground border-border/50"
+                         )}>
+                            {statusMeta.label}
+                         </div>
+                      </td>
+                      <td className="p-3 border-r border-border">
+                         <div className="flex flex-col">
+                            <span className="text-[9px] font-black uppercase">{toLocalDate(deadline.dueDate)}</span>
+                            <span className="text-[7px] font-bold text-muted-foreground uppercase">PROTO_DATE</span>
+                         </div>
+                      </td>
+                      <td className="p-3 border-r border-border">
+                         <div className="flex items-center gap-2">
+                            <Clock className={cn("size-3", isOverdue ? "text-rose-500" : "text-muted-foreground/40")} />
+                            <span className={cn("text-[8px] font-black uppercase tracking-widest", isOverdue ? "text-rose-500" : "text-foreground/80")}>
+                               {isOverdue ? `${Math.abs(daysLeft)}D_DELAY` : daysLeft > 0 ? `${daysLeft}D_REMAIN` : 'SYNC_TODAY'}
+                            </span>
+                         </div>
+                      </td>
+                      <td className="p-3 border-r border-border text-right text-[10px] font-black tabular-nums numeric">
+                        {formatCurrency(deadline.amount)}
+                      </td>
+                      <td className="p-3 text-right">
+                        <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-none">
+                          <Button variant="outline" size="icon" className="size-6 rounded-none border-border" onClick={() => openEditDialog(deadline)}>
+                            <Calendar className="size-3" />
                           </Button>
-                          <Button
-                            size="sm"
-                            className={cn(
-                              'justify-between h-8 text-[10px] uppercase font-bold tracking-wider',
-                              deadline.isCompleted
-                                ? 'border border-emerald-900/50 bg-emerald-950/20 text-emerald-500 hover:bg-emerald-900/30'
-                                : 'bg-primary text-primary-foreground hover:bg-primary/90'
-                            )}
+                          <Button 
+                            variant="outline" 
+                            size="icon" 
+                            className={cn("size-6 rounded-none border-border", deadline.isCompleted ? "text-emerald-500 border-emerald-500/30" : "")} 
                             onClick={() => handleToggleCompleted(deadline)}
                           >
-                            <span>{deadline.isCompleted ? 'Reset' : 'Mark paid'}</span>
-                            <CheckCircle className="h-3 w-3" />
+                            <CheckCircle className="size-3" />
                           </Button>
-                          <Button
-                            size="sm"
-                            className="justify-between bg-destructive/10 text-destructive border border-destructive/20 hover:bg-destructive/20 hover:text-destructive h-8 text-[10px] uppercase font-bold tracking-wider"
-                            onClick={() => handleDelete(deadline.id)}
-                            disabled={isDeleting === deadline.id}
-                          >
-                            <span>{isDeleting === deadline.id ? 'Deleting…' : 'Delete'}</span>
-                            <Trash2 className="h-3 w-3" />
+                          <Button variant="outline" size="icon" className="size-6 rounded-none border-border text-rose-500 hover:bg-rose-500/10" onClick={() => handleDelete(deadline.id)}>
+                            <Trash2 className="size-3" />
                           </Button>
                         </div>
-                      </CardContent>
-                    </Card>
+                      </td>
+                    </tr>
                   );
-                })
-              )}
-            </TabsContent>
-          </Tabs>
+                })}
+                {filteredDeadlines.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="p-12 text-center text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                      NO_ACTIVE_PROTOCOLS
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 

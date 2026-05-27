@@ -128,23 +128,53 @@ export async function validateOpeningBalance(
   userId: string,
   accountNumber: string,
   bankCode: string,
-  newOpeningBalance: number
+  newOpeningBalance: number,
+  newStatementStartDate?: Date | string | null
 ): Promise<BalanceValidationResult> {
   const tolerance = 0.01; // Allow ±0.01 for rounding differences
   const warningThreshold = 1.00; // Warn if difference > 1.00
 
   try {
-    // Get latest statement for this account
-    const lastStatement = await (prisma as any).accountStatement.findFirst({
-      where: {
-        userId,
-        accountNumber,
-        bankCode,
-      },
-      orderBy: {
-        statementEndDate: 'desc',
-      },
-    });
+    const startDate = newStatementStartDate ? new Date(newStatementStartDate) : null;
+    const startDateValid = startDate && !Number.isNaN(startDate.getTime());
+
+    // Prefer the statement immediately before this import period
+    let lastStatement = startDateValid
+      ? await (prisma as any).accountStatement.findFirst({
+          where: {
+            userId,
+            accountNumber,
+            bankCode,
+            statementEndDate: { lt: startDate },
+          },
+          orderBy: { statementEndDate: 'desc' },
+        })
+      : null;
+
+    // Fallback: latest statement for this account (legacy behaviour)
+    if (!lastStatement) {
+      lastStatement = await (prisma as any).accountStatement.findFirst({
+        where: { userId, accountNumber, bankCode },
+        orderBy: { statementEndDate: 'desc' },
+      });
+    }
+
+    // If the latest statement starts on/after the new one, it's an overlap or re-import — skip strict check
+    if (
+      lastStatement &&
+      startDateValid &&
+      new Date(lastStatement.statementStartDate).getTime() >= startDate!.getTime()
+    ) {
+      return {
+        isValid: true,
+        isFirstImport: false,
+        lastClosingBalance: Number(lastStatement.closingBalance),
+        discrepancy: null,
+        warning:
+          'This statement overlaps or precedes an existing import for this account. Opening balance continuity was not enforced.',
+        error: null,
+      };
+    }
 
     // First import - no validation needed
     if (!lastStatement) {
@@ -158,7 +188,36 @@ export async function validateOpeningBalance(
       };
     }
 
-    const lastClosingBalance = Number(lastStatement.closingBalance);
+    let lastClosingBalance = Number(lastStatement.closingBalance);
+    let gapDays = 0;
+    let hasGap = false;
+
+    if (startDateValid) {
+      const lastEndDate = new Date(lastStatement.statementEndDate);
+      gapDays = Math.ceil((startDate!.getTime() - lastEndDate.getTime()) / (1000 * 60 * 60 * 24));
+      hasGap = gapDays > 1;
+    }
+
+    // Prefer last known running balance from transactions (more reliable than statement metadata)
+    if (startDateValid) {
+      const lastTxn = await (prisma as any).transaction.findFirst({
+        where: {
+          userId,
+          accountNumber,
+          bankCode,
+          isDeleted: false,
+          balance: { not: null },
+          transactionDate: { lt: startDate },
+        },
+        orderBy: [{ transactionDate: 'desc' }, { createdAt: 'desc' }],
+        select: { balance: true },
+      });
+
+      if (lastTxn?.balance != null) {
+        lastClosingBalance = Number(lastTxn.balance);
+      }
+    }
+
     const discrepancy = Math.abs(newOpeningBalance - lastClosingBalance);
 
     // Perfect match or within tolerance
@@ -173,6 +232,20 @@ export async function validateOpeningBalance(
       };
     }
 
+    const mismatchMessage = `Opening balance (${newOpeningBalance}) differs from previous closing balance (${lastClosingBalance}) by ${discrepancy.toFixed(2)}.`;
+
+    // Missing statements between imports — expected mismatch, allow import
+    if (hasGap) {
+      return {
+        isValid: true,
+        isFirstImport: false,
+        lastClosingBalance,
+        discrepancy,
+        warning: `${mismatchMessage} There is a ${gapDays}-day gap since the last statement — this is expected if intermediate statements were not imported.`,
+        error: null,
+      };
+    }
+
     // Small difference - warning but allow
     if (discrepancy < warningThreshold) {
       return {
@@ -180,29 +253,29 @@ export async function validateOpeningBalance(
         isFirstImport: false,
         lastClosingBalance,
         discrepancy,
-        warning: `Opening balance (${newOpeningBalance}) differs from previous closing balance (${lastClosingBalance}) by ${discrepancy.toFixed(2)}. This may be due to pending transactions or rounding.`,
+        warning: `${mismatchMessage} This may be due to pending transactions or rounding.`,
         error: null,
       };
     }
 
-    // Large difference - error, require confirmation
+    // Large difference with contiguous periods - still allow import but surface as warning, not blocking error
     return {
-      isValid: false,
+      isValid: true,
       isFirstImport: false,
       lastClosingBalance,
       discrepancy,
-      warning: null,
-      error: `Opening balance (${newOpeningBalance}) differs significantly from previous closing balance (${lastClosingBalance}) by ${discrepancy.toFixed(2)}. Please verify the statement period and account number.`,
+      warning: `${mismatchMessage} Please verify the statement period and account number.`,
+      error: null,
     };
   } catch (error) {
     console.error('Error validating opening balance:', error);
     return {
-      isValid: false,
+      isValid: true,
       isFirstImport: false,
       lastClosingBalance: null,
       discrepancy: null,
-      warning: null,
-      error: 'Error validating opening balance',
+      warning: 'Could not verify opening balance against previous imports. Transactions were still imported.',
+      error: null,
     };
   }
 }

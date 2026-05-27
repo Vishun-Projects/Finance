@@ -41,10 +41,12 @@ class handler(BaseHTTPRequestHandler):
                 self._send_error(400, "Missing 'pdf_data' in payload")
                 return
 
-            # Prepare downstream request
+            # Forward full payload to the PDF handler
             downstream_payload = {
                 "pdf_data": payload.get("pdf_data"),
                 "bank": (payload.get("bank") or "").lower(),
+                "password": payload.get("password") or "",
+                "bank_profiles": payload.get("bank_profiles") or [],
             }
             downstream_req = {"body": json.dumps(downstream_payload)}
 

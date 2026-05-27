@@ -37,8 +37,9 @@ import { Button } from "@/components/ui/button";
 import { useTheme } from '../../contexts/ThemeContext';
 import { Sun, Moon } from 'lucide-react';
 import { cn } from "@/lib/utils";
+import { navLinkVariants } from '@/design/variants';
+import { patterns } from '@/design/patterns';
 
-// Map user's requested icons to Lucide equivalent
 const primaryNavItemsConfig = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutGrid },
   { href: '/education', label: 'Insights', icon: BookOpen },
@@ -51,17 +52,17 @@ const primaryNavItemsConfig = [
 ];
 
 const mobilePrimaryNavItems = [
-  ...primaryNavItemsConfig.slice(0, 4), // Top 4 priority items
-  { href: '#menu', label: 'More', icon: Menu }, // 5th item triggers menu
+  ...primaryNavItemsConfig.slice(0, 4),
+  { href: '#menu', label: 'More', icon: Menu },
 ];
-// Drawer contains everything NOT in the top 4
 const mobileDrawerItems = primaryNavItemsConfig.slice(4);
 
 export default function Navigation() {
   const { user, logout } = useAuth();
-  const { theme, setTheme } = useTheme();
+  const { setTheme, isLoading, isDark } = useTheme();
   const pathname = usePathname();
   const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const isDarkMode = !isLoading && isDark;
 
   const activeByHref = useMemo(() => {
     return new Set(
@@ -73,20 +74,15 @@ export default function Navigation() {
 
   return (
     <>
-      {/* Desktop Sidebar - Matches User Design */}
-      <aside className="hidden lg:flex w-64 border-r border-border flex-col py-8 px-6 bg-sidebar shrink-0 h-full z-50">
-        {/* Brand */}
-        <div className="flex items-center justify-between gap-3 mb-12">
-          <div className="flex items-center gap-3">
-            <div className="size-8 flex items-center justify-center shrink-0">
-              <img src="/icon-removebg-preview.png" alt="Logo" className="w-full h-full object-contain" />
-            </div>
-            <span className="font-bold text-lg tracking-tight text-foreground">Vishnu Finance</span>
+      <aside className={cn(patterns.sidebar, 'hidden lg:flex h-full z-50')}>
+        <div className="mb-10 flex items-center gap-3">
+          <div className="flex size-8 shrink-0 items-center justify-center">
+            <img src="/icon-removebg-preview.png" alt="Logo" className="size-full object-contain" />
           </div>
+          <span className="text-base font-medium tracking-tight text-foreground">Vishnu Finance</span>
         </div>
 
-        {/* Navigation */}
-        <nav className="flex flex-col gap-1 flex-1">
+        <nav className="flex flex-1 flex-col gap-0.5">
           {primaryNavItemsConfig.map((item) => {
             const Icon = item.icon;
             const isActive = activeByHref.has(item.href);
@@ -94,47 +90,49 @@ export default function Navigation() {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center gap-4 w-full px-3 py-3 transition-all duration-200 border-l-4 ${isActive
-                  ? 'text-foreground bg-muted/50 border-l-primary'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/30 border-l-transparent'
-                  }`}
+                className={navLinkVariants({ active: isActive })}
               >
-                <Icon className={cn("w-5 h-5", isActive ? "text-primary" : "text-muted-foreground/40")} />
-                <span className={cn("text-[11px] font-black uppercase tracking-widest", isActive ? "text-foreground" : "text-muted-foreground")}>
-                  {item.label}
-                </span>
+                <Icon className={cn('size-4', isActive ? 'text-foreground' : 'text-hint')} />
+                <span>{item.label}</span>
               </Link>
             );
           })}
         </nav>
 
-        {/* Profile Footer */}
-        <div className="mt-auto pt-6 border-t border-border">
+        <div className="mt-auto space-y-2 border-t border-border pt-5">
+          <button
+            type="button"
+            onClick={() => setTheme(isDarkMode ? 'light' : 'dark')}
+            className={cn(navLinkVariants({ active: false }), 'w-full')}
+            suppressHydrationWarning
+          >
+            {isDarkMode ? <Moon className="size-4" /> : <Sun className="size-4" />}
+            <span>{isDarkMode ? 'Dark mode' : 'Light mode'}</span>
+          </button>
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="flex items-center gap-3 w-full text-left outline-none group bg-muted/20 p-3 border border-border/50">
-                <div className="size-9 border border-border flex items-center justify-center overflow-hidden shrink-0 transition-all bg-background">
+              <button className="flex w-full items-center gap-3 rounded-md border border-border bg-surface p-3 text-left outline-none">
+                <div className="flex size-9 shrink-0 items-center justify-center overflow-hidden border border-border bg-background">
                   {user?.avatarUrl ? (
                     <img alt="Profile" className="size-full object-cover" src={user.avatarUrl} />
                   ) : (
-                    <div className="size-full flex items-center justify-center text-muted-foreground bg-muted">
-                      <UserIcon className="w-4 h-4" />
+                    <div className="flex size-full items-center justify-center bg-surface text-muted">
+                      <UserIcon className="size-4" />
                     </div>
                   )}
                 </div>
-                <div className="flex flex-col min-w-0">
-                  <span className="text-[11px] font-black uppercase tracking-tight truncate text-foreground leading-none mb-1">{user?.name || 'User'}</span>
-                  <div className="flex">
-                    <span className="text-[8px] px-1.5 py-0.5 bg-primary/10 text-primary font-black uppercase tracking-widest border border-primary/20">Audit Tier: 1</span>
-                  </div>
+                <div className="flex min-w-0 flex-col">
+                  <span className="truncate text-sm font-medium text-foreground">{user?.name || 'User'}</span>
+                  <span className="text-xs text-hint">{user?.email}</span>
                 </div>
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56 mb-2 bg-card border-border text-foreground">
+            <DropdownMenuContent align="end" className="mb-2 w-56 border-border bg-card text-foreground">
               <DropdownMenuLabel>My Account</DropdownMenuLabel>
               <DropdownMenuSeparator className="bg-border" />
-              <DropdownMenuItem onClick={() => logout()} className="cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10">
-                <LogOut className="mr-2 h-4 w-4" />
+              <DropdownMenuItem onClick={() => logout()} className="cursor-pointer text-destructive focus:bg-[var(--danger-bg)] focus:text-destructive">
+                <LogOut className="mr-2 size-4" />
                 <span>Log out</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -153,32 +151,25 @@ export default function Navigation() {
               return (
                 <Sheet key={item.label} open={isSheetOpen} onOpenChange={setIsSheetOpen}>
                   <SheetTrigger asChild>
-                    <button
-                      className="flex flex-col items-center justify-center gap-1 flex-1 h-full rounded-lg transition-all duration-200 active:scale-95 text-muted-foreground hover:text-foreground"
-                    >
-                      <Icon className="w-5 h-5" />
+                    <button className="flex h-full flex-1 flex-col items-center justify-center gap-1 rounded-lg text-muted transition-all duration-200 active:scale-95 hover:text-foreground">
+                      <Icon className="size-5" />
                       <span className="text-[10px] font-medium">{item.label}</span>
                     </button>
                   </SheetTrigger>
-                  <SheetContent side="bottom" className="h-[80vh] bg-card border-t border-border p-0 rounded-none">
-                    {/* Reusing the Drawer Content Logic but adapting for bottom sheet style */}
-                    <SheetHeader className="p-6 text-left border-b border-border">
-                      <SheetTitle className="text-lg font-bold flex items-center gap-3">
-                        <Avatar
-                          userId={user?.id || 'guest'}
-                          src={user?.avatarUrl}
-                          size="md"
-                        />
+                  <SheetContent side="bottom" className="h-[80vh] rounded-t-lg border-t border-border bg-card p-0">
+                    <SheetHeader className="border-b border-border p-6 text-left">
+                      <SheetTitle className="flex items-center gap-3 text-lg font-medium">
+                        <Avatar userId={user?.id || 'guest'} src={user?.avatarUrl} size="md" />
                         <div className="flex flex-col">
-                          <span className="text-base truncate max-w-[180px]">{user?.name || 'Guest User'}</span>
-                          <span className="text-xs font-normal text-muted-foreground uppercase tracking-wider">Premium Member</span>
+                          <span className="max-w-[180px] truncate text-base">{user?.name || 'Guest User'}</span>
+                          <span className="text-xs font-normal text-hint">{user?.email}</span>
                         </div>
                       </SheetTitle>
                     </SheetHeader>
 
-                    <div className="flex flex-col h-full overflow-y-auto px-4 py-6 pb-20 custom-scrollbar">
+                    <div className="custom-scrollbar flex h-full flex-col overflow-y-auto px-4 py-6 pb-20">
                       <div className="space-y-1">
-                        <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-3 px-2">Apps</p>
+                        <p className="mb-3 px-2 text-xs font-medium uppercase tracking-wider text-hint">More</p>
                         {mobileDrawerItems.map((drawerItem) => {
                           const DrawerIcon = drawerItem.icon;
                           const isDrawerActive = activeByHref.has(drawerItem.href);
@@ -187,43 +178,39 @@ export default function Navigation() {
                               key={drawerItem.href}
                               href={drawerItem.href}
                               onClick={() => setIsSheetOpen(false)}
-                              className={`flex items-center gap-3 w-full px-3 py-3 rounded-lg transition-colors ${isDrawerActive
-                                ? 'text-primary bg-primary/10 border border-primary/20'
-                                : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
-                                }`}
+                              className={navLinkVariants({ active: isDrawerActive })}
                             >
-                              <DrawerIcon className="w-5 h-5" />
-                              <span className="text-sm font-medium">{drawerItem.label}</span>
+                              <DrawerIcon className="size-5" />
+                              <span>{drawerItem.label}</span>
                             </Link>
                           );
                         })}
                       </div>
 
                       <div className="mt-8 space-y-1">
-                        <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-3 px-2">Preferences</p>
-
-                        <div className="flex items-center justify-between px-3 py-3 rounded-lg text-muted-foreground hover:bg-muted/50">
+                        <p className="mb-3 px-2 text-xs font-medium uppercase tracking-wider text-hint">Preferences</p>
+                        <div className="flex items-center justify-between rounded-md px-3 py-3 text-muted hover:bg-surface" suppressHydrationWarning>
                           <div className="flex items-center gap-3">
-                            {theme === 'dark' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
+                            {isDarkMode ? <Moon className="size-5" /> : <Sun className="size-5" />}
                             <span className="text-sm font-medium">Dark Mode</span>
                           </div>
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                            onClick={() => setTheme(isDarkMode ? 'light' : 'dark')}
                             className="h-6 w-10 p-0"
                           >
-                            <div className={`w-8 h-4 rounded-full relative transition-colors ${theme === 'dark' ? 'bg-primary' : 'bg-muted'}`}>
-                              <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all ${theme === 'dark' ? 'left-4.5' : 'left-0.5'}`} />
+                            <div className={cn('relative h-4 w-8 rounded-full transition-colors', isDarkMode ? 'bg-accent' : 'bg-surface')}>
+                              <div className={cn('absolute top-0.5 size-3 rounded-full bg-background transition-all', isDarkMode ? 'left-4' : 'left-0.5')} />
                             </div>
                           </Button>
                         </div>
 
                         <button
                           onClick={() => logout()}
-                          className="flex items-center gap-3 w-full px-3 py-3 rounded-lg text-destructive hover:bg-destructive/10 transition-colors"
+                          className="flex w-full items-center gap-3 rounded-md px-3 py-3 text-destructive transition-colors hover:bg-[var(--danger-bg)]"
                         >
-                          <LogOut className="w-5 h-5" />
+                          <LogOut className="size-5" />
                           <span className="text-sm font-medium">Log out</span>
                         </button>
                       </div>
@@ -237,13 +224,13 @@ export default function Navigation() {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex flex-col items-center justify-center gap-1 flex-1 h-full rounded-lg transition-all duration-200 active:scale-95 ${isActive
-                  ? 'text-foreground'
-                  : 'text-muted-foreground hover:text-foreground'
-                  }`}
+                className={cn(
+                  'flex h-full flex-1 flex-col items-center justify-center gap-1 rounded-lg transition-all duration-200 active:scale-95',
+                  isActive ? 'text-foreground' : 'text-muted hover:text-foreground'
+                )}
               >
-                <Icon className={`w-5 h-5 ${isActive ? 'scale-110' : ''}`} />
-                <span className={`text-[10px] font-medium ${isActive ? 'font-semibold' : ''}`}>
+                <Icon className={cn('size-5', isActive && 'scale-110')} />
+                <span className={cn('text-[10px] font-medium', isActive && 'font-semibold')}>
                   {item.label}
                 </span>
               </Link>
@@ -252,18 +239,27 @@ export default function Navigation() {
         </div>
       </nav>
 
-      {/* Mobile Top Bar (Clean) */}
       <div className={cn(
-        "fixed top-0 left-0 right-0 z-40 border-b border-border bg-background lg:hidden px-4 h-12 flex items-center justify-between transition-all duration-300",
-        pathname === '/dashboard' ? "opacity-0 invisible pointer-events-none h-0" : "opacity-100 visible h-12"
+        "fixed top-0 left-0 right-0 z-40 flex h-12 items-center justify-between border-b border-border bg-background px-4 transition-all duration-300 lg:hidden",
+        pathname === '/dashboard' ? "pointer-events-none invisible h-0 opacity-0" : "visible h-12 opacity-100"
       )}>
         <div className="flex items-center gap-2">
-          <div className="size-7 flex items-center justify-center shrink-0">
-            <img src="/icon-removebg-preview.png" alt="Logo" className="w-full h-full object-contain" />
+          <div className="flex size-7 shrink-0 items-center justify-center">
+            <img src="/icon-removebg-preview.png" alt="Logo" className="size-full object-contain" />
           </div>
-          <span className="text-[10px] font-black tracking-[0.3em] uppercase text-foreground leading-none">Vishnu Finance</span>
+          <span className="text-xs font-medium tracking-wide text-foreground">Vishnu Finance</span>
         </div>
-        <div className="w-7"></div>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => setTheme(isDarkMode ? 'light' : 'dark')}
+            className="flex size-8 items-center justify-center rounded-md border border-border text-muted hover:bg-surface hover:text-foreground"
+            aria-label="Toggle theme"
+            suppressHydrationWarning
+          >
+            {isDarkMode ? <Moon className="size-4" /> : <Sun className="size-4" />}
+          </button>
+        </div>
       </div>
     </>
   );

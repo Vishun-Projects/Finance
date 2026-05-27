@@ -184,7 +184,7 @@ export default function AdminEducationPage() {
                         <form onSubmit={handleCreateOrUpdate} className="space-y-6">
                             <div className="grid grid-cols-2 gap-6">
                                 <div className="space-y-2">
-                                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Intelligence Title</Label>
+                                    <Label className="text-[11px] font-medium uppercase tracking-[0.08em] text-hint">Title</Label>
                                     <Input
                                         className="h-10 bg-muted/20 border-border focus:border-primary/50"
                                         value={editingPost?.title || ''}
@@ -193,7 +193,7 @@ export default function AdminEducationPage() {
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Access Slug</Label>
+                                    <Label className="text-[11px] font-medium uppercase tracking-[0.08em] text-hint">Slug</Label>
                                     <Input
                                         className="h-10 bg-muted/20 border-border focus:border-primary/50"
                                         value={editingPost?.slug || ''}
@@ -205,7 +205,7 @@ export default function AdminEducationPage() {
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="space-y-2">
-                                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Premium Cover Asset</Label>
+                                    <Label className="text-[11px] font-medium uppercase tracking-[0.08em] text-hint">Cover image</Label>
                                     <div className="flex gap-2">
                                         <Input
                                             className="h-10 bg-muted/20 border-border focus:border-primary/50"
@@ -230,7 +230,7 @@ export default function AdminEducationPage() {
                                     </div>
                                 </div>
                                 <div className="space-y-2">
-                                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">AI Visual Blueprint</Label>
+                                    <Label className="text-[11px] font-medium uppercase tracking-[0.08em] text-hint">Image prompt</Label>
                                     <Input
                                         className="h-10 bg-muted/20 border-border focus:border-primary/50"
                                         value={editingPost?.imagePrompt || ''}
@@ -241,7 +241,7 @@ export default function AdminEducationPage() {
                             </div>
 
                             <div className="space-y-1.5">
-                                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Insight Summary</Label>
+                                <Label className="text-[11px] font-medium uppercase tracking-[0.08em] text-hint">Summary</Label>
                                 <Textarea
                                     className="bg-muted/20 border-border focus:border-primary/50 min-h-[60px]"
                                     value={editingPost?.excerpt || ''}
@@ -251,7 +251,7 @@ export default function AdminEducationPage() {
                             </div>
 
                             <div className="space-y-1.5">
-                                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Detailed Intelligence (Markdown)</Label>
+                                <Label className="text-[11px] font-medium uppercase tracking-[0.08em] text-hint">Content (Markdown)</Label>
                                 <MarkdownEditor
                                     value={editingPost?.content || ''}
                                     onChange={value => setEditingPost({ ...editingPost, content: value })}
@@ -261,7 +261,7 @@ export default function AdminEducationPage() {
 
                             <div className="grid grid-cols-4 gap-4">
                                 <div className="space-y-1.5">
-                                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Category</Label>
+                                    <Label className="text-[11px] font-medium uppercase tracking-[0.08em] text-hint">Category</Label>
                                     <Input
                                         className="h-10 bg-muted/20 border-border focus:border-primary/50"
                                         value={editingPost?.category || ''}
@@ -269,7 +269,7 @@ export default function AdminEducationPage() {
                                     />
                                 </div>
                                 <div className="space-y-1.5">
-                                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Difficulty</Label>
+                                    <Label className="text-[11px] font-medium uppercase tracking-[0.08em] text-hint">Difficulty</Label>
                                     <Input
                                         className="h-10 bg-muted/20 border-border focus:border-primary/50"
                                         value={editingPost?.difficulty || ''}
@@ -277,7 +277,7 @@ export default function AdminEducationPage() {
                                     />
                                 </div>
                                 <div className="space-y-1.5">
-                                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Read Time</Label>
+                                    <Label className="text-[11px] font-medium uppercase tracking-[0.08em] text-hint">Read time</Label>
                                     <Input
                                         className="h-10 bg-muted/20 border-border focus:border-primary/50"
                                         type="number"
@@ -293,7 +293,7 @@ export default function AdminEducationPage() {
                                         onChange={e => setEditingPost({ ...editingPost, published: e.target.checked })}
                                         className="size-5 rounded border-border text-primary focus:ring-primary bg-muted/20"
                                     />
-                                    <Label htmlFor="published" className="text-[10px] font-black uppercase tracking-widest">Published</Label>
+                                    <Label htmlFor="published" className="text-sm font-medium">Published</Label>
                                 </div>
                                 {editingPost?.id && (
                                     <div className="flex items-center space-x-2 pt-8">
@@ -304,14 +304,14 @@ export default function AdminEducationPage() {
                                             onChange={e => setEditingPost({ ...editingPost, regenerateImage: e.target.checked } as any)}
                                             className="size-5 rounded border-border text-primary focus:ring-primary bg-muted/20"
                                         />
-                                        <Label htmlFor="regenerateImage" className="text-[10px] font-black uppercase tracking-widest text-primary font-bold">Regenerate AI Image</Label>
+                                        <Label htmlFor="regenerateImage" className="text-sm font-medium text-primary">Regenerate AI image</Label>
                                     </div>
                                 )}
                             </div>
 
                             <DialogFooter className="pt-6 border-t border-border mt-8">
-                                <Button type="submit" className="w-full md:w-auto px-12 h-12 text-[11px] font-black uppercase tracking-[0.2em] shadow-lg shadow-primary/20">
-                                    {editingPost?.id ? 'Update Intelligence' : 'Deploy Intelligence'}
+                                <Button type="submit" className="w-full md:w-auto px-8">
+                                    {editingPost?.id ? 'Update post' : 'Create post'}
                                 </Button>
                             </DialogFooter>
                         </form>
@@ -319,7 +319,7 @@ export default function AdminEducationPage() {
                 </Dialog>
             </div>
 
-            <div className="glass-card rounded-2xl overflow-hidden shadow-sm border-none">
+            <div className="card-base overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="w-full text-left">
                         <thead>

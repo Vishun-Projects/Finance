@@ -36,6 +36,8 @@ def handler(request):
         # Get PDF file data (base64 encoded)
         pdf_base64 = body.get('pdf_data')
         bank_hint = body.get('bank', '').lower()
+        password = body.get('password') or None
+        bank_profiles = body.get('bank_profiles') or []
         
         if not pdf_base64:
             return {
@@ -64,8 +66,20 @@ def handler(request):
             df, metadata = parse_bank_statement(
                 pdf_path, 
                 bank_code=bank_code_hint,
-                bank_profiles=body.get('bank_profiles')
+                password=password if password else None,
+                bank_profiles=bank_profiles
             )
+
+            if metadata and metadata.get("status") == "needs_password":
+                return {
+                    'statusCode': 401,
+                    'headers': {'Content-Type': 'application/json'},
+                    'body': json.dumps({
+                        'success': False,
+                        'status': 'needs_password',
+                        'error': metadata.get('error', 'Password required')
+                    })
+                }
             
             # Format results
             if df is not None and hasattr(df, 'empty') and not df.empty:
@@ -87,6 +101,7 @@ def handler(request):
                     'count': len(transactions),
                     'metadata': metadata or {},
                     'bank': metadata.get('bank', 'Unknown') if metadata else 'Unknown',
+                    'parserMethod': (metadata or {}).get('parserMethod', 'primary'),
                     'debug': {
                         'page_count': len(df) if df is not None else 0,
                         'first_page_sample': metadata.get('raw_rows_sample')[:5] if metadata else []

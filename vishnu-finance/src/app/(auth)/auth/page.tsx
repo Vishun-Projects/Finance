@@ -1,6 +1,6 @@
 import { Suspense } from 'react';
 import { redirect } from 'next/navigation';
-import AuthPageClient from './auth-page-client';
+import AuthPageClient from './page-client';
 import { RouteLoadingState } from '@/components/feedback/route-fallbacks';
 import { getCurrentUser } from '@/lib/auth/server-auth';
 

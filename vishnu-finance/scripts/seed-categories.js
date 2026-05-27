@@ -4,9 +4,7 @@ const { PrismaClient } = require('@prisma/client');
 
 const prisma = new PrismaClient();
 
-// Comprehensive default categories
-const defaultCategories = [
-  // Income Categories
+const incomeCategories = [
   { name: 'Salary', type: 'INCOME', color: '#10B981', isDefault: true },
   { name: 'Freelance', type: 'INCOME', color: '#3B82F6', isDefault: true },
   { name: 'Investment Returns', type: 'INCOME', color: '#8B5CF6', isDefault: true },
@@ -20,30 +18,42 @@ const defaultCategories = [
   { name: 'Transfer', type: 'INCOME', color: '#6366F1', isDefault: true },
   { name: 'Income', type: 'INCOME', color: '#8B5CF6', isDefault: true },
   { name: 'Other Income', type: 'INCOME', color: '#6B7280', isDefault: true },
+];
 
-  // Expense Categories
-  { name: 'Food & Dining', type: 'EXPENSE', color: '#10B981', isDefault: true },
-  { name: 'Groceries', type: 'EXPENSE', color: '#22C55E', isDefault: true },
-  { name: 'Transportation', type: 'EXPENSE', color: '#F59E0B', isDefault: true },
-  { name: 'Housing', type: 'EXPENSE', color: '#3B82F6', isDefault: true },
-  { name: 'Utilities', type: 'EXPENSE', color: '#8B5CF6', isDefault: true },
-  { name: 'Entertainment', type: 'EXPENSE', color: '#EF4444', isDefault: true },
-  { name: 'Healthcare', type: 'EXPENSE', color: '#EC4899', isDefault: true },
-  { name: 'Education', type: 'EXPENSE', color: '#06B6D4', isDefault: true },
-  { name: 'Shopping', type: 'EXPENSE', color: '#84CC16', isDefault: true },
-  { name: 'Insurance', type: 'EXPENSE', color: '#F97316', isDefault: true },
-  { name: 'Personal Care', type: 'EXPENSE', color: '#A855F7', isDefault: true },
-  { name: 'Travel', type: 'EXPENSE', color: '#14B8A6', isDefault: true },
-  { name: 'Subscriptions', type: 'EXPENSE', color: '#F43F5E', isDefault: true },
-  { name: 'Debt Payment', type: 'EXPENSE', color: '#DC2626', isDefault: true },
+const planExpenseCategories = [
+  { name: 'Groceries + Home', type: 'EXPENSE', color: '#2563EB', isDefault: true },
+  { name: 'Train Pass', type: 'EXPENSE', color: '#2563EB', isDefault: true },
+  { name: 'Mobile + Internet', type: 'EXPENSE', color: '#2563EB', isDefault: true },
+  { name: 'Electricity / Water', type: 'EXPENSE', color: '#2563EB', isDefault: true },
+  { name: 'Personal Care', type: 'EXPENSE', color: '#2563EB', isDefault: true },
+  { name: 'Medical / Pharmacy', type: 'EXPENSE', color: '#2563EB', isDefault: true },
+  { name: 'Family Support', type: 'EXPENSE', color: '#2563EB', isDefault: true },
+  { name: 'Needs Buffer', type: 'EXPENSE', color: '#64748B', isDefault: true },
+  { name: 'Food Outside', type: 'EXPENSE', color: '#7C3AED', isDefault: true },
+  { name: 'OTT + Subscriptions', type: 'EXPENSE', color: '#7C3AED', isDefault: true },
+  { name: 'Clothes / Personal', type: 'EXPENSE', color: '#7C3AED', isDefault: true },
+  { name: 'Entertainment / Outings', type: 'EXPENSE', color: '#7C3AED', isDefault: true },
+  { name: 'Friends & Social', type: 'EXPENSE', color: '#7C3AED', isDefault: true },
+  { name: 'Misc Buffer', type: 'EXPENSE', color: '#64748B', isDefault: true },
+  { name: 'EMI', type: 'EXPENSE', color: '#DC2626', isDefault: true },
+  { name: 'Emergency Fund', type: 'EXPENSE', color: '#16A34A', isDefault: true },
+  { name: 'SIP', type: 'EXPENSE', color: '#16A34A', isDefault: true },
+  { name: 'PPF', type: 'EXPENSE', color: '#16A34A', isDefault: true },
+  { name: 'Direct Stocks', type: 'EXPENSE', color: '#16A34A', isDefault: true },
+  { name: 'Parents Health — Mummy', type: 'EXPENSE', color: '#B45309', isDefault: true },
+  { name: 'Parents Health — Papa', type: 'EXPENSE', color: '#B45309', isDefault: true },
+  { name: 'Term Life Insurance', type: 'EXPENSE', color: '#B45309', isDefault: true },
+  { name: 'Own Health Insurance', type: 'EXPENSE', color: '#B45309', isDefault: true },
+  { name: 'Personal Accident', type: 'EXPENSE', color: '#B45309', isDefault: true },
+  { name: 'Insurance Buffer', type: 'EXPENSE', color: '#64748B', isDefault: true },
   { name: 'Taxes', type: 'EXPENSE', color: '#7C2D12', isDefault: true },
-  { name: 'Charity & Donations', type: 'EXPENSE', color: '#059669', isDefault: true },
-  { name: 'Investment', type: 'EXPENSE', color: '#9333EA', isDefault: true },
-  { name: 'Family', type: 'EXPENSE', color: '#F472B6', isDefault: true },
   { name: 'Fees & Charges', type: 'EXPENSE', color: '#DC2626', isDefault: true },
-  { name: 'Miscellaneous', type: 'EXPENSE', color: '#9CA3AF', isDefault: true },
+  { name: 'Charity & Donations', type: 'EXPENSE', color: '#059669', isDefault: true },
+  { name: 'Education', type: 'EXPENSE', color: '#06B6D4', isDefault: true },
   { name: 'Other Expenses', type: 'EXPENSE', color: '#6B7280', isDefault: true },
 ];
+
+const defaultCategories = [...incomeCategories, ...planExpenseCategories];
 
 async function main() {
   console.log('🌱 Seeding default categories...\n');
@@ -53,7 +63,6 @@ async function main() {
 
   for (const category of defaultCategories) {
     try {
-      // Check if category exists
       const existingCategory = await prisma.category.findFirst({
         where: {
           name: category.name,
@@ -63,9 +72,7 @@ async function main() {
       });
 
       if (!existingCategory) {
-        await prisma.category.create({
-          data: category,
-        });
+        await prisma.category.create({ data: category });
         console.log(`✅ Created: ${category.name} (${category.type})`);
         created++;
       } else {
@@ -92,4 +99,3 @@ main()
   .finally(async () => {
     await prisma.$disconnect();
   });
-

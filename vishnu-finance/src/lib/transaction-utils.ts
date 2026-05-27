@@ -41,6 +41,101 @@ export function getTransactionType(transaction: Transaction): 'credit' | 'debit'
   return transaction.creditAmount > 0 ? 'credit' : 'debit';
 }
 
+const PAYMENT_RAIL_STORES = new Set([
+  'paytm',
+  'phonepe',
+  'google pay',
+  'gpay',
+  'bharatpe',
+  'payzapp',
+  'mobikwik',
+  'cred',
+]);
+
+const INVALID_ENTITY_PATTERNS = [
+  /^(yesb|hdfc|icic|sbin|kkbk|utib|axis|idfb|cnrb|barb|mahb|bkid)\d/i,
+  /atm service branch/i,
+  /\bbr\s*anch\b/i,
+  /^yesb0/i,
+];
+
+export function isInvalidEntityName(name?: string | null): boolean {
+  if (!name?.trim()) return true;
+  const trimmed = name.trim();
+  const lower = trimmed.toLowerCase();
+  if (PAYMENT_RAIL_STORES.has(lower)) return true;
+  if (/@/.test(trimmed)) return true;
+  const digitCount = (trimmed.match(/\d/g) || []).length;
+  if (digitCount >= Math.max(6, trimmed.replace(/\s/g, '').length * 0.5)) return true;
+  return INVALID_ENTITY_PATTERNS.some((pattern) => pattern.test(trimmed));
+}
+
+/** Prefer person/store over raw UPI description; fix payment-rail mislabels like Paytm from VPA. */
+export function parseBankSlashCounterparty(description?: string | null): string | null {
+  if (!description) return null;
+  const match = description.match(/[A-Z]{4}0[A-Z0-9]*UPI\/([^/]+)/i)
+    || description.match(/[A-Z]{4}\d+\/([^/]+?)(?:\s*\/|$)/i);
+  if (!match?.[1]) return null;
+
+  let name = match[1]
+    .replace(/\bINR\b/gi, ' ')
+    .replace(/\s*(?:Date|Transaction|Details|Debits|Credits|Balance).*$/i, '')
+    .replace(/\s*(?:ANCH|ATM|SERVICE|BRANCH)\s*:.*$/i, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!name || name.length < 2) return null;
+  return name
+    .split(' ')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+}
+
+export function getTransactionDisplayName(transaction: {
+  description?: string | null;
+  store?: string | null;
+  personName?: string | null;
+}): string {
+  const store = isInvalidEntityName(transaction.store) ? '' : (transaction.store?.trim() || '');
+  const personName = isInvalidEntityName(transaction.personName)
+    ? ''
+    : (transaction.personName?.trim() || '');
+  const storeIsPaymentRail = store && PAYMENT_RAIL_STORES.has(store.toLowerCase());
+
+  if (personName && (!store || storeIsPaymentRail)) {
+    return personName;
+  }
+
+  if (store && !storeIsPaymentRail) {
+    return store;
+  }
+
+  const fromDescription = parseBankSlashCounterparty(transaction.description);
+  if (fromDescription && !isInvalidEntityName(fromDescription)) {
+    return fromDescription;
+  }
+
+  return personName || store || transaction.description?.trim() || 'Transaction';
+}
+
+export type EntityUpdateField = 'personName' | 'store';
+
+/** Which transaction field backs the display name — used when renaming inline. */
+export function getEntityUpdateField(transaction: {
+  store?: string | null;
+  personName?: string | null;
+}): EntityUpdateField {
+  const store = isInvalidEntityName(transaction.store) ? '' : (transaction.store?.trim() || '');
+  const personName = isInvalidEntityName(transaction.personName)
+    ? ''
+    : (transaction.personName?.trim() || '');
+  const storeIsPaymentRail = store && PAYMENT_RAIL_STORES.has(store.toLowerCase());
+
+  if (personName && (!store || storeIsPaymentRail)) return 'personName';
+  if (store && !storeIsPaymentRail) return 'store';
+  return personName ? 'personName' : 'store';
+}
+
 /**
  * Apply amount preset filter
  */

@@ -229,7 +229,7 @@ export interface SalaryHistory {
   location?: string;
   department?: string;
   grade?: string;
-  changeType: 'PROMOTION' | 'TRANSFER' | 'COMPANY_CHANGE' | 'LOCATION_CHANGE' | 'DEPARTMENT_CHANGE' | 'SALARY_REVISION' | 'OTHER';
+  changeType: 'PROMOTION' | 'TRANSFER' | 'COMPANY_CHANGE' | 'LOCATION_CHANGE' | 'DEPARTMENT_CHANGE' | 'SALARY_REVISION' | 'NEW_JOB' | 'OTHER';
   changeReason?: string;
   userId: string;
   createdAt: Date;

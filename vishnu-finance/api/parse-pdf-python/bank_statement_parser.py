@@ -71,21 +71,24 @@ def parse_bank_statement(file_path: Path, bank_code: Optional[str] = None, passw
         raise FileNotFoundError(f"File not found: {file_path}")
 
     try:
-        # Import new Pipeline Manager
-        from pipeline.manager import PipelineManager
+        # Import Parse Orchestrator (primary + fallbacks)
+        from pipeline.orchestrator import ParseOrchestrator
         
-        manager = PipelineManager()
+        orchestrator = ParseOrchestrator()
         # Statement ID is arbitrary for local runs, or could be filename
         statement_id = file_path.stem 
         
-        # Run Pipeline
-        result = manager.run_pipeline(
+        # Run hybrid parse pipeline
+        result = orchestrator.parse(
             str(file_path), 
             statement_id=statement_id, 
             password=password, 
             bank_profiles=bank_profiles,
             bank_code=bank_code
         )
+        
+        if result.get("status") == "needs_password":
+            return pd.DataFrame(), {"status": "needs_password", "error": result.get("error")}
         
         if result.get("status") == "failed":
             print(f"Pipeline failed: {result.get('error')}", file=sys.stderr)
@@ -112,6 +115,7 @@ def parse_bank_statement(file_path: Path, bank_code: Optional[str] = None, passw
         # Metadata extraction
         metadata = result.get("metadata", {})
         metadata["bank"] = detected_bank
+        metadata["parserMethod"] = result.get("parserMethod") or metadata.get("parserMethod")
         
         return df, metadata
 
@@ -167,13 +171,8 @@ def deduplicate_transactions(df: pd.DataFrame) -> pd.DataFrame:
 
 def get_parser_for_bank(bank_code: str) -> BaseBankParser:
     """
-    Get appropriate parser for bank code.
-    
-    Args:
-        bank_code: Bank code
-        
-    Returns:
-        Parser instance
+    Deprecated: legacy parsers are invoked via pipeline.fallbacks.legacy_adapter.
+    Kept for CLI compatibility only.
     """
     if bank_code == 'SBIN':
         return SBIParser()

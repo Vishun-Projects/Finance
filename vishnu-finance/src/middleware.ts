@@ -5,7 +5,7 @@ import type { NextRequest } from 'next/server';
 import { jwtVerify } from 'jose';
 
 // Routes that don't require authentication
-const publicRoutes = ['/login', '/register', '/auth', '/api/auth/oauth/google', '/api/auth/oauth/google/callback'];
+const publicRoutes = ['/auth', '/api/auth/oauth/google', '/api/auth/oauth/google/callback'];
 const adminPrefix = '/admin';
 
 const JWT_SECRET = new TextEncoder().encode(

@@ -133,6 +133,53 @@ export async function getCanonicalNamesBatch(
   }
 }
 
+export async function upsertEntityMapping(
+  userId: string,
+  canonicalName: string,
+  mappedNames: string[],
+  entityType: EntityType,
+): Promise<void> {
+  const trimmed = canonicalName.trim();
+  if (!trimmed) return;
+
+  const aliases = [...new Set(mappedNames.map((n) => n?.trim()).filter(Boolean))].filter(
+    (n) => n.toLowerCase() !== trimmed.toLowerCase(),
+  );
+
+  try {
+    const existing = await prisma.entityMapping.findFirst({
+      where: { userId, canonicalName: trimmed, entityType },
+    });
+
+    if (existing) {
+      const raw = existing.mappedNames;
+      const existingNames = Array.isArray(raw)
+        ? (raw as string[])
+        : (JSON.parse(String(raw || '[]')) as string[]);
+      const merged = Array.from(new Set([...existingNames, ...aliases]));
+      await prisma.entityMapping.update({
+        where: { id: existing.id },
+        data: { mappedNames: JSON.stringify(merged), updatedAt: new Date() },
+      });
+    } else if (aliases.length > 0) {
+      await prisma.entityMapping.create({
+        data: {
+          userId,
+          canonicalName: trimmed,
+          mappedNames: JSON.stringify(aliases),
+          entityType,
+        },
+      });
+    }
+
+    globalCache.delete(`entity_mappings:${userId}:PERSON`);
+    globalCache.delete(`entity_mappings:${userId}:STORE`);
+    globalCache.delete(`entity_mappings:${userId}:PERSON_STORE`);
+  } catch {
+    // entity_mappings table may not exist yet
+  }
+}
+
 
 
 

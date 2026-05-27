@@ -341,13 +341,5 @@ self.addEventListener('periodicsync', (event) => {
 });
 
 async function doPeriodicSync() {
-  try {
-    // Sync financial data in background
-    const response = await fetch('/api/analytics?background=true');
-    if (response.ok) {
-      console.log('Background sync completed successfully');
-    }
-  } catch (error) {
-    console.error('Periodic sync error:', error);
-  }
+  // Background sync placeholder — wire to a real endpoint when needed.
 }

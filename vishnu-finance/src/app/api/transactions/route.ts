@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db';
 import { getCanonicalName, getCanonicalNamesBatch } from '@/lib/entity-mapping-service';
 import { rateLimitMiddleware, getRouteType } from '@/lib/rate-limit';
 import { TransactionCategory } from '@/types';
+import { TRANSACTION_PAGE_SIZE_MAX } from '@/features/transactions/constants';
 import { globalCache } from '@/lib/cache-singleton';
 
 export const dynamic = 'force-dynamic';
@@ -52,7 +53,9 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1');
     const pageSizeParam = searchParams.get('pageSize');
     // Allow larger page sizes for "all time" queries, but cap at 500 for safety to prevent timeouts
-    const pageSize = pageSizeParam === 'all' ? 500 : Math.min(parseInt(pageSizeParam || '50'), 500);
+    const pageSize = pageSizeParam === 'all'
+      ? TRANSACTION_PAGE_SIZE_MAX
+      : Math.min(parseInt(pageSizeParam || '50', 10), TRANSACTION_PAGE_SIZE_MAX);
     const skip = (page - 1) * pageSize;
 
     // Check if we need totals (for summary cards)
@@ -120,18 +123,16 @@ export async function GET(request: NextRequest) {
     // Date range filter
     // AI OPTIMIZATION: If range is 'all', ignore defensive startDate/endDate to ensure consistency with Dashboard
     if (range !== 'all' && (startDate || endDate)) {
-      const start = startDate ? new Date(startDate) : null;
-      const end = endDate ? new Date(endDate) : null;
+      const { parseLocalDateStart, parseLocalDateEnd } = await import('@/lib/date-range');
+      const start = startDate ? parseLocalDateStart(startDate) : null;
+      const end = endDate ? parseLocalDateEnd(endDate) : null;
       const isValidStart = start && !isNaN(start.getTime());
       const isValidEnd = end && !isNaN(end.getTime());
 
       if (isValidStart || isValidEnd) {
         where.transactionDate = {};
         if (isValidStart) where.transactionDate.gte = start;
-        if (isValidEnd) {
-          end!.setHours(23, 59, 59, 999);
-          where.transactionDate.lte = end;
-        }
+        if (isValidEnd) where.transactionDate.lte = end;
       }
     }
 

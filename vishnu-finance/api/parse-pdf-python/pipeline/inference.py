@@ -100,13 +100,6 @@ class InferenceEngineShim:
         metadata = ctx.metadata
         opening_bal = None
         
-    def _detect_opening_balance(self, ctx: JobContext) -> Optional[float]:
-        """
-        Scans all pages for metadata summary sections.
-        """
-        metadata = ctx.metadata
-        opening_bal = None
-        
         # 1. Broad Metadata Extraction Patterns
         summary_patterns = {
             "openingBalance": [

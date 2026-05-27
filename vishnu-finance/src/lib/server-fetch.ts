@@ -58,27 +58,32 @@ async function resolveUrl(input: string | URL, inboundHeaders?: Headers): Promis
     return input;
   }
 
+  const headersList = inboundHeaders ?? (await nextHeaders());
+  const host =
+    headersList.get('x-forwarded-host') ||
+    headersList.get('host');
+
+  // Prefer the active request host so SSR internal fetches hit the same port as the page.
+  if (host) {
+    const protocol =
+      headersList.get('x-forwarded-proto') ||
+      (host.startsWith('localhost') || host.startsWith('127.') ? 'http' : 'https');
+    return new URL(input, `${protocol}://${host}`);
+  }
+
   const explicitBase =
     process.env.INTERNAL_API_BASE_URL ||
     process.env.API_BASE_URL ||
     process.env.NEXT_PUBLIC_APP_URL ||
-    process.env.APP_URL;
+    process.env.APP_URL ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined);
 
   if (explicitBase) {
     return new URL(input, explicitBase);
   }
 
-  const headersList = inboundHeaders ?? (await nextHeaders());
-  const host =
-    headersList.get('x-forwarded-host') ||
-    headersList.get('host') ||
-    process.env.VERCEL_URL ||
-    'localhost:3000';
-  const protocol =
-    headersList.get('x-forwarded-proto') ||
-    (host.startsWith('localhost') || host.startsWith('127.') ? 'http' : 'https');
-
-  return new URL(input, `${protocol}://${host}`);
+  const port = process.env.PORT || '3000';
+  return new URL(input, `http://localhost:${port}`);
 }
 
 async function parseResponse(

@@ -40,7 +40,7 @@ async function run() {
 		for (let i = 1; i <= 3; i++) {
 			const fd = new FormData();
 			fd.append('file', new Blob([fs.readFileSync(abs)]), path.basename(abs));
-			const res = await fetch(`${baseUrl}/api/parse`, { method: 'POST', body: fd as any });
+			const res = await fetch(`${baseUrl}/api/parse-pdf`, { method: 'POST', body: fd as any });
 			const body = await res.json().catch(() => ({}));
 			if (!res.ok) {
 				console.error(`Parse failed [run ${i}]`, body);

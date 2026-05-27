@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { ArrowLeft, ExternalLink, TrendingUp, TrendingDown, Minus, Share2, Sparkles, Calendar } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { BriefingService } from '@/services/briefing-service';
-import BriefingGenerator from '@/components/BriefingGenerator';
+import BriefingGenerator from '@/features/education/components/briefing-generator';
 
 // Helper to parse "YYYY-MM-DD" to Date start/end 
 function getDateRange(dateStr: string) {

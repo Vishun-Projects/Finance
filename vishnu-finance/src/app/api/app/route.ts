@@ -353,11 +353,14 @@ export async function POST(request: NextRequest) {
         page = 1,
         pageSize: pageSizeParam = '50',
         includeTotals = false,
+        includeCount = true,
         type: financialCategoryParamRaw,
+        financialCategory: financialCategoryAlias,
         categoryId,
         startDate,
         endDate,
-        search: searchTerm,
+        search: searchTermRaw,
+        searchTerm: searchTermAlias,
         includeDeleted = false,
         sortField = 'transactionDate',
         sortDirection = 'desc',
@@ -367,6 +370,9 @@ export async function POST(request: NextRequest) {
         range, // New parameter to detect 'all' range
       } = body || {};
 
+      const searchTerm = searchTermRaw ?? searchTermAlias;
+      const financialCategoryInput = financialCategoryParamRaw ?? financialCategoryAlias;
+
       // AI OPTIMIZATION: High-speed query caching for Dashboard/Transactions
       const cacheKey = `transactions_list:${user.id}:${JSON.stringify(body)}`;
       const { globalCache } = await import('@/lib/cache-singleton');
@@ -375,10 +381,13 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(cachedResponse);
       }
 
-      const pageSize = pageSizeParam === 'all' ? 5000 : Math.min(parseInt(String(pageSizeParam || '50')), 5000);
+      const pageSize = pageSizeParam === 'all'
+        ? 100
+        : Math.min(parseInt(String(pageSizeParam || '50'), 10), 100);
       const skip = (Number(page) - 1) * pageSize;
+      const shouldCount = includeCount !== false && Number(page) === 1;
       const allowedCategories = ['INCOME', 'EXPENSE', 'TRANSFER', 'INVESTMENT', 'OTHER'] as const;
-      const normalizedCategory = financialCategoryParamRaw?.toUpperCase() ?? null;
+      const normalizedCategory = financialCategoryInput?.toUpperCase() ?? null;
       const financialCategory = normalizedCategory && allowedCategories.includes(normalizedCategory as any)
         ? normalizedCategory
         : null;
@@ -396,18 +405,16 @@ export async function POST(request: NextRequest) {
 
       // AI OPTIMIZATION: If range is 'all', ignore defensive startDate/endDate to ensure consistency with "Overall Time"
       if (range !== 'all' && (startDate || endDate)) {
-        const start = startDate ? new Date(startDate) : null;
-        const end = endDate ? new Date(endDate) : null;
+        const { parseLocalDateStart, parseLocalDateEnd } = await import('@/lib/date-range');
+        const start = startDate ? parseLocalDateStart(startDate) : null;
+        const end = endDate ? parseLocalDateEnd(endDate) : null;
         const isValidStart = start && !isNaN(start.getTime());
         const isValidEnd = end && !isNaN(end.getTime());
 
         if (isValidStart || isValidEnd) {
           where.transactionDate = {};
           if (isValidStart) where.transactionDate.gte = start;
-          if (isValidEnd) {
-            end!.setHours(23, 59, 59, 999);
-            where.transactionDate.lte = end;
-          }
+          if (isValidEnd) where.transactionDate.lte = end;
         }
       }
 
@@ -479,7 +486,7 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Fetch data in parallel
+      // Fetch data in parallel — skip count/aggregates on page>1 to reduce pooler load
       const [transactionsData, totalCountData, totalsData] = await Promise.all([
         (prisma as any).transaction.findMany({
           where,
@@ -505,8 +512,10 @@ export async function POST(request: NextRequest) {
           skip,
           take: pageSize,
         }),
-        (prisma as any).transaction.count({ where }),
-        includeTotals ? (async () => {
+        shouldCount
+          ? (prisma as any).transaction.count({ where })
+          : Promise.resolve(null),
+        includeTotals && shouldCount ? (async () => {
           const [incomeRes, expenseRes] = await Promise.all([
             (prisma as any).transaction.aggregate({
               where: { ...where, financialCategory: 'INCOME' },
@@ -547,10 +556,10 @@ export async function POST(request: NextRequest) {
       const responseData = {
         transactions: transformed,
         pagination: {
-          total: totalCount,
+          total: totalCount ?? undefined,
           page: Number(page),
           pageSize,
-          totalPages: Math.ceil(totalCount / pageSize),
+          totalPages: totalCount != null ? Math.ceil(totalCount / pageSize) : undefined,
         },
         totals,
       };
@@ -559,6 +568,114 @@ export async function POST(request: NextRequest) {
       globalCache.set(cacheKey, responseData, 30000);
 
       return NextResponse.json(responseData);
+    }
+
+    if (action === 'transactions_daily_spend') {
+      const { AuthService } = await import('@/lib/auth');
+      const { prisma } = await import('@/lib/db');
+      const { Prisma } = await import('@prisma/client');
+      const authToken = request.cookies.get('auth-token');
+      if (!authToken) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      const user = await AuthService.getUserFromToken(authToken.value);
+      if (!user || !user.isActive) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+      const { startDate, endDate, range } = body || {};
+
+      let dateFilter: typeof Prisma.empty = Prisma.empty;
+      if (range !== 'all' && (startDate || endDate)) {
+        const start = startDate ? new Date(startDate) : null;
+        const end = endDate ? new Date(endDate) : null;
+        const isValidStart = start && !Number.isNaN(start.getTime());
+        const isValidEnd = end && !Number.isNaN(end.getTime());
+
+        if (isValidStart && isValidEnd) {
+          end!.setHours(23, 59, 59, 999);
+          dateFilter = Prisma.sql`AND "transactionDate" >= ${start} AND "transactionDate" <= ${end}`;
+        } else if (isValidStart) {
+          dateFilter = Prisma.sql`AND "transactionDate" >= ${start}`;
+        } else if (isValidEnd) {
+          end!.setHours(23, 59, 59, 999);
+          dateFilter = Prisma.sql`AND "transactionDate" <= ${end}`;
+        }
+      }
+
+      const rows = await prisma.$queryRaw<Array<{ date: string; expense: number; income: number; count: number }>>`
+        SELECT
+          to_char("transactionDate" AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS date,
+          COALESCE(SUM("debitAmount"), 0)::float AS expense,
+          COALESCE(SUM("creditAmount"), 0)::float AS income,
+          COUNT(*)::int AS count
+        FROM "transactions"
+        WHERE "userId" = ${user.id}
+          AND "isDeleted" = false
+          ${dateFilter}
+        GROUP BY 1
+        ORDER BY 1 ASC
+      `;
+
+      return NextResponse.json({
+        daily: rows.map((row) => ({
+          date: row.date,
+          expense: Number(row.expense) || 0,
+          income: Number(row.income) || 0,
+          count: Number(row.count) || 0,
+        })),
+      });
+    }
+
+    if (action === 'transactions_category_breakdown') {
+      const { AuthService } = await import('@/lib/auth');
+      const { prisma } = await import('@/lib/db');
+      const { Prisma } = await import('@prisma/client');
+      const authToken = request.cookies.get('auth-token');
+      if (!authToken) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      const user = await AuthService.getUserFromToken(authToken.value);
+      if (!user || !user.isActive) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+      const { startDate, endDate, range } = body || {};
+
+      let dateFilter: typeof Prisma.empty = Prisma.empty;
+      if (range !== 'all' && (startDate || endDate)) {
+        const start = startDate ? new Date(startDate) : null;
+        const end = endDate ? new Date(endDate) : null;
+        const isValidStart = start && !Number.isNaN(start.getTime());
+        const isValidEnd = end && !Number.isNaN(end.getTime());
+
+        if (isValidStart && isValidEnd) {
+          end!.setHours(23, 59, 59, 999);
+          dateFilter = Prisma.sql`AND t."transactionDate" >= ${start} AND t."transactionDate" <= ${end}`;
+        } else if (isValidStart) {
+          dateFilter = Prisma.sql`AND t."transactionDate" >= ${start}`;
+        } else if (isValidEnd) {
+          end!.setHours(23, 59, 59, 999);
+          dateFilter = Prisma.sql`AND t."transactionDate" <= ${end}`;
+        }
+      }
+
+      const rows = await prisma.$queryRaw<Array<{ name: string; expense: number; count: number }>>`
+        SELECT
+          COALESCE(c.name, 'Uncategorized') AS name,
+          COALESCE(SUM(t."debitAmount"), 0)::float AS expense,
+          COUNT(*)::int AS count
+        FROM "transactions" t
+        LEFT JOIN "categories" c ON t."categoryId" = c.id
+        WHERE t."userId" = ${user.id}
+          AND t."isDeleted" = false
+          AND t."financialCategory" = 'EXPENSE'
+          AND t."debitAmount" > 0
+          ${dateFilter}
+        GROUP BY COALESCE(c.name, 'Uncategorized')
+        ORDER BY expense DESC
+        LIMIT 25
+      `;
+
+      return NextResponse.json({
+        categories: rows.map((row) => ({
+          name: row.name,
+          expense: Number(row.expense) || 0,
+          count: Number(row.count) || 0,
+        })),
+      });
     }
 
     // Transactions - Create
@@ -1165,9 +1282,9 @@ export async function POST(request: NextRequest) {
         const updates: Array<{ id: string, categoryId: string, notes?: string | null, method: 'HISTORY' | 'RULE' | 'AI' }> = [];
 
         // 1. PRE-FETCH HISTORICAL MATCHES (BULK)
-        const upiIds = transactions.map(t => t.upiId).filter(Boolean) as string[];
-        const stores = transactions.map(t => t.store).filter(Boolean) as string[];
-        const personNames = transactions.map(t => t.personName).filter(Boolean) as string[];
+        const upiIds = transactions.map((t: { upiId?: string | null }) => t.upiId).filter(Boolean) as string[];
+        const stores = transactions.map((t: { store?: string | null }) => t.store).filter(Boolean) as string[];
+        const personNames = transactions.map((t: { personName?: string | null }) => t.personName).filter(Boolean) as string[];
 
         const [upiHistory, storeHistory, personHistory] = await Promise.all([
           upiIds.length > 0 ? (prisma as any).transaction.findMany({

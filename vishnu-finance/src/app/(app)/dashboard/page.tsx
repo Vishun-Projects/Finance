@@ -1,36 +1,26 @@
 import { Suspense } from 'react';
-import SimpleDashboard from '@/components/simple-dashboard';
-import FinancialSkeleton from '@/components/feedback/financial-skeleton';
-import { loadDashboardSummary } from '@/lib/loaders/dashboard';
 import { requireUser } from '@/lib/auth/server-auth';
-import type { SimpleDashboardData } from '@/components/simple-dashboard';
-import { getCurrentMonthRange } from '@/lib/date-range';
+import { RouteLoadingState } from '@/components/feedback/route-fallbacks';
+import DashboardPage from '@/features/dashboard/components/dashboard-page';
+import { loadDashboard } from '@/features/dashboard/loaders';
 
 export const dynamic = 'force-dynamic';
 
-export default async function DashboardPage() {
+export default async function DashboardRoutePage() {
   const user = await requireUser({ redirectTo: '/auth?tab=login' });
-  const { startDate, endDate } = getCurrentMonthRange();
-
-  let initialData: SimpleDashboardData | null = null;
-  try {
-    initialData = await loadDashboardSummary({
-      userId: user.id,
-      startDate,
-      endDate,
-      revalidate: 120,
-    });
-  } catch (error) {
-    console.error('[dashboard] failed to bootstrap summary', error);
-  }
+  const data = await loadDashboard(user.id);
 
   return (
-    <Suspense fallback={<FinancialSkeleton />}>
-      <SimpleDashboard
-        initialData={initialData}
-        initialStartDate={startDate}
-        initialEndDate={endDate}
-      />
+    <Suspense
+      fallback={
+        <RouteLoadingState
+          title="Loading dashboard"
+          description="Pulling transactions and plan adherence..."
+          className="min-h-[50vh]"
+        />
+      }
+    >
+      <DashboardPage data={data} />
     </Suspense>
   );
 }

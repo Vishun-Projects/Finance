@@ -2,7 +2,7 @@ import { Suspense } from 'react';
 import SettingsPageClient from './page-client';
 import { requireUser } from '@/lib/auth/server-auth';
 import { RouteLoadingState } from '@/components/feedback/route-fallbacks';
-import { loadUserDocuments, loadUserPreferences } from '@/lib/loaders/settings';
+import { loadUserDocuments, loadUserPreferences } from '@/features/settings/loaders';
 
 export const dynamic = 'force-dynamic';
 

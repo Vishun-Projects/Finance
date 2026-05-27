@@ -93,7 +93,7 @@ export default function AdminAuditPage() {
 
   return (
     <div className="space-y-6">
-      <div className="glass-card p-6 rounded-2xl shadow-sm">
+      <div className="card-base p-6 rounded-2xl shadow-sm">
         <div className="flex flex-col gap-1.5 mb-2">
           <h3 className="text-lg font-bold leading-none tracking-tight font-display">Audit Overview</h3>
           <p className="text-sm text-muted-foreground">
@@ -125,7 +125,7 @@ export default function AdminAuditPage() {
         </div>
       </div>
 
-      <div className="glass-card p-6 rounded-2xl shadow-sm">
+      <div className="card-base p-6 rounded-2xl shadow-sm">
         <div className="flex flex-col gap-1.5 mb-6">
           <h3 className="text-base font-bold leading-none tracking-tight font-display">Filters</h3>
           <p className="text-xs text-muted-foreground">Refine audit results by actor, event, or severity.</p>
@@ -167,7 +167,7 @@ export default function AdminAuditPage() {
         </div>
       </div>
 
-      <div className="glass-card rounded-2xl shadow-sm overflow-hidden border-none">
+      <div className="card-base overflow-hidden">
         {loading ? (
           <div className="px-4 py-10 text-center text-muted-foreground flex flex-col items-center gap-2 text-sm">
             <RefreshCw className="w-5 h-5 animate-spin text-primary" />

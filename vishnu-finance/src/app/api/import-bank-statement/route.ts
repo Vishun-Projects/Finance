@@ -13,6 +13,8 @@ import { writeAuditLog, extractRequestMeta } from '@/lib/audit';
 import { validateBalanceReconciliation, formatValidationResult } from '@/lib/balance-validator';
 import { categorizeTransactions, detectAutoPayTransactions } from '@/lib/transaction-categorization-service';
 import * as crypto from 'crypto';
+import { toLocalISODate } from '@/lib/date-range';
+import { globalCache } from '@/lib/cache-singleton';
 
 interface ImportRecord {
   title?: string;
@@ -53,7 +55,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { userId, records, metadata, document, useAICategorization = true, validateBalance = true, categorizeInBackground = false, forceInsert = false } = body as {
+    const { userId, records, metadata, document, useAICategorization = true, validateBalance = true, categorizeInBackground = false, forceInsert = false, updateExisting = true } = body as {
       userId: string;
       records: ImportRecord[];
       metadata?: StatementMetadata;
@@ -68,6 +70,7 @@ export async function POST(request: NextRequest) {
       validateBalance?: boolean;
       categorizeInBackground?: boolean; // If true, skip categorization during import and do it in background
       forceInsert?: boolean; // Skip duplicate check and force insert
+      updateExisting?: boolean; // Refresh parsed fields when dedupHash already exists
     };
 
     // Log categorization settings
@@ -116,12 +119,11 @@ export async function POST(request: NextRequest) {
           userId,
           accountNumber,
           bankCode,
-          metadata.openingBalance
+          metadata.openingBalance,
+          metadata.statementStartDate
         );
 
-        if (balanceValidation.error) {
-          errors.push(balanceValidation.error);
-        } else if (balanceValidation.warning) {
+        if (balanceValidation.warning) {
           warnings.push(balanceValidation.warning);
         }
 
@@ -810,7 +812,7 @@ export async function POST(request: NextRequest) {
       }
       let dateStr = '';
       try {
-        dateStr = r.transactionDate.toISOString().slice(0, 10);
+        dateStr = toLocalISODate(r.transactionDate);
       } catch {
         invalidDateCount++;
         return false;
@@ -835,6 +837,7 @@ export async function POST(request: NextRequest) {
     }
 
     let inserted = 0;
+    let updatedExisting = 0;
     let duplicates = internalDuplicateCount; // Start with internal duplicates
     let creditInserted = 0;
     let debitInserted = 0;
@@ -914,7 +917,7 @@ export async function POST(request: NextRequest) {
               if (!isNaN(date.getTime())) {
                 const credit = Number(e.creditAmount).toFixed(2);
                 const debit = Number(e.debitAmount).toFixed(2);
-                const dateStr = date.toISOString().slice(0, 10);
+                const dateStr = toLocalISODate(date);
 
                 const bucketKey = `${dateStr}|${credit}|${debit}`;
                 if (!existingBuckets.has(bucketKey)) {
@@ -976,8 +979,7 @@ export async function POST(request: NextRequest) {
     const toInsert = unique.filter(r => {
       if (!r.transactionDate || isNaN(r.transactionDate.getTime())) return false;
 
-      if (forceInsert) {
-        // Force insert mode: skip duplicate check
+      if (forceInsert || updateExisting) {
         return true;
       }
 
@@ -993,7 +995,7 @@ export async function POST(request: NextRequest) {
         // Check 2: Fuzzy Date+Amount+Description
         const credit = Number(r.creditAmount).toFixed(2);
         const debit = Number(r.debitAmount).toFixed(2);
-        const dateStr = r.transactionDate.toISOString().slice(0, 10);
+        const dateStr = toLocalISODate(r.transactionDate);
         const bucketKey = `${dateStr}|${credit}|${debit}`;
 
         const candidates = existingBuckets.get(bucketKey);
@@ -1053,15 +1055,25 @@ export async function POST(request: NextRequest) {
       // Process batches with controlled parallelism for optimal performance
       const CONCURRENT_BATCHES = 5; // Process 5 batches in parallel (optimized for MySQL)
 
-      const processBatch = async (chunk: typeof toInsert, batchNum: number): Promise<{ inserted: number; credit: number; debit: number }> => {
+      const processBatch = async (chunk: typeof toInsert, batchNum: number): Promise<{ inserted: number; updated: number; credit: number; debit: number }> => {
         try {
-          // Use raw SQL INSERT IGNORE for maximum performance (fastest method)
+          const dedupHashes = chunk
+            .map((r) => (r as any).dedupHash as string | undefined)
+            .filter((hash): hash is string => Boolean(hash));
+          let batchUpdated = 0;
+          if (updateExisting && dedupHashes.length > 0) {
+            batchUpdated = await (prisma as any).transaction.count({
+              where: { userId, dedupHash: { in: dedupHashes } },
+            });
+          }
+
+          // Use raw SQL INSERT for maximum performance (fastest method)
           const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
           const values = chunk.map((r, idx) => {
             // Generate unique ID
             const id = `'${Date.now()}_${batchNum}_${idx}_${Math.random().toString(36).substr(2, 9)}'`;
             if (!r.transactionDate) throw new Error('Transaction date is required');
-            const date = `'${r.transactionDate.toISOString().split('T')[0]}'`;
+            const date = `'${toLocalISODate(r.transactionDate)}'`;
             const desc = (r.description || '').replace(/'/g, "''").replace(/\\/g, '\\\\').substring(0, 500);
             const credit = r.creditAmount || 0;
             const debit = r.debitAmount || 0;
@@ -1096,7 +1108,38 @@ export async function POST(request: NextRequest) {
             INSERT INTO transactions 
             (id, userId, transactionDate, description, creditAmount, debitAmount, financialCategory, categoryId, accountStatementId, bankCode, transactionId, accountNumber, transferType, personName, upiId, branch, store, rawData, balance, notes, receiptUrl, isDeleted, isPartialData, hasInvalidDate, hasZeroAmount, parsingMethod, parsingConfidence, dedupHash, createdAt, updatedAt, documentId, "autoCategorized")
             VALUES ${values}
-            ON CONFLICT (dedupHash) DO NOTHING
+            ON CONFLICT ("dedupHash") DO UPDATE SET
+              description = EXCLUDED.description,
+              "personName" = EXCLUDED."personName",
+              store = EXCLUDED.store,
+              "upiId" = EXCLUDED."upiId",
+              branch = EXCLUDED.branch,
+              notes = EXCLUDED.notes,
+              balance = EXCLUDED.balance,
+              "bankCode" = EXCLUDED."bankCode",
+              "transactionId" = EXCLUDED."transactionId",
+              "accountNumber" = EXCLUDED."accountNumber",
+              "transferType" = EXCLUDED."transferType",
+              "parsingMethod" = EXCLUDED."parsingMethod",
+              "parsingConfidence" = EXCLUDED."parsingConfidence",
+              "rawData" = EXCLUDED."rawData",
+              "receiptUrl" = COALESCE(EXCLUDED."receiptUrl", transactions."receiptUrl"),
+              "documentId" = COALESCE(EXCLUDED."documentId", transactions."documentId"),
+              "accountStatementId" = COALESCE(EXCLUDED."accountStatementId", transactions."accountStatementId"),
+              "categoryId" = CASE
+                WHEN transactions."autoCategorized" = true OR transactions."categoryId" IS NULL
+                THEN EXCLUDED."categoryId"
+                ELSE transactions."categoryId"
+              END,
+              "autoCategorized" = CASE
+                WHEN transactions."autoCategorized" = true THEN EXCLUDED."autoCategorized"
+                ELSE transactions."autoCategorized"
+              END,
+              "isDeleted" = false,
+              "deletedAt" = NULL,
+              "updatedAt" = EXCLUDED."updatedAt"
+            WHERE transactions."userId" = EXCLUDED."userId"
+              AND ${updateExisting ? 'TRUE' : 'transactions."isDeleted" = true'}
           `);
 
           // Count credits and debits
@@ -1107,8 +1150,11 @@ export async function POST(request: NextRequest) {
             if (r.debitAmount > 0) batchDebit++;
           }
 
+          const batchInserted = Math.max(0, chunk.length - batchUpdated);
+
           return {
-            inserted: chunk.length, // INSERT IGNORE handles duplicates, so we count attempted
+            inserted: batchInserted,
+            updated: batchUpdated,
             credit: batchCredit,
             debit: batchDebit,
           };
@@ -1161,19 +1207,20 @@ export async function POST(request: NextRequest) {
 
             return {
               inserted: result.count,
+              updated: 0,
               credit: batchCredit,
               debit: batchDebit,
             };
           } catch (fallbackError: any) {
             console.error(`❌ Batch ${batchNum} fallback also failed:`, fallbackError.message);
-            return { inserted: 0, credit: 0, debit: 0 };
+            return { inserted: 0, updated: 0, credit: 0, debit: 0 };
           }
         }
       };
 
       // Process batches in parallel with concurrency control
       const processBatchesInParallel = async () => {
-        const results: Array<{ inserted: number; credit: number; debit: number }> = [];
+        const results: Array<{ inserted: number; updated: number; credit: number; debit: number }> = [];
 
         for (let i = 0; i < chunks.length; i += CONCURRENT_BATCHES) {
           const batchGroup = chunks.slice(i, i + CONCURRENT_BATCHES);
@@ -1187,6 +1234,7 @@ export async function POST(request: NextRequest) {
           // Aggregate results
           for (const result of batchResults) {
             inserted += result.inserted;
+            updatedExisting += result.updated;
             creditInserted += result.credit;
             debitInserted += result.debit;
           }
@@ -1213,6 +1261,8 @@ export async function POST(request: NextRequest) {
     }
 
     console.log(`✅ Import Bank Statement: ${inserted} transactions inserted (${creditInserted} credits, ${debitInserted} debits), ${duplicates} duplicates`);
+
+    globalCache.clear();
 
     const meta = extractRequestMeta(request);
 
@@ -1341,7 +1391,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       inserted,
-      skipped: unique.length - inserted,
+      updatedExisting,
+      processed: inserted + updatedExisting,
+      skipped: unique.length - toInsert.length,
       duplicates,
       creditInserted,
       debitInserted,
@@ -1422,7 +1474,7 @@ function generateDedupHash(tx: {
     return `id_${tx.userId}_${tx.transactionId.trim()}`;
   }
 
-  const dateStr = tx.transactionDate.toISOString().slice(0, 10);
+  const dateStr = toLocalISODate(tx.transactionDate);
   const credit = Number(tx.creditAmount || 0).toFixed(2);
   const debit = Number(tx.debitAmount || 0).toFixed(2);
 

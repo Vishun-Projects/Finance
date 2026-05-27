@@ -171,7 +171,7 @@ export default function AdminSuperDocumentsPage() {
       </div>
 
       {/* Upload Section */}
-      <div className="glass-card p-6 rounded-2xl shadow-sm">
+      <div className="card-base p-6 rounded-2xl shadow-sm">
         <div className="flex flex-col gap-1.5 mb-6">
           <h3 className="text-lg font-bold leading-none tracking-tight font-display">Upload Super Document</h3>
           <p className="text-sm text-muted-foreground">
@@ -239,7 +239,7 @@ export default function AdminSuperDocumentsPage() {
       </div>
 
       {/* Documents List */}
-      <div className="glass-card rounded-2xl shadow-sm overflow-hidden border-none">
+      <div className="card-base overflow-hidden">
         <div className="flex items-center justify-between p-6 border-b border-border/10">
           <div>
             <h3 className="text-lg font-bold leading-none tracking-tight font-display">Super Documents</h3>

@@ -1,4 +1,4 @@
-import { AuthLayoutClient } from './AuthLayoutClient';
+import { AuthLayoutClient } from '@/features/auth/components/auth-layout';
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {

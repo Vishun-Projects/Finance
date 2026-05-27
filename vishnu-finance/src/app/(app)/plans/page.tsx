@@ -1,10 +1,9 @@
 import { Suspense } from 'react';
 import { requireUser } from '@/lib/auth/server-auth';
 import { RouteLoadingState } from '@/components/feedback/route-fallbacks';
-import { loadGoals } from '@/lib/loaders/goals';
-import { loadDeadlines } from '@/lib/loaders/deadlines';
-import { loadWishlist } from '@/lib/loaders/wishlist';
-import PlansPageClient, { PlansBootstrap } from './page-client';
+import { loadGoals, loadDeadlines, loadWishlist } from '@/features/plans/loaders';
+import type { PlansBootstrap } from '@/features/plans/components/plans-page';
+import PlansPageClient from './page-client';
 
 const ALLOWED_TABS = ['overview', 'goals', 'deadlines', 'wishlist'] as const;
 type PlansTab = (typeof ALLOWED_TABS)[number];

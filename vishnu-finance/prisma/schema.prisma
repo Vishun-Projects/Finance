@@ -93,8 +93,9 @@ model User {
   salaryHistories      SalaryHistory[]
   salaryStructures     SalaryStructure[]
   superDocuments       SuperDocument[]       @relation("SuperDocumentUploadedBy")
-  transactions         Transaction[]
-  upiMappings          UpiFieldMapping[]
+  transactions            Transaction[]
+  transactionSettlements  TransactionSettlement[]
+  upiMappings             UpiFieldMapping[]
   preferences          UserPreferences?
   wishlistItems        WishlistItem[]
 
@@ -410,7 +411,8 @@ model Transaction {
   category           Category?           @relation(fields: [categoryId], references: [id])
   document           Document?           @relation(fields: [documentId], references: [id])
   subcategory        Category?           @relation("TransactionSubcategory", fields: [subcategoryId], references: [id])
-  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user               User                          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  settlementMember   TransactionSettlementMember?
 
   @@index([userId])
   @@index([userId, transactionDate])
@@ -425,6 +427,32 @@ model Transaction {
   @@index([documentId])
   @@index([accountStatementId])
   @@map("transactions")
+}
+
+model TransactionSettlement {
+  id        String                      @id @default(cuid())
+  userId    String
+  label     String?
+  type      SettlementType
+  createdAt DateTime                    @default(now())
+  updatedAt DateTime                    @updatedAt
+  user      User                        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  members   TransactionSettlementMember[]
+
+  @@index([userId])
+  @@index([userId, createdAt])
+  @@map("transaction_settlements")
+}
+
+model TransactionSettlementMember {
+  id            String                @id @default(cuid())
+  settlementId  String
+  transactionId String                @unique
+  settlement    TransactionSettlement @relation(fields: [settlementId], references: [id], onDelete: Cascade)
+  transaction   Transaction           @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+
+  @@index([settlementId])
+  @@map("transaction_settlement_members")
 }
 
 model Document {
@@ -711,6 +739,13 @@ enum TransactionCategory {
   EXPENSE
   TRANSFER
   INVESTMENT
+  OTHER
+}
+
+enum SettlementType {
+  LEND_RETURN
+  BORROW_REPAY
+  EXPENSE_REFUND
   OTHER
 }
 

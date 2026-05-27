@@ -226,7 +226,7 @@ export default function AdminDocumentsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="glass-card p-6 rounded-2xl shadow-sm">
+      <div className="card-base p-6 rounded-2xl shadow-sm">
         <div className="flex flex-col gap-1.5 mb-6">
           <h3 className="text-lg font-bold leading-none tracking-tight flex items-center gap-2 font-display">
             <Shield className="w-5 h-5 text-primary" />
@@ -304,7 +304,7 @@ export default function AdminDocumentsPage() {
         </div>
       </div>
 
-      <div className="glass-card rounded-2xl shadow-sm overflow-hidden border-none">
+      <div className="card-base overflow-hidden">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 p-6 border-b border-border/10">
           <div>
             <h3 className="text-sm font-bold leading-none tracking-tight font-display">Documents</h3>

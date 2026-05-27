@@ -64,7 +64,9 @@ class CandidatesShim:
             "ACCOUNTBRANCH", "PHONENO", "EARMARKED", "UNCLEARED FUNDS",
             "CORRECT IF NO ERROR", "IS THAT ON RECORD", "GSTIN NUMBER",
             "A/C OPEN DATE", "ACCOUNT STATUS", "EARMARKEDFORHOLD",
-            "CORRECTIFNOERROR", "ISTHATONRECORD"
+            "CORRECTIFNOERROR", "ISTHATONRECORD",
+            "HDFCBANKGSTIN", "GOODS-AND-SERVICE-TAX", "SENAPATIBAPAT",
+            "LOWER PAREL", "MUMBAI400013", "PAGE NO", "MICR CODE",
         ]
         if any(k in upper for k in noise_keys):
             return True

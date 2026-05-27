@@ -105,3 +105,60 @@ class PipelineManager:
             logger.error(f"Pipeline crashed during execution: {traceback.format_exc()}")
             return self.persistence.create_failure_response(f"Internal Pipeline Error: {err_msg}")
 
+    def run_pipeline_from_ocr_pages(
+        self,
+        file_path: str,
+        statement_id: str,
+        ocr_pages: List[Dict[str, Any]],
+        password: Optional[str] = None,
+        bank_profiles: Optional[List[Dict[str, Any]]] = None,
+        bank_code: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Re-run layout/inference stages using OCR-derived word artifacts.
+        """
+        from .models import JobContext, PageArtifact, WordArtifact, BBox
+
+        ctx = JobContext(
+            statement_id=statement_id,
+            file_path=file_path,
+            password=password,
+            bank_profiles=bank_profiles,
+            bank_code=bank_code,
+        )
+
+        try:
+            for page_data in ocr_pages:
+                page_artifact = PageArtifact(page_no=page_data["page_no"])
+                for word in page_data.get("words", []):
+                    page_artifact.words.append(
+                        WordArtifact(
+                            text=word["text"],
+                            bbox=BBox(
+                                x0=float(word["x0"]),
+                                y0=float(word["top"]),
+                                x1=float(word["x1"]),
+                                y1=float(word["bottom"]),
+                            ),
+                            confidence=float(word.get("confidence", 0.8)),
+                            page=page_data["page_no"],
+                        )
+                    )
+                ctx.pages.append(page_artifact)
+
+            if not ctx.pages:
+                return self.persistence.create_failure_response("OCR pages empty")
+
+            self.sanitizer.sanitize_numerals(ctx)
+            self.layout.analyze_layout(ctx)
+            self.bank_detector.detect_bank(ctx)
+            mapping = self.mapper.map_columns(ctx)
+            candidates_list = self.candidates.generate_candidates(ctx, mapping) if mapping else []
+            transactions = self.inference.process_transactions(ctx, candidates_list)
+            transactions = self.normalization.normalize_transactions(ctx, transactions)
+            validation_result = self.validator.validate(transactions)
+            return self.persistence.save_and_format(ctx, transactions, validation_result, candidates=candidates_list)
+        except Exception as e:
+            logger.error(f"OCR pipeline failed: {traceback.format_exc()}")
+            return self.persistence.create_failure_response(f"OCR Pipeline Error: {str(e)}")
+

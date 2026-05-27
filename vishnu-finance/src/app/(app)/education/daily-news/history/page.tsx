@@ -1,144 +1,152 @@
 import { prisma } from '@/lib/db';
 import Link from 'next/link';
-import { ArrowLeft, ArrowRight, TrendingUp, TrendingDown, Minus, Calendar } from 'lucide-react';
-import BriefingImage from '@/components/BriefingImage';
-import HistoryCalendar from '@/components/HistoryCalendar';
+import { ArrowLeft, ArrowRight, Minus } from 'lucide-react';
+import BriefingImage from '@/features/education/components/briefing-image';
+import HistoryCalendar from '@/features/education/components/history-calendar';
+import { PageHero } from '@/components/ui/hero';
+import { SectionLabel } from '@/components/ui/section-label';
+import { Chip } from '@/components/ui/chip';
+import { Card } from '@/components/ui/card';
+import { patterns } from '@/design/patterns';
+import { getSentimentChipVariant } from '@/design/tokens';
+import { chipVariants } from '@/design/variants';
+import { cn } from '@/lib/utils';
+
+const sentimentBorderClass: Record<string, string> = {
+  success: 'border-l-success',
+  warning: 'border-l-warning',
+  danger: 'border-l-danger',
+};
 
 export default async function DailyBriefingHistoryPage() {
-    const briefings = await prisma.dailyBriefing.findMany({
-        orderBy: {
-            date: 'desc'
-        }
-    });
+  const briefings = await prisma.dailyBriefing.findMany({
+    orderBy: {
+      date: 'desc',
+    },
+  });
 
-    // Fetch just the dates for the calendar to avoid loading heavy content
-    const allDates = await prisma.dailyBriefing.findMany({
-        select: { date: true },
-        orderBy: { date: 'desc' }
-    });
+  const allDates = await prisma.dailyBriefing.findMany({
+    select: { date: true },
+    orderBy: { date: 'desc' },
+  });
 
-    const availableDates = allDates.map(b => b.date.toISOString());
+  const availableDates = allDates.map((b) => b.date.toISOString());
 
-    return (
-        <div className="flex flex-col h-full bg-background text-muted-foreground selection:bg-primary/30 selection:text-white overflow-y-auto custom-scrollbar">
-            {/* Header - Desktop Only */}
-            <div className="hidden lg:flex h-16 border-b border-border items-center justify-between px-8 shrink-0 bg-background/50 backdrop-blur sticky top-0 z-30">
-                <div className="flex items-center gap-2">
-                    <Link href="/education" className="flex items-center gap-2 hover:text-foreground transition-colors group">
-                        <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-                        <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground group-hover:text-primary transition-colors">Back to Hub</h2>
-                    </Link>
-                </div>
-            </div>
+  return (
+    <div className={cn(patterns.pageShell, 'flex h-full flex-col overflow-y-auto text-muted custom-scrollbar')}>
+      <div className="sticky top-0 z-30 hidden h-14 shrink-0 items-center border-b border-border bg-background/80 px-8 backdrop-blur lg:flex">
+        <Link
+          href="/education"
+          className="group flex items-center gap-2 text-muted transition-colors hover:text-foreground"
+        >
+          <ArrowLeft className="size-4 transition-transform group-hover:-translate-x-1" />
+          <SectionLabel className="mb-0 group-hover:text-foreground">Back to Hub</SectionLabel>
+        </Link>
+      </div>
 
-            <main className="p-4 pt-20 lg:p-8 space-y-8 max-w-7xl mx-auto w-full pb-24">
-                {/* Mobile Back Link */}
-                <div className="lg:hidden mb-4">
-                    <Link href="/education" className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-accent/50 border border-border text-[10px] font-bold uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors">
-                        <ArrowLeft className="w-3 h-3" /> Back to Hub
-                    </Link>
-                </div>
-
-                <div className="flex flex-col gap-2 mb-8">
-                    <div className="flex items-center gap-2 text-primary">
-                        <TrendingUp className="w-4 h-4" />
-                        <span className="text-[10px] font-bold uppercase tracking-[0.2em]">Market Archives</span>
-                    </div>
-                    <h1 className="text-4xl md:text-6xl font-black tracking-tight text-foreground leading-[0.9] font-display">
-                        DAILY <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-primary/50 italic pr-2">BRIEFINGS</span>
-                    </h1>
-                    <p className="text-muted-foreground text-sm font-medium leading-relaxed max-w-xl border-l-2 border-primary/30 pl-4 mt-2">
-                        A chronological record of AI-generated market intelligence. Track the pulse of the economy day by day.
-                    </p>
-                </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-                    {/* Main Timeline Grid */}
-                    <div className="lg:col-span-3 relative pl-6 lg:pl-10 border-l border-border/40 space-y-6 lg:space-y-8 ml-2 lg:ml-0">
-                        {briefings.length === 0 && ( /* Empty State */
-                            <div className="text-center py-20 opacity-50 glass-card rounded-3xl border-dashed">
-                                <Minus className="w-12 h-12 mx-auto mb-4 text-muted-foreground/30" />
-                                <h3 className="text-sm font-bold uppercase tracking-widest">No Archives Found</h3>
-                            </div>
-                        )}
-
-                        {briefings.map((briefing) => {
-                            const dateStr = new Date(briefing.date).toLocaleDateString("en-CA");
-                            const sentimentColor =
-                                briefing.sentiment === 'Bullish' ? 'text-green-500 border-green-500/20 bg-green-500/5' :
-                                    briefing.sentiment === 'Bearish' ? 'text-red-500 border-red-500/20 bg-red-500/5' :
-                                        'text-yellow-500 border-yellow-500/20 bg-yellow-500/5';
-
-                            const sentimentBorder =
-                                briefing.sentiment === 'Bullish' ? 'border-l-green-500/50' :
-                                    briefing.sentiment === 'Bearish' ? 'border-l-red-500/50' :
-                                        'border-l-yellow-500/50';
-
-                            return (
-                                <div key={briefing.id} className="relative group">
-                                    {/* Timeline Dot */}
-                                    <div className="absolute -left-[31px] lg:-left-[47px] top-6 lg:top-8 w-3 h-3 lg:w-4 lg:h-4 rounded-full border-2 lg:border-4 border-background bg-muted-foreground/30 group-hover:bg-primary group-hover:scale-125 transition-all duration-300 z-10 shadow-sm"></div>
-
-                                    <Link
-                                        href={`/education/daily-news/${dateStr}`}
-                                        className={`block relative overflow-hidden rounded-2xl md:rounded-3xl glass-card border-none bg-card/40 hover:bg-card/60 transition-all duration-500 group-hover:shadow-2xl group-hover:shadow-primary/5 group-hover:scale-[1.01] border-l-4 ${sentimentBorder}`}
-                                    >
-                                        <div className="grid grid-cols-1 md:grid-cols-5 h-full">
-                                            {/* Left: Image (Col 2) */}
-                                            <div className="md:col-span-2 h-40 md:h-auto relative overflow-hidden">
-                                                <BriefingImage
-                                                    src={briefing.heroImage}
-                                                    title={briefing.title || 'Market Briefing'}
-                                                    sentiment={briefing.sentiment}
-                                                    sentimentColor={sentimentColor}
-                                                    score={briefing.sentimentScore}
-                                                />
-                                                <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-transparent to-transparent md:bg-gradient-to-r md:from-transparent md:to-card/40"></div>
-
-                                                {/* Mobile Date Badge overlay */}
-                                                <div className="absolute top-3 left-3 md:hidden">
-                                                    <span className="bg-background/80 backdrop-blur-md text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md border border-white/10 shadow-sm">
-                                                        {new Date(briefing.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                                                    </span>
-                                                </div>
-                                            </div>
-
-                                            {/* Right: Content (Col 3) */}
-                                            <div className="md:col-span-3 p-5 md:p-6 flex flex-col justify-center relative z-20 -mt-10 md:mt-0">
-                                                <div className="flex items-center gap-2 mb-2 md:mb-3">
-                                                    <span className={`text-[9px] font-black px-2 py-0.5 rounded-md border backdrop-blur-sm ${sentimentColor} uppercase tracking-widest`}>
-                                                        {briefing.sentiment}
-                                                    </span>
-                                                    <span className="hidden md:inline text-muted-foreground text-[10px] font-bold uppercase tracking-widest">
-                                                        {new Date(briefing.date).toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })}
-                                                    </span>
-                                                </div>
-
-                                                <h3 className="text-lg md:text-xl font-bold text-foreground mb-2 leading-tight group-hover:text-primary transition-colors font-display line-clamp-2">
-                                                    {briefing.title}
-                                                </h3>
-
-                                                <p className="text-muted-foreground text-xs leading-relaxed line-clamp-2 mb-4 font-medium opacity-80">
-                                                    {(briefing.summary as string[])?.[0] || 'Market analysis and key takeaways...'}
-                                                </p>
-
-                                                <div className="flex items-center text-primary text-[10px] font-black uppercase tracking-widest group-hover:gap-2 transition-all">
-                                                    Read Analysis <ArrowRight className="w-3 h-3 ml-1" />
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </Link>
-                                </div>
-                            );
-                        })}
-                    </div>
-
-                    {/* Sidebar Calendar */}
-                    <div className="hidden lg:block lg:col-span-1 h-full sticky top-24">
-                        <HistoryCalendar availableDates={availableDates} />
-                    </div>
-                </div>
-            </main>
+      <main className={cn(patterns.pageContentWide, 'space-y-6 pb-24 pt-20 lg:pt-8')}>
+        <div className="lg:hidden">
+          <Link
+            href="/education"
+            className="inline-flex items-center gap-2 rounded-[var(--radius-pill)] border border-border bg-surface px-3 py-1.5 text-[11px] font-medium text-muted transition-colors hover:text-foreground"
+          >
+            <ArrowLeft className="size-3" />
+            Back to Hub
+          </Link>
         </div>
-    );
+
+        <PageHero
+          tag="Market Archives"
+          title="Daily briefings"
+          subtitle="A chronological record of AI-generated market intelligence. Track the pulse of the economy day by day."
+        />
+
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-4">
+          <div className="relative ml-2 space-y-6 border-l border-border pl-6 lg:col-span-3 lg:ml-0 lg:space-y-8 lg:pl-10">
+            {briefings.length === 0 && (
+              <Card className="card-base border-dashed py-20 text-center">
+                <Minus className="mx-auto mb-4 size-12 text-hint" />
+                <SectionLabel className="mb-0 text-foreground">No archives found</SectionLabel>
+              </Card>
+            )}
+
+            {briefings.map((briefing) => {
+              const dateStr = new Date(briefing.date).toLocaleDateString('en-CA');
+              const sentimentVariant = getSentimentChipVariant(briefing.sentiment);
+              const borderClass = sentimentBorderClass[sentimentVariant];
+
+              return (
+                <div key={briefing.id} className="group relative">
+                  <div className="absolute -left-[25px] top-6 z-10 size-3 rounded-full border-2 border-background bg-hint transition-all group-hover:scale-125 group-hover:bg-foreground lg:-left-[41px] lg:top-8 lg:size-4" />
+
+                  <Link href={`/education/daily-news/${dateStr}`} className="block">
+                    <Card
+                      className={cn(
+                        'card-base overflow-hidden border-l-4 transition-colors hover:bg-surface',
+                        borderClass
+                      )}
+                    >
+                      <div className="grid h-full grid-cols-1 md:grid-cols-5">
+                        <div className="relative h-40 overflow-hidden md:col-span-2 md:h-auto">
+                          <BriefingImage
+                            src={briefing.heroImage}
+                            title={briefing.title || 'Market Briefing'}
+                            sentiment={briefing.sentiment}
+                            sentimentColor={chipVariants({ variant: sentimentVariant })}
+                            score={briefing.sentimentScore}
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-transparent to-transparent md:bg-gradient-to-r md:from-transparent md:to-card/40" />
+
+                          <div className="absolute left-3 top-3 md:hidden">
+                            <Chip variant="neutral">
+                              {new Date(briefing.date).toLocaleDateString(undefined, {
+                                month: 'short',
+                                day: 'numeric',
+                              })}
+                            </Chip>
+                          </div>
+                        </div>
+
+                        <div className="relative z-20 -mt-10 flex flex-col justify-center p-5 md:col-span-3 md:mt-0 md:p-6">
+                          <div className="mb-2 flex items-center gap-2 md:mb-3">
+                            <Chip variant={sentimentVariant}>{briefing.sentiment}</Chip>
+                            <span className="hidden text-[11px] font-medium uppercase tracking-wide text-hint md:inline">
+                              {new Date(briefing.date).toLocaleDateString(undefined, {
+                                weekday: 'long',
+                                month: 'short',
+                                day: 'numeric',
+                              })}
+                            </span>
+                          </div>
+
+                          <h3 className="mb-2 line-clamp-2 text-lg font-medium leading-tight text-foreground md:text-xl">
+                            {briefing.title}
+                          </h3>
+
+                          <p className="mb-4 line-clamp-2 text-xs leading-relaxed text-muted">
+                            {(briefing.summary as string[])?.[0] || 'Market analysis and key takeaways...'}
+                          </p>
+
+                          <div className="flex items-center text-[11px] font-medium text-foreground transition-all group-hover:gap-2">
+                            Read Analysis
+                            <ArrowRight className="ml-1 size-3" />
+                          </div>
+                        </div>
+                      </div>
+                    </Card>
+                  </Link>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="hidden lg:col-span-1 lg:block">
+            <div className="sticky top-24">
+              <HistoryCalendar availableDates={availableDates} />
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
 }

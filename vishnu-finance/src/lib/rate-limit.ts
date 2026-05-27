@@ -111,7 +111,7 @@ export function getRouteType(pathname: string): keyof typeof RATE_LIMITS | 'defa
   if (pathname.includes('/dashboard')) return 'dashboard';
   if (pathname.includes('/auth')) return 'auth';
   if (pathname.includes('/analytics')) return 'analytics';
-  if (['/api/expenses', '/api/income', '/api/goals', '/api/deadlines', '/api/wishlist'].some(p => pathname.includes(p))) {
+  if (['/api/goals', '/api/deadlines', '/api/wishlist'].some(p => pathname.includes(p))) {
     return 'crud';
   }
   return 'default';

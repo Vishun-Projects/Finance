@@ -70,7 +70,14 @@ _BRAND_MAP = {
     "shree mahal": "Shree Mahalaxmi",
 }
 _UPI_COLON_RE = re.compile(r'UPI:\d+:([^@(]+)@[^@(]+\(([^)]+)\)?', re.IGNORECASE)
+_BANK_UPI_SLASH_RE = re.compile(r'[A-Z]{4}0[A-Z0-9]*UPI/([^/]+)', re.IGNORECASE)
+_BANK_CODE_SLASH_RE = re.compile(r'[A-Z]{4}\d+/([^/]+?)(?:\s*/|\s*$)', re.IGNORECASE)
+_VPA_RE = re.compile(r'[a-z0-9._-]+@[a-z0-9._-]+', re.IGNORECASE)
 _MERCHANT_FRAGS = {"ZOMATO", "SWIGGY", "BLINKIT", "ZEPTO", "AMAZON", "FLIPKART", "GOOGLE", "BAJAJ", "SIMPL", "JIO", "RECHARGE", "PAYTM", "VRL", "AXIO", "ZOMATO4", "BAJAJFINANCE", "BLINKIT.PAYU"}
+_PAYMENT_RAIL_BRANDS = {
+    "PAYTM", "PHONEPE", "GPAY", "GOOGLE PAY", "BHARATPE", "PAYZAPP", "MOBIKWIK",
+}
+_COMPANY_MARKERS = ("LIMITED", "PRIVATE", "PVT", "LLP", "SYSTEMS", "ENTERPRISES", "SERVICES", "CORP", "INC")
 
 class BaseStyle:
     """
@@ -81,11 +88,12 @@ class BaseStyle:
     # Store Keywords for classification
     STORE_KEYWORDS = [
         "XEROX", "MEDICAL", "GENERAL", "MART", "FOOD", "DINING", "STORE", "CAFE", 
-        "RESTAURANT", "PAYTM", "GOPAY", "ZOMATO", "SWIGGY", "RAILWAYS", "GROWW", 
+        "RESTAURANT", "GOPAY", "ZOMATO", "SWIGGY", "RAILWAYS", "GROWW", 
         "ADDAT", "GAMING", "CHALO", "MMRDA", "MMRCL", "AMAZON", "FLIPKART", "BLINKIT", 
         "ZEPTO", "BIGBASKET", "RELIANCE", "JIOMART", "D MART", "NETFLIX", "SPOTIFY",
         "TICKETING", "HOTEL", "MEDICO", "PHARMACY", "HOSPITAL", "ENTERPRISES", "TRAVELS",
-        "TRADERS", "REFRIGERATION", "ELECTRONICS", "TELECOM", "MOBILE", "BAKERY", "DAIRY"
+        "TRADERS", "REFRIGERATION", "ELECTRONICS", "TELECOM", "MOBILE", "BAKERY", "DAIRY",
+        "COUNTER", "STATIONERY", " QR"
     ]
 
     # Negative Anchors: Fragments that are EXCLUSIVELY noise
@@ -108,8 +116,146 @@ class BaseStyle:
         if not text: return ""
         # 1. Remove Page x of y
         text = re.sub(r'(?i)\bof\s+\d+\s+Page\s+\d+\b', '', text)
-        # 2. Collapse whitespace
+        # 2. Strip common Indian bank footer/legal blocks
+        footer_patterns = [
+            r"(?i)closing\s*balance\s*includes\s*funds.*",
+            r"(?i)contents\s*of\s*this\s*statement.*",
+            r"(?i)the\s*address\s*on\s*this\s*statement.*",
+            r"(?i)registered\s*office\s*address.*",
+            r"(?i)state\s*account\s*branch\s*gstn.*",
+            r"(?i)hdfc\s*bank\s*gstin.*",
+            r"(?i)goods-and-service-tax.*",
+        ]
+        for pattern in footer_patterns:
+            text = re.sub(pattern, '', text, flags=re.DOTALL)
+        # 3. Collapse whitespace
         return " ".join(text.split()).strip()
+
+    def _strip_branch_noise(self, text: str) -> str:
+        text = re.sub(r'(?i)\bBR\s*ANCH\s*:.*$', '', text)
+        text = re.sub(r'(?i)\bBRANCH\s*:.*$', '', text)
+        return text.strip()
+
+    def _is_invalid_entity(self, name: str) -> bool:
+        if not name or len(name.strip()) < 2:
+            return True
+        normalized = name.strip()
+        upper = normalized.upper()
+        compact = re.sub(r'\s+', '', upper)
+        if re.match(r'^(YESB|HDFC|ICIC|SBIN|KKBK|UTIB|AXIS|IDFB|CNRB|BARB|MAHB|BKID)\d', compact):
+            return True
+        if '@' in normalized:
+            return True
+        digits = sum(ch.isdigit() for ch in normalized)
+        if digits >= max(6, len(compact) * 0.5):
+            return True
+        if upper in {"ATM SERVICE BRANCH", "BR ANCH", "BRANCH", "ATM SERVICE", "UPI"}:
+            return True
+        if upper.endswith(" BRANCH") or "ATM SERVICE BRANCH" in upper:
+            return True
+        if upper in _PAYMENT_RAIL_BRANDS:
+            return True
+        return False
+
+    def _extract_upi_note(self, cleaned: str) -> Optional[str]:
+        match = re.search(r'(?i)/UPI/\d[\d\s]*/([^/]+?)(?:/\s*(?:BR|BRANCH)|$)', cleaned)
+        if not match:
+            return None
+        note = self._normalize_entity_name(match.group(1))
+        if note and not self._is_invalid_entity(note):
+            return note
+        return None
+
+    def _normalize_entity_name(self, text: str) -> str:
+        if not text:
+            return ""
+        name = re.sub(r'\s*(?:Date|Transaction|Details|Debits|Credits|Balance).*$', '', text, flags=re.IGNORECASE).strip()
+        name = re.sub(r'\s*(?:ANCH|ATM|SERVICE|BRANCH)\s*:.*$', '', name, flags=re.IGNORECASE).strip()
+        name = re.sub(r'\bINR\b', ' ', name, flags=re.IGNORECASE)
+        name = re.sub(r'\s+', ' ', name).strip()
+        if not name:
+            return ""
+        words = name.split()
+        merged: List[str] = []
+        for word in words:
+            if len(word) == 1 and word.islower() and merged:
+                merged[-1] = f"{merged[-1]}{word}"
+            else:
+                merged.append(word)
+        name = ' '.join(merged)
+        return name.title()
+
+    def _is_discarded_fragment(self, frag: str) -> bool:
+        if not frag or len(frag.strip()) < 3:
+            return True
+        frag = frag.strip()
+        for pattern in self.ANCHORS.values():
+            if re.match(pattern, frag, re.IGNORECASE):
+                return True
+        if re.search(r'\d{3,}', frag):
+            return True
+        upper = frag.upper()
+        if upper in {"UPI", "NEFT", "RTGS", "IMPS", "ACH", "POS"}:
+            return True
+        if frag.lower() in {"card", "branch", "atm", "cash", "deposit", "cheque", "fee", "tax", "charge", "to", "by"}:
+            return True
+        return False
+
+    def _fragment_is_vpa_or_handle(self, frag: str) -> bool:
+        if '@' in frag:
+            return True
+        return bool(re.search(r'(?i)^(?:paytmqr|paytm\.|gpay|phonepe|bharatpe|okhdfcbank|okicici|ybl|pty|axl|ibl)', frag))
+
+    def _looks_like_company(self, name: str) -> bool:
+        upper = name.upper()
+        return any(marker in upper for marker in _COMPANY_MARKERS)
+
+    def _classify_entity(self, name: str, commodity: str, upi_id: Optional[str]) -> Tuple[Optional[str], Optional[str], float, str, Optional[str]]:
+        normalized = self._normalize_entity_name(name)
+        if not normalized:
+            return None, None, 0.0, commodity, upi_id
+        is_store = (
+            any(kw in normalized.upper() for kw in self.STORE_KEYWORDS)
+            or self._looks_like_company(normalized)
+        )
+        if is_store:
+            return normalized, None, 0.92, commodity, upi_id
+        return None, normalized, 0.92, commodity, upi_id
+
+    def _extract_bank_upi_slash_name(self, cleaned: str) -> Optional[str]:
+        match = _BANK_UPI_SLASH_RE.search(cleaned)
+        if match:
+            return match.group(1).strip()
+        match = _BANK_CODE_SLASH_RE.search(cleaned)
+        if match:
+            return match.group(1).strip()
+        return None
+
+    def _merchant_from_fragment(self, frag: str) -> Optional[str]:
+        if self._fragment_is_vpa_or_handle(frag):
+            return None
+
+        u_frag = frag.upper()
+        for kw in _MERCHANT_FRAGS:
+            if kw in u_frag:
+                brand = _BRAND_MAP.get(kw.lower(), kw.title())
+                if brand.upper() in _PAYMENT_RAIL_BRANDS:
+                    return None
+                return brand
+
+        for key, val in _BRAND_MAP.items():
+            if key in frag.lower() and val.upper() not in _PAYMENT_RAIL_BRANDS:
+                return val
+        return None
+
+    def _extract_upi_id(self, cleaned: str) -> Optional[str]:
+        vpa_match = _VPA_RE.search(cleaned)
+        if vpa_match:
+            return vpa_match.group(0).strip()
+        upi_match = re.search(r'upi/.*?/[^/]+/([^/]+)/', cleaned.lower())
+        if upi_match:
+            return upi_match.group(1).strip()
+        return None
 
     def extract_entities(self, text: str) -> Tuple[Optional[str], Optional[str], float, str, Optional[str]]:
         """
@@ -119,6 +265,7 @@ class BaseStyle:
         from .categories import get_commodity
         
         cleaned = self.clean_description(text)
+        cleaned = self._strip_branch_noise(cleaned)
         commodity = get_commodity(cleaned)
         
         # ── Priority 0: Karnataka / Standard UPI colon format ──────────────
@@ -167,77 +314,77 @@ class BaseStyle:
             if is_store:
                 return name, None, 0.9, commodity, upi_id
             return None, name, 0.9, commodity, upi_id
+
+        upi_id = self._extract_upi_id(cleaned)
+
+        # ── Priority 1: YES/HDFC slash format ───────────────────────────────
+        # YESB0MCHUPI/Vinod INR Singh Rajput /XXXXX /paytm...@pty ...
+        slash_name = self._extract_bank_upi_slash_name(cleaned)
+        if slash_name:
+            normalized_slash = self._normalize_entity_name(slash_name)
+            if not self._is_invalid_entity(normalized_slash):
+                store, person, conf, _, resolved_upi = self._classify_entity(slash_name, commodity, upi_id)
+                if store or person:
+                    return store, person, conf, commodity, resolved_upi
         
         # Extract UPI ID if present (slash format for other banks)
-        upi_id = None
-        upi_match = re.search(r'upi/.*?/[^/]+/([^/]+)/', cleaned.lower())
-        if upi_match:
-            upi_id = upi_match.group(1).strip()
+        if not upi_id:
+            upi_match = re.search(r'upi/.*?/[^/]+/([^/]+)/', cleaned.lower())
+            if upi_match:
+                upi_id = upi_match.group(1).strip()
         
         # 1. Fragmentation: Split by semantic delimiters
-        # We also split by "INR" or "UPI" if they are surrounded by delimiters
         fragments = [f.strip() for f in re.split(r'[/-]|:|\s{2,}', cleaned) if f.strip()]
         
-        candidates = []
-        for frag in fragments:
-            # 1. Check brand map for this fragment
-            u_frag = frag.upper()
-            found_brand = None
-            for kw in _MERCHANT_FRAGS:
-                if kw in u_frag:
-                    found_brand = _BRAND_MAP.get(kw.lower(), kw.title())
-                    break
-            if found_brand:
-                return found_brand, None, 0.95, get_commodity(found_brand), upi_id
+        person_candidates: List[Tuple[str, float]] = []
+        store_candidates: List[Tuple[str, float]] = []
 
-            # NEW: Scrub noise tokens from WITHIN the fragment...
-            scrubbed_fragArr = []
+        for frag in fragments:
+            brand = self._merchant_from_fragment(frag)
+            if brand:
+                store_candidates.append((brand, 0.95))
+                continue
+
+            if self._is_discarded_fragment(frag):
+                continue
+
+            scrubbed_frag_arr = []
             for w in frag.split():
                 if w.upper() not in {"INR", "UPI", "NEFT", "RTGS", "IMPS"}:
-                    scrubbed_fragArr.append(w)
-            scrubbed_frag = " ".join(scrubbed_fragArr)
-            if not scrubbed_frag:
+                    scrubbed_frag_arr.append(w)
+            scrubbed_frag = " ".join(scrubbed_frag_arr).strip()
+            if not scrubbed_frag or self._is_discarded_fragment(scrubbed_frag):
                 continue
-                
-            frag = scrubbed_frag # replacing with the scrubbed version for anchor checks
 
-            if len(frag) < 3: 
+            normalized = self._normalize_entity_name(scrubbed_frag)
+            if not normalized:
                 continue
-            if bool(re.search(r'\d{3,}', frag)): # Hash/ID
-                continue
-            if frag.upper() in {"UPI", "NEFT", "RTGS", "IMPS", "ACH", "POS"}:
-                continue
-                
-            # Discard fragments that are strictly informational anchors
-            if frag.lower() in [
-                "card", "branch", "atm", "cash", "deposit", 
-                "cheque", "fee", "tax", "charge", "to", "by"
-            ]:
-                continue
-                
+
             score = 0.5
-            
-            # Boost if it looks like a person's name
-            if self._is_likely_person(frag):
+            if self._is_likely_person(normalized):
                 score += 0.3
-            # Boost if it has capitalization
-            if any(c.isupper() for c in frag):
+            if any(c.isupper() for c in scrubbed_frag):
                 score += 0.2
-            # Penalty if it looks like a location/date
-            if re.match(r'^(delhi|mumbai|bangalore|chennai|hyderabad)$', frag.lower()):
+            if re.match(r'^(delhi|mumbai|bangalore|chennai|hyderabad)$', normalized.lower()):
                 score -= 0.3
-            
-            candidates.append((frag, score))
-            
-        if not candidates:
-            return None, None, 0.0, commodity, upi_id
-            
-        # 2. Selection: Pick highest score
-        best_candidate = max(candidates, key=lambda x: x[1])
-        name = best_candidate[0].title()
-        conf = min(best_candidate[1], 1.0)
-        
-        return name, name, conf, commodity, upi_id
+            if self._looks_like_company(normalized) or any(kw in normalized.upper() for kw in self.STORE_KEYWORDS):
+                store_candidates.append((normalized, min(score + 0.2, 1.0)))
+            else:
+                person_candidates.append((normalized, min(score, 1.0)))
+
+        if person_candidates:
+            best_person = max(person_candidates, key=lambda x: x[1])
+            return None, best_person[0], best_person[1], commodity, upi_id
+
+        if store_candidates:
+            best_store = max(store_candidates, key=lambda x: x[1])
+            return best_store[0], None, best_store[1], commodity, upi_id
+
+        upi_note = self._extract_upi_note(cleaned)
+        if upi_note:
+            return upi_note, None, 0.7, commodity, upi_id
+
+        return None, None, 0.0, commodity, upi_id
 
     def classify_commodity(self, text: str) -> str:
         from .categories import get_commodity

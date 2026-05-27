@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { unlink, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
+import { callPythonParser } from '@/lib/python-parser-client';
 
 // Dynamic import for Node.js parser fallback (PDF only)
 const parsePDFWithNode = async (filePath: string, bankHint?: string) => {
@@ -15,75 +16,27 @@ const parsePDFWithNode = async (filePath: string, bankHint?: string) => {
 };
 
 /**
- * Call Python serverless/microservice function for bank statement parsing
+ * Deprecated: use /api/parse-pdf instead.
+ * Kept for backward compatibility — forwards to the unified Python parser.
  */
-async function tryPythonParser(fileBuffer: Buffer, fileType: string, bankType: string | null): Promise<{ success: boolean; data?: any; error?: string }> {
+async function tryPythonParser(
+  fileBuffer: Buffer,
+  bankType: string | null,
+  password?: string
+): Promise<{ success: boolean; data?: any; error?: string }> {
   try {
-    let baseUrl: string;
-    const isVercel = !!process.env.VERCEL_URL || !!process.env.VERCEL;
-
-    if (isVercel) {
-      baseUrl = `https://${process.env.VERCEL_URL || process.env.NEXT_PUBLIC_APP_URL}`;
-    } else {
-      baseUrl = 'http://127.0.0.1:8000'; // Target local FastAPI microservice
-    }
-
-    const pythonFunctionUrl = `${baseUrl}/api/parser`;
     const fileBase64 = fileBuffer.toString('base64');
-
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-    };
-
-    if (process.env.VERCEL_AUTOMATION_BYPASS_SECRET) {
-      headers['x-vercel-protection-bypass'] = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
-    }
-
-    const response = await fetch(pythonFunctionUrl, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        type: 'bank-statement',
-        payload: {
-          file_data: fileBase64,
-          file_type: fileType,
-          bankType: bankType || '',
-        }
-      }),
+    return await callPythonParser({
+      pdf_data: fileBase64,
+      bank: (bankType || '').toLowerCase(),
+      bank_profiles: [],
+      password: password || '',
     });
-
-    if (response.ok) {
-      const data = await response.json();
-      if (data.statusCode && data.body) {
-        try {
-          const parsedBody = typeof data.body === 'string' ? JSON.parse(data.body) : data.body;
-          if (data.statusCode === 200) {
-            return { success: true, data: parsedBody };
-          } else {
-            return { success: false, error: parsedBody.error || 'Python parser failed' };
-          }
-        } catch (_e) {
-          return { success: false, error: data.body || 'Failed to parse Python response' };
-        }
-      }
-      return { success: true, data };
-    } else {
-      const errorText = await response.text();
-      let errorMessage = errorText;
-      try {
-        const errorJson = JSON.parse(errorText);
-        errorMessage = errorJson.error || errorJson.message || errorText;
-      } catch {
-        // Not JSON
-      }
-      console.error(`❌ Parse Bank Statement API: Python function returned error status ${response.status}:`, errorMessage);
-      return { success: false, error: errorMessage };
-    }
   } catch (error) {
     console.log('⚠️ Parse Bank Statement API: Python function call failed, will try fallback:', error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error'
+      error: error instanceof Error ? error.message : 'Unknown error',
     };
   }
 }
@@ -121,7 +74,7 @@ export async function POST(request: NextRequest) {
     const buffer = Buffer.from(bytes);
 
     console.log('🐍 Parse Bank Statement API: Attempting Python serverless/microservice function...');
-    const pythonResult = await tryPythonParser(buffer, fileType, bankType);
+    const pythonResult = await tryPythonParser(buffer, bankType);
 
     if (pythonResult.success && pythonResult.data) {
       console.log('✅ Parse Bank Statement API: Python parser succeeded');

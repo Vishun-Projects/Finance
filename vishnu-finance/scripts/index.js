@@ -102,16 +102,24 @@ function runCommand(command, options = {}) {
 }
 
 async function applyMigrations() {
+  if (process.env.SKIP_BOOTSTRAP_MIGRATE === '1') {
+    logSection('⏩ Skipping Prisma migrations (SKIP_BOOTSTRAP_MIGRATE=1)');
+    return;
+  }
+
   logSection('⏩ Applying Prisma migrations');
 
-  const migrated = runCommand('npx prisma migrate deploy');
+  const migrated = runCommand('npx prisma migrate deploy', {
+    env: {
+      ...process.env,
+      PRISMA_MIGRATE_ADVISORY_LOCK_TIMEOUT: process.env.PRISMA_MIGRATE_ADVISORY_LOCK_TIMEOUT || '60000',
+    },
+  });
   if (!migrated) {
-    console.warn('⚠️  prisma migrate deploy failed (DB may be unreachable). Attempting db push...');
-    const pushed = runCommand('npx prisma db push --accept-data-loss');
-    if (!pushed) {
-      console.warn('⚠️  prisma db push also failed. Skipping schema sync – app will use existing schema.');
-      // Non-fatal: dev server can still start even if migrations didn't run
-    }
+    console.warn(
+      '⚠️  prisma migrate deploy failed (often advisory lock timeout on Supabase). Skipping schema sync – app will use existing schema.',
+    );
+    console.warn('   Run `npm run bootstrap` manually when you need migrations, or check for stale DB connections.');
   }
 
   // Skip prisma generate if the engine binary already exists (avoids EPERM on Windows when
@@ -327,6 +335,11 @@ function runSeeder(scriptPath) {
 }
 
 async function runSeeders() {
+  if (process.env.SKIP_BOOTSTRAP_SEED === '1') {
+    logSection('🌱 Skipping seeders (SKIP_BOOTSTRAP_SEED=1)');
+    return;
+  }
+
   logSection('🌱 Seeding data');
 
   const seeders = discoverSeederScripts();
@@ -379,9 +392,11 @@ async function main() {
     logSection('🧩 PostgreSQL detected - skipping raw column verification');
   }
 
-  // GIVE DB A MOMENT TO BREATHE
-  console.log('\n⏳ Waiting 3s for database connections to settle...');
-  await new Promise(resolve => setTimeout(resolve, 3000));
+  // GIVE DB A MOMENT TO BREATHE (skip when fast-start flags are set)
+  if (process.env.SKIP_BOOTSTRAP_MIGRATE !== '1' && process.env.SKIP_BOOTSTRAP_SEED !== '1') {
+    console.log('\n⏳ Waiting 3s for database connections to settle...');
+    await new Promise(resolve => setTimeout(resolve, 3000));
+  }
 
   await runSeeders();
 

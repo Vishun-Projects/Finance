@@ -1,0 +1,493 @@
+'use client';
+
+import React from 'react';
+import {
+  X,
+  Upload,
+  RefreshCw,
+  FileText,
+  BrainCircuit,
+  Check,
+  TrendingUp,
+} from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Callout } from '@/components/ui/callout';
+import { Chip } from '@/components/ui/chip';
+import { cn } from '@/lib/utils';
+import { getTransactionDisplayName } from '@/lib/transaction-utils';
+
+export interface ParsedBankTransaction {
+  debit?: number | string;
+  credit?: number | string;
+  description?: string;
+  date?: string;
+  date_iso?: string;
+  narration?: string;
+  store?: string;
+  personName?: string;
+  commodity?: string;
+  balance?: number | string;
+  upiId?: string;
+  [key: string]: unknown;
+}
+
+interface ParsedTransactionsReviewModalProps {
+  open: boolean;
+  onClose: () => void;
+  fileName?: string;
+  parsingViewMode: 'transactions' | 'raw' | 'json';
+  onParsingViewModeChange: (mode: 'transactions' | 'raw' | 'json') => void;
+  parsedTransactions: ParsedBankTransaction[];
+  filteredParsed: ParsedBankTransaction[];
+  visibleParsed: ParsedBankTransaction[];
+  statementMetadata: Record<string, unknown> | null;
+  parserMethod: string;
+  parseValidation: {
+    valid?: boolean;
+    reconciled?: boolean;
+    mismatch_count?: number;
+    opening_balance?: number;
+    closing_balance?: number;
+  } | null;
+  actualTotals: { totalCredits: number; totalDebits: number };
+  previewMonthOnly: boolean;
+  onPreviewMonthOnlyChange: (value: boolean) => void;
+  previewPage: number;
+  onPreviewPageChange: (page: number) => void;
+  previewPageSize: number;
+  onPreviewPageSizeChange: (size: number) => void;
+  totalPages: number;
+  allowImportDespiteValidation: boolean;
+  onAllowImportDespiteValidationChange: (value: boolean) => void;
+  isImporting: boolean;
+  importProgress: number;
+  onImport: () => void;
+  formatPreviewDate: (transaction: ParsedBankTransaction) => string;
+  getPreviewDescription: (transaction: ParsedBankTransaction) => string;
+}
+
+function formatInr(value: number) {
+  return `₹${value.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+export default function ParsedTransactionsReviewModal({
+  open,
+  onClose,
+  fileName,
+  parsingViewMode,
+  onParsingViewModeChange,
+  parsedTransactions,
+  filteredParsed,
+  visibleParsed,
+  statementMetadata,
+  parserMethod,
+  parseValidation,
+  actualTotals,
+  previewMonthOnly,
+  onPreviewMonthOnlyChange,
+  previewPage,
+  onPreviewPageChange,
+  previewPageSize,
+  onPreviewPageSizeChange,
+  totalPages,
+  allowImportDespiteValidation,
+  onAllowImportDespiteValidationChange,
+  isImporting,
+  importProgress,
+  onImport,
+  formatPreviewDate,
+  getPreviewDescription,
+}: ParsedTransactionsReviewModalProps) {
+  if (!open) return null;
+
+  const importDisabled =
+    isImporting || filteredParsed.length === 0 || (parseValidation?.valid === false && !allowImportDespiteValidation);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 md:p-6"
+      onClick={onClose}
+    >
+      <div
+        className="bg-card rounded-lg border shadow-2xl max-w-6xl w-full max-h-[92vh] overflow-hidden flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="px-5 py-4 border-b flex items-start justify-between gap-4 shrink-0">
+          <div className="min-w-0">
+            <h3 className="text-lg font-semibold text-foreground">Review parsed transactions</h3>
+            <p className="text-sm text-muted-foreground mt-1 truncate">
+              {fileName || 'Bank statement'}
+              {' · '}
+              {filteredParsed.length} of {parsedTransactions.length} transactions
+              {parserMethod ? ` · ${parserMethod.replace(/_/g, ' ')}` : ''}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-2 rounded-md hover:bg-muted shrink-0"
+            aria-label="Close"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="flex border-b px-5 bg-muted/20 shrink-0">
+          {(
+            [
+              ['transactions', `Transactions (${filteredParsed.length})`],
+              ['raw', 'Pipeline debug'],
+              ['json', 'JSON'],
+            ] as const
+          ).map(([mode, label]) => (
+            <button
+              key={mode}
+              type="button"
+              onClick={() => onParsingViewModeChange(mode)}
+              className={cn(
+                'px-4 py-3 text-sm font-medium border-b-2 transition-colors',
+                parsingViewMode === mode
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-muted-foreground hover:text-foreground',
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <div className="overflow-y-auto flex-1 min-h-0 p-5">
+          {parsingViewMode === 'transactions' && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <div className="rounded-lg border border-border bg-muted/30 p-3">
+                  <p className="text-xs text-muted-foreground">Total credits</p>
+                  <p className="text-lg font-semibold text-success">{formatInr(actualTotals.totalCredits)}</p>
+                </div>
+                <div className="rounded-lg border border-border bg-muted/30 p-3">
+                  <p className="text-xs text-muted-foreground">Total debits</p>
+                  <p className="text-lg font-semibold text-danger">{formatInr(actualTotals.totalDebits)}</p>
+                </div>
+                <div className="rounded-lg border border-border bg-muted/30 p-3">
+                  <p className="text-xs text-muted-foreground">Transactions</p>
+                  <p className="text-lg font-semibold text-foreground">{filteredParsed.length}</p>
+                </div>
+                <div className="rounded-lg border border-border bg-muted/30 p-3">
+                  <p className="text-xs text-muted-foreground">Reconciliation</p>
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {parseValidation?.reconciled ? (
+                      <Badge className="bg-success/15 text-success border-success/30">Balanced</Badge>
+                    ) : (
+                      <Badge className="bg-warning/15 text-warning border-warning/30">Check balances</Badge>
+                    )}
+                    {parseValidation?.valid === false && (
+                      <Badge className="bg-danger/15 text-danger border-danger/30">
+                        {parseValidation.mismatch_count ?? 0} mismatch
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {parseValidation?.valid === false && (
+                <>
+                  <Callout variant="warning" title="Balance mismatch">
+                    Parsed totals may not fully match running balances. Review before importing.
+                  </Callout>
+                  <label className="mt-2 flex items-center gap-2 text-sm cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={allowImportDespiteValidation}
+                      onChange={(e) => onAllowImportDespiteValidationChange(e.target.checked)}
+                    />
+                    Import anyway (skip duplicate checks)
+                  </label>
+                </>
+              )}
+
+              {statementMetadata && (
+                <details className="rounded-lg border border-border bg-muted/20">
+                  <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-foreground">
+                    Account & statement details
+                  </summary>
+                  <div className="px-4 pb-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
+                    {Boolean(statementMetadata.accountNumber) && (
+                      <div>
+                        <p className="text-xs text-muted-foreground">Account</p>
+                        <p className="font-mono">{String(statementMetadata.accountNumber)}</p>
+                      </div>
+                    )}
+                    {Boolean(statementMetadata.accountHolderName) && (
+                      <div>
+                        <p className="text-xs text-muted-foreground">Holder</p>
+                        <p>{String(statementMetadata.accountHolderName)}</p>
+                      </div>
+                    )}
+                    {statementMetadata.openingBalance != null && (
+                      <div>
+                        <p className="text-xs text-muted-foreground">Opening balance</p>
+                        <p>{formatInr(Number(statementMetadata.openingBalance))}</p>
+                      </div>
+                    )}
+                    {statementMetadata.closingBalance != null && (
+                      <div>
+                        <p className="text-xs text-muted-foreground">Closing balance</p>
+                        <p>{formatInr(Number(statementMetadata.closingBalance))}</p>
+                      </div>
+                    )}
+                    {Boolean(statementMetadata.ifsc) && (
+                      <div>
+                        <p className="text-xs text-muted-foreground">IFSC</p>
+                        <p className="font-mono">{String(statementMetadata.ifsc)}</p>
+                      </div>
+                    )}
+                  </div>
+                </details>
+              )}
+
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <label className="inline-flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={previewMonthOnly}
+                    onChange={(e) => {
+                      onPreviewMonthOnlyChange(e.target.checked);
+                      onPreviewPageChange(1);
+                    }}
+                  />
+                  Current month only
+                </label>
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="text-muted-foreground">Rows</span>
+                  <select
+                    value={previewPageSize}
+                    onChange={(e) => {
+                      onPreviewPageSizeChange(parseInt(e.target.value || '200', 10));
+                      onPreviewPageChange(1);
+                    }}
+                    className="border rounded-md px-2 py-1 bg-background text-foreground text-sm"
+                  >
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                    <option value={200}>200</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="hidden md:block border border-border rounded-lg overflow-hidden">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-muted/60 sticky top-0">
+                    <tr>
+                      <th className="px-3 py-2.5 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">Date</th>
+                      <th className="px-3 py-2.5 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">Description</th>
+                      <th className="px-3 py-2.5 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">Payee</th>
+                      <th className="px-3 py-2.5 text-right text-xs font-medium uppercase tracking-wide text-muted-foreground">Credit</th>
+                      <th className="px-3 py-2.5 text-right text-xs font-medium uppercase tracking-wide text-muted-foreground">Debit</th>
+                      <th className="px-3 py-2.5 text-right text-xs font-medium uppercase tracking-wide text-muted-foreground">Balance</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {visibleParsed.map((transaction, index) => {
+                      const debitAmount = parseFloat(String(transaction.debit || '0'));
+                      const creditAmount = parseFloat(String(transaction.credit || '0'));
+                      const balance = transaction.balance != null ? parseFloat(String(transaction.balance)) : null;
+                      const description = getPreviewDescription(transaction);
+                      const payee = getTransactionDisplayName({
+                        description,
+                        store: transaction.store,
+                        personName: transaction.personName,
+                      });
+
+                      return (
+                        <tr key={`${previewPage}-${index}`} className="hover:bg-muted/40 align-top">
+                          <td className="px-3 py-2.5 whitespace-nowrap text-foreground">{formatPreviewDate(transaction)}</td>
+                          <td className="px-3 py-2.5 text-foreground max-w-md">
+                            <p className="line-clamp-2" title={description}>{description}</p>
+                            {transaction.upiId ? (
+                              <p className="text-xs text-muted-foreground mt-0.5 truncate">{String(transaction.upiId)}</p>
+                            ) : null}
+                          </td>
+                          <td className="px-3 py-2.5 text-foreground">{payee}</td>
+                          <td className="px-3 py-2.5 text-right font-medium text-success whitespace-nowrap">
+                            {creditAmount > 0 ? formatInr(creditAmount) : '—'}
+                          </td>
+                          <td className="px-3 py-2.5 text-right font-medium text-danger whitespace-nowrap">
+                            {debitAmount > 0 ? formatInr(debitAmount) : '—'}
+                          </td>
+                          <td className="px-3 py-2.5 text-right text-muted-foreground whitespace-nowrap">
+                            {balance != null && !Number.isNaN(balance) ? formatInr(balance) : '—'}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="md:hidden divide-y divide-border border border-border rounded-lg overflow-hidden">
+                {visibleParsed.length === 0 ? (
+                  <div className="px-4 py-8 text-center text-sm text-muted-foreground">No transactions in this view</div>
+                ) : (
+                  visibleParsed.map((transaction, index) => {
+                    const debitAmount = parseFloat(String(transaction.debit || '0'));
+                    const creditAmount = parseFloat(String(transaction.credit || '0'));
+                    const isIncome = creditAmount > 0;
+                    const description = getPreviewDescription(transaction);
+                    const payee = getTransactionDisplayName({
+                      description,
+                      store: transaction.store,
+                      personName: transaction.personName,
+                    });
+
+                    return (
+                      <div key={`${previewPage}-m-${index}`} className="p-4 bg-card">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs text-muted-foreground">{formatPreviewDate(transaction)}</p>
+                            <p className="text-sm font-medium text-foreground mt-1 line-clamp-2">{description}</p>
+                            {payee ? <p className="text-xs text-muted-foreground mt-1">{payee}</p> : null}
+                            <div className="mt-2">
+                              <Chip variant={isIncome ? 'success' : 'danger'}>{isIncome ? 'Credit' : 'Debit'}</Chip>
+                            </div>
+                          </div>
+                          <p className={cn('text-sm font-semibold shrink-0', isIncome ? 'text-success' : 'text-danger')}>
+                            {isIncome ? formatInr(creditAmount) : formatInr(debitAmount)}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">
+                    Page {previewPage} of {totalPages} · showing {visibleParsed.length} rows
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onPreviewPageChange(Math.max(1, previewPage - 1))}
+                      disabled={previewPage === 1}
+                    >
+                      Previous
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onPreviewPageChange(Math.min(totalPages, previewPage + 1))}
+                      disabled={previewPage === totalPages}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {parsingViewMode === 'raw' && (
+            <div className="space-y-4">
+              <Callout variant="info" title="Developer view">
+                Pipeline extraction samples for debugging parse quality. Use the Transactions tab to review imports.
+              </Callout>
+              <div>
+                <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
+                  <FileText className="w-4 h-4" />
+                  Raw PDF rows (sample)
+                </h4>
+                <div className="border rounded-lg overflow-hidden max-h-64 overflow-y-auto">
+                  {(statementMetadata?.raw_rows_sample as string[] | undefined)?.length ? (
+                    (statementMetadata?.raw_rows_sample as string[]).map((row, i) => (
+                      <div key={i} className="px-3 py-2 text-xs font-mono border-b border-border last:border-0 hover:bg-muted/30">
+                        <span className="text-muted-foreground mr-2">{i + 1}.</span>
+                        {row}
+                      </div>
+                    ))
+                  ) : (
+                    <p className="p-4 text-sm text-muted-foreground">No raw row samples available.</p>
+                  )}
+                </div>
+              </div>
+              <div>
+                <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4" />
+                  Parsed candidates (sample)
+                </h4>
+                <div className="border rounded-lg overflow-x-auto">
+                  <table className="min-w-full text-xs">
+                    <thead className="bg-muted/60">
+                      <tr>
+                        <th className="px-2 py-2 text-left">#</th>
+                        <th className="px-2 py-2 text-left">Date</th>
+                        <th className="px-2 py-2 text-left">Description</th>
+                        <th className="px-2 py-2 text-right">Debit</th>
+                        <th className="px-2 py-2 text-right">Credit</th>
+                        <th className="px-2 py-2 text-right">Balance</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {((statementMetadata?.raw_candidates as Record<string, unknown>[]) || []).slice(0, 50).map((can, i) => (
+                        <tr key={i} className="hover:bg-muted/30">
+                          <td className="px-2 py-2 text-muted-foreground">{i + 1}</td>
+                          <td className="px-2 py-2 whitespace-nowrap">{String(can.raw_date || '—')}</td>
+                          <td className="px-2 py-2 max-w-xs truncate" title={String(can.raw_description || '')}>
+                            {String(can.raw_description || '—')}
+                          </td>
+                          <td className="px-2 py-2 text-right">{can.debit != null ? String(can.debit) : '—'}</td>
+                          <td className="px-2 py-2 text-right">{can.credit != null ? String(can.credit) : '—'}</td>
+                          <td className="px-2 py-2 text-right">{can.balance != null ? String(can.balance) : '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {parsingViewMode === 'json' && (
+            <div>
+              <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
+                <BrainCircuit className="w-4 h-4" />
+                Full pipeline output
+              </h4>
+              <pre className="bg-muted/30 border rounded-lg p-4 max-h-[55vh] overflow-auto text-xs font-mono">
+                {JSON.stringify({ metadata: statementMetadata, transactions: parsedTransactions }, null, 2)}
+              </pre>
+            </div>
+          )}
+        </div>
+
+        <div className="border-t px-5 py-4 shrink-0 bg-card space-y-3">
+          {isImporting && (
+            <div className="w-full bg-muted rounded-full h-2">
+              <div className="bg-primary h-2 rounded-full transition-all" style={{ width: `${importProgress}%` }} />
+            </div>
+          )}
+          <Button type="button" className="w-full" disabled={importDisabled} onClick={onImport}>
+            {isImporting ? (
+              <>
+                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                Importing… {importProgress}%
+              </>
+            ) : (
+              <>
+                <Upload className="w-4 h-4 mr-2" />
+                Import {filteredParsed.length} transactions
+              </>
+            )}
+          </Button>
+          <p className="text-xs text-center text-muted-foreground">
+            Credits → Income · Debits → Expenses · Duplicates skipped automatically
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}

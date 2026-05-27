@@ -1,0 +1,23 @@
+{
+  "footerNoisePatterns": [
+    "closingbalanceincludes",
+    "contentsofthisstatement",
+    "registeredofficeaddress",
+    "hdfcbankgstin"
+  ],
+  "baselines": [
+    {
+      "sourceCsv": "parsed_hdfc_Acct Statement_7094_01112025_21.42.06 - converted.csv",
+      "minTransactions": 200,
+      "maxFooterNoiseRows": 0
+    },
+    {
+      "sourceCsv": "parsed_AccountStatement_28-10-2025 11_00_46.csv",
+      "minTransactions": 1
+    },
+    {
+      "sourceCsv": "parsed_AccountStatement_01-Jul-2025_30-Sep-2025.csv",
+      "minTransactions": 1
+    }
+  ]
+}

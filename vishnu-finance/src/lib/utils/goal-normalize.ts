@@ -1,4 +1,4 @@
-import type { Goal } from '@/types/goals';
+import type { Goal } from '@/features/plans/types';
 
 function toNumber(value: unknown): number {
   if (typeof value === 'number') {

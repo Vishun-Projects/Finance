@@ -153,8 +153,8 @@ export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
     // Extract changeType and changeReason separately - they go to SalaryHistory, not SalaryStructure
-    const { id, changeType, changeReason, userId, ...updateData } = body;
-    console.log('✏️ SALARY STRUCTURE PUT - Update data:', JSON.stringify({ id, ...updateData }, null, 2));
+    const { id, changeType, changeReason, userId, historyId, ...updateData } = body;
+    console.log('✏️ SALARY STRUCTURE PUT - Update data:', JSON.stringify({ id, historyId, ...updateData }, null, 2));
 
     if (!id) {
       console.log('❌ SALARY STRUCTURE PUT - No ID provided');
@@ -185,36 +185,57 @@ export async function PUT(request: NextRequest) {
 
     console.log('✅ SALARY STRUCTURE PUT - Successfully updated salary structure:', JSON.stringify(updatedSalaryStructure, null, 2));
 
-    // Update the existing history entry for this salary structure instead of creating duplicates
+    // Update salary history — specific revision when historyId is provided, else latest for structure
     if (userId) {
-      console.log('✏️ SALARY STRUCTURE PUT - Updating existing salary history entry...');
-      // Find the most recent history entry for this structure and update it
-      const existingHistory = await (prisma as any).salaryHistory.findFirst({
-        where: { salaryStructureId: id },
-        orderBy: { createdAt: 'desc' }
-      });
+      console.log('✏️ SALARY STRUCTURE PUT - Updating salary history entry...');
+      const historyData = {
+        jobTitle: updatedSalaryStructure.jobTitle,
+        company: updatedSalaryStructure.company,
+        baseSalary: updatedSalaryStructure.baseSalary,
+        allowances: updatedSalaryStructure.allowances,
+        deductions: updatedSalaryStructure.deductions,
+        employerContributions: updatedSalaryStructure.employerContributions,
+        effectiveDate: updatedSalaryStructure.effectiveDate,
+        endDate: updatedSalaryStructure.endDate,
+        currency: updatedSalaryStructure.currency,
+        location: updatedSalaryStructure.location,
+        department: updatedSalaryStructure.department,
+        grade: updatedSalaryStructure.grade,
+      };
 
-      if (existingHistory) {
-        await (prisma as any).salaryHistory.update({
-          where: { id: existingHistory.id },
-          data: {
-            jobTitle: updatedSalaryStructure.jobTitle,
-            company: updatedSalaryStructure.company,
-            baseSalary: updatedSalaryStructure.baseSalary,
-            allowances: updatedSalaryStructure.allowances,
-            deductions: updatedSalaryStructure.deductions,
-            employerContributions: updatedSalaryStructure.employerContributions,
-            effectiveDate: updatedSalaryStructure.effectiveDate,
-            endDate: updatedSalaryStructure.endDate,
-            currency: updatedSalaryStructure.currency,
-            location: updatedSalaryStructure.location,
-            department: updatedSalaryStructure.department,
-            grade: updatedSalaryStructure.grade,
-            changeType: changeType || existingHistory.changeType,
-            changeReason: changeReason || existingHistory.changeReason
-          }
+      if (historyId) {
+        const existingHistory = await (prisma as any).salaryHistory.findFirst({
+          where: { id: historyId, salaryStructureId: id, userId },
         });
-        console.log('✅ SALARY STRUCTURE PUT - Successfully updated salary history entry');
+
+        if (existingHistory) {
+          await (prisma as any).salaryHistory.update({
+            where: { id: historyId },
+            data: {
+              ...historyData,
+              changeType: changeType || existingHistory.changeType,
+              changeReason: changeReason || existingHistory.changeReason,
+            },
+          });
+          console.log('✅ SALARY STRUCTURE PUT - Successfully updated specific salary history entry');
+        }
+      } else {
+        const existingHistory = await (prisma as any).salaryHistory.findFirst({
+          where: { salaryStructureId: id },
+          orderBy: { createdAt: 'desc' },
+        });
+
+        if (existingHistory) {
+          await (prisma as any).salaryHistory.update({
+            where: { id: existingHistory.id },
+            data: {
+              ...historyData,
+              changeType: changeType || existingHistory.changeType,
+              changeReason: changeReason || existingHistory.changeReason,
+            },
+          });
+          console.log('✅ SALARY STRUCTURE PUT - Successfully updated salary history entry');
+        }
       }
     }
 

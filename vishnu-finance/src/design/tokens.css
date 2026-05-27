@@ -1,0 +1,220 @@
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500&family=Geist+Mono:wght@400&display=swap');
+
+:root {
+  /* Base palette — system-design-flows.html */
+  --bg: #ffffff;
+  --bg2: #f7f7f5;
+  --border: #e5e5e2;
+  --text: #141413;
+  --muted: #6b6b67;
+  --hint: #a0a09b;
+  --accent: #141413;
+
+  /* shadcn compatibility aliases */
+  --background: var(--bg);
+  --foreground: var(--text);
+  --card: var(--bg);
+  --card-foreground: var(--text);
+  --popover: var(--bg);
+  --popover-foreground: var(--text);
+  --primary: var(--accent);
+  --primary-foreground: #ffffff;
+  --secondary: var(--bg2);
+  --secondary-foreground: var(--text);
+  --muted-foreground: var(--muted);
+  --accent-foreground: var(--text);
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --input: var(--border);
+  --ring: var(--accent);
+  --sidebar: var(--bg2);
+
+  /* Semantic status */
+  --success: #15803d;
+  --success-bg: #f0fdf4;
+  --success-border: #bbf7d0;
+  --warning: #b45309;
+  --warning-bg: #fffbeb;
+  --warning-border: #fde68a;
+  --danger: #dc2626;
+  --danger-bg: #fef2f2;
+  --danger-border: #fecaca;
+  --info: #2563eb;
+  --info-bg: #eff6ff;
+  --info-border: #bfdbfe;
+  --purple: #7c3aed;
+  --purple-bg: #f5f3ff;
+  --purple-border: #ddd6fe;
+  --orange: #ea580c;
+  --orange-bg: #fff7ed;
+  --orange-border: #fed7aa;
+
+  /* Chip variants */
+  --chip-success-bg: var(--success-bg);
+  --chip-success-fg: var(--success);
+  --chip-success-border: var(--success-border);
+  --chip-warning-bg: var(--warning-bg);
+  --chip-warning-fg: var(--warning);
+  --chip-warning-border: var(--warning-border);
+  --chip-danger-bg: var(--danger-bg);
+  --chip-danger-fg: var(--danger);
+  --chip-danger-border: var(--danger-border);
+  --chip-info-bg: var(--info-bg);
+  --chip-info-fg: var(--info);
+  --chip-info-border: var(--info-border);
+  --chip-purple-bg: var(--purple-bg);
+  --chip-purple-fg: var(--purple);
+  --chip-purple-border: var(--purple-border);
+  --chip-orange-bg: var(--orange-bg);
+  --chip-orange-fg: var(--orange);
+  --chip-orange-border: var(--orange-border);
+  --chip-neutral-bg: var(--bg2);
+  --chip-neutral-fg: var(--muted);
+  --chip-neutral-border: var(--border);
+
+  /* Callout variants */
+  --callout-success-bg: var(--success-bg);
+  --callout-success-fg: #166534;
+  --callout-success-title: #15803d;
+  --callout-success-border: var(--success-border);
+  --callout-warning-bg: var(--warning-bg);
+  --callout-warning-fg: #92400e;
+  --callout-warning-title: #92400e;
+  --callout-warning-border: var(--warning-border);
+  --callout-danger-bg: var(--danger-bg);
+  --callout-danger-fg: #991b1b;
+  --callout-danger-title: #991b1b;
+  --callout-danger-border: var(--danger-border);
+  --callout-info-bg: var(--info-bg);
+  --callout-info-fg: #1d4ed8;
+  --callout-info-title: #1e40af;
+  --callout-info-border: var(--info-border);
+  --callout-orange-bg: var(--orange-bg);
+  --callout-orange-fg: #9a3412;
+  --callout-orange-title: #9a3412;
+  --callout-orange-border: var(--orange-border);
+  --callout-purple-bg: var(--purple-bg);
+  --callout-purple-fg: #6d28d9;
+  --callout-purple-title: #5b21b6;
+  --callout-purple-border: var(--purple-border);
+  --callout-neutral-bg: var(--bg2);
+  --callout-neutral-fg: var(--muted);
+  --callout-neutral-title: var(--text);
+  --callout-neutral-border: var(--border);
+
+  /* Budget / category colors */
+  --category-needs: #2563eb;
+  --category-wants: #7c3aed;
+  --category-emi: #dc2626;
+  --category-invest: #16a34a;
+  --category-insurance: #b45309;
+  --category-default: var(--category-needs);
+
+  /* Category color picker presets */
+  --category-preset-01: #2563eb;
+  --category-preset-02: #16a34a;
+  --category-preset-03: #b45309;
+  --category-preset-04: #dc2626;
+  --category-preset-05: #7c3aed;
+  --category-preset-06: #db2777;
+  --category-preset-07: #0891b2;
+  --category-preset-08: #65a30d;
+  --category-preset-09: #ea580c;
+  --category-preset-10: #4f46e5;
+  --category-preset-11: #0d9488;
+  --category-preset-12: #e11d48;
+  --category-preset-13: #991b1b;
+  --category-preset-14: #7c2d12;
+  --category-preset-15: #059669;
+  --category-preset-16: #6b7280;
+
+  /* Layout */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --radius-pill: 20px;
+  --border-width: 0.5px;
+  --sidebar-width: 16rem;
+  --content-max-width: 40rem;
+  --page-max-width: 80rem;
+
+  /* Typography */
+  --font-sans: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, 'Cascadia Code', monospace;
+
+  /* Charts */
+  --chart-credits: #16a34a;
+  --chart-debits: #dc2626;
+  --overlay: rgba(0, 0, 0, 0.2);
+}
+
+.dark {
+  --bg: #141413;
+  --bg2: #1c1c1a;
+  --border: #2e2e2c;
+  --text: #f7f7f5;
+  --muted: #a0a09b;
+  --hint: #6b6b67;
+  --accent: #f7f7f5;
+
+  --background: var(--bg);
+  --foreground: var(--text);
+  --card: #1c1c1a;
+  --card-foreground: var(--text);
+  --popover: #1c1c1a;
+  --popover-foreground: var(--text);
+  --primary: var(--accent);
+  --primary-foreground: #141413;
+  --secondary: #1c1c1a;
+  --secondary-foreground: var(--text);
+  --muted-foreground: var(--muted);
+  --sidebar: #1c1c1a;
+
+  --success-bg: #052e16;
+  --success-border: #14532d;
+  --warning-bg: #422006;
+  --warning-border: #713f12;
+  --danger-bg: #450a0a;
+  --danger-border: #7f1d1d;
+  --info-bg: #172554;
+  --info-border: #1e3a8a;
+  --purple-bg: #2e1065;
+  --purple-border: #4c1d95;
+  --orange-bg: #431407;
+  --orange-border: #7c2d12;
+
+  --chip-success-bg: var(--success-bg);
+  --chip-warning-bg: var(--warning-bg);
+  --chip-danger-bg: var(--danger-bg);
+  --chip-info-bg: var(--info-bg);
+  --chip-purple-bg: var(--purple-bg);
+  --chip-orange-bg: var(--orange-bg);
+  --chip-neutral-bg: var(--bg2);
+
+  --callout-success-bg: var(--success-bg);
+  --callout-warning-bg: var(--warning-bg);
+  --callout-danger-bg: var(--danger-bg);
+  --callout-info-bg: var(--info-bg);
+  --callout-orange-bg: var(--orange-bg);
+  --callout-purple-bg: var(--purple-bg);
+  --callout-neutral-bg: var(--bg2);
+
+  --callout-success-fg: #86efac;
+  --callout-success-title: #bbf7d0;
+  --callout-warning-fg: #fde68a;
+  --callout-warning-title: #fde68a;
+  --callout-danger-fg: #fecaca;
+  --callout-danger-title: #fecaca;
+  --callout-info-fg: #93c5fd;
+  --callout-info-title: #bfdbfe;
+  --callout-orange-fg: #fed7aa;
+  --callout-orange-title: #fed7aa;
+  --callout-purple-fg: #c4b5fd;
+  --callout-purple-title: #ddd6fe;
+  --callout-neutral-fg: var(--muted);
+  --callout-neutral-title: var(--text);
+
+  --chart-credits: #86efac;
+  --chart-debits: #fca5a5;
+  --overlay: rgba(0, 0, 0, 0.5);
+}

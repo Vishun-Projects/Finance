@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { requireUser } from "@/lib/auth/server-auth";
 import { RouteLoadingState } from "@/components/feedback/route-fallbacks";
 import NavigationIsland from "@/components/layout/navigation-island";
-import AppPageShell from "@/components/layout/app-page-shell";
+import { AppPageShell } from "@/components/layout/app-page-shell";
 
 export const metadata: Metadata = {
   title: "Vishnu Finance - Dashboard",

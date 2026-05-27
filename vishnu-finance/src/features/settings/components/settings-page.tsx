@@ -855,7 +855,28 @@ export default function SettingsPageClient({ initialDocuments, initialPreference
         <PageHero tag="Configuration" title="Settings" className="mb-8" />
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full space-y-8">
-          <TabsList className="flex h-auto w-full items-center justify-start gap-1 overflow-x-auto rounded-md border border-border bg-surface p-1 no-scrollbar">
+          <div className="md:hidden">
+            <Select value={activeTab} onValueChange={setActiveTab}>
+              <SelectTrigger className="h-10 w-full">
+                <SelectValue placeholder="Settings section" />
+              </SelectTrigger>
+              <SelectContent>
+                {[
+                  { value: 'profile', label: 'Profile' },
+                  { value: 'appearance', label: 'Appearance' },
+                  { value: 'notifications', label: 'Alerts' },
+                  { value: 'security', label: 'Security' },
+                  { value: 'categories', label: 'Categories' },
+                  { value: 'documentation', label: 'Portal' },
+                ].map((tab) => (
+                  <SelectItem key={tab.value} value={tab.value}>
+                    {tab.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <TabsList className="hidden h-auto w-full min-w-0 items-center justify-start gap-1 overflow-x-auto rounded-md border border-border bg-surface p-1 md:flex">
             {[
               { value: 'profile', icon: User, label: 'Profile' },
               { value: 'appearance', icon: Palette, label: 'Appearance' },

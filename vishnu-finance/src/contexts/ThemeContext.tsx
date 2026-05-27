@@ -102,6 +102,30 @@ function ThemeSync() {
 
   }, [theme, user?.id, mounted, isInitialized]);
 
+  // Sync Capacitor status bar with theme
+  React.useEffect(() => {
+    if (!mounted || typeof window === 'undefined') return;
+
+    const syncStatusBar = async () => {
+      try {
+        const { Capacitor } = await import('@capacitor/core');
+        if (!Capacitor.isNativePlatform()) return;
+
+        const { StatusBar, Style } = await import('@capacitor/status-bar');
+        const isDarkTheme =
+          theme === 'dark' ||
+          (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+
+        await StatusBar.setStyle({ style: isDarkTheme ? Style.Dark : Style.Light });
+        await StatusBar.setBackgroundColor({ color: isDarkTheme ? '#000000' : '#ffffff' });
+      } catch {
+        // Native status bar unavailable
+      }
+    };
+
+    void syncStatusBar();
+  }, [theme, mounted]);
+
   return null;
 }
 

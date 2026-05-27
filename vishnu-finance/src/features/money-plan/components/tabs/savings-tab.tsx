@@ -45,7 +45,7 @@ export function SavingsTab() {
             </div>
             <Tag color={priorityColor[item.priority]}>{priorityLabel[item.priority]}</Tag>
           </div>
-          <div className="mb-2.5 grid grid-cols-3 gap-2">
+          <div className="mb-2.5 grid grid-cols-1 gap-2 sm:grid-cols-3">
             {(
               [
                 ['Return', item.rate],

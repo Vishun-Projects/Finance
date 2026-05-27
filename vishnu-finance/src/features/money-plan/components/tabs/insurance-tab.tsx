@@ -32,18 +32,18 @@ const snapshotTextClass: Record<SnapshotVariant, string> = {
 };
 
 export function InsuranceTab() {
-  const plan = useScaledMoneyPlan();
+  const scaledPlan = useScaledMoneyPlan();
   const [openClaim, setOpenClaim] = useState<string | null>(null);
   const [openCoverage, setOpenCoverage] = useState<string | null>(null);
 
-  const plans = useMemo(() => getInsurancePlans(plan), [plan]);
+  const plans = useMemo(() => getInsurancePlans(scaledPlan), [scaledPlan]);
 
   const premiums = {
-    parentsMummy: plan.parentsMummy,
-    parentsPapa: plan.parentsPapa,
-    term: plan.termPremium,
-    ownHealth: plan.ownHealth,
-    pa: plan.pacover,
+    parentsMummy: scaledPlan.parentsMummy,
+    parentsPapa: scaledPlan.parentsPapa,
+    term: scaledPlan.termPremium,
+    ownHealth: scaledPlan.ownHealth,
+    pa: scaledPlan.pacover,
   };
   const totalMonthly = Object.values(premiums).reduce((s, v) => s + v, 0);
 
@@ -54,13 +54,13 @@ export function InsuranceTab() {
     variant: SnapshotVariant;
   }> = [
     {
-      label: `Mummy Health (age ${plan.parents.mummy})`,
+      label: `Mummy Health (age ${scaledPlan.parents.mummy})`,
       cover: '₹10L',
       monthly: fmt(premiums.parentsMummy),
       variant: 'danger',
     },
     {
-      label: `Papa Health (age ${plan.parents.papa})`,
+      label: `Papa Health (age ${scaledPlan.parents.papa})`,
       cover: '₹10L',
       monthly: fmt(premiums.parentsPapa),
       variant: 'danger',
@@ -95,7 +95,7 @@ export function InsuranceTab() {
     <div>
       <PlanCallout
         variant="red"
-        title={`Parents — Mummy ${plan.parents.mummy} · Papa ${plan.parents.papa} — Golden Window`}
+        title={`Parents — Mummy ${scaledPlan.parents.mummy} · Papa ${scaledPlan.parents.papa} — Golden Window`}
         icon={planIcons.alert}
         className="mb-4"
       >
@@ -125,37 +125,37 @@ export function InsuranceTab() {
           ))}
         </div>
         <div className="mt-2.5 border-t border-border pt-2 text-[11px] text-hint">
-          ✓ These figures match the Overview breakdown exactly. Buffer {fmt(plan.insuranceBuffer)}/mo
+          ✓ These figures match the Overview breakdown exactly. Buffer {fmt(scaledPlan.insuranceBuffer)}/mo
           kept for renewal hikes.
         </div>
       </PlanCard>
 
-      {plans.map((plan) => (
-        <PlanCard key={plan.id} className="mb-3.5">
+      {plans.map((insurancePlan) => (
+        <PlanCard key={insurancePlan.id} className="mb-3.5">
           <div className="mb-1 flex items-start justify-between">
             <div>
-              <div className="text-sm font-medium text-foreground">{plan.type}</div>
-              <div className="mt-0.5 text-[11px] text-hint">{plan.subtitle}</div>
+              <div className="text-sm font-medium text-foreground">{insurancePlan.type}</div>
+              <div className="mt-0.5 text-[11px] text-hint">{insurancePlan.subtitle}</div>
             </div>
             <div className="ml-3 flex shrink-0 flex-col items-end gap-1">
-              <PlanTag color={priorityColor[plan.priority]}>{plan.priority}</PlanTag>
-              <span className="text-xs font-medium text-foreground">{plan.amount}</span>
+              <PlanTag color={priorityColor[insurancePlan.priority]}>{insurancePlan.priority}</PlanTag>
+              <span className="text-xs font-medium text-foreground">{insurancePlan.amount}</span>
             </div>
           </div>
 
-          {plan.amountMummy && plan.amountPapa && (
+          {insurancePlan.amountMummy && insurancePlan.amountPapa && (
             <div className="my-2 grid grid-cols-2 gap-1.5">
               <div className="rounded-md bg-[var(--danger-bg)] px-2.5 py-1.5">
                 <div className="mb-0.5 text-[10px] text-hint">
-                  Mummy (age {plan.parents.mummy})
+                  Mummy (age {scaledPlan.parents.mummy})
                 </div>
-                <div className="text-xs font-medium text-[var(--danger)]">{plan.amountMummy}</div>
+                <div className="text-xs font-medium text-[var(--danger)]">{insurancePlan.amountMummy}</div>
               </div>
               <div className="rounded-md bg-[var(--danger-bg)] px-2.5 py-1.5">
                 <div className="mb-0.5 text-[10px] text-hint">
-                  Papa (age {plan.parents.papa})
+                  Papa (age {scaledPlan.parents.papa})
                 </div>
-                <div className="text-xs font-medium text-[var(--danger)]">{plan.amountPapa}</div>
+                <div className="text-xs font-medium text-[var(--danger)]">{insurancePlan.amountPapa}</div>
               </div>
             </div>
           )}
@@ -163,49 +163,49 @@ export function InsuranceTab() {
           <div className="my-2.5 flex items-center justify-between rounded-md bg-surface px-2.5 py-2">
             <div>
               <span className="text-[11px] text-hint">Cover: </span>
-              <span className="text-[13px] font-semibold text-foreground">{plan.cover}</span>
+              <span className="text-[13px] font-semibold text-foreground">{insurancePlan.cover}</span>
             </div>
             <div className="flex gap-2">
               <button
                 type="button"
-                onClick={() => setOpenCoverage(openCoverage === plan.id ? null : plan.id)}
+                onClick={() => setOpenCoverage(openCoverage === insurancePlan.id ? null : insurancePlan.id)}
                 className={cn(
                   'cursor-pointer rounded border border-border px-2.5 py-1 text-[11px] font-medium',
-                  openCoverage === plan.id
+                  openCoverage === insurancePlan.id
                     ? 'bg-foreground text-primary-foreground'
                     : 'bg-card text-muted'
                 )}
               >
-                {openCoverage === plan.id ? 'Hide' : 'View Coverage'}
+                {openCoverage === insurancePlan.id ? 'Hide' : 'View Coverage'}
               </button>
               <button
                 type="button"
-                onClick={() => setOpenClaim(openClaim === plan.id ? null : plan.id)}
+                onClick={() => setOpenClaim(openClaim === insurancePlan.id ? null : insurancePlan.id)}
                 className={cn(
                   'cursor-pointer rounded border border-border px-2.5 py-1 text-[11px] font-medium',
-                  openClaim === plan.id
+                  openClaim === insurancePlan.id
                     ? 'bg-[var(--info)] text-primary-foreground'
                     : 'bg-card text-muted'
                 )}
               >
-                {openClaim === plan.id ? 'Hide' : 'How to Claim'}
+                {openClaim === insurancePlan.id ? 'Hide' : 'How to Claim'}
               </button>
             </div>
           </div>
 
-          {openCoverage === plan.id && <CoverageBlock plan={plan} />}
-          {openClaim === plan.id && <ClaimBlock plan={plan} />}
+          {openCoverage === insurancePlan.id && <CoverageBlock plan={insurancePlan} />}
+          {openClaim === insurancePlan.id && <ClaimBlock plan={insurancePlan} />}
 
-          {plan.familyFloaterNote && (
+          {insurancePlan.familyFloaterNote && (
             <Callout variant="warning" title="Family Floater" className="mb-2.5 px-2.5 py-1.5">
-              {plan.familyFloaterNote}
+              {insurancePlan.familyFloaterNote}
             </Callout>
           )}
 
           <div className="mb-1.5 mt-2.5 text-[11px] uppercase tracking-[0.06em] text-hint">
             Plan Options
           </div>
-          {plan.options.map((opt) => (
+          {insurancePlan.options.map((opt) => (
             <div
               key={opt.name}
               className={cn(
@@ -240,7 +240,7 @@ export function InsuranceTab() {
           ))}
 
           <Callout variant="warning" title="CA Note" icon={planIcons.info} className="mt-1 px-2.5 py-2">
-            {plan.caNote}
+            {insurancePlan.caNote}
           </Callout>
         </PlanCard>
       ))}

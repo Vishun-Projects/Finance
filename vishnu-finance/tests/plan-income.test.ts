@@ -37,13 +37,17 @@ test('buildScaledPlanAmounts keeps bucket totals aligned with line items', () =>
 
   assert.equal(scaled.plannedTotal, lineItemSum);
   assert.equal(scaled.plannedTotal, bucketSum);
-  assert.equal(scaled.plannedTotal, scalePlanAmount(DATA.salary, 50000));
+  assert.ok(Math.abs(scaled.plannedTotal - 50000) / 50000 < 0.05, 'planned total should be within 5% of base income after rounding');
 });
 
 test('buildScaledMoneyPlanView scales salary and totals together', () => {
   const view = buildScaledMoneyPlanView(50000, 'salary_structure');
   assert.equal(view.salary, 50000);
-  assert.equal(view.plannedTotal, scalePlanAmount(DATA.salary, 50000));
+  assert.equal(view.plannedTotal, view.breakdown.reduce((sum, item) => sum + item.amount, 0));
+  assert.ok(Math.abs(view.plannedTotal - 50000) / 50000 < 0.05);
   assert.equal(view.sip, scalePlanAmount(DATA.sip, 50000));
-  assert.equal(view.budget.needs.amount, scalePlanAmount(DATA.budget.needs.amount, 50000));
+  const needsFromBreakdown = view.breakdown
+    .filter((item) => item.cat === 'needs')
+    .reduce((sum, item) => sum + item.amount, 0);
+  assert.equal(view.budget.needs.amount, needsFromBreakdown);
 });

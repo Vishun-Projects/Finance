@@ -320,7 +320,7 @@ export default function AdminEducationPage() {
             </div>
 
             <div className="card-base overflow-hidden">
-                <div className="overflow-x-auto">
+                <div className="hidden overflow-x-auto md:block">
                     <table className="w-full text-left">
                         <thead>
                             <tr className="bg-muted/50 border-b border-border">
@@ -370,6 +370,33 @@ export default function AdminEducationPage() {
                             <p className="text-muted-foreground">No posts created yet.</p>
                         </div>
                     )}
+                </div>
+                <div className="space-y-3 p-3 md:hidden">
+                    {posts.map((post) => (
+                        <div key={post.id} className="rounded-md border border-border bg-surface/40 p-3">
+                            <div className="mb-2 flex items-start justify-between gap-2">
+                                <div className="min-w-0">
+                                    <p className="font-medium text-foreground">{post.title}</p>
+                                    <p className="text-xs text-muted-foreground">/{post.slug}</p>
+                                </div>
+                                <Badge variant={post.published ? 'default' : 'secondary'} className="shrink-0 rounded-full px-2">
+                                    {post.published ? 'Published' : 'Draft'}
+                                </Badge>
+                            </div>
+                            <p className="mb-3 text-sm capitalize text-muted-foreground">{post.difficulty}</p>
+                            <div className="flex justify-end gap-2">
+                                <Button variant="ghost" size="icon" onClick={() => {
+                                    setEditingPost(post);
+                                    setIsDialogOpen(true);
+                                }}>
+                                    <Edit2 className="w-4 h-4" />
+                                </Button>
+                                <Button variant="ghost" size="icon" onClick={() => handleDelete(post.id)} className="text-destructive hover:bg-destructive/10">
+                                    <Trash2 className="w-4 h-4" />
+                                </Button>
+                            </div>
+                        </div>
+                    ))}
                 </div>
             </div>
         </div>

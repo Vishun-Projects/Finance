@@ -159,16 +159,29 @@ export function ResearchTab() {
           <div
             key={row.age}
             className={cn(
-              'grid grid-cols-[100px_1fr_1fr_1fr] items-center gap-2 py-2',
+              'py-2 md:grid md:grid-cols-[100px_1fr_1fr_1fr] md:items-center md:gap-2',
               i < INSURANCE_PREMIUM_AGE_TABLE.length - 1 && 'border-b border-border',
             )}
           >
-            <div className="text-[11px] font-medium" style={{ color: row.col }}>
-              Age {row.age}
+            <div className="mb-2 flex items-center justify-between md:mb-0 md:block">
+              <div className="text-[11px] font-medium" style={{ color: row.col }}>
+                Age {row.age}
+              </div>
+              <div className="text-[11px] font-medium md:hidden" style={{ color: row.col }}>
+                {row.note}
+              </div>
             </div>
-            <div className="text-[11px] text-muted-foreground">{row.mummy}</div>
-            <div className="text-[11px] text-muted-foreground">{row.papa}</div>
-            <div className="text-[11px] font-medium" style={{ color: row.col }}>
+            <div className="space-y-1 md:space-y-0">
+              <div className="flex justify-between gap-2 text-[11px] md:block md:text-muted-foreground">
+                <span className="text-hint md:hidden">Mummy</span>
+                <span>{row.mummy}</span>
+              </div>
+              <div className="flex justify-between gap-2 text-[11px] md:block md:text-muted-foreground">
+                <span className="text-hint md:hidden">Papa</span>
+                <span>{row.papa}</span>
+              </div>
+            </div>
+            <div className="hidden text-[11px] font-medium md:block" style={{ color: row.col }}>
               {row.note}
             </div>
           </div>
@@ -207,11 +220,11 @@ export function ResearchTab() {
           <div
             key={when}
             className={cn(
-              'flex gap-3 py-1.5',
+              'flex flex-wrap gap-x-3 gap-y-1.5 py-1.5',
               i < RERESEARCH_SCHEDULE.length - 1 && 'border-b border-border',
             )}
           >
-            <span className="min-w-[140px] text-xs font-medium text-muted-foreground">{when}</span>
+            <span className="min-w-[120px] shrink-0 text-xs font-medium text-muted-foreground sm:min-w-[140px]">{when}</span>
             <span className="text-xs text-hint">{what}</span>
           </div>
         ))}

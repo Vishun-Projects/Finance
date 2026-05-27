@@ -88,7 +88,7 @@ export function RoadmapTab() {
         <div className="text-[13px] leading-relaxed text-muted-foreground">
           Har appraisal/increment ka <strong className="text-foreground">80% investments mein</strong>, 20% lifestyle.
         </div>
-        <div className="mt-3 grid grid-cols-3 gap-2 border-t border-border pt-3">
+        <div className="mt-3 grid grid-cols-1 gap-2 border-t border-border pt-3 sm:grid-cols-3">
           {(
             [
               [`Age ${plan.age}`, `${fmt(plan.sip)} SIP start`],

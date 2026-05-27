@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useMemo } from 'react';
+import { useBreakpoint } from '@/hooks/use-breakpoint';
 import {
   Heart,
   TrendingUp,
@@ -68,7 +69,7 @@ const HealthGauge = ({ score, size = 260 }: { score: number; size?: number }) =>
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-        <span className="text-6xl font-medium tabular-nums text-foreground leading-none">{score}</span>
+        <span className="text-4xl font-medium tabular-nums text-foreground leading-none sm:text-6xl">{score}</span>
         <span className="mt-3 text-[11px] font-medium uppercase tracking-[0.08em] text-hint">Health score</span>
       </div>
     </div>
@@ -79,6 +80,7 @@ export default function FinancialHealthPageClient({
   initialData,
 }: FinancialHealthPageClientProps) {
   const { setTheme, isDark } = useTheme();
+  const isMdUp = useBreakpoint('md');
 
   const healthScore = useMemo(() => {
     let score = 0;
@@ -153,10 +155,12 @@ export default function FinancialHealthPageClient({
         </div>
 
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
-          <div className="card-base flex flex-col items-center justify-center p-8 text-center lg:col-span-5">
-            <p className="mb-8 text-[11px] font-medium uppercase tracking-[0.08em] text-hint">Overall score</p>
-            <HealthGauge score={healthScore} />
-            <div className="mt-10 grid w-full grid-cols-2 gap-8 border-t border-border pt-8">
+          <div className="card-base flex flex-col items-center justify-center p-4 text-center sm:p-8 lg:col-span-5">
+            <p className="mb-6 text-[11px] font-medium uppercase tracking-[0.08em] text-hint sm:mb-8">Overall score</p>
+            <div className="mx-auto w-full max-w-[260px]">
+              <HealthGauge score={healthScore} size={220} />
+            </div>
+            <div className="mt-10 grid w-full grid-cols-2 gap-4 border-t border-border pt-4 sm:gap-8 sm:pt-8">
               <div className="text-left">
                 <p className="mb-2 text-xs text-hint">Global ranking</p>
                 <p className="text-xl font-medium tabular-nums">
@@ -170,7 +174,7 @@ export default function FinancialHealthPageClient({
             </div>
           </div>
 
-          <div className="card-base flex flex-col p-8 lg:col-span-7">
+          <div className="card-base flex flex-col p-4 md:p-8 lg:col-span-7">
             <div className="mb-8 flex items-center justify-between">
               <div>
                 <h3 className="text-[11px] font-medium uppercase tracking-[0.08em] text-hint">Income trend</h3>
@@ -191,7 +195,7 @@ export default function FinancialHealthPageClient({
                 Not enough income history to chart yet.
               </div>
             ) : (
-            <ChartContainer height={250}>
+            <ChartContainer height={isMdUp ? 250 : 200}>
               <AreaChart data={chartData}>
                 <Tooltip
                   formatter={(value: number) => formatRupees(value)}
@@ -247,7 +251,7 @@ export default function FinancialHealthPageClient({
           </div>
         </div>
 
-        <div className="card-base mt-8 flex flex-col items-start justify-between gap-8 border-dashed p-8 md:flex-row md:items-center">
+        <div className="card-base mt-8 flex flex-col items-start justify-between gap-8 border-dashed p-4 md:flex-row md:items-center md:p-8">
           <div className="flex max-w-3xl items-start gap-5">
             <div className="flex size-14 shrink-0 items-center justify-center rounded-md border border-border bg-surface">
               <Lightbulb className="size-7 text-primary" />

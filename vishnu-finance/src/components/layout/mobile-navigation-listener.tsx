@@ -61,12 +61,19 @@ export function MobileNavigationListener() {
 
         // 3. Handle Hardware Back Button (Android)
         const backButtonListener = App.addListener('backButton', ({ canGoBack }) => {
-            if (canGoBack) {
-                Haptics.impact({ style: ImpactStyle.Light });
-                window.history.back();
-            } else {
-                App.minimizeApp();
-            }
+          const openOverlay = document.querySelector('[data-state="open"][role="dialog"]');
+          if (openOverlay) {
+            document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+            void Haptics.impact({ style: ImpactStyle.Light });
+            return;
+          }
+
+          if (canGoBack) {
+            void Haptics.impact({ style: ImpactStyle.Light });
+            window.history.back();
+          } else {
+            App.minimizeApp();
+          }
         });
 
         // 4. Handle Deep Links (OAuth Callbacks & App Links)

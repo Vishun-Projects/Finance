@@ -14,14 +14,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
-import { PLAN_CATEGORY_GUIDE, PLAN_CATEGORY_PICKER_GROUPS } from '@/features/dashboard/config/plan-expense-categories';
+import { ResponsiveSheet } from '@/components/ui/responsive-sheet';
+import { PLAN_CATEGORY_PICKER_GROUPS } from '@/features/dashboard/config/plan-expense-categories';
 import {
   formatGroupDateRange,
   groupLineItemTransactions,
@@ -110,143 +104,123 @@ export function LineItemTransactionsSheet({
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="flex w-full flex-col sm:max-w-md">
-        <SheetHeader>
-          <SheetTitle className="pr-6 text-left text-base">{lineItemLabel}</SheetTitle>
-          <SheetDescription className="text-left">
-            {formatRupees(actual)} spent / {formatRupees(planned)} planned this month
-          </SheetDescription>
-        </SheetHeader>
+    <ResponsiveSheet
+      open={open}
+      onOpenChange={onOpenChange}
+      title={lineItemLabel}
+      description={`${formatRupees(actual)} spent / ${formatRupees(planned)} planned this month`}
+      desktopSide="right"
+      contentClassName="flex flex-col sm:max-w-md"
+    >
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        {loading ? (
+          <div className="flex items-center justify-center py-12 text-muted-foreground">
+            <Loader2 className="mr-2 size-4 animate-spin" />
+            Loading transactions…
+          </div>
+        ) : error && groups.length === 0 ? (
+          <p className="py-8 text-center text-sm text-[var(--danger)]">{error}</p>
+        ) : groups.length === 0 ? (
+          <p className="py-8 text-center text-sm text-muted-foreground">
+            No transactions mapped to this line item this month.
+          </p>
+        ) : (
+          <ul className="divide-y divide-border">
+            {groups.map((group) => {
+              const isSaving = savingKey === group.key;
+              const dateLabel = formatGroupDateRange(group.dates);
 
-        {/* <p className="mt-2 text-[10px] text-muted-foreground">
-          Pick the breakdown line that matches — family, medical, and friends now have their own categories.
-          Linked lend/borrow pairs show net amounts after repayments.
-        </p> */}
-
-        {/* <div className="mt-2 rounded-md border border-border bg-surface/50 px-2.5 py-2">
-          <p className="mb-1 text-[10px] font-medium text-foreground">Where does it go?</p>
-          <ul className="space-y-0.5 text-[10px] text-muted-foreground">
-            {PLAN_CATEGORY_GUIDE.map((row) => (
-              <li key={row.category}>
-                <span className="text-foreground">{row.category}</span>
-                <span className="text-hint"> — </span>
-                {row.examples}
-              </li>
-            ))}
-          </ul>
-        </div> */}
-
-        <div className="mt-3 min-h-0 flex-1 overflow-y-auto">
-          {loading ? (
-            <div className="flex items-center justify-center py-12 text-muted-foreground">
-              <Loader2 className="mr-2 size-4 animate-spin" />
-              Loading transactions…
-            </div>
-          ) : error && groups.length === 0 ? (
-            <p className="py-8 text-center text-sm text-[var(--danger)]">{error}</p>
-          ) : groups.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">
-              No transactions mapped to this line item this month.
-            </p>
-          ) : (
-            <ul className="divide-y divide-border">
-              {groups.map((group) => {
-                const isSaving = savingKey === group.key;
-                const dateLabel = formatGroupDateRange(group.dates);
-
-                return (
-                  <li key={group.key} className="py-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-foreground">{group.displayName}</p>
-                        <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                          <Select
-                            value={group.categoryName}
-                            disabled={isSaving}
-                            onValueChange={(value) => void saveCategory(group, value)}
-                          >
-                            <SelectTrigger className="h-8 max-w-[220px] text-xs">
-                              {isSaving ? (
-                                <span className="flex items-center gap-1.5 text-muted-foreground">
-                                  <Loader2 className="size-3 animate-spin" />
-                                  Saving…
-                                </span>
-                              ) : (
-                                <SelectValue placeholder="Category" />
-                              )}
-                            </SelectTrigger>
-                            <SelectContent className="max-h-[280px]">
-                              {PLAN_CATEGORY_PICKER_GROUPS.map((section) => (
-                                <SelectGroup key={section.label}>
-                                  <SelectLabel>{section.label}</SelectLabel>
-                                  {section.options.map((opt) => (
-                                    <SelectItem key={opt.value} value={opt.value} className="text-xs">
-                                      {opt.label}
-                                    </SelectItem>
-                                  ))}
-                                </SelectGroup>
-                              ))}
-                              {!PLAN_CATEGORY_PICKER_GROUPS.some((g) =>
-                                g.options.some((o) => o.value === group.categoryName),
-                              ) && (
-                                <SelectGroup>
-                                  <SelectLabel>Current</SelectLabel>
-                                  <SelectItem value={group.categoryName} className="text-xs">
-                                    {group.categoryName}
+              return (
+                <li key={group.key} className="py-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-foreground">{group.displayName}</p>
+                      <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                        <Select
+                          value={group.categoryName}
+                          disabled={isSaving}
+                          onValueChange={(value) => void saveCategory(group, value)}
+                        >
+                          <SelectTrigger className="h-8 max-w-[220px] text-xs">
+                            {isSaving ? (
+                              <span className="flex items-center gap-1.5 text-muted-foreground">
+                                <Loader2 className="size-3 animate-spin" />
+                                Saving…
+                              </span>
+                            ) : (
+                              <SelectValue placeholder="Category" />
+                            )}
+                          </SelectTrigger>
+                          <SelectContent className="max-h-[280px]">
+                            {PLAN_CATEGORY_PICKER_GROUPS.map((section) => (
+                              <SelectGroup key={section.label}>
+                                <SelectLabel>{section.label}</SelectLabel>
+                                {section.options.map((opt) => (
+                                  <SelectItem key={opt.value} value={opt.value} className="text-xs">
+                                    {opt.label}
                                   </SelectItem>
-                                </SelectGroup>
-                              )}
-                            </SelectContent>
-                          </Select>
-                          {group.count > 1 && (
-                            <Badge variant="outline" className="px-1 py-0 text-[9px] font-normal">
-                              {group.count} payments
-                            </Badge>
-                          )}
-                        </div>
-                        <p className="mt-1 text-[11px] text-muted-foreground">{dateLabel}</p>
-                        {group.transactions.some((tx) => tx.settlementId) && (
-                          <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                            {group.transactions
-                              .filter((tx) => tx.settlementId)
-                              .map((tx) => (
-                                <Badge key={tx.id} variant="outline" className="px-1 py-0 text-[9px] font-normal">
-                                  Linked · net {formatRupees(tx.amount)}
-                                  {tx.grossAmount !== tx.amount ? ` (gross ${formatRupees(tx.grossAmount)})` : ''}
-                                </Badge>
-                              ))}
-                            <Button variant="ghost" size="sm" className="h-6 px-2 text-[10px]" asChild>
-                              <Link href={`/transactions?link=${group.transactionIds[0]}`}>
-                                <Link2 className="mr-1 size-3" />
-                                Manage link
-                              </Link>
-                            </Button>
-                          </div>
+                                ))}
+                              </SelectGroup>
+                            ))}
+                            {!PLAN_CATEGORY_PICKER_GROUPS.some((g) =>
+                              g.options.some((o) => o.value === group.categoryName),
+                            ) && (
+                              <SelectGroup>
+                                <SelectLabel>Current</SelectLabel>
+                                <SelectItem value={group.categoryName} className="text-xs">
+                                  {group.categoryName}
+                                </SelectItem>
+                              </SelectGroup>
+                            )}
+                          </SelectContent>
+                        </Select>
+                        {group.count > 1 && (
+                          <Badge variant="outline" className="px-1 py-0 text-[9px] font-normal">
+                            {group.count} payments
+                          </Badge>
                         )}
                       </div>
-                      <span className="shrink-0 text-sm font-medium tabular-nums text-[var(--danger)]">
-                        {formatRupees(group.totalAmount)}
-                      </span>
+                      <p className="mt-1 text-[11px] text-muted-foreground">{dateLabel}</p>
+                      {group.transactions.some((tx) => tx.settlementId) && (
+                        <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                          {group.transactions
+                            .filter((tx) => tx.settlementId)
+                            .map((tx) => (
+                              <Badge key={tx.id} variant="outline" className="px-1 py-0 text-[9px] font-normal">
+                                Linked · net {formatRupees(tx.amount)}
+                                {tx.grossAmount !== tx.amount ? ` (gross ${formatRupees(tx.grossAmount)})` : ''}
+                              </Badge>
+                            ))}
+                          <Button variant="ghost" size="sm" className="h-6 px-2 text-[10px]" asChild>
+                            <Link href={`/transactions?link=${group.transactionIds[0]}`}>
+                              <Link2 className="mr-1 size-3" />
+                              Manage link
+                            </Link>
+                          </Button>
+                        </div>
+                      )}
                     </div>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-          {error && groups.length > 0 && (
-            <p className="mt-2 text-center text-xs text-[var(--danger)]">{error}</p>
-          )}
-        </div>
-
-        {lineItemLabel && (
-          <Button variant="outline" size="sm" className="mt-4 w-full" asChild>
-            <Link href={`/transactions?lineItem=${encodeURIComponent(lineItemLabel)}`}>
-              Open in transactions
-            </Link>
-          </Button>
+                    <span className="shrink-0 text-sm font-medium tabular-nums text-[var(--danger)]">
+                      {formatRupees(group.totalAmount)}
+                    </span>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
         )}
-      </SheetContent>
-    </Sheet>
+        {error && groups.length > 0 && (
+          <p className="mt-2 text-center text-xs text-[var(--danger)]">{error}</p>
+        )}
+      </div>
+
+      {lineItemLabel && (
+        <Button variant="outline" size="sm" className="mt-4 w-full" asChild>
+          <Link href={`/transactions?lineItem=${encodeURIComponent(lineItemLabel)}`}>
+            Open in transactions
+          </Link>
+        </Button>
+      )}
+    </ResponsiveSheet>
   );
 }

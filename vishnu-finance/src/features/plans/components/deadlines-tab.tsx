@@ -22,7 +22,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import FabButton from '@/components/ui/fab-button';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
+import { ResponsiveSheet } from '@/components/ui/responsive-sheet';
 
 interface DeadlinesPageClientProps {
   initialDeadlines: DeadlinesResponse;
@@ -399,7 +399,7 @@ export default function DeadlinesPageClient({ initialDeadlines, userId, layoutVa
             />
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="hidden overflow-x-auto md:block">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border bg-surface text-left text-[11px] font-medium uppercase tracking-[0.08em] text-hint">
@@ -483,28 +483,91 @@ export default function DeadlinesPageClient({ initialDeadlines, userId, layoutVa
               </tbody>
             </table>
           </div>
+
+          <div className="divide-y divide-border md:hidden">
+            {filteredDeadlines.map((deadline) => {
+              const statusMeta = computeStatus(deadline);
+              const dueDate = new Date(deadline.dueDate);
+              const daysLeft = Math.ceil((dueDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+              const isOverdue = statusMeta.status === 'OVERDUE';
+
+              return (
+                <div key={deadline.id} className="space-y-3 px-4 py-4">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="font-medium text-foreground">{deadline.title}</p>
+                      {deadline.category ? (
+                        <p className="text-xs capitalize text-muted">{deadline.category}</p>
+                      ) : null}
+                    </div>
+                    <Badge
+                      variant={statusMeta.tone === 'destructive' ? 'destructive' : 'outline'}
+                      className="shrink-0 capitalize"
+                    >
+                      {statusMeta.label}
+                    </Badge>
+                  </div>
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                    <span className="text-muted">Due {toLocalDate(deadline.dueDate)}</span>
+                    <span className={cn(isOverdue ? 'text-[var(--danger)]' : 'text-muted')}>
+                      {isOverdue
+                        ? `${Math.abs(daysLeft)} days overdue`
+                        : daysLeft > 0
+                          ? `${daysLeft} days left`
+                          : 'Due today'}
+                    </span>
+                  </div>
+                  <p className="text-sm tabular-nums text-foreground">{formatCurrency(deadline.amount)}</p>
+                  <div className="flex items-center gap-1">
+                    <Button variant="ghost" size="sm" className="h-8" onClick={() => openEditDialog(deadline)}>
+                      Edit
+                    </Button>
+                    <Button variant="ghost" size="sm" className="h-8" onClick={() => handleToggleCompleted(deadline)}>
+                      {deadline.isCompleted ? 'Undo' : 'Complete'}
+                    </Button>
+                    <Button variant="ghost" size="sm" className="h-8 text-[var(--danger)]" onClick={() => handleDelete(deadline.id)}>
+                      Delete
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+            {filteredDeadlines.length === 0 && (
+              <p className="px-4 py-12 text-center text-sm text-muted">No deadlines found.</p>
+            )}
+          </div>
         </section>
       </div>
 
-      <Sheet open={dialogOpen} onOpenChange={(open) => {
-        setDialogOpen(open);
-        if (!open) {
-          resetForm();
-        }
-      }}>
-        <SheetContent side="bottom" className="h-[92vh] overflow-hidden border-t border-border p-0 sm:h-auto sm:max-w-lg rounded-t-2xl">
-          <div className="flex justify-center pt-3 pb-1 sm:hidden">
-            <div className="h-1.5 w-12 rounded-full bg-muted" />
+      <ResponsiveSheet
+        open={dialogOpen}
+        onOpenChange={(open) => {
+          setDialogOpen(open);
+          if (!open) {
+            resetForm();
+          }
+        }}
+        title={editingDeadline ? 'Update deadline' : 'Add deadline'}
+        description="Keep track of upcoming bills, EMIs, and other important payments."
+        footer={
+          <div className="flex w-full flex-col gap-3 sm:flex-row sm:justify-end">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDialogOpen(false);
+                resetForm();
+              }}
+              disabled={isSaving}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleSubmit} disabled={isSaving} className="gap-2">
+              {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <AlarmClock className="h-4 w-4" />}
+              {editingDeadline ? 'Update deadline' : 'Create deadline'}
+            </Button>
           </div>
-          <div className="h-full overflow-y-auto px-6 py-4 pb-32 sm:pb-6">
-            <SheetHeader className="mb-6 text-left">
-              <SheetTitle className="text-lg font-medium">
-                {editingDeadline ? 'Update deadline' : 'Add deadline'}
-              </SheetTitle>
-              <SheetDescription>
-                Keep track of upcoming bills, EMIs, and other important payments.
-              </SheetDescription>
-            </SheetHeader>
+        }
+      >
             <div className="space-y-5">
               <div className="space-y-2">
                 <label className="text-sm font-medium text-foreground" htmlFor="deadline-title">
@@ -641,26 +704,8 @@ export default function DeadlinesPageClient({ initialDeadlines, userId, layoutVa
                 />
               </div>
 
-              <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:justify-end">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setDialogOpen(false);
-                    resetForm();
-                  }}
-                  disabled={isSaving}
-                >
-                  Cancel
-                </Button>
-                <Button onClick={handleSubmit} disabled={isSaving} className="gap-2">
-                  {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <AlarmClock className="h-4 w-4" />}
-                  {editingDeadline ? 'Update deadline' : 'Create deadline'}
-                </Button>
-              </div>
             </div>
-          </div>
-        </SheetContent>
-      </Sheet>
+      </ResponsiveSheet>
     </div>
   );
 }

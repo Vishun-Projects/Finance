@@ -13,6 +13,7 @@ import {
   History,
   Plus,
   Trash2,
+  Lightbulb,
 } from 'lucide-react';
 import PageSkeleton from '@/components/feedback/page-skeleton';
 import { MarkdownRenderer } from '@/features/advisor/components/markdown-renderer';
@@ -25,6 +26,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { ResponsiveSheet } from '@/components/ui/responsive-sheet';
 import { cn } from '@/lib/utils';
 
 interface Message {
@@ -53,6 +55,7 @@ export default function AdvisorPageClient() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loadingConversations, setLoadingConversations] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [insightsOpen, setInsightsOpen] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -205,8 +208,8 @@ export default function AdvisorPageClient() {
   }
 
   return (
-    <div className="flex h-[calc(100vh)] overflow-hidden bg-background text-foreground">
-      <div className="hidden h-full xl:block">
+    <div className="flex min-h-[calc(100dvh-12rem)] flex-col overflow-hidden bg-background text-foreground xl:min-h-[calc(100dvh-6rem)] xl:flex-row">
+      <div className="hidden h-full shrink-0 border-r border-border xl:block xl:w-72">
         <InsightSidebar userId={user.id} className="h-full" />
       </div>
 
@@ -217,6 +220,15 @@ export default function AdvisorPageClient() {
             <p className="text-xs text-hint">Ask questions about your finances</p>
           </div>
           <div className="flex items-center gap-1 md:gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2 px-2 xl:hidden md:px-3"
+              onClick={() => setInsightsOpen(true)}
+            >
+              <Lightbulb className="size-3.5" />
+              <span className="hidden sm:inline text-xs">Insights</span>
+            </Button>
             <Sheet open={historyOpen} onOpenChange={setHistoryOpen}>
               <SheetTrigger asChild>
                 <Button variant="ghost" size="sm" className="gap-2 px-2 md:px-3">
@@ -269,7 +281,7 @@ export default function AdvisorPageClient() {
           </div>
         </header>
 
-        <div className="flex-1 space-y-8 overflow-y-auto p-4 pt-20 sm:p-8 md:pt-8 custom-scrollbar">
+        <div className="flex-1 space-y-8 overflow-y-auto p-4 sm:p-8 custom-scrollbar">
           {loading && messages.length === 0 ? (
             <div className="flex min-h-[60vh] flex-col items-center justify-center">
               <Loader2 className="size-8 animate-spin text-primary opacity-50" />
@@ -318,7 +330,7 @@ export default function AdvisorPageClient() {
                   </div>
 
                   {message.chartConfig && (
-                    <div className="mt-4 h-[280px] w-full">
+                    <div className="mt-4 h-[200px] w-full md:h-[280px]">
                       <ChartMessage config={message.chartConfig} />
                     </div>
                   )}
@@ -362,6 +374,17 @@ export default function AdvisorPageClient() {
           </div>
         </div>
       </section>
+
+      <ResponsiveSheet
+        open={insightsOpen}
+        onOpenChange={setInsightsOpen}
+        title="Financial insights"
+        description="Context from your accounts and spending patterns"
+        desktopSide="right"
+        contentClassName="p-0 xl:hidden"
+      >
+        <InsightSidebar userId={user.id} className="h-full min-h-[50vh]" />
+      </ResponsiveSheet>
     </div>
   );
 }

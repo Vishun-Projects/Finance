@@ -26,7 +26,7 @@ import {
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import FabButton from '@/components/ui/fab-button';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
+import { ResponsiveSheet } from '@/components/ui/responsive-sheet';
 
 import { WishlistPriority, WishlistItem, WishlistResponse } from '@/features/plans/types';
 
@@ -337,7 +337,7 @@ export default function WishlistPageClient({ initialWishlist, userId, layoutVari
             />
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="hidden overflow-x-auto md:block">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border bg-surface text-left text-[11px] font-medium uppercase tracking-[0.08em] text-hint">
@@ -407,22 +407,69 @@ export default function WishlistPageClient({ initialWishlist, userId, layoutVari
               </tbody>
             </table>
           </div>
+
+          <div className="divide-y divide-border md:hidden">
+            {filteredItems.map((item) => (
+              <div key={item.id} className={cn('space-y-3 px-4 py-4', item.isCompleted && 'opacity-60')}>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className={cn('font-medium text-foreground', item.isCompleted && 'line-through')}>{item.title}</p>
+                    {item.category ? (
+                      <p className="text-xs capitalize text-muted">{item.category}</p>
+                    ) : null}
+                  </div>
+                  <Badge variant="outline" className="shrink-0 capitalize">{item.priority.toLowerCase()}</Badge>
+                </div>
+                {item.tags && item.tags.length > 0 ? (
+                  <div className="flex flex-wrap gap-1">
+                    {item.tags.slice(0, 3).map((tag, tagIdx) => (
+                      <Badge key={tagIdx} variant="secondary" className="text-[10px] font-normal">
+                        {tag}
+                      </Badge>
+                    ))}
+                  </div>
+                ) : null}
+                <p className="text-sm tabular-nums text-foreground">{formatRupees(item.estimatedCost || 0)}</p>
+                <div className="flex items-center gap-1">
+                  <Button variant="ghost" size="sm" className="h-8" onClick={() => openEditDialog(item)}>
+                    Edit
+                  </Button>
+                  <Button variant="ghost" size="sm" className="h-8" onClick={() => handleToggleCompleted(item)}>
+                    {item.isCompleted ? 'Undo' : 'Purchased'}
+                  </Button>
+                  <Button variant="ghost" size="sm" className="h-8 text-[var(--danger)]" onClick={() => handleDelete(item.id)}>
+                    Delete
+                  </Button>
+                </div>
+              </div>
+            ))}
+            {filteredItems.length === 0 && (
+              <p className="px-4 py-12 text-center text-sm text-muted">No wishlist items found.</p>
+            )}
+          </div>
         </section>
       </div>
 
-      <Sheet open={dialogOpen} onOpenChange={(open) => {
-        setDialogOpen(open);
-        if (!open) resetForm();
-      }}>
-        <SheetContent side="bottom" className="h-[92vh] overflow-hidden border-t border-border p-0 sm:h-auto sm:max-w-lg rounded-t-2xl">
-          <div className="flex justify-center pt-3 pb-1 sm:hidden">
-            <div className="h-1.5 w-12 rounded-full bg-muted" />
+      <ResponsiveSheet
+        open={dialogOpen}
+        onOpenChange={(open) => {
+          setDialogOpen(open);
+          if (!open) resetForm();
+        }}
+        title={editingItem ? 'Update item' : 'Add item'}
+        description="Track products you want to purchase."
+        footer={
+          <div className="flex w-full flex-col gap-3 sm:flex-row sm:justify-end">
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSubmit} disabled={isSaving} className="gap-2">
+              {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShoppingCart className="h-4 w-4" />}
+              {editingItem ? 'Update item' : 'Add item'}
+            </Button>
           </div>
-          <div className="h-full overflow-y-auto px-6 py-4 pb-32 sm:pb-6">
-            <SheetHeader className="mb-6 text-left">
-              <SheetTitle className="text-lg font-medium">{editingItem ? 'Update item' : 'Add item'}</SheetTitle>
-              <SheetDescription>Track products you want to purchase.</SheetDescription>
-            </SheetHeader>
+        }
+      >
             <div className="space-y-5">
               <div className="space-y-2">
                 <label className="text-sm font-medium text-foreground">Title</label>
@@ -489,19 +536,8 @@ export default function WishlistPageClient({ initialWishlist, userId, layoutVari
                 />
               </div>
 
-              <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:justify-end">
-                <Button variant="outline" onClick={() => setDialogOpen(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={handleSubmit} disabled={isSaving} className="gap-2">
-                  {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShoppingCart className="h-4 w-4" />}
-                  {editingItem ? 'Update item' : 'Add item'}
-                </Button>
-              </div>
             </div>
-          </div>
-        </SheetContent>
-      </Sheet>
+      </ResponsiveSheet>
     </div>
   );
 }

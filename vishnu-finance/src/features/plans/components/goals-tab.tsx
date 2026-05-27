@@ -26,7 +26,7 @@ import {
 } from 'lucide-react';
 import { normalizeGoals } from '@/lib/utils/goal-normalize';
 import FabButton from '@/components/ui/fab-button';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
+import { ResponsiveSheet } from '@/components/ui/responsive-sheet';
 
 interface GoalsPageClientProps {
   initialGoals: Goal[];
@@ -402,7 +402,7 @@ export default function GoalsPageClient({
             />
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="hidden overflow-x-auto md:block">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border bg-surface text-left text-[11px] font-medium uppercase tracking-[0.08em] text-hint">
@@ -461,27 +461,82 @@ export default function GoalsPageClient({
               </tbody>
             </table>
           </div>
+
+          <div className="divide-y divide-border md:hidden">
+            {filteredGoals.map((goal) => {
+              const progress = calculateGoalProgress(goal);
+              return (
+                <div key={goal.id} className="space-y-3 px-4 py-4">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="font-medium text-foreground">{goal.title}</p>
+                      {goal.category ? (
+                        <p className="text-xs capitalize text-muted">{goal.category}</p>
+                      ) : null}
+                    </div>
+                    <Badge variant="outline" className="shrink-0 capitalize">{goal.priority.toLowerCase()}</Badge>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Progress value={progress} className="h-1.5 flex-1" />
+                    <span className="w-8 text-right text-xs tabular-nums text-muted">{progress}%</span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs tabular-nums">
+                    <span className="text-muted">Saved {formatCurrency(goal.currentAmount)}</span>
+                    <span className="text-foreground">Target {formatCurrency(goal.targetAmount)}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button variant="ghost" size="sm" className="h-8" onClick={() => openEditDialog(goal)}>
+                      Edit
+                    </Button>
+                    <Button variant="ghost" size="sm" className="h-8 text-[var(--danger)]" onClick={() => handleDelete(goal.id)}>
+                      Delete
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+            {filteredGoals.length === 0 && (
+              <p className="px-4 py-12 text-center text-sm text-muted">No goals found.</p>
+            )}
+          </div>
         </section>
       </div>
 
 
-      <Sheet open={dialogOpen} onOpenChange={(open) => {
-        setDialogOpen(open);
-        if (!open) {
-          resetForm();
-        }
-      }}>
-        <SheetContent side="bottom" className="h-[92vh] sm:h-auto sm:max-w-lg rounded-t-2xl p-0 overflow-hidden border-t border-border">
-          <div className="flex justify-center pt-3 pb-1 sm:hidden">
-            <div className="h-1.5 w-12 rounded-full bg-muted" />
+      <ResponsiveSheet
+        open={dialogOpen}
+        onOpenChange={(open) => {
+          setDialogOpen(open);
+          if (!open) {
+            resetForm();
+          }
+        }}
+        title={editingGoal ? 'Update goal' : 'Create goal'}
+        description="Set your target amount, progress, and timeline."
+        footer={
+          <div className="flex w-full flex-col gap-3 sm:flex-row sm:justify-end">
+            <Button
+              variant="outline"
+              className="h-12 border-border bg-card text-foreground hover:bg-muted font-bold uppercase tracking-widest text-[10px]"
+              onClick={() => {
+                setDialogOpen(false);
+                resetForm();
+              }}
+              disabled={isSaving}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSubmit}
+              disabled={isSaving}
+              className="h-12 gap-2 font-bold uppercase tracking-widest text-[10px] shadow-lg shadow-primary/20"
+            >
+              {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <GoalIcon className="h-4 w-4" />}
+              {editingGoal ? 'Update goal' : 'Create goal'}
+            </Button>
           </div>
-          <div className="px-6 py-4 overflow-y-auto h-full pb-32 sm:pb-6">
-            <SheetHeader className="text-left mb-6">
-              <SheetTitle className="text-lg font-medium">{editingGoal ? 'Update goal' : 'Create goal'}</SheetTitle>
-              <SheetDescription>
-                Set your target amount, progress, and timeline.
-              </SheetDescription>
-            </SheetHeader>
+        }
+      >
             <div className="space-y-5">
               <div className="space-y-2">
                 <label className="text-sm font-medium text-foreground" htmlFor="goal-title">
@@ -582,31 +637,8 @@ export default function GoalsPageClient({
                 </Select>
               </div>
 
-              <div className="flex flex-col gap-3 sm:flex-row sm:justify-end pt-4">
-                <Button
-                  variant="outline"
-                  className="h-12 border-border bg-card text-foreground hover:bg-muted font-bold uppercase tracking-widest text-[10px]"
-                  onClick={() => {
-                    setDialogOpen(false);
-                    resetForm();
-                  }}
-                  disabled={isSaving}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleSubmit}
-                  disabled={isSaving}
-                  className="h-12 gap-2 font-bold uppercase tracking-widest text-[10px] shadow-lg shadow-primary/20"
-                >
-                  {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <GoalIcon className="h-4 w-4" />}
-                  {editingGoal ? 'Update goal' : 'Create goal'}
-                </Button>
-              </div>
             </div>
-          </div>
-        </SheetContent>
-      </Sheet>
+      </ResponsiveSheet>
     </div>
   );
 }

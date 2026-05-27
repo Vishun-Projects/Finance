@@ -179,9 +179,9 @@ export default function TransactionFormModal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 sm:p-6" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm sm:items-center sm:p-4 md:p-6" onClick={onClose}>
       <div
-        className="bg-background rounded-2xl w-full max-w-2xl max-h-[90vh] shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200"
+        className="flex max-h-[95dvh] w-full max-w-2xl flex-col overflow-hidden rounded-t-2xl bg-background shadow-2xl animate-in slide-in-from-bottom duration-200 sm:max-h-[90vh] sm:rounded-2xl sm:animate-in sm:zoom-in-95"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header - Fixed */}

@@ -106,11 +106,11 @@ export default function ParsedTransactionsReviewModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 md:p-6"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-0 md:items-center md:p-3 md:p-6"
       onClick={onClose}
     >
       <div
-        className="bg-card rounded-lg border shadow-2xl max-w-6xl w-full max-h-[92vh] overflow-hidden flex flex-col"
+        className="flex max-h-[95dvh] w-full max-w-[min(100%,72rem)] flex-col overflow-hidden rounded-t-2xl border bg-card shadow-2xl md:max-h-[92vh] md:rounded-lg"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-5 py-4 border-b flex items-start justify-between gap-4 shrink-0">

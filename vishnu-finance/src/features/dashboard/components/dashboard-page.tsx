@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useBreakpoint } from '@/hooks/use-breakpoint';
 import {
   ArrowRight,
   AlertCircle,
@@ -75,17 +76,9 @@ export default function DashboardPage({ data }: DashboardPageProps) {
   const recentTransactions = stats.recentTransactions.slice(0, 8);
   const recentActivityRef = useRef<HTMLElement>(null);
   const [recentActivityHeight, setRecentActivityHeight] = useState<number>();
-  const [isXlUp, setIsXlUp] = useState(false);
+  const isMdUp = useBreakpoint('md');
 
   useEffect(() => {
-    const media = window.matchMedia('(min-width: 1280px)');
-    const updateMatch = () => setIsXlUp(media.matches);
-    updateMatch();
-    media.addEventListener('change', updateMatch);
-    return () => media.removeEventListener('change', updateMatch);
-  }, []);
-
-  useLayoutEffect(() => {
     const element = recentActivityRef.current;
     if (!element) return;
 
@@ -120,10 +113,10 @@ export default function DashboardPage({ data }: DashboardPageProps) {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <div className="card-base p-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="card-base card-compact p-4 sm:p-4">
           <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-hint">Income</p>
-          <p className="mt-2 flex items-center gap-1.5 text-xl font-semibold tabular-nums text-[var(--success)]">
+          <p className="mt-2 flex items-center gap-1.5 text-lg font-semibold tabular-nums text-[var(--success)] sm:text-xl">
             <TrendingUp className="size-4" />
             {formatRupees(income)}
           </p>
@@ -137,7 +130,7 @@ export default function DashboardPage({ data }: DashboardPageProps) {
         </div>
         <div className="card-base p-4">
           <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-hint">Spent</p>
-          <p className="mt-2 flex items-center gap-1.5 text-xl font-semibold tabular-nums text-[var(--danger)]">
+          <p className="mt-2 flex items-center gap-1.5 text-lg font-semibold tabular-nums text-[var(--danger)] sm:text-xl">
             <TrendingDown className="size-4" />
             {formatRupees(expenses)}
           </p>
@@ -146,7 +139,7 @@ export default function DashboardPage({ data }: DashboardPageProps) {
           <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-hint">Net flow</p>
           <p
             className={cn(
-              'mt-2 flex items-center gap-1.5 text-xl font-semibold tabular-nums',
+              'mt-2 flex items-center gap-1.5 text-lg font-semibold tabular-nums sm:text-xl',
               netFlow >= 0 ? 'text-[var(--success)]' : 'text-[var(--danger)]',
             )}
           >
@@ -157,7 +150,7 @@ export default function DashboardPage({ data }: DashboardPageProps) {
         </div>
         <div className="card-base p-4">
           <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-hint">Plan adherence</p>
-          <p className="mt-2 text-xl font-semibold tabular-nums text-foreground">{combinedPlanScore}%</p>
+          <p className="mt-2 text-lg font-semibold tabular-nums text-foreground sm:text-xl">{combinedPlanScore}%</p>
           <Progress value={combinedPlanScore} className="mt-2 h-1.5" />
           <p className="mt-1 text-[10px] text-muted">
             Budget {adherence.overallScore}% · Goals{' '}
@@ -182,13 +175,13 @@ export default function DashboardPage({ data }: DashboardPageProps) {
         </div>
       )}
 
-      <div className="grid min-h-0 grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)] xl:items-start">
+      <div className="grid min-h-0 grid-cols-1 gap-4 md:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)] md:items-start">
         <PlanVsActualSection
           buckets={adherence.buckets}
           lineItems={adherence.lineItems}
           plannedTotal={adherence.plannedTotal}
           actualTotal={adherence.actualTotal}
-          maxHeight={isXlUp ? recentActivityHeight : undefined}
+          maxHeight={isMdUp ? recentActivityHeight : undefined}
           monthlyIncome={monthlyIncome}
           planBaseIncome={planBaseIncome}
           planIncomeSource={adherence.planIncomeSource}
@@ -289,8 +282,8 @@ export default function DashboardPage({ data }: DashboardPageProps) {
       </div>
 
       {stats.salaryInfo && (
-        <div className="card-base flex flex-wrap items-center justify-between gap-3 p-4">
-          <div className="flex items-center gap-2 text-sm text-foreground">
+        <div className="card-base flex flex-col gap-3 p-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+          <div className="flex min-w-0 items-start gap-2 text-sm text-foreground sm:items-center">
             <CheckCircle2 className="size-4 text-[var(--success)]" />
             <span>
               Salary: {stats.salaryInfo.jobTitle} · {stats.salaryInfo.company} · take-home{' '}

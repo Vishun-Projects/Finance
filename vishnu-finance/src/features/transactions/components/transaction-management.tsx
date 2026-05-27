@@ -19,7 +19,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import TransactionCard from './transaction-card';
 import TransactionFormModal, { TransactionFormData } from './transaction-form-modal';
 import { SettlementLinkModal, type SettlementCandidate } from './settlement-link-modal';
-import MobileHeader from './mobile-header';
 import FilterSheet from './filter-sheet';
 import QuickRangeChips, { QuickRange } from './quick-range-chips';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -144,6 +143,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
   const [showSelectionMode, setShowSelectionMode] = useState(false); // Toggle checkbox visibility
   const [isFilterOpen, setIsFilterOpen] = useState(false); // Advanced filter modal
   const [period, setPeriod] = useState<'daily' | 'weekly' | 'monthly' | 'custom'>('monthly');
+  const [mobilePanel, setMobilePanel] = useState<'list' | 'calendar' | 'breakdown'>('list');
 
 
   // PDF Import state
@@ -2057,7 +2057,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
   return (
     <div className={cn(patterns.pageFluid, 'transactions-layout-root flex flex-col pb-8 lg:pb-4')}>
 
-      <div className="mb-4 flex shrink-0 flex-wrap items-center gap-2">
+      <div className="mb-4 hidden shrink-0 flex-wrap items-center gap-2 md:flex">
         <div className="relative min-w-[160px] flex-1 basis-[200px]">
           <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-hint" />
           <Input
@@ -2101,12 +2101,46 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
         </Callout>
       )}
 
-      {/* Mobile quick actions */}
-      <div className="mb-4 flex flex-wrap gap-2 md:hidden">
-        <Button variant="outline" size="sm" onClick={() => setIsFilterOpen(true)}><Filter className="size-3.5" /></Button>
-        <Button variant="outline" size="sm" onClick={() => setShowSelectionMode(!showSelectionMode)}><CheckSquare className="size-3.5" /></Button>
-        <Button variant="outline" size="sm" onClick={openImportDialog}><FileText className="size-3.5" /></Button>
-        <Button size="sm" onClick={() => { setEditingTransaction(null); setShowForm(true); }}><Plus className="size-3.5" /></Button>
+      {/* Mobile search + quick actions */}
+      <div className="mb-4 flex flex-col gap-2 md:hidden">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-hint" />
+          <Input
+            type="text"
+            placeholder="Search transactions..."
+            className="h-9 rounded-md border-border bg-card pl-9 text-sm"
+            value={localSearch}
+            onChange={(e) => handleSearch(e.target.value)}
+          />
+        </div>
+        <NavPillGroup className="w-full justify-start overflow-x-auto">
+          {(['daily', 'weekly', 'monthly'] as const).map((p) => (
+            <NavPill key={p} label={p} active={period === p} onClick={() => handlePeriodChange(p)} />
+          ))}
+        </NavPillGroup>
+        <NavPillGroup className="w-full justify-start">
+          {(
+            [
+              ['list', 'List'],
+              ['calendar', 'Calendar'],
+              ['breakdown', 'Breakdown'],
+            ] as const
+          ).map(([panel, label]) => (
+            <NavPill
+              key={panel}
+              label={label}
+              active={mobilePanel === panel}
+              onClick={() => setMobilePanel(panel)}
+            />
+          ))}
+        </NavPillGroup>
+        <div className="flex flex-wrap gap-2">
+        <Button variant="outline" size="sm" className="btn-touch" onClick={() => setIsFilterOpen(true)}><Filter className="size-3.5" /></Button>
+        <Button variant="outline" size="sm" className="btn-touch" onClick={() => setShowSelectionMode(!showSelectionMode)}><CheckSquare className="size-3.5" /></Button>
+        <Button variant="outline" size="sm" className="btn-touch" onClick={openImportDialog}><FileText className="size-3.5" /></Button>
+        <Button variant="outline" size="sm" className="btn-touch" onClick={handleGlobalAutoCategorize} disabled={isBulkUpdating}><Sparkles className={cn('size-3.5', isBulkUpdating && 'animate-spin')} /></Button>
+        <Button size="sm" className="btn-touch" onClick={() => { setEditingTransaction(null); setShowForm(true); }}><Plus className="size-3.5" /></Button>
+        </div>
       </div>
 
       <div className={cn(patterns.cardGrid, 'mb-5 shrink-0 lg:grid-cols-4')}>
@@ -2137,7 +2171,10 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
       </div>
 
       <div className="transactions-layout-grid grid min-h-0 grid-cols-1 gap-4 lg:min-h-[28rem] lg:grid-cols-[minmax(0,1fr)_17.5rem] xl:grid-cols-[minmax(0,1fr)_19rem]">
-        <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
+        <div className={cn(
+          'flex h-full min-h-0 min-w-0 flex-col overflow-hidden',
+          mobilePanel !== 'list' && 'hidden md:flex'
+        )}>
             <section className="card-base hidden h-full min-h-0 flex-col overflow-hidden md:flex">
               <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto custom-scrollbar">
               <table className="w-full table-fixed text-left text-sm">
@@ -2250,7 +2287,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
               )}
             </section>
 
-            <div className="card-base mt-5 flex max-h-[50vh] flex-col overflow-hidden md:hidden">
+            <div className="card-base mt-5 flex min-h-[50dvh] flex-col overflow-hidden md:hidden md:mt-0">
               <div className="min-h-0 flex-1 overflow-y-auto custom-scrollbar">
               {isLoading && !transactions.length ? (
                 <div className="space-y-4 p-4">
@@ -2335,15 +2372,23 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
             </div>
         </div>
 
-        <aside className="card-base flex h-full min-h-0 w-full shrink-0 flex-col overflow-hidden">
+        <aside className={cn(
+          'card-base flex h-full min-h-0 w-full shrink-0 flex-col overflow-hidden',
+          mobilePanel === 'list' ? 'hidden md:flex' : 'flex'
+        )}>
+          <div className={cn(mobilePanel === 'breakdown' && 'hidden md:block')}>
           <SpendingCalendar
             dailySpend={dailySpend}
             formatAmount={formatAmount}
             rangeEnd={endDate || startDate}
             isLoading={isDailySpendLoading}
           />
+          </div>
 
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <div className={cn(
+            'flex min-h-0 flex-1 flex-col overflow-hidden',
+            mobilePanel === 'calendar' && 'hidden md:flex'
+          )}>
           <div className="flex shrink-0 items-center justify-between border-b border-border px-3 py-2">
             <div>
               <h2 className="text-xs font-medium text-foreground">Breakdown</h2>

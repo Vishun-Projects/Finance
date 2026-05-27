@@ -10,7 +10,7 @@ import { cn, formatRupees } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
+import { ResponsiveSheet } from '@/components/ui/responsive-sheet';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
@@ -55,7 +55,7 @@ function SalaryLineItemEditor({
   return (
     <div className="space-y-2 rounded-lg border border-border bg-surface/40 p-3">
       <label className="text-sm font-medium text-foreground">{label}</label>
-      <div className="grid grid-cols-[minmax(0,1fr)_6.5rem_auto] gap-2">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_6.5rem_auto]">
         <Input value={nameValue} onChange={(e) => onNameChange(e.target.value)} placeholder="Name" className="h-9 text-sm" />
         <Input type="number" value={amountValue} onChange={(e) => onAmountChange(e.target.value)} placeholder="₹" className="h-9 text-sm" />
         <Button type="button" onClick={onAdd} size="sm" variant="outline" className="h-9 shrink-0 px-3">Add</Button>
@@ -89,14 +89,42 @@ function BreakdownTable({
   rows: Array<{ label: string; value: string; tone?: 'default' | 'muted' | 'danger' | 'success' | 'info'; bold?: boolean }>;
 }) {
   return (
-    <table className="w-full text-sm">
-      <tbody>
+    <>
+      <table className="hidden w-full text-sm md:table">
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.label} className={cn(row.bold && 'border-t border-border')}>
+              <td className={cn('py-1.5 pr-3', row.bold ? 'font-medium text-foreground' : 'text-muted')}>{row.label}</td>
+              <td
+                className={cn(
+                  'py-1.5 text-right tabular-nums numeric',
+                  row.bold && 'font-medium',
+                  row.tone === 'danger' && 'text-[var(--danger)]',
+                  row.tone === 'success' && 'text-[var(--success)]',
+                  row.tone === 'info' && 'text-info',
+                  row.tone === 'muted' && 'text-muted',
+                  !row.tone && 'text-foreground'
+                )}
+              >
+                {row.value}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div className="space-y-2 md:hidden">
         {rows.map((row) => (
-          <tr key={row.label} className={cn(row.bold && 'border-t border-border')}>
-            <td className={cn('py-1.5 pr-3', row.bold ? 'font-medium text-foreground' : 'text-muted')}>{row.label}</td>
-            <td
+          <div
+            key={row.label}
+            className={cn(
+              'flex items-center justify-between gap-3 rounded-md border border-border bg-surface/40 px-3 py-2 text-sm',
+              row.bold && 'border-t-2'
+            )}
+          >
+            <span className={cn(row.bold ? 'font-medium text-foreground' : 'text-muted')}>{row.label}</span>
+            <span
               className={cn(
-                'py-1.5 text-right tabular-nums numeric',
+                'tabular-nums numeric',
                 row.bold && 'font-medium',
                 row.tone === 'danger' && 'text-[var(--danger)]',
                 row.tone === 'success' && 'text-[var(--success)]',
@@ -106,11 +134,11 @@ function BreakdownTable({
               )}
             >
               {row.value}
-            </td>
-          </tr>
+            </span>
+          </div>
         ))}
-      </tbody>
-    </table>
+      </div>
+    </>
   );
 }
 
@@ -492,7 +520,7 @@ export default function SalaryStructureManagement() {
 
   function renderFormSheet() {
     return (
-      <Sheet
+      <ResponsiveSheet
         open={showForm}
         onOpenChange={(open) => {
           setShowForm(open);
@@ -502,25 +530,29 @@ export default function SalaryStructureManagement() {
             resetForm();
           }
         }}
+        title={
+          editingHistoryId
+            ? 'Edit revision'
+            : editingStructure
+              ? 'Edit salary'
+              : 'Update structure'
+        }
+        description={
+          editingHistoryId
+            ? 'Update this historical salary entry.'
+            : editingStructure
+              ? 'Change the current active salary details.'
+              : 'Add a new job, revision, or promotion — keeps history intact.'
+        }
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setShowForm(false)}>Cancel</Button>
+            <Button onClick={handleSubmit}>Save</Button>
+          </>
+        }
+        contentClassName="gap-0 p-0"
       >
-        <SheetContent side="right" className="flex h-full w-full flex-col gap-0 p-0 sm:max-w-md md:max-w-lg">
-          <SheetHeader className="shrink-0 space-y-1 border-b border-border px-6 py-5 pr-12 text-left">
-            <SheetTitle className="text-lg font-medium">
-              {editingHistoryId
-                ? 'Edit revision'
-                : editingStructure
-                  ? 'Edit salary'
-                  : 'Update structure'}
-            </SheetTitle>
-            <SheetDescription>
-              {editingHistoryId
-                ? 'Update this historical salary entry.'
-                : editingStructure
-                  ? 'Change the current active salary details.'
-                  : 'Add a new job, revision, or promotion — keeps history intact.'}
-            </SheetDescription>
-          </SheetHeader>
-          <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5 custom-scrollbar">
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 custom-scrollbar md:px-6">
             <div className="mx-auto w-full max-w-md space-y-6">
               <section className="space-y-3">
                 <h4 className="text-sm font-medium text-foreground">Role</h4>
@@ -556,12 +588,7 @@ export default function SalaryStructureManagement() {
               </section>
             </div>
           </div>
-          <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border px-6 py-4">
-            <Button variant="outline" onClick={() => setShowForm(false)}>Cancel</Button>
-            <Button onClick={handleSubmit}>Save</Button>
-          </div>
-        </SheetContent>
-      </Sheet>
+      </ResponsiveSheet>
     );
   }
 
@@ -651,7 +678,9 @@ export default function SalaryStructureManagement() {
             {sortedHistory.length === 0 ? (
               <p className="text-xs text-muted">No revisions yet.</p>
             ) : (
-              <table className="w-full text-xs">
+              <>
+                <div className="hidden overflow-x-auto md:block">
+                  <table className="w-full text-xs">
                 <thead>
                   <tr className="border-b border-border text-left text-[10px] font-medium uppercase tracking-wide text-hint">
                     <th className="pb-2 pr-2">Date</th>
@@ -707,7 +736,44 @@ export default function SalaryStructureManagement() {
                     );
                   })}
                 </tbody>
-              </table>
+                  </table>
+                </div>
+
+                <div className="space-y-3 md:hidden">
+                  {sortedHistory.slice(0, 6).map((item) => {
+                    const itemAllowances = parseRecordField(item.allowances);
+                    const itemDeductions = parseRecordField(item.deductions);
+                    const itemNet =
+                      Number(item.baseSalary) / 12 +
+                      Object.values(itemAllowances).reduce((s, v) => s + v, 0) -
+                      Object.values(itemDeductions).reduce((s, v) => s + v, 0);
+                    return (
+                      <div key={item.id} className="rounded-md border border-border p-3">
+                        <div className="mb-2 flex items-center justify-between gap-2">
+                          <span className="text-xs tabular-nums text-foreground">
+                            {new Date(item.effectiveDate).toLocaleDateString('en-IN', { month: 'short', year: '2-digit' })}
+                          </span>
+                          <Badge variant="outline" className="px-1.5 py-0 text-[10px] font-normal">
+                            {formatChangeType(item.changeType)}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center justify-between text-xs tabular-nums">
+                          <span className="text-[var(--success)]">{formatRupees(itemNet)}/mo</span>
+                          <span className="text-muted">{formatRupees(Number(item.baseSalary))}/yr</span>
+                        </div>
+                        <div className="mt-2 flex items-center gap-1">
+                          <Button variant="ghost" size="sm" className="h-7" onClick={() => handleEditHistory(item)}>
+                            Edit
+                          </Button>
+                          <Button variant="ghost" size="sm" className="h-7 text-[var(--danger)]" onClick={() => handleDelete(item.salaryStructureId)}>
+                            Delete
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
             )}
             {sortedHistory.length > 6 ? (
               <p className="mt-2 text-[10px] text-muted">Showing latest 6 of {sortedHistory.length}</p>

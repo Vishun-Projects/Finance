@@ -112,7 +112,7 @@ export default function PostDetail() {
                         <span className="text-muted-foreground font-sans text-[10px] uppercase tracking-[0.2em]">Reading Mode</span>
                     </div>
                     <div className="flex items-center gap-4">
-                        <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-accent/50 rounded-full border border-border">
+                        <div className="flex flex-wrap items-center gap-2 px-3 py-1.5 bg-accent/50 rounded-full border border-border">
                             <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
                             <span className="text-[10px] font-sans font-bold uppercase tracking-wider text-foreground">Live</span>
                         </div>

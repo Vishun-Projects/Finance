@@ -101,8 +101,8 @@ export default function PlansPage({ bootstrap, userId, defaultTab = "overview" }
           subtitle="Track goals, deadlines, and wishlist items in one place."
         />
 
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-          <NavPillGroup>
+        <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <NavPillGroup className="w-full sm:w-auto">
             {TABS.map(tab => (
               <NavPill
                 key={tab}
@@ -113,7 +113,7 @@ export default function PlansPage({ bootstrap, userId, defaultTab = "overview" }
             ))}
           </NavPillGroup>
 
-          <div className="flex items-center gap-2">
+          <div className="flex w-full items-center gap-2 sm:w-auto">
             <Button variant="outline" size="sm" onClick={refreshModule} disabled={isRefreshing}>
               <RefreshCw className={cn("size-3.5 mr-2", isRefreshing && "animate-spin")} />
               Refresh

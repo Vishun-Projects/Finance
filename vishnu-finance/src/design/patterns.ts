@@ -26,6 +26,14 @@ export const patterns = {
     'rounded-t-2xl border-t max-h-[min(92vh,calc(100dvh-env(safe-area-inset-top)))] safe-bottom overflow-y-auto',
   /** Standard card list spacing for mobile table replacements */
   mobileCardList: 'space-y-3 md:hidden',
+  /** Horizontal scroll KPI strip on mobile */
+  mobileKpiStrip: 'flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
+  /** Compact KPI pill inside strip */
+  mobileKpiPill: 'min-w-[5.5rem] shrink-0 rounded-md p-2.5',
+  /** Icon-led compact list row */
+  mobileCompactRow: 'py-2.5 px-3',
+  /** Collapsible section summary row */
+  mobileSectionCollapse: 'border-t border-border',
 } as const;
 
 export function pattern(name: keyof typeof patterns, className?: string) {

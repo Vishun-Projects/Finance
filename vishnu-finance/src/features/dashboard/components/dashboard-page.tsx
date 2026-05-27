@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { useBreakpoint } from '@/hooks/use-breakpoint';
 import {
   ArrowRight,
   AlertCircle,
@@ -24,6 +23,9 @@ import { PlanVsActualSection } from '@/features/dashboard/components/plan-vs-act
 import type { GoalAdherence } from '@/lib/plan-adherence-service';
 import { cn, formatRupees } from '@/lib/utils';
 import { getTransactionDisplayName } from '@/lib/transaction-utils';
+import { MobileHeroMetric } from '@/components/ui/mobile-kpi-strip';
+import { NavPill, NavPillGroup } from '@/components/ui/nav-pill';
+import { useBreakpoint } from '@/hooks/use-breakpoint';
 
 interface DashboardPageProps {
   data: DashboardBootstrap;
@@ -73,10 +75,13 @@ export default function DashboardPage({ data }: DashboardPageProps) {
       .map((goal) => `Goal behind pace: ${goal.name}`),
   ];
 
-  const recentTransactions = stats.recentTransactions.slice(0, 8);
+  const isMdUp = useBreakpoint('md');
+  const mobileAlerts = alerts.slice(0, isMdUp ? 4 : 2);
+  const mobileGoals = adherence.goals.slice(0, isMdUp ? 5 : 3);
+  const recentTransactions = stats.recentTransactions.slice(0, isMdUp ? 8 : 4);
   const recentActivityRef = useRef<HTMLElement>(null);
   const [recentActivityHeight, setRecentActivityHeight] = useState<number>();
-  const isMdUp = useBreakpoint('md');
+  const [mobileView, setMobileView] = useState<'summary' | 'plan' | 'activity'>('summary');
 
   useEffect(() => {
     const element = recentActivityRef.current;
@@ -93,14 +98,14 @@ export default function DashboardPage({ data }: DashboardPageProps) {
   }, [adherence.goals.length, recentTransactions.length]);
 
   return (
-    <div className={cn(patterns.pageFluid, 'flex flex-col gap-5 pb-8')}>
+    <div className={cn(patterns.pageFluid, 'flex flex-col gap-5 max-md:gap-3 pb-8')}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-hint">Dashboard</p>
-          <h1 className="text-xl font-semibold text-foreground">{adherence.monthLabel}</h1>
-          <p className="text-xs text-muted">Live transactions vs your phase plan and goals</p>
+          <p className="max-md:hidden text-[11px] font-medium uppercase tracking-[0.08em] text-hint">Dashboard</p>
+          <h1 className="text-xl font-semibold text-foreground max-md:text-lg">{adherence.monthLabel}</h1>
+          <p className="max-md:hidden text-xs text-muted">Live transactions vs your phase plan and goals</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 max-md:hidden">
           <Button variant="outline" size="sm" asChild>
             <Link href="/phase-plan">Phase plan</Link>
           </Button>
@@ -113,7 +118,31 @@ export default function DashboardPage({ data }: DashboardPageProps) {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <MobileHeroMetric
+        label="Net flow"
+        value={`${netFlow >= 0 ? '+' : ''}${formatRupees(netFlow)}`}
+        tone={netFlow >= 0 ? 'success' : 'danger'}
+        subtitle={
+          <span>
+            Income {formatRupees(income)} · Spent {formatRupees(expenses)}
+          </span>
+        }
+        footer={
+          <div>
+            <div className="mb-1 flex items-center justify-between text-[10px] text-muted">
+              <span>Plan adherence {combinedPlanScore}%</span>
+              <span>
+                {adherence.activeGoals > 0
+                  ? `${adherence.goalsOnTrack}/${adherence.activeGoals} goals on track`
+                  : 'No goals set'}
+              </span>
+            </div>
+            <Progress value={combinedPlanScore} className="h-1.5" />
+          </div>
+        }
+      />
+
+      <div className="hidden grid-cols-2 gap-3 sm:grid-cols-2 md:grid lg:grid-cols-4">
         <div className="card-base card-compact p-4 sm:p-4">
           <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-hint">Income</p>
           <p className="mt-2 flex items-center gap-1.5 text-lg font-semibold tabular-nums text-[var(--success)] sm:text-xl">
@@ -121,7 +150,7 @@ export default function DashboardPage({ data }: DashboardPageProps) {
             {formatRupees(income)}
           </p>
           {incomeBreakdown && incomeBreakdown.total > 0 && (
-            <p className="mt-1 text-[10px] text-muted">
+            <p className="mt-1 hidden text-[10px] text-muted md:block">
               Salary {formatRupees(incomeBreakdown.salary)}
               {incomeBreakdown.family > 0 ? ` · Family ${formatRupees(incomeBreakdown.family)}` : ''}
               {incomeBreakdown.other > 0 ? ` · Other ${formatRupees(incomeBreakdown.other)}` : ''}
@@ -152,7 +181,7 @@ export default function DashboardPage({ data }: DashboardPageProps) {
           <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-hint">Plan adherence</p>
           <p className="mt-2 text-lg font-semibold tabular-nums text-foreground sm:text-xl">{combinedPlanScore}%</p>
           <Progress value={combinedPlanScore} className="mt-2 h-1.5" />
-          <p className="mt-1 text-[10px] text-muted">
+          <p className="mt-1 hidden text-[10px] text-muted md:block">
             Budget {adherence.overallScore}% · Goals{' '}
             {adherence.activeGoals > 0
               ? `${adherence.goalsOnTrack}/${adherence.activeGoals} on track`
@@ -161,21 +190,37 @@ export default function DashboardPage({ data }: DashboardPageProps) {
         </div>
       </div>
 
-      {alerts.length > 0 && (
-        <div className="card-base border-[var(--warning)]/30 bg-[var(--warning)]/5 p-4">
+      {mobileAlerts.length > 0 && (
+        <div className={cn(
+          'card-base border-[var(--warning)]/30 bg-[var(--warning)]/5 p-4 max-md:p-3',
+          mobileView !== 'summary' && 'max-md:hidden'
+        )}>
           <div className="mb-2 flex items-center gap-2 text-sm font-medium text-foreground">
             <AlertCircle className="size-4 text-[var(--warning)]" />
             Needs attention
           </div>
           <ul className="space-y-1 text-xs text-muted">
-            {alerts.slice(0, 4).map((alert) => (
+            {mobileAlerts.map((alert) => (
               <li key={alert}>{alert}</li>
             ))}
           </ul>
         </div>
       )}
 
+      <NavPillGroup className="w-full justify-start md:hidden">
+        {(
+          [
+            ['summary', 'Summary'],
+            ['plan', 'Plan'],
+            ['activity', 'Activity'],
+          ] as const
+        ).map(([view, label]) => (
+          <NavPill key={view} label={label} active={mobileView === view} onClick={() => setMobileView(view)} />
+        ))}
+      </NavPillGroup>
+
       <div className="grid min-h-0 grid-cols-1 gap-4 md:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)] md:items-start">
+        <div className={cn(mobileView !== 'plan' && 'max-md:hidden')}>
         <PlanVsActualSection
           buckets={adherence.buckets}
           lineItems={adherence.lineItems}
@@ -187,9 +232,10 @@ export default function DashboardPage({ data }: DashboardPageProps) {
           planIncomeSource={adherence.planIncomeSource}
           incomeBreakdown={incomeBreakdown}
         />
+        </div>
 
         <div className="flex flex-col gap-4">
-          <section className="card-base shrink-0 p-4">
+          <section className={cn('card-base shrink-0 p-4 max-md:p-3', mobileView !== 'activity' && 'max-md:hidden')}>
             <div className="mb-3 flex items-center justify-between gap-2">
               <div>
                 <h2 className="text-sm font-medium text-foreground">Goals tracker</h2>
@@ -206,7 +252,7 @@ export default function DashboardPage({ data }: DashboardPageProps) {
               <p className="text-xs text-muted">No active goals yet. Add goals on the Plans page.</p>
             ) : (
               <div className="space-y-3">
-                {adherence.goals.slice(0, 5).map((goal) => (
+                {mobileGoals.map((goal) => (
                   <div key={goal.id} className="rounded-md border border-border bg-surface/40 p-3">
                     <div className="mb-1.5 flex items-start justify-between gap-2">
                       <div className="min-w-0">
@@ -221,7 +267,7 @@ export default function DashboardPage({ data }: DashboardPageProps) {
                     </div>
                     <Progress value={goal.progressPercent} className="h-1.5" />
                     {goal.targetDate ? (
-                      <p className="mt-1 text-[10px] text-muted">Target {format(new Date(goal.targetDate), 'd MMM yyyy')}</p>
+                      <p className="mt-1 hidden text-[10px] text-muted md:block">Target {format(new Date(goal.targetDate), 'd MMM yyyy')}</p>
                     ) : null}
                   </div>
                 ))}
@@ -229,7 +275,10 @@ export default function DashboardPage({ data }: DashboardPageProps) {
             )}
           </section>
 
-          <section ref={recentActivityRef} className="card-base p-4">
+          <section
+            ref={recentActivityRef}
+            className={cn('card-base p-4 max-md:p-3', mobileView !== 'activity' && 'max-md:hidden md:block')}
+          >
             <div className="mb-3 flex items-center justify-between gap-2">
               <div>
                 <h2 className="text-sm font-medium text-foreground">Recent activity</h2>

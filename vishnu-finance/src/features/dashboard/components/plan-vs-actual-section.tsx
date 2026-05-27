@@ -31,11 +31,11 @@ function progressClass(status: BucketAdherence['status']) {
 
 function BucketRow({ bucket }: { bucket: BucketAdherence }) {
   return (
-    <div>
-      <div className="mb-1.5 flex items-center justify-between gap-2 text-xs">
+    <div className="max-md:space-y-1">
+      <div className="mb-1.5 flex items-center justify-between gap-2 text-xs max-md:mb-1">
         <div className="flex min-w-0 items-center gap-2">
           <span className="font-medium text-foreground">{bucket.label}</span>
-          <Badge variant="outline" className="px-1.5 py-0 text-[10px] font-normal">
+          <Badge variant="outline" className="max-md:hidden px-1.5 py-0 text-[10px] font-normal md:inline-flex">
             {bucketStatusLabel(bucket.status)}
           </Badge>
         </div>
@@ -44,7 +44,7 @@ function BucketRow({ bucket }: { bucket: BucketAdherence }) {
         </span>
       </div>
       <Progress value={Math.min(100, bucket.percentUsed)} className={progressClass(bucket.status)} />
-      <p className="mt-1 text-[10px] text-muted">
+      <p className="mt-1 hidden text-[10px] text-muted md:block">
         {bucket.status === 'over'
           ? `${formatRupees(bucket.actual - bucket.planned)} over plan`
           : `${formatRupees(bucket.remaining)} remaining`}
@@ -104,7 +104,7 @@ function LineItemRow({
         </div>
       </div>
       <Progress value={Math.min(100, item.percentUsed)} className={progressClass(item.status)} />
-      <p className="mt-1 text-[10px] text-muted">
+      <p className="mt-1 hidden text-[10px] text-muted md:block">
         {item.actual === 0
           ? `${formatRupees(item.planned)} planned · tap to inspect`
           : item.status === 'over'
@@ -146,17 +146,19 @@ export function PlanVsActualSection({
   const router = useRouter();
   const totalDelta = actualTotal - plannedTotal;
   const [selectedLineItem, setSelectedLineItem] = useState<LineItemAdherence | null>(null);
+  const [showAllBreakdown, setShowAllBreakdown] = useState(false);
+  const visibleLineItems = showAllBreakdown ? lineItems : lineItems.slice(0, 5);
 
   return (
     <>
       <section
-        className="card-base flex min-h-0 flex-col overflow-hidden p-4"
+        className="card-base flex min-h-0 flex-col overflow-hidden p-4 max-md:max-h-[45dvh] max-md:p-3"
         style={maxHeight ? { maxHeight: `${maxHeight}px` } : undefined}
       >
-        <div className="mb-4 flex shrink-0 items-center justify-between gap-2">
+        <div className="mb-4 flex shrink-0 items-center justify-between gap-2 max-md:mb-2">
           <div>
             <h2 className="text-sm font-medium text-foreground">Monthly plan vs actual</h2>
-            <p className="text-[10px] text-muted">
+            <p className="max-md:hidden text-[10px] text-muted">
               Budget scaled to {formatRupees(planBaseIncome)} take-home ({planIncomeSourceLabel(planIncomeSource)})
             </p>
           </div>
@@ -169,7 +171,7 @@ export function PlanVsActualSection({
         </div>
 
         <Tabs defaultValue="overview" className="flex min-h-0 w-full flex-1 flex-col">
-          <TabsList className="mb-4 h-8 w-full shrink-0 justify-start bg-surface">
+          <TabsList className="mb-4 h-8 w-full shrink-0 justify-start bg-surface max-md:mb-2 max-md:h-7">
             <TabsTrigger value="overview" className="h-7 px-3 text-xs">
               Overview
             </TabsTrigger>
@@ -179,7 +181,7 @@ export function PlanVsActualSection({
           </TabsList>
 
           <TabsContent value="overview" className="mt-0 flex min-h-0 flex-1 flex-col data-[state=inactive]:hidden">
-            <div className="custom-scrollbar min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
+            <div className="custom-scrollbar min-h-0 flex-1 space-y-4 overflow-y-auto pr-1 max-md:space-y-2">
               {buckets.map((bucket) => (
                 <BucketRow key={bucket.key} bucket={bucket} />
               ))}
@@ -189,7 +191,7 @@ export function PlanVsActualSection({
           <TabsContent value="breakdown" className="mt-0 flex min-h-0 flex-1 flex-col data-[state=inactive]:hidden">
             <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto pr-1">
               <div className="divide-y divide-border">
-                {lineItems.map((item) => (
+                {visibleLineItems.map((item) => (
                   <LineItemRow
                     key={item.label}
                     item={item}
@@ -197,6 +199,17 @@ export function PlanVsActualSection({
                   />
                 ))}
               </div>
+              {lineItems.length > 5 && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="mt-2 h-8 w-full text-xs md:hidden"
+                  onClick={() => setShowAllBreakdown((v) => !v)}
+                >
+                  {showAllBreakdown ? 'Show less' : `Show all ${lineItems.length} items`}
+                </Button>
+              )}
             </div>
             <div className="mt-3 flex shrink-0 items-center justify-between border-t-2 border-foreground pt-3">
               <span className="text-xs font-medium text-foreground">Total</span>
@@ -213,7 +226,7 @@ export function PlanVsActualSection({
               </span>
             </div>
             {monthlyIncome > plannedTotal && (
-              <p className="mt-2 shrink-0 text-[10px] text-muted">
+              <p className="mt-2 hidden shrink-0 text-[10px] text-muted md:block">
                 Plan allocates {formatRupees(plannedTotal)} of {formatRupees(monthlyIncome)} received this month
                 {incomeBreakdown && incomeBreakdown.family > 0
                   ? ` (salary ${formatRupees(incomeBreakdown.salary)} + family ${formatRupees(incomeBreakdown.family)}`
@@ -225,14 +238,14 @@ export function PlanVsActualSection({
               </p>
             )}
             {monthlyIncome <= plannedTotal && planBaseIncome > 0 && (
-              <p className="mt-2 shrink-0 text-[10px] text-muted">
+              <p className="mt-2 hidden shrink-0 text-[10px] text-muted md:block">
                 Plan targets {formatRupees(plannedTotal)} based on {formatRupees(planBaseIncome)} take-home.
                 {monthlyIncome < plannedTotal
                   ? ` Received ${formatRupees(monthlyIncome)} so far this month.`
                   : ''}
               </p>
             )}
-            <p className="mt-2 shrink-0 text-[10px] text-muted">
+            <p className="mt-2 hidden shrink-0 text-[10px] text-muted md:block">
               Tap any row to see the transactions behind it. Lend money to a friend and got it back?
               Link both transactions so only the net counts.
             </p>

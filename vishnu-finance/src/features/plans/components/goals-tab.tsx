@@ -17,6 +17,7 @@ import { cn } from '@/lib/utils';
 import {
   ArrowUpRight,
   CheckCircle,
+  Filter,
   Goal as GoalIcon,
   Loader2,
   Plus,
@@ -25,7 +26,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { normalizeGoals } from '@/lib/utils/goal-normalize';
-import FabButton from '@/components/ui/fab-button';
+import { CompactListRow } from '@/components/ui/compact-list-row';
 import { ResponsiveSheet } from '@/components/ui/responsive-sheet';
 
 interface GoalsPageClientProps {
@@ -78,6 +79,8 @@ export default function GoalsPageClient({
   const [statusFilter, setStatusFilter] = useState<'all' | GoalStatus>('all');
   const [priorityFilter, setPriorityFilter] = useState<'all' | GoalPriority>('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [actionGoal, setActionGoal] = useState<Goal | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
   const [formState, setFormState] = useState<GoalFormState>({
@@ -348,14 +351,6 @@ export default function GoalsPageClient({
           </div>
         )}
 
-        {/* Mobile FAB */}
-        <FabButton
-          label="New Goal"
-          icon={<Plus className="h-5 w-5" />}
-          onClick={openCreateDialog}
-          className="bg-primary text-primary-foreground"
-        />
-
         {!isEmbedded ? (
           <section className={cn(patterns.cardGrid, 'lg:grid-cols-4')}>
             <div className="card-base p-4">
@@ -380,26 +375,63 @@ export default function GoalsPageClient({
         ) : null}
 
         <section className="card-base overflow-hidden">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
-            <div className="flex flex-wrap gap-1">
-              {STATUS_FILTERS.map((s) => (
-                <Button
-                  key={s}
-                  variant={statusFilter === s ? 'default' : 'ghost'}
-                  size="sm"
-                  className="h-8 capitalize"
-                  onClick={() => setStatusFilter(s)}
-                >
-                  {s === 'all' ? 'All' : s.toLowerCase()}
-                </Button>
-              ))}
+          <div className="border-b border-border px-4 py-3">
+            <div className="hidden flex-wrap items-center justify-between gap-3 md:flex">
+              <div className="flex flex-wrap gap-1">
+                {STATUS_FILTERS.map((s) => (
+                  <Button
+                    key={s}
+                    variant={statusFilter === s ? 'default' : 'ghost'}
+                    size="sm"
+                    className="h-8 capitalize"
+                    onClick={() => setStatusFilter(s)}
+                  >
+                    {s === 'all' ? 'All' : s.toLowerCase()}
+                  </Button>
+                ))}
+              </div>
+              <Input
+                placeholder="Search goals…"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="h-9 w-full max-w-xs"
+              />
             </div>
-            <Input
-              placeholder="Search goals…"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="h-9 w-full max-w-xs"
-            />
+            <div className="md:hidden">
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 gap-1.5"
+                  onClick={() => setMobileFiltersOpen((v) => !v)}
+                >
+                  <Filter className="size-3.5" />
+                  Filter
+                </Button>
+                <Input
+                  placeholder="Search goals…"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="h-8 flex-1"
+                />
+              </div>
+              {mobileFiltersOpen && (
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {STATUS_FILTERS.map((s) => (
+                    <Button
+                      key={s}
+                      variant={statusFilter === s ? 'default' : 'ghost'}
+                      size="sm"
+                      className="h-8 capitalize"
+                      onClick={() => setStatusFilter(s)}
+                    >
+                      {s === 'all' ? 'All' : s.toLowerCase()}
+                    </Button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="hidden overflow-x-auto md:block">
@@ -466,33 +498,18 @@ export default function GoalsPageClient({
             {filteredGoals.map((goal) => {
               const progress = calculateGoalProgress(goal);
               return (
-                <div key={goal.id} className="space-y-3 px-4 py-4">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="font-medium text-foreground">{goal.title}</p>
-                      {goal.category ? (
-                        <p className="text-xs capitalize text-muted">{goal.category}</p>
-                      ) : null}
-                    </div>
-                    <Badge variant="outline" className="shrink-0 capitalize">{goal.priority.toLowerCase()}</Badge>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Progress value={progress} className="h-1.5 flex-1" />
-                    <span className="w-8 text-right text-xs tabular-nums text-muted">{progress}%</span>
-                  </div>
-                  <div className="flex items-center justify-between text-xs tabular-nums">
-                    <span className="text-muted">Saved {formatCurrency(goal.currentAmount)}</span>
-                    <span className="text-foreground">Target {formatCurrency(goal.targetAmount)}</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Button variant="ghost" size="sm" className="h-8" onClick={() => openEditDialog(goal)}>
-                      Edit
-                    </Button>
-                    <Button variant="ghost" size="sm" className="h-8 text-[var(--danger)]" onClick={() => handleDelete(goal.id)}>
-                      Delete
-                    </Button>
-                  </div>
-                </div>
+                <CompactListRow
+                  key={goal.id}
+                  icon={<Target className="size-4 text-muted" />}
+                  title={goal.title}
+                  subtitle={goal.category ? goal.category : undefined}
+                  trailing={
+                    <span className="text-xs text-muted">
+                      {progress}% · {formatCurrency(goal.currentAmount)}/{formatCurrency(goal.targetAmount)}
+                    </span>
+                  }
+                  onClick={() => setActionGoal(goal)}
+                />
               );
             })}
             {filteredGoals.length === 0 && (
@@ -502,6 +519,45 @@ export default function GoalsPageClient({
         </section>
       </div>
 
+      <ResponsiveSheet
+        open={!!actionGoal}
+        onOpenChange={(open) => !open && setActionGoal(null)}
+        title={actionGoal?.title ?? 'Goal'}
+        footer={
+          <div className="flex w-full gap-2">
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() => {
+                if (actionGoal) openEditDialog(actionGoal);
+                setActionGoal(null);
+              }}
+            >
+              Edit
+            </Button>
+            <Button
+              variant="outline"
+              className="flex-1 text-[var(--danger)]"
+              onClick={() => {
+                if (actionGoal) handleDelete(actionGoal.id);
+                setActionGoal(null);
+              }}
+            >
+              Delete
+            </Button>
+          </div>
+        }
+      >
+        {actionGoal && (
+          <div className="space-y-2 text-sm">
+            <p className="text-muted">
+              {calculateGoalProgress(actionGoal)}% · {formatCurrency(actionGoal.currentAmount)} of{' '}
+              {formatCurrency(actionGoal.targetAmount)}
+            </p>
+            <Badge variant="outline" className="capitalize">{actionGoal.priority.toLowerCase()}</Badge>
+          </div>
+        )}
+      </ResponsiveSheet>
 
       <ResponsiveSheet
         open={dialogOpen}

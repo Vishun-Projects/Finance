@@ -15,13 +15,14 @@ import {
   AlarmClock,
   Calendar,
   CheckCircle,
+  Filter,
   Loader2,
   Plus,
   RefreshCw,
   Repeat,
   Trash2,
 } from 'lucide-react';
-import FabButton from '@/components/ui/fab-button';
+import { CompactListRow } from '@/components/ui/compact-list-row';
 import { ResponsiveSheet } from '@/components/ui/responsive-sheet';
 
 interface DeadlinesPageClientProps {
@@ -82,6 +83,8 @@ export default function DeadlinesPageClient({ initialDeadlines, userId, layoutVa
   const [deadlines, setDeadlines] = useState<Deadline[]>(initialDeadlines.data);
   const [statusFilter, setStatusFilter] = useState<'all' | 'PENDING' | 'OVERDUE' | 'PAID' | 'SKIPPED'>('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [actionDeadline, setActionDeadline] = useState<Deadline | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingDeadline, setEditingDeadline] = useState<Deadline | null>(null);
@@ -343,14 +346,6 @@ export default function DeadlinesPageClient({ initialDeadlines, userId, layoutVa
           </div>
         )}
 
-        {/* Mobile FAB */}
-        <FabButton
-          label="New Deadline"
-          icon={<Plus className="h-5 w-5" />}
-          onClick={openCreateDialog}
-          className="bg-primary text-primary-foreground"
-        />
-
         {!isEmbedded ? (
           <section className={cn(patterns.cardGrid, 'lg:grid-cols-4')}>
             <div className="card-base p-4">
@@ -377,26 +372,63 @@ export default function DeadlinesPageClient({ initialDeadlines, userId, layoutVa
         ) : null}
 
         <section className="card-base overflow-hidden">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
-            <div className="flex flex-wrap gap-1">
-              {STATUS_FILTERS.map((s) => (
-                <Button
-                  key={s}
-                  variant={statusFilter === s ? 'default' : 'ghost'}
-                  size="sm"
-                  className="h-8 capitalize"
-                  onClick={() => setStatusFilter(s)}
-                >
-                  {s === 'all' ? 'All' : s.toLowerCase()}
-                </Button>
-              ))}
+          <div className="border-b border-border px-4 py-3">
+            <div className="hidden flex-wrap items-center justify-between gap-3 md:flex">
+              <div className="flex flex-wrap gap-1">
+                {STATUS_FILTERS.map((s) => (
+                  <Button
+                    key={s}
+                    variant={statusFilter === s ? 'default' : 'ghost'}
+                    size="sm"
+                    className="h-8 capitalize"
+                    onClick={() => setStatusFilter(s)}
+                  >
+                    {s === 'all' ? 'All' : s.toLowerCase()}
+                  </Button>
+                ))}
+              </div>
+              <Input
+                placeholder="Search deadlines…"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="h-9 w-full max-w-xs"
+              />
             </div>
-            <Input
-              placeholder="Search deadlines…"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="h-9 w-full max-w-xs"
-            />
+            <div className="md:hidden">
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 gap-1.5"
+                  onClick={() => setMobileFiltersOpen((v) => !v)}
+                >
+                  <Filter className="size-3.5" />
+                  Filter
+                </Button>
+                <Input
+                  placeholder="Search deadlines…"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="h-8 flex-1"
+                />
+              </div>
+              {mobileFiltersOpen && (
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {STATUS_FILTERS.map((s) => (
+                    <Button
+                      key={s}
+                      variant={statusFilter === s ? 'default' : 'ghost'}
+                      size="sm"
+                      className="h-8 capitalize"
+                      onClick={() => setStatusFilter(s)}
+                    >
+                      {s === 'all' ? 'All' : s.toLowerCase()}
+                    </Button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="hidden overflow-x-auto md:block">
@@ -492,44 +524,24 @@ export default function DeadlinesPageClient({ initialDeadlines, userId, layoutVa
               const isOverdue = statusMeta.status === 'OVERDUE';
 
               return (
-                <div key={deadline.id} className="space-y-3 px-4 py-4">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="font-medium text-foreground">{deadline.title}</p>
-                      {deadline.category ? (
-                        <p className="text-xs capitalize text-muted">{deadline.category}</p>
-                      ) : null}
+                <CompactListRow
+                  key={deadline.id}
+                  icon={<AlarmClock className="size-4 text-muted" />}
+                  title={deadline.title}
+                  subtitle={`Due ${toLocalDate(deadline.dueDate)}`}
+                  trailing={
+                    <div className="text-right">
+                      <p className="text-xs font-medium tabular-nums text-foreground">{formatCurrency(deadline.amount)}</p>
+                      <span
+                        className={cn(
+                          'inline-block size-2 rounded-full',
+                          isOverdue ? 'bg-[var(--danger)]' : 'bg-[var(--success)]'
+                        )}
+                      />
                     </div>
-                    <Badge
-                      variant={statusMeta.tone === 'destructive' ? 'destructive' : 'outline'}
-                      className="shrink-0 capitalize"
-                    >
-                      {statusMeta.label}
-                    </Badge>
-                  </div>
-                  <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-                    <span className="text-muted">Due {toLocalDate(deadline.dueDate)}</span>
-                    <span className={cn(isOverdue ? 'text-[var(--danger)]' : 'text-muted')}>
-                      {isOverdue
-                        ? `${Math.abs(daysLeft)} days overdue`
-                        : daysLeft > 0
-                          ? `${daysLeft} days left`
-                          : 'Due today'}
-                    </span>
-                  </div>
-                  <p className="text-sm tabular-nums text-foreground">{formatCurrency(deadline.amount)}</p>
-                  <div className="flex items-center gap-1">
-                    <Button variant="ghost" size="sm" className="h-8" onClick={() => openEditDialog(deadline)}>
-                      Edit
-                    </Button>
-                    <Button variant="ghost" size="sm" className="h-8" onClick={() => handleToggleCompleted(deadline)}>
-                      {deadline.isCompleted ? 'Undo' : 'Complete'}
-                    </Button>
-                    <Button variant="ghost" size="sm" className="h-8 text-[var(--danger)]" onClick={() => handleDelete(deadline.id)}>
-                      Delete
-                    </Button>
-                  </div>
-                </div>
+                  }
+                  onClick={() => setActionDeadline(deadline)}
+                />
               );
             })}
             {filteredDeadlines.length === 0 && (
@@ -538,6 +550,51 @@ export default function DeadlinesPageClient({ initialDeadlines, userId, layoutVa
           </div>
         </section>
       </div>
+
+      <ResponsiveSheet
+        open={!!actionDeadline}
+        onOpenChange={(open) => !open && setActionDeadline(null)}
+        title={actionDeadline?.title ?? 'Deadline'}
+        footer={
+          <div className="flex w-full flex-col gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (actionDeadline) openEditDialog(actionDeadline);
+                setActionDeadline(null);
+              }}
+            >
+              Edit
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (actionDeadline) handleToggleCompleted(actionDeadline);
+                setActionDeadline(null);
+              }}
+            >
+              {actionDeadline?.isCompleted ? 'Mark pending' : 'Mark complete'}
+            </Button>
+            <Button
+              variant="outline"
+              className="text-[var(--danger)]"
+              onClick={() => {
+                if (actionDeadline) handleDelete(actionDeadline.id);
+                setActionDeadline(null);
+              }}
+            >
+              Delete
+            </Button>
+          </div>
+        }
+      >
+        {actionDeadline && (
+          <div className="space-y-2 text-sm">
+            <p className="text-muted">Due {toLocalDate(actionDeadline.dueDate)}</p>
+            <p className="tabular-nums">{formatCurrency(actionDeadline.amount)}</p>
+          </div>
+        )}
+      </ResponsiveSheet>
 
       <ResponsiveSheet
         open={dialogOpen}

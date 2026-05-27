@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import {
+  Filter,
   Plus,
   RefreshCw,
   ShoppingCart,
@@ -25,7 +26,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import FabButton from '@/components/ui/fab-button';
+import { CompactListRow } from '@/components/ui/compact-list-row';
 import { ResponsiveSheet } from '@/components/ui/responsive-sheet';
 
 import { WishlistPriority, WishlistItem, WishlistResponse } from '@/features/plans/types';
@@ -46,6 +47,8 @@ export default function WishlistPageClient({ initialWishlist, userId, layoutVari
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<WishlistItem | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [actionItem, setActionItem] = useState<WishlistItem | null>(null);
   const [statusFilter, setStatusFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
 
@@ -286,13 +289,6 @@ export default function WishlistPageClient({ initialWishlist, userId, layoutVari
           </div>
         )}
 
-        <FabButton
-          label="Add item"
-          icon={<Plus className="h-5 w-5" />}
-          onClick={openCreateDialog}
-          className="bg-primary text-primary-foreground"
-        />
-
         {!isEmbedded ? (
           <section className={cn(patterns.cardGrid, 'lg:grid-cols-4')}>
             <div className="card-base p-4">
@@ -315,26 +311,63 @@ export default function WishlistPageClient({ initialWishlist, userId, layoutVari
         ) : null}
 
         <section className="card-base overflow-hidden">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
-            <div className="flex flex-wrap gap-1">
-              {(['all', 'pending', 'completed'] as const).map((s) => (
-                <Button
-                  key={s}
-                  variant={statusFilter === s ? 'default' : 'ghost'}
-                  size="sm"
-                  className="h-8 capitalize"
-                  onClick={() => setStatusFilter(s)}
-                >
-                  {s}
-                </Button>
-              ))}
+          <div className="border-b border-border px-4 py-3">
+            <div className="hidden flex-wrap items-center justify-between gap-3 md:flex">
+              <div className="flex flex-wrap gap-1">
+                {(['all', 'pending', 'completed'] as const).map((s) => (
+                  <Button
+                    key={s}
+                    variant={statusFilter === s ? 'default' : 'ghost'}
+                    size="sm"
+                    className="h-8 capitalize"
+                    onClick={() => setStatusFilter(s)}
+                  >
+                    {s}
+                  </Button>
+                ))}
+              </div>
+              <Input
+                placeholder="Search wishlist…"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="h-9 w-full max-w-xs"
+              />
             </div>
-            <Input
-              placeholder="Search wishlist…"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="h-9 w-full max-w-xs"
-            />
+            <div className="md:hidden">
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 gap-1.5"
+                  onClick={() => setMobileFiltersOpen((v) => !v)}
+                >
+                  <Filter className="size-3.5" />
+                  Filter
+                </Button>
+                <Input
+                  placeholder="Search wishlist…"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="h-8 flex-1"
+                />
+              </div>
+              {mobileFiltersOpen && (
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {(['all', 'pending', 'completed'] as const).map((s) => (
+                    <Button
+                      key={s}
+                      variant={statusFilter === s ? 'default' : 'ghost'}
+                      size="sm"
+                      className="h-8 capitalize"
+                      onClick={() => setStatusFilter(s)}
+                    >
+                      {s}
+                    </Button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="hidden overflow-x-auto md:block">
@@ -410,38 +443,31 @@ export default function WishlistPageClient({ initialWishlist, userId, layoutVari
 
           <div className="divide-y divide-border md:hidden">
             {filteredItems.map((item) => (
-              <div key={item.id} className={cn('space-y-3 px-4 py-4', item.isCompleted && 'opacity-60')}>
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className={cn('font-medium text-foreground', item.isCompleted && 'line-through')}>{item.title}</p>
-                    {item.category ? (
-                      <p className="text-xs capitalize text-muted">{item.category}</p>
-                    ) : null}
+              <CompactListRow
+                key={item.id}
+                icon={<ShoppingCart className="size-4 text-muted" />}
+                title={item.title}
+                subtitle={item.category ?? undefined}
+                trailing={
+                  <div className="text-right">
+                    <p className={cn('text-xs font-medium tabular-nums', item.isCompleted && 'line-through opacity-60')}>
+                      {formatRupees(item.estimatedCost || 0)}
+                    </p>
+                    <span
+                      className={cn(
+                        'inline-block size-2 rounded-full',
+                        item.priority === 'HIGH' || item.priority === 'CRITICAL'
+                          ? 'bg-[var(--danger)]'
+                          : item.priority === 'MEDIUM'
+                            ? 'bg-[var(--warning)]'
+                            : 'bg-muted'
+                      )}
+                    />
                   </div>
-                  <Badge variant="outline" className="shrink-0 capitalize">{item.priority.toLowerCase()}</Badge>
-                </div>
-                {item.tags && item.tags.length > 0 ? (
-                  <div className="flex flex-wrap gap-1">
-                    {item.tags.slice(0, 3).map((tag, tagIdx) => (
-                      <Badge key={tagIdx} variant="secondary" className="text-[10px] font-normal">
-                        {tag}
-                      </Badge>
-                    ))}
-                  </div>
-                ) : null}
-                <p className="text-sm tabular-nums text-foreground">{formatRupees(item.estimatedCost || 0)}</p>
-                <div className="flex items-center gap-1">
-                  <Button variant="ghost" size="sm" className="h-8" onClick={() => openEditDialog(item)}>
-                    Edit
-                  </Button>
-                  <Button variant="ghost" size="sm" className="h-8" onClick={() => handleToggleCompleted(item)}>
-                    {item.isCompleted ? 'Undo' : 'Purchased'}
-                  </Button>
-                  <Button variant="ghost" size="sm" className="h-8 text-[var(--danger)]" onClick={() => handleDelete(item.id)}>
-                    Delete
-                  </Button>
-                </div>
-              </div>
+                }
+                onClick={() => setActionItem(item)}
+                className={item.isCompleted ? 'opacity-60' : undefined}
+              />
             ))}
             {filteredItems.length === 0 && (
               <p className="px-4 py-12 text-center text-sm text-muted">No wishlist items found.</p>
@@ -449,6 +475,51 @@ export default function WishlistPageClient({ initialWishlist, userId, layoutVari
           </div>
         </section>
       </div>
+
+      <ResponsiveSheet
+        open={!!actionItem}
+        onOpenChange={(open) => !open && setActionItem(null)}
+        title={actionItem?.title ?? 'Wishlist item'}
+        footer={
+          <div className="flex w-full flex-col gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (actionItem) openEditDialog(actionItem);
+                setActionItem(null);
+              }}
+            >
+              Edit
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (actionItem) handleToggleCompleted(actionItem);
+                setActionItem(null);
+              }}
+            >
+              {actionItem?.isCompleted ? 'Mark pending' : 'Mark purchased'}
+            </Button>
+            <Button
+              variant="outline"
+              className="text-[var(--danger)]"
+              onClick={() => {
+                if (actionItem) handleDelete(actionItem.id);
+                setActionItem(null);
+              }}
+            >
+              Delete
+            </Button>
+          </div>
+        }
+      >
+        {actionItem && (
+          <div className="space-y-2 text-sm">
+            <p className="tabular-nums">{formatRupees(actionItem.estimatedCost || 0)}</p>
+            <Badge variant="outline" className="capitalize">{actionItem.priority.toLowerCase()}</Badge>
+          </div>
+        )}
+      </ResponsiveSheet>
 
       <ResponsiveSheet
         open={dialogOpen}

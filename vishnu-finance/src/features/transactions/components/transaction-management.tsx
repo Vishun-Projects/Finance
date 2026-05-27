@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Plus, Search, Filter, X, RefreshCw, CheckSquare, Square, Trash2, RotateCw, Tag, Layers, ChevronLeft, ChevronRight, Sparkles, Check, Calendar as CalendarIcon, FileText, Upload, AlertCircle, TrendingUp, ChevronDown, Edit, Download, ArrowUp, ShoppingCart, Utensils, Zap, ShoppingBag, BrainCircuit, Sun, Moon, Link2 } from 'lucide-react';
+import { Plus, Search, Filter, X, RefreshCw, CheckSquare, Square, Trash2, RotateCw, Tag, Layers, ChevronLeft, ChevronRight, Sparkles, Check, Calendar as CalendarIcon, FileText, Upload, AlertCircle, TrendingUp, ChevronDown, Edit, Download, ArrowUp, ShoppingCart, Utensils, Zap, ShoppingBag, BrainCircuit, Sun, Moon, Link2, MoreHorizontal } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { ChartContainer } from '@/components/ui/chart-container';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Cell } from 'recharts';
@@ -41,6 +41,13 @@ import ParsedTransactionsReviewModal from './parsed-transactions-review-modal';
 import SpendingCalendar, { type DailySpendEntry } from './spending-calendar';
 import { TRANSACTION_PAGE_SIZE } from '@/features/transactions/constants';
 import { toLocalISODate } from '@/lib/date-range';
+import { MobileKpiStrip } from '@/components/ui/mobile-kpi-strip';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 
 const CHART_BAR_COLORS = [
   'var(--chart-credits)',
@@ -144,6 +151,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
   const [isFilterOpen, setIsFilterOpen] = useState(false); // Advanced filter modal
   const [period, setPeriod] = useState<'daily' | 'weekly' | 'monthly' | 'custom'>('monthly');
   const [mobilePanel, setMobilePanel] = useState<'list' | 'calendar' | 'breakdown'>('list');
+  const [mobileToolsOpen, setMobileToolsOpen] = useState(false);
 
 
   // PDF Import state
@@ -2102,48 +2110,99 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
       )}
 
       {/* Mobile search + quick actions */}
-      <div className="mb-4 flex flex-col gap-2 md:hidden">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-hint" />
-          <Input
-            type="text"
-            placeholder="Search transactions..."
-            className="h-9 rounded-md border-border bg-card pl-9 text-sm"
-            value={localSearch}
-            onChange={(e) => handleSearch(e.target.value)}
-          />
-        </div>
-        <NavPillGroup className="w-full justify-start overflow-x-auto">
-          {(['daily', 'weekly', 'monthly'] as const).map((p) => (
-            <NavPill key={p} label={p} active={period === p} onClick={() => handlePeriodChange(p)} />
-          ))}
-        </NavPillGroup>
-        <NavPillGroup className="w-full justify-start">
-          {(
-            [
-              ['list', 'List'],
-              ['calendar', 'Calendar'],
-              ['breakdown', 'Breakdown'],
-            ] as const
-          ).map(([panel, label]) => (
-            <NavPill
-              key={panel}
-              label={label}
-              active={mobilePanel === panel}
-              onClick={() => setMobilePanel(panel)}
+      <div className="mb-3 flex flex-col gap-2 md:hidden">
+        <div className="flex items-center gap-2">
+          <div className="relative min-w-0 flex-1">
+            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-hint" />
+            <Input
+              type="text"
+              placeholder="Search transactions..."
+              className="h-9 rounded-md border-border bg-card pl-9 text-sm"
+              value={localSearch}
+              onChange={(e) => handleSearch(e.target.value)}
             />
-          ))}
-        </NavPillGroup>
-        <div className="flex flex-wrap gap-2">
-        <Button variant="outline" size="sm" className="btn-touch" onClick={() => setIsFilterOpen(true)}><Filter className="size-3.5" /></Button>
-        <Button variant="outline" size="sm" className="btn-touch" onClick={() => setShowSelectionMode(!showSelectionMode)}><CheckSquare className="size-3.5" /></Button>
-        <Button variant="outline" size="sm" className="btn-touch" onClick={openImportDialog}><FileText className="size-3.5" /></Button>
-        <Button variant="outline" size="sm" className="btn-touch" onClick={handleGlobalAutoCategorize} disabled={isBulkUpdating}><Sparkles className={cn('size-3.5', isBulkUpdating && 'animate-spin')} /></Button>
-        <Button size="sm" className="btn-touch" onClick={() => { setEditingTransaction(null); setShowForm(true); }}><Plus className="size-3.5" /></Button>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="btn-touch shrink-0 px-2.5"
+            onClick={() => setMobileToolsOpen(true)}
+            aria-label="More actions"
+          >
+            <MoreHorizontal className="size-4" />
+          </Button>
+          <Button
+            size="sm"
+            className="btn-touch shrink-0 px-2.5"
+            onClick={() => { setEditingTransaction(null); setShowForm(true); }}
+            aria-label="Add transaction"
+          >
+            <Plus className="size-4" />
+          </Button>
+        </div>
+        <div className="flex items-center gap-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <NavPillGroup className="shrink-0">
+            {(['daily', 'weekly', 'monthly'] as const).map((p) => (
+              <NavPill key={p} label={p} active={period === p} onClick={() => handlePeriodChange(p)} />
+            ))}
+          </NavPillGroup>
+          <NavPillGroup className="shrink-0">
+            {(
+              [
+                ['list', 'List'],
+                ['calendar', 'Cal'],
+                ['breakdown', 'Stats'],
+              ] as const
+            ).map(([panel, label]) => (
+              <NavPill
+                key={panel}
+                label={label}
+                active={mobilePanel === panel}
+                onClick={() => setMobilePanel(panel)}
+              />
+            ))}
+          </NavPillGroup>
         </div>
       </div>
 
-      <div className={cn(patterns.cardGrid, 'mb-5 shrink-0 lg:grid-cols-4')}>
+      <Sheet open={mobileToolsOpen} onOpenChange={setMobileToolsOpen}>
+        <SheetContent side="bottom" className={cn(patterns.bottomSheet, 'rounded-t-2xl p-4 md:hidden')}>
+          <SheetHeader className="mb-3 text-left">
+            <SheetTitle className="text-base">Actions</SheetTitle>
+          </SheetHeader>
+          <div className="grid grid-cols-2 gap-2">
+            <Button variant="outline" className="h-11 justify-start gap-2" onClick={() => { setIsFilterOpen(true); setMobileToolsOpen(false); }}>
+              <Filter className="size-4" /> Filters
+            </Button>
+            <Button variant="outline" className="h-11 justify-start gap-2" onClick={() => { setShowSelectionMode(!showSelectionMode); setMobileToolsOpen(false); }}>
+              <CheckSquare className="size-4" /> Select
+            </Button>
+            <Button variant="outline" className="h-11 justify-start gap-2" onClick={() => { openImportDialog(); setMobileToolsOpen(false); }}>
+              <FileText className="size-4" /> Import
+            </Button>
+            <Button variant="outline" className="h-11 justify-start gap-2" onClick={() => { handleGlobalAutoCategorize(); setMobileToolsOpen(false); }} disabled={isBulkUpdating}>
+              <Sparkles className={cn('size-4', isBulkUpdating && 'animate-spin')} /> Auto categorize
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {!isLoading && (
+        <MobileKpiStrip
+          className="mb-3 shrink-0"
+          items={[
+            { label: 'Income', value: formatAmount(income), tone: 'success' },
+            { label: 'Expenses', value: formatAmount(expense), tone: 'danger' },
+            {
+              label: 'Net',
+              value: `${net > 0 ? '+' : ''}${formatAmount(net)}`,
+              tone: net >= 0 ? 'success' : 'danger',
+            },
+          ]}
+        />
+      )}
+
+      <div className={cn(patterns.cardGrid, 'mb-5 hidden shrink-0 md:grid lg:grid-cols-4')}>
         {isLoading ? (
           [1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-20 w-full rounded-md" />)
         ) : (
@@ -2287,8 +2346,8 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
               )}
             </section>
 
-            <div className="card-base mt-5 flex min-h-[50dvh] flex-col overflow-hidden md:hidden md:mt-0">
-              <div className="min-h-0 flex-1 overflow-y-auto custom-scrollbar">
+            <div className="card-base mt-5 flex flex-col md:hidden md:mt-0">
+              <div className="custom-scrollbar">
               {isLoading && !transactions.length ? (
                 <div className="space-y-4 p-4">
                   {[1, 2, 3].map((i) => (
@@ -3157,8 +3216,8 @@ const MobileTransactionCard = React.memo(({
     <div
       onClick={onPress}
       className={cn(
-        "p-4 transition-all active:bg-muted/30 flex items-center gap-4 relative",
-        isSelected && "bg-primary/5 shadow-inner"
+        'relative flex items-center gap-3 px-3 py-2.5 transition-all active:bg-muted/30 md:hidden',
+        isSelected && 'bg-primary/5 shadow-inner'
       )}
     >
       {showSelectionMode && (
@@ -3166,57 +3225,55 @@ const MobileTransactionCard = React.memo(({
           <button
             onClick={(e) => { e.stopPropagation(); toggleSelect(transaction.id); }}
             className={cn(
-              "w-6 h-6 rounded-md border flex items-center justify-center transition-all",
-              isSelected ? "bg-foreground border-foreground text-background shadow-md" : "bg-background border-input"
+              'flex size-5 items-center justify-center rounded border transition-all',
+              isSelected ? 'border-foreground bg-foreground text-background' : 'border-input bg-background'
             )}
           >
-            {isSelected && <Check className="w-4 h-4" />}
+            {isSelected && <Check className="size-3" />}
           </button>
         </div>
       )}
 
-      <div className="size-11 rounded-none bg-card border border-border/50 flex items-center justify-center shrink-0 shadow-sm relative overflow-hidden">
-        {brandName ? (
-          <BrandLogo name={brandName} size={44} />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center bg-muted/50">
-            <CategoryIcon category={transaction.category?.name || ''} className="w-5 h-5" />
-          </div>
-        )}
+      <div className="relative size-9 shrink-0">
+        <div className="flex size-9 items-center justify-center overflow-hidden rounded-md border border-border/50 bg-card shadow-sm">
+          {brandName ? (
+            <BrandLogo name={brandName} size={36} />
+          ) : (
+            <div className="flex size-full items-center justify-center bg-muted/50">
+              <CategoryIcon category={transaction.category?.name || ''} className="size-4" />
+            </div>
+          )}
+        </div>
+        <span
+          className={cn(
+            'absolute -bottom-0.5 -right-0.5 size-2 rounded-full border border-background',
+            isIncome ? 'bg-[var(--success)]' : isExpense ? 'bg-[var(--danger)]' : 'bg-muted'
+          )}
+          aria-hidden
+        />
       </div>
 
-      <div className="flex-1 min-w-0">
-        <div className="flex items-start justify-between gap-2 mb-0.5">
-          <h4 className="font-bold text-sm text-foreground truncate tracking-tight">
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center justify-between gap-2">
+          <h4 className="truncate text-sm font-medium text-foreground">
             {getTransactionDisplayName({
               description: transaction.description,
               store: transaction.store,
               personName: transaction.personName,
             })}
           </h4>
-          <span className={cn(
-            "font-black text-sm tracking-tight whitespace-nowrap",
-            isIncome ? "text-success" : isExpense ? "text-danger" : "text-foreground"
-          )}>
+          <span
+            className={cn(
+              'shrink-0 text-sm font-semibold tabular-nums',
+              isIncome ? 'text-[var(--success)]' : isExpense ? 'text-[var(--danger)]' : 'text-foreground'
+            )}
+          >
             {isIncome ? '+' : '-'}{formatAmount(amount)}
           </span>
         </div>
-        <div className="flex items-center gap-2">
-          <Chip variant={isIncome ? 'success' : 'neutral'} className="uppercase tracking-[0.1em] font-black text-[9px] px-1.5 py-0.5 rounded-md">
-            {transaction.category?.name || 'General'}
-          </Chip>
-          {brandName && (
-            <span className="bg-primary/10 text-primary text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md">
-              ✓ Brand
-            </span>
-          )}
-          {transaction.autoCategorized && (
-            <Chip variant="success" className="inline-flex items-center text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md gap-1">
-              <Sparkles className="w-2 h-2" />
-              Auto
-            </Chip>
-          )}
-        </div>
+        <p className="truncate text-[10px] uppercase tracking-wide text-muted">
+          {transaction.category?.name || 'General'}
+        </p>
       </div>
     </div>
   );

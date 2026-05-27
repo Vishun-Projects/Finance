@@ -10,6 +10,8 @@ import { cn, formatRupees } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { MobileCollapsibleSection } from '@/components/ui/mobile-collapsible-section';
+import { MobileHeroMetric, MobileKpiStrip } from '@/components/ui/mobile-kpi-strip';
 import { ResponsiveSheet } from '@/components/ui/responsive-sheet';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -597,7 +599,7 @@ export default function SalaryStructureManagement() {
       <div className="flex flex-col gap-4 lg:max-h-[calc(100vh-7rem)]">
         {/* Header — one line */}
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="min-w-0">
+          <div className="min-w-0 max-md:hidden">
             <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-hint">Salary</p>
             <h1 className="truncate text-xl font-semibold text-foreground">
               {activeStructure.jobTitle}
@@ -608,20 +610,49 @@ export default function SalaryStructureManagement() {
               {activeStructure.location ? ` · ${activeStructure.location}` : ''}
             </p>
           </div>
-          <div className="flex shrink-0 flex-wrap items-center gap-2">
-            <Button size="sm" variant="outline" onClick={() => handleEdit(activeStructure)}>
-              <Edit className="mr-1.5 size-3.5" />
-              Edit current
+          <div className="flex shrink-0 flex-wrap items-center gap-2 max-md:w-full max-md:justify-end">
+            <Button size="sm" variant="outline" onClick={() => handleEdit(activeStructure)} className="max-md:px-2">
+              <Edit className="size-3.5 sm:mr-1.5" />
+              <span className="max-md:hidden">Edit current</span>
             </Button>
-            <Button size="sm" onClick={openNewStructure}>
-              <Plus className="mr-1.5 size-3.5" />
-              Update structure
+            <Button size="sm" onClick={openNewStructure} className="max-md:px-2">
+              <Plus className="size-3.5 sm:mr-1.5" />
+              <span className="max-md:hidden">Update structure</span>
             </Button>
           </div>
         </div>
 
-        {/* All KPIs in one row */}
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <MobileHeroMetric
+          label="Take-home / mo"
+          value={formatRupees(netMonthly)}
+          tone="success"
+          subtitle={
+            <>
+              Gross {formatRupees(grossAnnual)} · CTC {formatRupees(annualCTC)} · Ded {formatRupees(totalMonthlyDeductions)}
+            </>
+          }
+          footer={
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" className="h-8 flex-1" onClick={() => handleEdit(activeStructure)}>
+                Edit
+              </Button>
+              <Button size="sm" className="h-8 flex-1" onClick={openNewStructure}>
+                Update
+              </Button>
+            </div>
+          }
+        />
+
+        <MobileKpiStrip
+          items={[
+            { label: 'Gross/yr', value: formatRupees(grossAnnual) },
+            { label: 'CTC/yr', value: formatRupees(annualCTC), tone: 'info' },
+            { label: 'Ded/mo', value: `-${formatRupees(totalMonthlyDeductions)}`, tone: 'danger' },
+          ]}
+        />
+
+        {/* All KPIs in one row — desktop only */}
+        <div className="hidden grid-cols-2 gap-3 md:grid md:grid-cols-4">
           <div className="card-base p-3">
             <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-hint">Take-home / mo</p>
             <p className="mt-1 text-xl font-semibold tabular-nums text-[var(--success)] numeric sm:text-2xl">{formatRupees(netMonthly)}</p>
@@ -644,43 +675,69 @@ export default function SalaryStructureManagement() {
 
         {/* Main grid — fits one screen, no page scroll on desktop */}
         <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-3">
-          <section className="card-base flex flex-col p-4">
-            <h2 className="mb-3 text-sm font-medium text-foreground">Monthly breakdown</h2>
-            <BreakdownTable rows={breakdownRows} />
-          </section>
-
-          <section className="card-base flex flex-col p-4">
-            <h2 className="mb-2 text-sm font-medium text-foreground">Base salary trend</h2>
-            {historyChartData.length < 2 ? (
-              <div className="flex flex-1 items-center justify-center text-xs text-muted">Need 2+ revisions for trend.</div>
-            ) : (
-              <ChartContainer height={130} className="flex-1">
-                <LineChart data={historyChartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" opacity={0.35} />
-                  <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: 'var(--muted)' }} />
-                  <YAxis hide tickFormatter={(v) => `${(v / 100000).toFixed(0)}L`} />
-                  <Tooltip
-                    formatter={(value: number) => formatRupees(value)}
-                    labelFormatter={(_, items) => (items?.[0]?.payload as { fullDate?: string })?.fullDate ?? ''}
-                    contentStyle={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '12px' }}
-                  />
-                  <Line type="monotone" dataKey="salary" stroke="var(--foreground)" strokeWidth={2} dot={false} />
-                </LineChart>
-              </ChartContainer>
-            )}
-          </section>
-
-          <section className="card-base flex flex-col p-4">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-sm font-medium text-foreground">Revision history</h2>
-              <span className="text-xs text-muted">{sortedHistory.length} total</span>
+          <MobileCollapsibleSection
+            title="Monthly breakdown"
+            summary={
+              <span>
+                Gross {formatRupees(grossMonthly)} · Ded -{formatRupees(totalMonthlyDeductions)} · Net{' '}
+                {formatRupees(netMonthly)}
+              </span>
+            }
+            className="flex flex-col lg:col-span-1"
+          >
+            <div className="p-4">
+              <h2 className="mb-3 hidden text-sm font-medium text-foreground md:block">Monthly breakdown</h2>
+              <BreakdownTable rows={breakdownRows} />
             </div>
-            {sortedHistory.length === 0 ? (
-              <p className="text-xs text-muted">No revisions yet.</p>
-            ) : (
-              <>
-                <div className="hidden overflow-x-auto md:block">
-                  <table className="w-full text-xs">
+          </MobileCollapsibleSection>
+
+          <MobileCollapsibleSection
+            title="Base salary trend"
+            summary={historyChartData.length >= 2 ? 'Tap to view chart' : 'Need 2+ revisions'}
+            className="flex flex-col lg:col-span-1"
+          >
+            <div className="p-4">
+              <h2 className="mb-2 hidden text-sm font-medium text-foreground md:block">Base salary trend</h2>
+              {historyChartData.length < 2 ? (
+                <div className="flex flex-1 items-center justify-center text-xs text-muted">Need 2+ revisions for trend.</div>
+              ) : (
+                <ChartContainer height={130} className="flex-1">
+                  <LineChart data={historyChartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" opacity={0.35} />
+                    <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: 'var(--muted)' }} />
+                    <YAxis hide tickFormatter={(v) => `${(v / 100000).toFixed(0)}L`} />
+                    <Tooltip
+                      formatter={(value: number) => formatRupees(value)}
+                      labelFormatter={(_, items) => (items?.[0]?.payload as { fullDate?: string })?.fullDate ?? ''}
+                      contentStyle={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '12px' }}
+                    />
+                    <Line type="monotone" dataKey="salary" stroke="var(--foreground)" strokeWidth={2} dot={false} />
+                  </LineChart>
+                </ChartContainer>
+              )}
+            </div>
+          </MobileCollapsibleSection>
+
+          <MobileCollapsibleSection
+            title="Revision history"
+            summary={
+              sortedHistory[0]
+                ? `${new Date(sortedHistory[0].effectiveDate).toLocaleDateString('en-IN', { month: 'short', year: '2-digit' })} · ${sortedHistory.length} total`
+                : 'No revisions yet'
+            }
+            className="flex flex-col lg:col-span-1"
+          >
+            <div className="p-4">
+              <div className="mb-3 hidden items-center justify-between md:flex">
+                <h2 className="text-sm font-medium text-foreground">Revision history</h2>
+                <span className="text-xs text-muted">{sortedHistory.length} total</span>
+              </div>
+              {sortedHistory.length === 0 ? (
+                <p className="text-xs text-muted">No revisions yet.</p>
+              ) : (
+                <>
+                  <div className="hidden overflow-x-auto md:block">
+                    <table className="w-full text-xs">
                 <thead>
                   <tr className="border-b border-border text-left text-[10px] font-medium uppercase tracking-wide text-hint">
                     <th className="pb-2 pr-2">Date</th>
@@ -778,7 +835,8 @@ export default function SalaryStructureManagement() {
             {sortedHistory.length > 6 ? (
               <p className="mt-2 text-[10px] text-muted">Showing latest 6 of {sortedHistory.length}</p>
             ) : null}
-          </section>
+            </div>
+          </MobileCollapsibleSection>
         </div>
       </div>
 

@@ -3,8 +3,7 @@ import { Suspense } from "react";
 import { requireUser } from "@/lib/auth/server-auth";
 import { RouteLoadingState } from "@/components/feedback/route-fallbacks";
 import NavigationIsland from "@/components/layout/navigation-island";
-import { patterns } from "@/design/patterns";
-import { cn } from "@/lib/utils";
+import AppPageShell from "@/components/layout/app-page-shell";
 
 export const metadata: Metadata = {
   title: "Vishnu Finance - Dashboard",
@@ -34,7 +33,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       </Suspense>
 
       <main className="flex-1 flex flex-col min-w-0 bg-background overflow-y-auto custom-scrollbar overflow-x-hidden pb-24 lg:pb-0">
-        <div className={cn(patterns.pageShellMobile, 'pt-14 lg:pt-8')}>{children}</div>
+        <AppPageShell>{children}</AppPageShell>
       </main>
     </div>
   );

@@ -191,10 +191,7 @@ export default function DashboardPage({ data }: DashboardPageProps) {
       </div>
 
       {mobileAlerts.length > 0 && (
-        <div className={cn(
-          'card-base border-[var(--warning)]/30 bg-[var(--warning)]/5 p-4 max-md:p-3',
-          mobileView !== 'summary' && 'max-md:hidden'
-        )}>
+        <div className="card-base hidden border-[var(--warning)]/30 bg-[var(--warning)]/5 p-4 max-md:p-3 md:block">
           <div className="mb-2 flex items-center gap-2 text-sm font-medium text-foreground">
             <AlertCircle className="size-4 text-[var(--warning)]" />
             Needs attention
@@ -219,8 +216,162 @@ export default function DashboardPage({ data }: DashboardPageProps) {
         ))}
       </NavPillGroup>
 
-      <div className="grid min-h-0 grid-cols-1 gap-4 md:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)] md:items-start">
-        <div className={cn(mobileView !== 'plan' && 'max-md:hidden')}>
+      <div className="space-y-3 md:hidden">
+        {mobileView === 'summary' && (
+          <>
+            {mobileAlerts.length > 0 && (
+              <div className="card-base border-[var(--warning)]/30 bg-[var(--warning)]/5 p-3">
+                <div className="mb-2 flex items-center gap-2 text-sm font-medium text-foreground">
+                  <AlertCircle className="size-4 text-[var(--warning)]" />
+                  Needs attention
+                </div>
+                <ul className="space-y-1 text-xs text-muted">
+                  {mobileAlerts.map((alert) => (
+                    <li key={alert}>{alert}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {stats.salaryInfo && (
+              <div className="card-base flex flex-col gap-3 p-3">
+                <div className="flex min-w-0 items-start gap-2 text-sm text-foreground">
+                  <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-[var(--success)]" />
+                  <span>
+                    Salary: {stats.salaryInfo.jobTitle} · {stats.salaryInfo.company} · take-home{' '}
+                    {formatRupees(stats.salaryInfo.takeHome)}/mo
+                  </span>
+                </div>
+                <Button variant="ghost" size="sm" className="h-7 w-full text-xs" asChild>
+                  <Link href="/salary">Manage salary</Link>
+                </Button>
+              </div>
+            )}
+
+            <div className="grid grid-cols-3 gap-2">
+              <div className="card-base p-2.5">
+                <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-hint">Income</p>
+                <p className="mt-1 text-sm font-semibold tabular-nums text-[var(--success)]">{formatRupees(income)}</p>
+              </div>
+              <div className="card-base p-2.5">
+                <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-hint">Spent</p>
+                <p className="mt-1 text-sm font-semibold tabular-nums text-[var(--danger)]">{formatRupees(expenses)}</p>
+              </div>
+              <div className="card-base p-2.5">
+                <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-hint">Adherence</p>
+                <p className="mt-1 text-sm font-semibold tabular-nums">{combinedPlanScore}%</p>
+              </div>
+            </div>
+          </>
+        )}
+
+        {mobileView === 'plan' && (
+          <PlanVsActualSection
+            buckets={adherence.buckets}
+            lineItems={adherence.lineItems}
+            plannedTotal={adherence.plannedTotal}
+            actualTotal={adherence.actualTotal}
+            monthlyIncome={monthlyIncome}
+            planBaseIncome={planBaseIncome}
+            planIncomeSource={adherence.planIncomeSource}
+            incomeBreakdown={incomeBreakdown}
+          />
+        )}
+
+        {mobileView === 'activity' && (
+          <>
+            <section className="card-base shrink-0 p-3">
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <div>
+                  <h2 className="text-sm font-medium text-foreground">Goals tracker</h2>
+                  <p className="text-[10px] text-muted">Progress vs target pace</p>
+                </div>
+                <Button variant="ghost" size="sm" className="h-7 text-xs" asChild>
+                  <Link href="/plans">
+                    All plans
+                    <ArrowRight className="ml-1 size-3" />
+                  </Link>
+                </Button>
+              </div>
+              {adherence.goals.length === 0 ? (
+                <p className="text-xs text-muted">No active goals yet. Add goals on the Plans page.</p>
+              ) : (
+                <div className="space-y-3">
+                  {mobileGoals.map((goal) => (
+                    <div key={goal.id} className="rounded-md border border-border bg-surface/40 p-3">
+                      <div className="mb-1.5 flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="truncate text-xs font-medium text-foreground">{goal.name}</p>
+                          <p className="text-[10px] text-muted">
+                            {formatRupees(goal.currentAmount)} of {formatRupees(goal.targetAmount)}
+                          </p>
+                        </div>
+                        <Chip variant={goalStatusVariant(goal.status)} className="shrink-0 text-[10px]">
+                          {goalStatusLabel(goal.status)}
+                        </Chip>
+                      </div>
+                      <Progress value={goal.progressPercent} className="h-1.5" />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            <section className="card-base p-3">
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <div>
+                  <h2 className="text-sm font-medium text-foreground">Recent activity</h2>
+                  <p className="text-[10px] text-muted">Latest transactions this month</p>
+                </div>
+                <Target className="size-4 text-hint" />
+              </div>
+              {recentTransactions.length === 0 ? (
+                <p className="text-xs text-muted">No transactions this month.</p>
+              ) : (
+                <ul className="divide-y divide-border">
+                  {recentTransactions.map((tx) => {
+                    const isIncome = tx.amount > 0;
+                    const displayName =
+                      getTransactionDisplayName({
+                        description: tx.description ?? undefined,
+                        store: tx.store,
+                        personName: tx.personName,
+                      }) || tx.title;
+                    return (
+                      <li key={tx.id} className="flex items-center justify-between gap-3 py-2.5">
+                        <div className="min-w-0">
+                          <p className="truncate text-xs font-medium text-foreground">{displayName}</p>
+                          <div className="mt-0.5 flex items-center gap-2 text-[10px] text-muted">
+                            <span>{format(new Date(tx.date), 'd MMM')}</span>
+                            <Chip variant="neutral" className="px-1 py-0 text-[10px]">
+                              {tx.category}
+                            </Chip>
+                          </div>
+                        </div>
+                        <span
+                          className={cn(
+                            'shrink-0 text-xs font-medium tabular-nums',
+                            isIncome ? 'text-[var(--success)]' : 'text-[var(--danger)]',
+                          )}
+                        >
+                          {isIncome ? '+' : ''}
+                          {formatRupees(Math.abs(tx.amount))}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+              <Button variant="outline" size="sm" className="mt-3 w-full" asChild>
+                <Link href="/transactions">View all transactions</Link>
+              </Button>
+            </section>
+          </>
+        )}
+      </div>
+
+      <div className="hidden min-h-0 grid-cols-1 gap-4 md:grid md:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)] md:items-start">
+        <div>
         <PlanVsActualSection
           buckets={adherence.buckets}
           lineItems={adherence.lineItems}
@@ -235,7 +386,7 @@ export default function DashboardPage({ data }: DashboardPageProps) {
         </div>
 
         <div className="flex flex-col gap-4">
-          <section className={cn('card-base shrink-0 p-4 max-md:p-3', mobileView !== 'activity' && 'max-md:hidden')}>
+          <section className="card-base shrink-0 p-4 max-md:p-3">
             <div className="mb-3 flex items-center justify-between gap-2">
               <div>
                 <h2 className="text-sm font-medium text-foreground">Goals tracker</h2>
@@ -277,7 +428,7 @@ export default function DashboardPage({ data }: DashboardPageProps) {
 
           <section
             ref={recentActivityRef}
-            className={cn('card-base p-4 max-md:p-3', mobileView !== 'activity' && 'max-md:hidden md:block')}
+            className="card-base p-4 max-md:p-3"
           >
             <div className="mb-3 flex items-center justify-between gap-2">
               <div>
@@ -331,7 +482,7 @@ export default function DashboardPage({ data }: DashboardPageProps) {
       </div>
 
       {stats.salaryInfo && (
-        <div className="card-base flex flex-col gap-3 p-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+        <div className="card-base hidden flex-col gap-3 p-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between md:flex">
           <div className="flex min-w-0 items-start gap-2 text-sm text-foreground sm:items-center">
             <CheckCircle2 className="size-4 text-[var(--success)]" />
             <span>

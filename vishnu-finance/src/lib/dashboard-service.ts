@@ -3,6 +3,7 @@ import { getCachedData, setCachedData, CACHE_TTL } from './api-cache';
 import type { SimpleDashboardData } from '@/types/dashboard';
 import { computeIncomeBreakdown } from '@/lib/income-breakdown';
 import { getTransactionDisplayName } from '@/lib/transaction-utils';
+import { buildDynamicInsights } from '@/lib/dashboard-insights';
 import {
   getEffectiveExpenseAmount,
   getEffectiveIncomeAmount,
@@ -171,13 +172,17 @@ export class DashboardService {
                     const deadlines = await prisma.deadline.findMany({
                         where: { userId, isCompleted: false },
                         orderBy: { dueDate: 'asc' },
-                        select: { title: true, dueDate: true },
+                        select: { title: true, dueDate: true, amount: true },
                         take: 20
                     });
                     return {
                         count: deadlines.length,
                         next: deadlines[0] || null,
-                        items: deadlines.map((d: any) => ({ title: d.title, dueDate: d.dueDate.toISOString() }))
+                        items: deadlines.map((d: { title: string; dueDate: Date; amount: unknown }) => ({
+                            title: d.title,
+                            dueDate: d.dueDate.toISOString(),
+                            amount: Number(d.amount) || 0,
+                        }))
                     };
                 } catch { return { count: 0, next: null, items: [] }; }
             })(),
@@ -308,45 +313,14 @@ export class DashboardService {
         const netSavings = totalIncome - totalExpenses;
         const totalNetWorth = Number(netWorthStats._sum?.creditAmount || 0) - Number(netWorthStats._sum?.debitAmount || 0);
 
-        const dynamicInsights: Array<{ type: 'pattern' | 'warning' | 'positive'; message: string }> = [];
-        const topPayees = topPayeesResult as any[];
-        
-        categoryBreakdownRaw.slice(0, 3).forEach((cat: any) => {
-            if (cat.amount > totalExpenses * 0.3 && totalExpenses > 0) {
-                dynamicInsights.push({ 
-                    type: 'warning', 
-                    message: `SYSTEM_ALERT: [${cat.name}] sector consumes ${Math.round((cat.amount/totalExpenses)*100)}% of tactical outflow. Audit recommended.` 
-                });
-            }
+        const dynamicInsights = buildDynamicInsights({
+            categoryBreakdown: categoryBreakdownRaw as SimpleDashboardData['categoryBreakdown'],
+            topPayees: topPayeesResult as SimpleDashboardData['topPayees'],
+            totalExpenses,
+            monthIncome: currentMonthStatsResult.income,
+            monthExpenses: currentMonthStatsResult.expenses,
+            monthNet: currentMonthStatsResult.netFlow,
         });
-
-        const topPayee = topPayees[0];
-        if (topPayee && topPayee.amount > totalExpenses * 0.15 && totalExpenses > 0) {
-            dynamicInsights.push({
-                type: 'pattern',
-                message: `FLOW_PATTERN: High-frequency capital redirection to [${topPayee.name}] detected (${topPayee.count} events).`
-            });
-        }
-
-        const monthIncome = currentMonthStatsResult.income;
-        const monthExpenses = currentMonthStatsResult.expenses;
-        const monthNet = currentMonthStatsResult.netFlow;
-
-        if (monthNet > 0) {
-            dynamicInsights.push({
-                type: 'positive',
-                message: `CAPITAL_YEILD: Positive net flow maintained. Reserve runway extended by ${Math.floor(monthNet / (monthExpenses / 30 || 1))} days.`
-            });
-        } else if (monthExpenses > monthIncome && monthIncome > 0) {
-            dynamicInsights.push({
-                type: 'warning',
-                message: `SYSTEM_CRITICAL: Outflow exceeds inbound liquidity by ${Math.round((monthExpenses / monthIncome - 1) * 100)}%. Immediate burn reduction required.`
-            });
-        }
-
-        if (dynamicInsights.length === 0) {
-            dynamicInsights.push({ type: 'pattern', message: 'FAS_MONITORING: Nominal flow patterns detected. Continuously auditing transaction metadata.' });
-        }
 
         const trendsMap = new Map<string, { income: number; expenses: number; savings: number; credits: number; debits: number }>();
         (transactionTotalsData as any[]).forEach(t => {
@@ -413,7 +387,13 @@ export class DashboardService {
             wishlistInfo: wishlistInfo || { totalItems: 0, totalCost: 0, topItem: null, items: [] },
             deadlinesInfo: {
                 upcoming: deadlinesData?.count || 0,
-                nextDeadline: deadlinesData?.next ? { title: deadlinesData.next.title, dueDate: deadlinesData.next.dueDate.toISOString() } : null,
+                nextDeadline: deadlinesData?.next
+                    ? {
+                        title: deadlinesData.next.title,
+                        dueDate: deadlinesData.next.dueDate.toISOString(),
+                        amount: Number(deadlinesData.next.amount) || 0,
+                      }
+                    : null,
                 items: deadlinesData?.items || []
             },
             currentMonthStats: {
@@ -425,7 +405,7 @@ export class DashboardService {
               adjustedNetFlow: currentMonthStatsResult.adjustedNetFlow,
             },
             incomeBreakdown: currentMonthStatsResult.incomeBreakdown,
-            topPayees: topPayees || [],
+            topPayees: topPayeesResult || [],
             dynamicInsights: dynamicInsights.slice(0, 2)
         };
 

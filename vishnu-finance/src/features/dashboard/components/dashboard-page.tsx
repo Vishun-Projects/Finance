@@ -1,9 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { format } from 'date-fns';
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { format, differenceInCalendarDays, startOfDay } from 'date-fns';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
+  AlarmClock,
   ArrowRight,
   AlertCircle,
   CheckCircle2,
@@ -24,7 +25,19 @@ import type { GoalAdherence } from '@/lib/plan-adherence-service';
 import { cn, formatRupees } from '@/lib/utils';
 import { getTransactionDisplayName } from '@/lib/transaction-utils';
 import { MobileHeroMetric } from '@/components/ui/mobile-kpi-strip';
+import { CompactListRow } from '@/components/ui/compact-list-row';
 import { NavPill, NavPillGroup } from '@/components/ui/nav-pill';
+import { InsightBanner } from '@/components/ui/insight-banner';
+import { SegmentSplitBar } from '@/components/ui/segment-split-bar';
+import { CategoryLegend } from '@/components/ui/category-legend';
+import { BudgetProgressRow } from '@/components/ui/budget-progress-row';
+import {
+  buildContextBanner,
+  computeNeedsWantsSavingsSplit,
+  computeSpendingContext,
+  getOverBudgetBuckets,
+  getTopCategoriesWithPct,
+} from '@/lib/dashboard-insights';
 import { useBreakpoint } from '@/hooks/use-breakpoint';
 
 interface DashboardPageProps {
@@ -41,6 +54,13 @@ function goalStatusVariant(status: GoalAdherence['status']): 'success' | 'warnin
   if (status === 'completed') return 'success';
   if (status === 'on_track') return 'success';
   return 'warning';
+}
+
+function deadlineDueLabel(dueDate: string) {
+  const daysLeft = differenceInCalendarDays(startOfDay(new Date(dueDate)), startOfDay(new Date()));
+  if (daysLeft === 0) return 'Due today';
+  if (daysLeft === 1) return 'Due tomorrow';
+  return `Due in ${daysLeft} days`;
 }
 
 export default function DashboardPage({ data }: DashboardPageProps) {
@@ -65,6 +85,35 @@ export default function DashboardPage({ data }: DashboardPageProps) {
     today.setHours(0, 0, 0, 0);
     return due < today;
   });
+
+  const upcomingSoonDeadlines = useMemo(() => {
+    const today = startOfDay(new Date());
+    const threeDaysOut = new Date(today);
+    threeDaysOut.setDate(threeDaysOut.getDate() + 3);
+
+    return (stats.deadlinesInfo.items || [])
+      .filter((item) => {
+        const due = startOfDay(new Date(item.dueDate));
+        return due >= today && due <= threeDaysOut;
+      })
+      .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+  }, [stats.deadlinesInfo.items]);
+
+  const spendingContext = useMemo(
+    () => computeSpendingContext(currentMonthStats, adherence.plannedTotal),
+    [currentMonthStats, adherence.plannedTotal],
+  );
+  const segmentSplit = useMemo(() => computeNeedsWantsSavingsSplit(adherence.buckets), [adherence.buckets]);
+  const topCategories = useMemo(
+    () => getTopCategoriesWithPct(stats.categoryBreakdown ?? [], 5),
+    [stats.categoryBreakdown],
+  );
+  const summaryBudgetBuckets = useMemo(() => getOverBudgetBuckets(adherence.buckets, 4), [adherence.buckets]);
+  const contextBanner = useMemo(
+    () => buildContextBanner(currentMonthStats, incomeBreakdown, stats.salaryInfo, netFlow),
+    [currentMonthStats, incomeBreakdown, stats.salaryInfo, netFlow],
+  );
+  const summaryGoals = adherence.goals.slice(0, 2);
 
   const alerts: string[] = [
     ...overBudgetBuckets.map((bucket) => `${bucket.label} is over plan by ${formatRupees(bucket.actual - bucket.planned)}`),
@@ -102,7 +151,12 @@ export default function DashboardPage({ data }: DashboardPageProps) {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="max-md:hidden text-[11px] font-medium uppercase tracking-[0.08em] text-hint">Dashboard</p>
-          <h1 className="text-xl font-semibold text-foreground max-md:text-lg">{adherence.monthLabel}</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-semibold text-foreground max-md:text-lg">{adherence.monthLabel}</h1>
+            <span className="rounded-full bg-surface px-2 py-0.5 text-[10px] text-muted md:hidden">
+              {spendingContext.daysLeftInMonth} days left
+            </span>
+          </div>
           <p className="max-md:hidden text-xs text-muted">Live transactions vs your phase plan and goals</p>
         </div>
         <div className="flex flex-wrap items-center gap-2 max-md:hidden">
@@ -233,6 +287,29 @@ export default function DashboardPage({ data }: DashboardPageProps) {
               </div>
             )}
 
+            {contextBanner && <InsightBanner message={contextBanner.message} tone={contextBanner.tone} />}
+
+            {stats.dynamicInsights.length > 0 && (
+              <section className="card-base space-y-2 p-3">
+                <h2 className="text-[10px] font-medium uppercase tracking-[0.08em] text-hint">Insights</h2>
+                <ul className="space-y-1.5">
+                  {stats.dynamicInsights.slice(0, 2).map((insight) => (
+                    <li
+                      key={insight.message}
+                      className={cn(
+                        'text-xs leading-relaxed',
+                        insight.type === 'warning' && 'text-[var(--warning)]',
+                        insight.type === 'positive' && 'text-[var(--success)]',
+                        insight.type === 'pattern' && 'text-muted',
+                      )}
+                    >
+                      {insight.message}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+
             {stats.salaryInfo && (
               <div className="card-base flex flex-col gap-3 p-3">
                 <div className="flex min-w-0 items-start gap-2 text-sm text-foreground">
@@ -250,18 +327,146 @@ export default function DashboardPage({ data }: DashboardPageProps) {
 
             <div className="grid grid-cols-3 gap-2">
               <div className="card-base p-2.5">
-                <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-hint">Income</p>
-                <p className="mt-1 text-sm font-semibold tabular-nums text-[var(--success)]">{formatRupees(income)}</p>
-              </div>
-              <div className="card-base p-2.5">
                 <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-hint">Spent</p>
                 <p className="mt-1 text-sm font-semibold tabular-nums text-[var(--danger)]">{formatRupees(expenses)}</p>
+                <p className="mt-0.5 text-[10px] text-muted">of {formatRupees(adherence.plannedTotal)} plan</p>
+              </div>
+              <div className="card-base p-2.5">
+                <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-hint">Avg/day</p>
+                <p className="mt-1 text-sm font-semibold tabular-nums">{formatRupees(spendingContext.avgDailySpend)}</p>
+                <p className="mt-0.5 text-[10px] text-muted">plan {formatRupees(spendingContext.planDailyBurn)}</p>
               </div>
               <div className="card-base p-2.5">
                 <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-hint">Adherence</p>
                 <p className="mt-1 text-sm font-semibold tabular-nums">{combinedPlanScore}%</p>
+                <p className="mt-0.5 text-[10px] text-muted">{Math.round(spendingContext.spentOfPlanPercent)}% of plan</p>
               </div>
             </div>
+
+            {(segmentSplit.needs + segmentSplit.wants + segmentSplit.savings) > 0 && (
+              <section className="card-base p-3">
+                <h2 className="mb-2 text-[10px] font-medium uppercase tracking-[0.08em] text-hint">
+                  Needs · Wants · Savings
+                </h2>
+                <SegmentSplitBar split={segmentSplit} />
+              </section>
+            )}
+
+            {topCategories.length > 0 && (
+              <section className="card-base p-3">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <h2 className="text-[10px] font-medium uppercase tracking-[0.08em] text-hint">Where money went</h2>
+                  <Button variant="ghost" size="sm" className="h-7 text-xs" asChild>
+                    <Link href="/transactions">View txns</Link>
+                  </Button>
+                </div>
+                <CategoryLegend items={topCategories} />
+              </section>
+            )}
+
+            {summaryBudgetBuckets.length > 0 && (
+              <section className="card-base p-3">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <h2 className="text-[10px] font-medium uppercase tracking-[0.08em] text-hint">Budget vs actual</h2>
+                  <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setMobileView('plan')}>
+                    Full breakdown
+                  </Button>
+                </div>
+                <div className="space-y-2">
+                  {summaryBudgetBuckets.map((bucket) => (
+                    <BudgetProgressRow
+                      key={bucket.key}
+                      bucket={bucket}
+                      href={`/transactions?lineItem=${encodeURIComponent(bucket.label)}`}
+                    />
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {summaryGoals.length > 0 && (
+              <section className="card-base p-3">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <h2 className="text-[10px] font-medium uppercase tracking-[0.08em] text-hint">Goals</h2>
+                  <Button variant="ghost" size="sm" className="h-7 text-xs" asChild>
+                    <Link href="/plans?tab=goals">View all</Link>
+                  </Button>
+                </div>
+                <div className="space-y-2">
+                  {summaryGoals.map((goal) => (
+                    <Link
+                      key={goal.id}
+                      href="/plans?tab=goals"
+                      className="flex items-center gap-3 rounded-md border border-border bg-surface/40 p-2.5 transition-colors active:bg-muted/40"
+                    >
+                      <div className="relative flex size-9 shrink-0 items-center justify-center">
+                        <svg viewBox="0 0 36 36" className="size-9 -rotate-90">
+                          <circle cx="18" cy="18" r="14" fill="none" stroke="var(--border)" strokeWidth="3" />
+                          <circle
+                            cx="18"
+                            cy="18"
+                            r="14"
+                            fill="none"
+                            stroke="var(--warning)"
+                            strokeWidth="3"
+                            strokeDasharray={`${(goal.progressPercent / 100) * 88} 88`}
+                            strokeLinecap="round"
+                          />
+                        </svg>
+                        <span className="absolute text-[9px] font-medium tabular-nums">{goal.progressPercent}%</span>
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-xs font-medium text-foreground">{goal.name}</p>
+                        <p className="text-[10px] text-muted">
+                          {formatRupees(goal.currentAmount)} / {formatRupees(goal.targetAmount)}
+                        </p>
+                      </div>
+                      <Chip variant={goalStatusVariant(goal.status)} className="shrink-0 text-[10px]">
+                        {goalStatusLabel(goal.status)}
+                      </Chip>
+                    </Link>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {upcomingSoonDeadlines.length > 0 && (
+              <section className="card-base overflow-hidden p-3">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <AlarmClock className="size-4 text-info" />
+                    <h2 className="text-sm font-medium text-foreground">Due in 3 days</h2>
+                  </div>
+                  <Button variant="ghost" size="sm" className="h-7 text-xs" asChild>
+                    <Link href="/plans?tab=deadlines">
+                      View all
+                      <ArrowRight className="ml-1 size-3" />
+                    </Link>
+                  </Button>
+                </div>
+                <div className="-mx-1 divide-y divide-border">
+                  {upcomingSoonDeadlines.map((deadline) => (
+                    <Link key={`${deadline.title}-${deadline.dueDate}`} href="/plans?tab=deadlines">
+                      <CompactListRow
+                        icon={<AlarmClock className="size-4 text-muted" />}
+                        title={deadline.title}
+                        subtitle={format(new Date(deadline.dueDate), 'd MMM yyyy')}
+                        trailing={
+                          <div className="text-right">
+                            {deadline.amount ? (
+                              <p className="text-xs font-medium tabular-nums text-foreground">
+                                {formatRupees(deadline.amount)}
+                              </p>
+                            ) : null}
+                            <span className="text-[10px] font-medium text-info">{deadlineDueLabel(deadline.dueDate)}</span>
+                          </div>
+                        }
+                      />
+                    </Link>
+                  ))}
+                </div>
+              </section>
+            )}
           </>
         )}
 

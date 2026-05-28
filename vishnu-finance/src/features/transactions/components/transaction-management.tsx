@@ -242,8 +242,9 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
 
   // Sync state if URL changes externally (e.g. back button)
   useEffect(() => {
+    const lineItem = searchParams.get('lineItem');
     setFinancialCategory((searchParams.get('type') as TransactionCategory | 'ALL') || 'ALL');
-    setCurrentSearchTerm(searchParams.get('search') || '');
+    setCurrentSearchTerm(searchParams.get('search') || lineItem || '');
     setAmountPreset((searchParams.get('amountPreset') as any) || 'all');
     setSelectedCategoryId(searchParams.get('categoryId') || '');
     setQuickRange((searchParams.get('range') as QuickRange) || 'month');

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useMemo } from 'react';
+import Link from 'next/link';
 import { useBreakpoint } from '@/hooks/use-breakpoint';
 import {
   Heart,
@@ -275,9 +276,11 @@ export default function FinancialHealthPageClient({
               </div>
             </div>
           </div>
-          <Button size="lg" className="w-full md:w-auto">
-            View AI strategy
-            <ArrowRight className="ml-2 size-4" />
+          <Button size="lg" className="w-full md:w-auto" asChild>
+            <Link href="/advisor">
+              View AI strategy
+              <ArrowRight className="ml-2 size-4" />
+            </Link>
           </Button>
         </div>
     </>

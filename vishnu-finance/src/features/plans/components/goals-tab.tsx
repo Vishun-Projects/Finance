@@ -2,6 +2,7 @@
 'use client';
 
 import { useState, useMemo, useCallback, useTransition, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Goal, GoalPriority, GoalStatus } from '@/features/plans/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -95,6 +96,7 @@ export default function GoalsPageClient({
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [isRefreshing, startRefreshTransition] = useTransition();
+  const searchParams = useSearchParams();
 
   useEffect(() => {
     setGoals(normalizeGoals(initialGoals));
@@ -117,6 +119,13 @@ export default function GoalsPageClient({
     resetForm();
     setDialogOpen(true);
   };
+
+  useEffect(() => {
+    if (searchParams.get('action') === 'new' && searchParams.get('tab') === 'goals') {
+      openCreateDialog();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   const openEditDialog = (goal: Goal) => {
     setEditingGoal(goal);

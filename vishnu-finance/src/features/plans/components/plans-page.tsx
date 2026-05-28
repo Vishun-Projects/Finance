@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -60,6 +60,7 @@ const TAB_FROM_PARAM: Record<string, TabLabel> = {
 
 export default function PlansPage({ bootstrap, userId, defaultTab = "overview" }: PlansPageClientProps) {
   const isMobile = useIsMobile();
+  const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<TabLabel>(
     TAB_FROM_PARAM[defaultTab.toLowerCase()] ?? 'Overview',
   );
@@ -70,6 +71,18 @@ export default function PlansPage({ bootstrap, userId, defaultTab = "overview" }
   useEffect(() => {
     setGoals(normalizeGoals(bootstrap.goals));
   }, [bootstrap.goals]);
+
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    if (tabParam && TAB_FROM_PARAM[tabParam.toLowerCase()]) {
+      setActiveTab(TAB_FROM_PARAM[tabParam.toLowerCase()]);
+    }
+  }, [searchParams]);
+
+  const handleTabChange = (tab: TabLabel) => {
+    setActiveTab(tab);
+    router.replace(`/plans?tab=${tab.toLowerCase()}`, { scroll: false });
+  };
 
   const { goalStats } = usePlansInsights({
     goals,
@@ -125,7 +138,7 @@ export default function PlansPage({ bootstrap, userId, defaultTab = "overview" }
                   label={isMobile ? meta.mobileLabel : tab}
                   icon={isMobile ? <Icon className="size-3.5" /> : undefined}
                   active={activeTab === tab}
-                  onClick={() => setActiveTab(tab)}
+                  onClick={() => handleTabChange(tab)}
                   className="max-md:min-w-[4.25rem] max-md:flex-col max-md:gap-0.5 max-md:px-2 max-md:py-1.5 max-md:text-[10px]"
                 />
               );
@@ -205,7 +218,7 @@ export default function PlansPage({ bootstrap, userId, defaultTab = "overview" }
                     View all
                   </button>
                 </div>
-                <div className="divide-y divide-border max-md:hidden">
+                <div className="hidden divide-y divide-border md:block">
                   {goals.slice(0, 10).map(goal => (
                     <div key={goal.id} className="px-5 py-4">
                       <div className="mb-2 flex items-center justify-between gap-3">
@@ -221,32 +234,32 @@ export default function PlansPage({ bootstrap, userId, defaultTab = "overview" }
                       </div>
                     </div>
                   ))}
-                  <div className="md:hidden">
-                    {goals.slice(0, 3).map(goal => {
-                      const pct = goal.targetAmount > 0
-                        ? ((goal.currentAmount / goal.targetAmount) * 100).toFixed(0)
-                        : '0';
-                      return (
-                        <CompactListRow
-                          key={goal.id}
-                          icon={<Target className="size-4 text-muted" />}
-                          title={goal.title}
-                          trailing={
-                            <span className="text-xs text-muted">
-                              {pct}% · {formatCurrency(goal.currentAmount)}
-                            </span>
-                          }
-                        />
-                      );
-                    })}
-                  </div>
+                </div>
+                <div className="md:hidden">
+                  {goals.slice(0, 3).map(goal => {
+                    const pct = goal.targetAmount > 0
+                      ? ((goal.currentAmount / goal.targetAmount) * 100).toFixed(0)
+                      : '0';
+                    return (
+                      <CompactListRow
+                        key={goal.id}
+                        icon={<Target className="size-4 text-muted" />}
+                        title={goal.title}
+                        trailing={
+                          <span className="text-xs text-muted">
+                            {pct}% · {formatCurrency(goal.currentAmount)}
+                          </span>
+                        }
+                      />
+                    );
+                  })}
+                </div>
                   {goals.length === 0 && (
                     <div className="flex flex-col items-center justify-center px-5 py-12 text-center">
                       <Target className="mb-3 size-10 text-hint" />
                       <p className="text-sm text-muted">No goals yet. Create one to get started.</p>
                     </div>
                   )}
-                </div>
               </section>
 
               <section className="card-base lg:col-span-4">

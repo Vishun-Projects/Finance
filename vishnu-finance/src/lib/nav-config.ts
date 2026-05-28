@@ -18,12 +18,12 @@ export interface NavItem {
 
 export const primaryNavItemsConfig: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutGrid },
-  { href: '/education', label: 'Insights', icon: BookOpen },
+  { href: '/advisor', label: 'Advisor', icon: Brain },
   { href: '/transactions', label: 'Transactions', icon: ReceiptText },
   { href: '/plans', label: 'Plans', icon: Layers },
+  { href: '/education', label: 'Insights', icon: BookOpen },
   { href: '/financial-health', label: 'Health Score', icon: Heart },
   { href: '/salary', label: 'Salary', icon: Wallet },
-  { href: '/advisor', label: 'AI Advisor', icon: Brain },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 

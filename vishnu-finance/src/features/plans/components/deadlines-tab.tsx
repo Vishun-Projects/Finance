@@ -1,7 +1,8 @@
 
 'use client';
 
-import { useState, useMemo, useCallback, useTransition } from 'react';
+import { useState, useMemo, useCallback, useTransition, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import type { Deadline, DeadlinesResponse, DeadlineStatus } from '@/features/plans/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -80,6 +81,7 @@ function computeStatus(deadline: Deadline): { label: string; tone: 'default' | '
 }
 
 export default function DeadlinesPageClient({ initialDeadlines, userId, layoutVariant = 'standalone' }: DeadlinesPageClientProps) {
+  const searchParams = useSearchParams();
   const [deadlines, setDeadlines] = useState<Deadline[]>(initialDeadlines.data);
   const [statusFilter, setStatusFilter] = useState<'all' | 'PENDING' | 'OVERDUE' | 'PAID' | 'SKIPPED'>('all');
   const [searchTerm, setSearchTerm] = useState('');
@@ -175,6 +177,13 @@ export default function DeadlinesPageClient({ initialDeadlines, userId, layoutVa
     resetForm();
     setDialogOpen(true);
   };
+
+  useEffect(() => {
+    if (searchParams.get('action') === 'new' && searchParams.get('tab') === 'deadlines') {
+      openCreateDialog();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   const openEditDialog = (deadline: Deadline) => {
     setEditingDeadline(deadline);

@@ -57,8 +57,8 @@ export interface SimpleDashboardData {
   };
   deadlinesInfo: {
     upcoming: number;
-    nextDeadline: { title: string; dueDate: string } | null;
-    items: Array<{ title: string; dueDate: string }>;
+    nextDeadline: { title: string; dueDate: string; amount?: number } | null;
+    items: Array<{ title: string; dueDate: string; amount?: number }>;
   };
   currentMonthStats: {
     income: number;

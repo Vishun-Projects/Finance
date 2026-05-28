@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import {
   Filter,
   Plus,
@@ -40,6 +41,7 @@ interface WishlistPageClientProps {
 const PRIORITY_OPTIONS: WishlistPriority[] = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
 
 export default function WishlistPageClient({ initialWishlist, userId, layoutVariant = 'standalone' }: WishlistPageClientProps) {
+  const searchParams = useSearchParams();
   const [items, setItems] = useState<WishlistItem[]>(initialWishlist.data || []);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -108,6 +110,13 @@ export default function WishlistPageClient({ initialWishlist, userId, layoutVari
     resetForm();
     setDialogOpen(true);
   };
+
+  useEffect(() => {
+    if (searchParams.get('action') === 'new' && searchParams.get('tab') === 'wishlist') {
+      openCreateDialog();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   const openEditDialog = (item: WishlistItem) => {
     setEditingItem(item);

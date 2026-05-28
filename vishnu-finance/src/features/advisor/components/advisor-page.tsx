@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import PageSkeleton from '@/components/feedback/page-skeleton';
 import { MarkdownRenderer } from '@/features/advisor/components/markdown-renderer';
-import { InsightSidebar } from '@/features/advisor/components/insight-sidebar';
+import { FinancialInsightsPanel } from '@/features/advisor/components/financial-insights-panel';
 import { ChartMessage, ChartConfig } from '@/features/advisor/components/chart-message';
 import {
   Sheet,
@@ -209,15 +209,21 @@ export default function AdvisorPageClient() {
 
   return (
     <div className="flex min-h-[calc(100dvh-12rem)] flex-col overflow-hidden bg-background text-foreground xl:min-h-[calc(100dvh-6rem)] xl:flex-row">
-      <div className="hidden h-full shrink-0 border-r border-border xl:block xl:w-72">
-        <InsightSidebar userId={user.id} className="h-full" />
+      <div className="hidden h-full shrink-0 border-r border-border xl:block xl:w-80">
+        <FinancialInsightsPanel
+          className="h-full max-h-[calc(100dvh-6rem)]"
+          onPromptSelect={(prompt) => {
+            setInputMessage(prompt);
+            inputRef.current?.focus();
+          }}
+        />
       </div>
 
       <section className="relative flex min-w-0 flex-1 flex-col bg-background">
         <header className="sticky top-0 z-20 flex h-14 items-center justify-between border-b border-border bg-background px-4 md:px-6">
           <div>
-            <h1 className="text-sm font-medium text-foreground">AI Advisor</h1>
-            <p className="text-xs text-hint">Ask questions about your finances</p>
+            <h1 className="text-sm font-medium text-foreground">Advisor</h1>
+            <p className="text-xs text-hint">AI-powered financial analysis</p>
           </div>
           <div className="flex items-center gap-1 md:gap-2">
             <Button
@@ -281,6 +287,16 @@ export default function AdvisorPageClient() {
           </div>
         </header>
 
+        <div className="max-h-[40dvh] shrink-0 overflow-y-auto border-b border-border xl:hidden custom-scrollbar">
+          <FinancialInsightsPanel
+            compact
+            onPromptSelect={(prompt) => {
+              setInputMessage(prompt);
+              inputRef.current?.focus();
+            }}
+          />
+        </div>
+
         <div className="flex-1 space-y-8 overflow-y-auto p-4 sm:p-8 custom-scrollbar">
           {loading && messages.length === 0 ? (
             <div className="flex min-h-[60vh] flex-col items-center justify-center">
@@ -297,7 +313,7 @@ export default function AdvisorPageClient() {
                 <p className="text-sm text-muted">Ask about spending, projections, or financial planning.</p>
               </div>
               <div className="flex max-w-xl flex-wrap justify-center gap-3">
-                {["Analyze spending", "Project net worth", "Wealth trajectory"].map((qs) => (
+                {["Analyze my spending this month", "Show my savings gap", "Summarize my financial health"].map((qs) => (
                   <button
                     key={qs}
                     type="button"
@@ -378,12 +394,19 @@ export default function AdvisorPageClient() {
       <ResponsiveSheet
         open={insightsOpen}
         onOpenChange={setInsightsOpen}
-        title="Financial insights"
-        description="Context from your accounts and spending patterns"
+        title="Advisor insights"
+        description="Pre-computed analysis from your accounts and plan"
         desktopSide="right"
         contentClassName="p-0 xl:hidden"
       >
-        <InsightSidebar userId={user.id} className="h-full min-h-[50vh]" />
+        <FinancialInsightsPanel
+          className="h-full min-h-[50vh]"
+          onPromptSelect={(prompt) => {
+            setInsightsOpen(false);
+            setInputMessage(prompt);
+            inputRef.current?.focus();
+          }}
+        />
       </ResponsiveSheet>
     </div>
   );

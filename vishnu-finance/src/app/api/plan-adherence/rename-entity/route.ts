@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth/server-auth';
 import { clearUserCache } from '@/lib/api-cache';
+import { invalidateUserAppData } from '@/lib/server-data-cache';
 import { prisma } from '@/lib/db';
 import { upsertEntityMapping } from '@/lib/entity-mapping-service';
 import { getEntityUpdateField } from '@/lib/transaction-utils';
@@ -77,6 +78,7 @@ export async function POST(request: NextRequest) {
     }
 
     await clearUserCache(user.id);
+    invalidateUserAppData(user.id);
 
     return NextResponse.json({
       updated: transactions.length,

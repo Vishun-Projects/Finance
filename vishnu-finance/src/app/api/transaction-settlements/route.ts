@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth/server-auth';
 import { clearUserCache } from '@/lib/api-cache';
+import { invalidateUserAppData } from '@/lib/server-data-cache';
 import { createSettlement, listSettlements } from '@/lib/transaction-settlement-service';
 import type { SettlementType } from '@prisma/client';
 
@@ -73,6 +74,7 @@ export async function POST(request: NextRequest) {
     });
 
     await clearUserCache(user.id);
+    invalidateUserAppData(user.id);
 
     return NextResponse.json({ settlement });
   } catch (error) {

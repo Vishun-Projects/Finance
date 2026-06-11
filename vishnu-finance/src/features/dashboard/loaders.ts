@@ -12,17 +12,19 @@ export async function loadDashboard(userId: string): Promise<DashboardBootstrap>
   const startDate = parseLocalDateStart(monthRange.startDate);
   const endDate = parseLocalDateEnd(monthRange.endDate);
 
-  const [stats, goals, deadlines, wishlist, planIncomeContext, accountBalance] = await Promise.all([
+  const planIncomeContextPromise = loadPlanIncomeContext(userId);
+
+  const [stats, goals, deadlines, wishlist, planIncomeContext, accountBalance, adherence] = await Promise.all([
     dashboardService.getSimpleStats({ userId, startDate, endDate }),
     loadGoals(userId),
     loadDeadlines(userId),
     loadWishlist(userId),
-    loadPlanIncomeContext(userId),
+    planIncomeContextPromise,
     getCurrentAccountBalance(userId),
+    planIncomeContextPromise.then((ctx) => getPlanAdherence(userId, ctx.planScale)),
   ]);
 
   const planIncome = planIncomeContext.planScale;
-  const adherence = await getPlanAdherence(userId, planIncome);
 
   const disciplineSummary = computeDisciplineSummary(
     goals,

@@ -1,6 +1,7 @@
 import type { Transaction } from '@/types';
 import { TRANSACTION_PAGE_SIZE } from '@/features/transactions/constants';
-import { serverFetch } from '@/lib/server-fetch';
+import { parseLocalDateEnd, parseLocalDateStart } from '@/lib/date-range';
+import { prisma } from '@/lib/db';
 
 export interface TransactionPagination {
   total: number;
@@ -28,6 +29,7 @@ export interface TransactionCategorySummary {
 }
 
 interface LoadTransactionsParams {
+  userId: string;
   startDate: string;
   endDate: string;
   includeDeleted?: boolean;
@@ -37,7 +39,12 @@ interface LoadTransactionsParams {
   pageSize?: number;
 }
 
+function toJson<T>(value: unknown): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
 export async function loadTransactionsBootstrap({
+  userId,
   startDate,
   endDate,
   includeDeleted = false,
@@ -46,45 +53,107 @@ export async function loadTransactionsBootstrap({
   page = 1,
   pageSize = TRANSACTION_PAGE_SIZE,
 }: LoadTransactionsParams): Promise<TransactionsResponse> {
-  const params = new URLSearchParams({
-    startDate,
-    endDate,
-    sortField: 'transactionDate',
-    sortDirection: 'desc',
-    page: page.toString(),
-    pageSize: pageSize.toString(),
-    includeTotals: 'true',
-  });
+  const skip = (page - 1) * pageSize;
+  const where: Record<string, unknown> = { userId };
 
-  if (includeDeleted) {
-    params.set('includeDeleted', 'true');
+  if (!includeDeleted) {
+    where.isDeleted = false;
   }
 
   if (type !== 'ALL') {
-    params.set('type', type);
+    where.financialCategory = type;
   }
 
-  if (search) {
-    params.set('search', search);
+  const start = parseLocalDateStart(startDate);
+  const end = parseLocalDateEnd(endDate);
+  if (!Number.isNaN(start.getTime()) || !Number.isNaN(end.getTime())) {
+    where.transactionDate = {
+      ...(Number.isNaN(start.getTime()) ? {} : { gte: start }),
+      ...(Number.isNaN(end.getTime()) ? {} : { lte: end }),
+    };
   }
 
-  const data = await serverFetch<TransactionsResponse>(`/api/transactions?${params.toString()}`, {
-    description: 'transactions-bootstrap',
-    revalidate: false,
-  });
+  if (search?.trim()) {
+    const term = search.trim();
+    where.AND = [
+      {
+        OR: [
+          { description: { contains: term, mode: 'insensitive' } },
+          { store: { contains: term, mode: 'insensitive' } },
+          { personName: { contains: term, mode: 'insensitive' } },
+          { upiId: { contains: term, mode: 'insensitive' } },
+          { notes: { contains: term, mode: 'insensitive' } },
+          { category: { name: { contains: term, mode: 'insensitive' } } },
+        ],
+      },
+    ];
+  }
+
+  const [transactions, totalCount, totalsQuery] = await Promise.all([
+    prisma.transaction.findMany({
+      where,
+      include: {
+        category: true,
+        document: {
+          select: {
+            id: true,
+            originalName: true,
+            mimeType: true,
+            fileSize: true,
+            visibility: true,
+            sourceType: true,
+            uploadedById: true,
+            ownerId: true,
+            bankCode: true,
+            isDeleted: true,
+            deletedAt: true,
+          },
+        },
+      },
+      orderBy: { transactionDate: 'desc' },
+      skip,
+      take: pageSize,
+    }),
+    prisma.transaction.count({ where }),
+    prisma.transaction.aggregate({
+      where,
+      _sum: { creditAmount: true, debitAmount: true },
+    }),
+  ]);
 
   return {
-    transactions: data.transactions ?? [],
-    pagination: data.pagination ?? { total: 0, page, pageSize, totalPages: 0 },
-    totals: data.totals ?? null,
+    transactions: toJson(transactions) as Transaction[],
+    pagination: {
+      total: totalCount,
+      page,
+      pageSize,
+      totalPages: Math.ceil(totalCount / pageSize) || 0,
+    },
+    totals: {
+      income: Number(totalsQuery._sum.creditAmount || 0),
+      expense: Number(totalsQuery._sum.debitAmount || 0),
+    },
   };
 }
 
-export async function loadTransactionCategories(): Promise<TransactionCategorySummary[]> {
-  const data = await serverFetch<TransactionCategorySummary[]>('/api/categories', {
-    description: 'transaction-categories',
-    revalidate: false,
+export async function loadTransactionCategories(userId: string): Promise<TransactionCategorySummary[]> {
+  const categories = await prisma.category.findMany({
+    where: {
+      OR: [{ userId }, { isDefault: true }],
+    },
+    select: {
+      id: true,
+      name: true,
+      type: true,
+      color: true,
+    },
+    orderBy: { name: 'asc' },
   });
 
-  return data ?? [];
+  return categories.map((c) => ({
+    id: c.id,
+    name: c.name,
+    type: c.type as TransactionCategorySummary['type'],
+    color: c.color ?? undefined,
+  }));
 }

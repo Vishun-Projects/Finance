@@ -30,6 +30,7 @@ import {
   mobileBottomNavItems,
   primaryNavItemsConfig,
 } from '@/lib/nav-config';
+import { hideGlobalTopBar } from '@/lib/layout-config';
 import { hapticLight } from '@/lib/haptics';
 import { MobileBottomNav } from '@/components/layout/mobile-bottom-nav';
 
@@ -40,7 +41,7 @@ export default function Navigation() {
   const pathname = usePathname();
   const isDarkMode = !isLoading && isDark;
   const pageTitle = getPageTitle(pathname);
-  const hideMobileTopBar = pathname === '/dashboard' || pathname === '/advisor' || pathname === '/plans';
+  const hideMobileTopBar = hideGlobalTopBar(pathname);
 
   const activeByHref = useMemo(() => {
     return new Set(

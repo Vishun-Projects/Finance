@@ -12,6 +12,8 @@ import {
 import { useIsMobile } from '@/hooks/use-breakpoint';
 import { cn } from '@/lib/utils';
 import { patterns } from '@/design/patterns';
+import type { MobileSheetHeight } from '@/lib/motion-utils';
+import { mobileSheetHeightClasses } from '@/lib/motion-utils';
 
 type SheetSide = 'top' | 'bottom' | 'left' | 'right';
 
@@ -27,6 +29,7 @@ interface ResponsiveSheetProps {
   className?: string;
   contentClassName?: string;
   showGrabber?: boolean;
+  mobileHeight?: MobileSheetHeight;
 }
 
 export function ResponsiveSheet({
@@ -40,6 +43,7 @@ export function ResponsiveSheet({
   className,
   contentClassName,
   showGrabber = true,
+  mobileHeight = 'medium',
 }: ResponsiveSheetProps) {
   const isMobile = useIsMobile('lg');
   const side: SheetSide = isMobile ? 'bottom' : desktopSide;
@@ -49,8 +53,9 @@ export function ResponsiveSheet({
       <SheetContent
         side={side}
         className={cn(
-          isMobile && patterns.bottomSheet,
-          isMobile && 'h-[92vh] w-full p-0 sm:max-w-none',
+          isMobile && patterns.bottomSheetBase,
+          isMobile && mobileSheetHeightClasses[mobileHeight],
+          isMobile && 'w-full rounded-t-2xl p-0 sm:max-w-none',
           !isMobile && desktopSide === 'right' && 'sm:max-w-md md:max-w-lg',
           !isMobile && desktopSide === 'left' && 'sm:max-w-sm',
           className,
@@ -69,9 +74,11 @@ export function ResponsiveSheet({
               {description && <SheetDescription>{description}</SheetDescription>}
             </SheetHeader>
           )}
-          <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
+          <div className="scrollbar-none min-h-0 flex-1 overflow-y-auto">{children}</div>
           {footer && (
-            <SheetFooter className={cn('mt-4 shrink-0', isMobile && 'px-0')}>{footer}</SheetFooter>
+            <SheetFooter className={cn('mt-4 shrink-0 border-t border-border pt-4', isMobile && 'px-0')}>
+              {footer}
+            </SheetFooter>
           )}
         </div>
       </SheetContent>

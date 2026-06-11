@@ -102,12 +102,12 @@ export function PlanCapacityBanner({
         )}
       </div>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-        <div className="rounded-md border border-border bg-card/60 p-2.5">
+      <div className="grid grid-cols-3 gap-3 lg:grid-cols-5">
+        <div className="hidden rounded-md border border-border bg-card/60 p-2.5 lg:block">
           <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-hint">Headroom</p>
           <p className="mt-1 text-sm font-semibold tabular-nums">{formatDisciplineCurrency(capacity.headroom)}</p>
         </div>
-        <div className="rounded-md border border-border bg-card/60 p-2.5">
+        <div className="hidden rounded-md border border-border bg-card/60 p-2.5 lg:block">
           <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-hint">Unspent plan</p>
           <p className="mt-1 text-sm font-semibold tabular-nums">{formatDisciplineCurrency(capacity.underspend)}</p>
         </div>
@@ -116,13 +116,13 @@ export function PlanCapacityBanner({
           <p className="mt-1 text-sm font-semibold tabular-nums text-[var(--success)]">
             {formatDisciplineCurrency(capacity.available)}
           </p>
-          <p className="mt-0.5 text-[9px] text-muted">From income received</p>
+          <p className="mt-0.5 text-[9px] text-muted max-lg:hidden">From income received</p>
         </div>
         <div className="rounded-md border border-border bg-card/60 p-2.5">
           <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-hint">Required/mo</p>
           <p className="mt-1 text-sm font-semibold tabular-nums">{formatDisciplineCurrency(totalRequiredPerMonth)}</p>
         </div>
-        <div className="col-span-2 rounded-md border border-border bg-card/60 p-2.5 lg:col-span-1">
+        <div className="rounded-md border border-border bg-card/60 p-2.5">
           <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-hint">Gap</p>
           <p
             className={cn(

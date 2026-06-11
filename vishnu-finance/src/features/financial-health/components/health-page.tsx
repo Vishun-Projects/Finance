@@ -222,15 +222,7 @@ export default function FinancialHealthPageClient({
         )}
 
         {monthDiscipline ? (
-          <>
-            <div className="mb-4 hidden max-w-xs md:block">
-              <div className="card-base min-w-0 p-4">
-                <p className="text-[10px] uppercase tracking-[0.08em] text-hint">Plan adherence</p>
-                <p className="text-lg font-semibold tabular-nums">{monthAdherence?.overallScore ?? 0}%</p>
-              </div>
-            </div>
-            <PlanDisciplineStrip summary={monthDiscipline} className="mb-4 hidden md:block" />
-          </>
+          <PlanDisciplineStrip summary={monthDiscipline} className="mb-4 hidden md:block" />
         ) : null}
 
         <div className="grid grid-cols-1 gap-4 max-lg:gap-3 lg:grid-cols-12 lg:gap-5">

@@ -18,10 +18,9 @@ import Link from 'next/link';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Chip } from '@/components/ui/chip';
-import { PageHero } from '@/components/ui/hero';
+import { Card } from '@/components/ui/card';
 import { SectionLabel } from '@/components/ui/section-label';
 import { NavPill, NavPillGroup } from '@/components/ui/nav-pill';
-import { Card } from '@/components/ui/card';
 import { patterns } from '@/design/patterns';
 import { getSentimentChipVariant } from '@/design/tokens';
 import { cn } from '@/lib/utils';
@@ -105,7 +104,8 @@ export default function EducationPage() {
   useMobileRefreshRegister(
     useCallback(async () => {
       await Promise.all([fetchDailyNews(), fetchPosts()]);
-    }, [fetchDailyNews, fetchPosts])
+    }, [fetchDailyNews, fetchPosts]),
+    '/education',
   );
 
   const handleSearch = (e: React.FormEvent) => {
@@ -116,8 +116,7 @@ export default function EducationPage() {
   const completedCount = posts.filter((p) => p.isCompleted).length;
 
   return (
-    <div className="flex h-full flex-col text-muted">
-      <main className="space-y-6 overflow-y-auto custom-scrollbar scroll-pb-bottom-bar">
+    <div className="space-y-6 text-muted">
         <Card className="card-base relative overflow-hidden p-5 md:p-6">
           <div className="pointer-events-none absolute right-0 top-0 hidden p-8 opacity-[0.06] md:block">
             <Globe className="size-48 rotate-12" />
@@ -188,13 +187,6 @@ export default function EducationPage() {
             <p className="text-sm text-hint">Unable to load daily briefing.</p>
           )}
         </Card>
-
-        <PageHero
-          tag="Financial Education"
-          title="Master your financial future"
-          subtitle="Guides and insights to help you build lasting wealth."
-          className="hidden lg:block"
-        />
 
         <div className="sticky top-[calc(3rem+env(safe-area-inset-top))] z-20 -mx-1 py-2 lg:static lg:py-0">
           <NavPillGroup className="overflow-x-auto">
@@ -281,7 +273,6 @@ export default function EducationPage() {
             <SectionLabel className="mb-0 text-foreground">No matching guides</SectionLabel>
           </Card>
         )}
-      </main>
     </div>
   );
 }

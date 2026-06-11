@@ -1,7 +1,7 @@
 'use client';
 
 import { navPillVariants, segmentedNavPillVariants } from '@/design/variants';
-import { prefersReducedMotion } from '@/lib/motion-utils';
+import { getWhileTap, prefersReducedMotion } from '@/lib/motion-utils';
 import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
 import {
@@ -43,10 +43,11 @@ export function NavPill({
   }, [active, updateIndicator]);
 
   return (
-    <button
+    <motion.button
       type="button"
       onClick={onClick}
       data-nav-active={active ? 'true' : 'false'}
+      whileTap={getWhileTap()}
       className={cn(
         variants({ active }),
         variant === 'segmented' && active && 'font-semibold',
@@ -56,7 +57,7 @@ export function NavPill({
     >
       {icon}
       {label}
-    </button>
+    </motion.button>
   );
 }
 

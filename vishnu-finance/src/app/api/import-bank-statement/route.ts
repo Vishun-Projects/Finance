@@ -15,6 +15,7 @@ import { validateBalanceReconciliation, formatValidationResult } from '@/lib/bal
 import { categorizeTransactions, detectAutoPayTransactions } from '@/lib/transaction-categorization-service';
 import { toLocalISODate } from '@/lib/date-range';
 import { globalCache } from '@/lib/cache-singleton';
+import { revalidateUserAppPages } from '@/lib/server-data-cache';
 import { generateDedupHash, areDescriptionsSimilar, buildInFileDedupKey } from '@/lib/import-dedup';
 
 interface ImportRecord {
@@ -1280,6 +1281,7 @@ export async function POST(request: NextRequest) {
 
 
     globalCache.clear();
+    revalidateUserAppPages(userId);
 
     const meta = extractRequestMeta(request);
 
@@ -1365,7 +1367,8 @@ export async function POST(request: NextRequest) {
           after(() => {
             import('@/lib/multi-pass-categorization').then(({ multiPassCategorization }) => {
               multiPassCategorization(userId, insertedTransactionIds)
-                .then(result => {
+                .then(() => {
+                  revalidateUserAppPages(userId);
                 })
                 .catch(error => {
                   console.error('❌ Background categorization failed:', error);

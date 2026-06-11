@@ -20,8 +20,11 @@ import {
 import PageSkeleton from '@/components/feedback/page-skeleton';
 import { MarkdownRenderer } from '@/features/advisor/components/markdown-renderer';
 import { FinancialInsightsPanel } from '@/features/advisor/components/financial-insights-panel';
+import { TabPanelTransition } from '@/components/motion/tab-panel';
+import { useMobileRefreshRegister } from '@/contexts/MobileRefreshContext';
 import { ChartMessage, ChartConfig } from '@/features/advisor/components/chart-message';
 import { useTheme } from '@/contexts/ThemeContext';
+import { cn } from '@/lib/utils';
 import {
   Sheet,
   SheetContent,
@@ -29,7 +32,8 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet';
-import { cn } from '@/lib/utils';
+import { useRouteBootstrap } from '@/hooks/use-route-bootstrap';
+import type { AdvisorInsightsPayload } from '@/lib/dashboard-insights';
 
 interface Message {
   id: string;
@@ -50,8 +54,13 @@ interface Conversation {
 
 type AdvisorMode = 'insights' | 'ai';
 
-export default function AdvisorPageClient() {
+interface AdvisorPageProps {
+  initialInsights: import('@/lib/dashboard-insights').AdvisorInsightsPayload;
+}
+
+export default function AdvisorPage({ initialInsights }: AdvisorPageProps) {
   const { user, loading: authLoading } = useAuth();
+  const cachedInsights = useRouteBootstrap('/advisor', initialInsights);
   const { setTheme, isLoading: themeLoading, isDark } = useTheme();
   const isDarkMode = !themeLoading && isDark;
   const [mode, setMode] = useState<AdvisorMode>('ai');
@@ -65,6 +74,11 @@ export default function AdvisorPageClient() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const insightsRefreshRef = useRef<(() => Promise<void>) | null>(null);
+
+  const registerInsightsRefresh = useCallback((refetch: () => Promise<void>) => {
+    insightsRefreshRef.current = refetch;
+  }, []);
 
   const openAiWithPrompt = useCallback((prompt: string) => {
     setInputMessage(prompt);
@@ -92,6 +106,17 @@ export default function AdvisorPageClient() {
       fetchConversations();
     }
   }, [user, authLoading, fetchConversations]);
+
+  useMobileRefreshRegister(
+    useCallback(async () => {
+      if (mode === 'insights') {
+        await insightsRefreshRef.current?.();
+      } else {
+        await fetchConversations();
+      }
+    }, [mode, fetchConversations]),
+    '/advisor',
+  );
 
   useEffect(() => {
     async function fetchMessages(id: string) {
@@ -224,7 +249,7 @@ export default function AdvisorPageClient() {
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background text-foreground">
+    <div className="flex flex-col bg-background text-foreground">
       <header className="safe-top shrink-0 border-b border-border bg-background px-4 lg:px-6">
         <div className="flex h-14 items-center justify-between gap-3">
           <div className="min-w-0">
@@ -308,14 +333,16 @@ export default function AdvisorPageClient() {
         </div>
       </header>
 
+      <TabPanelTransition panelKey={mode}>
       {mode === 'insights' ? (
         <FinancialInsightsPanel
-          className="custom-scrollbar scroll-pb-bottom-bar min-h-0 flex-1 overflow-y-auto overscroll-contain pb-bottom-bar"
+          insights={cachedInsights}
           onPromptSelect={openAiWithPrompt}
+          onRegisterRefresh={registerInsightsRefresh}
         />
       ) : (
-        <section className="relative flex min-h-0 flex-1 flex-col bg-background">
-          <div className="custom-scrollbar scroll-pb-bottom-bar min-h-0 flex-1 space-y-8 overflow-y-auto overscroll-contain p-4 pb-bottom-bar sm:p-6">
+        <section className="relative flex flex-col bg-background">
+          <div className="space-y-8 p-4 pb-[calc(var(--app-bottom-inset)+5.5rem)] sm:p-6">
             {loading && messages.length === 0 ? (
               <div className="flex min-h-[50vh] flex-col items-center justify-center">
                 <Loader2 className="size-8 animate-spin text-primary opacity-50" />
@@ -390,36 +417,39 @@ export default function AdvisorPageClient() {
                 </div>
               ))
             )}
-            <div ref={messagesEndRef} className="h-10" />
-          </div>
-
-          <div className="fixed inset-x-0 bottom-[calc(var(--app-bottom-inset)+0.25rem)] z-30 shrink-0 p-3 glass-mobile-bar glass-text lg:static lg:bottom-auto lg:p-4 lg:pb-6">
-            <div className="relative mx-auto max-w-4xl">
-              <Input
-                ref={inputRef}
-                value={inputMessage}
-                onChange={(e) => setInputMessage(e.target.value)}
-                onKeyDown={handleKeyPress}
-                placeholder="Ask a question about your finances…"
-                disabled={loading}
-                className="h-12 border-border bg-card pr-24 text-sm"
-              />
-              <div className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-2">
-                <Button variant="ghost" size="icon" className="size-9 text-muted" disabled>
-                  <Mic className="size-4" />
-                </Button>
-                <Button
-                  onClick={sendMessage}
-                  disabled={loading || !inputMessage.trim()}
-                  size="icon"
-                  className="size-9"
-                >
-                  {loading ? <Loader2 className="size-4 animate-spin" /> : <ArrowUp className="size-4" />}
-                </Button>
-              </div>
-            </div>
+            <div ref={messagesEndRef} />
           </div>
         </section>
+      )}
+      </TabPanelTransition>
+
+      {mode === 'ai' && (
+        <div className="fixed inset-x-0 bottom-[calc(var(--app-bottom-inset)+0.25rem)] z-30 shrink-0 p-3 glass-mobile-bar glass-text lg:static lg:bottom-auto lg:p-4 lg:pb-6">
+          <div className="relative mx-auto max-w-4xl">
+            <Input
+              ref={inputRef}
+              value={inputMessage}
+              onChange={(e) => setInputMessage(e.target.value)}
+              onKeyDown={handleKeyPress}
+              placeholder="Ask a question about your finances…"
+              disabled={loading}
+              className="h-12 border-border bg-card pr-24 text-sm"
+            />
+            <div className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-2">
+              <Button variant="ghost" size="icon" className="size-9 text-muted" disabled>
+                <Mic className="size-4" />
+              </Button>
+              <Button
+                onClick={sendMessage}
+                disabled={loading || !inputMessage.trim()}
+                size="icon"
+                className="size-9"
+              >
+                {loading ? <Loader2 className="size-4 animate-spin" /> : <ArrowUp className="size-4" />}
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

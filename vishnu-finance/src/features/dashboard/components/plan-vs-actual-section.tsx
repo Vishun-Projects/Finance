@@ -140,8 +140,6 @@ interface PlanVsActualSectionProps {
   };
   maxHeight?: number;
   className?: string;
-  /** Expand card to fill parent height on mobile (dashboard Plans tab) */
-  fillHeight?: boolean;
   budgetPlanName?: string;
 }
 
@@ -157,7 +155,6 @@ export function PlanVsActualSection({
   incomeBreakdown,
   maxHeight,
   className,
-  fillHeight = false,
   budgetPlanName,
 }: PlanVsActualSectionProps) {
   const router = useRouter();
@@ -168,12 +165,7 @@ export function PlanVsActualSection({
   const visibleLineItems = showAllBreakdown ? lineItems : lineItems.slice(0, 5);
 
   return (
-    <div
-      className={cn(
-        fillHeight && 'flex min-h-0 flex-1 flex-col',
-        className,
-      )}
-    >
+    <div className={cn(className)}>
       <TakeHomeAnchor
         baseIncome={planBaseIncome}
         source={planIncomeSource}
@@ -184,13 +176,7 @@ export function PlanVsActualSection({
         lastMonthSalaryReceived={planIncomeContext?.lastMonthSalaryReceived}
         receivedSalarySource={planIncomeContext?.receivedSalarySource}
       />
-      <section
-        className={cn(
-          'card-base flex min-h-0 flex-col overflow-hidden p-4 max-lg:p-3',
-          fillHeight && 'min-h-0 flex-1',
-        )}
-        style={maxHeight ? { maxHeight: `${maxHeight}px` } : undefined}
-      >
+      <section className="card-base flex flex-col p-4 max-lg:p-3">
         <div className="mb-4 flex shrink-0 items-center justify-between gap-2 max-lg:mb-2">
           <div>
             <h2 className="text-sm font-medium text-foreground">Monthly budget vs actual</h2>
@@ -209,7 +195,7 @@ export function PlanVsActualSection({
           </Button>
         </div>
 
-        <Tabs defaultValue="overview" className="flex min-h-0 w-full flex-1 flex-col">
+        <Tabs defaultValue="overview" className="w-full">
           <TabsList className="mb-4 h-8 w-full shrink-0 justify-start bg-surface max-lg:mb-2 max-lg:h-7">
             <TabsTrigger value="overview" className="h-7 px-3 text-xs">
               Overview
@@ -219,16 +205,16 @@ export function PlanVsActualSection({
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="overview" className="mt-0 flex min-h-0 flex-1 flex-col data-[state=inactive]:hidden">
-            <div className="custom-scrollbar min-h-0 flex-1 space-y-4 overflow-y-auto pr-1 max-lg:space-y-2">
+          <TabsContent value="overview" className="mt-0 data-[state=inactive]:hidden">
+            <div className="space-y-4 max-lg:space-y-2">
               {buckets.map((bucket) => (
                 <BucketRow key={bucket.key} bucket={bucket} />
               ))}
             </div>
           </TabsContent>
 
-          <TabsContent value="breakdown" className="mt-0 flex min-h-0 flex-1 flex-col data-[state=inactive]:hidden">
-            <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto pr-1">
+          <TabsContent value="breakdown" className="mt-0 data-[state=inactive]:hidden">
+            <div>
               <div className="divide-y divide-border">
                 {visibleLineItems.map((item) => (
                   <LineItemRow

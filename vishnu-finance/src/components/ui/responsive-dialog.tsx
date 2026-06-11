@@ -20,6 +20,8 @@ import {
 import { useIsMobile } from '@/hooks/use-breakpoint';
 import { cn } from '@/lib/utils';
 import { patterns } from '@/design/patterns';
+import type { MobileSheetHeight } from '@/lib/motion-utils';
+import { mobileSheetHeightClasses } from '@/lib/motion-utils';
 
 interface ResponsiveDialogProps {
   open: boolean;
@@ -32,6 +34,8 @@ interface ResponsiveDialogProps {
   contentClassName?: string;
   /** Max width on desktop */
   maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | 'full';
+  /** Mobile bottom sheet height tier */
+  mobileHeight?: MobileSheetHeight;
 }
 
 const maxWidthClasses = {
@@ -43,6 +47,14 @@ const maxWidthClasses = {
   full: 'sm:max-w-[min(100%,72rem)]',
 };
 
+function SheetGrabber() {
+  return (
+    <div className="flex shrink-0 justify-center pt-3 pb-1">
+      <div className="h-1 w-10 rounded-full bg-muted-foreground/30" aria-hidden />
+    </div>
+  );
+}
+
 export function ResponsiveDialog({
   open,
   onOpenChange,
@@ -53,6 +65,7 @@ export function ResponsiveDialog({
   className,
   contentClassName,
   maxWidth = 'lg',
+  mobileHeight = 'medium',
 }: ResponsiveDialogProps) {
   const isMobile = useIsMobile('lg');
 
@@ -62,15 +75,14 @@ export function ResponsiveDialog({
         <SheetContent
           side="bottom"
           className={cn(
-            patterns.bottomSheet,
-            'h-[95dvh] w-full p-0 sm:max-w-none',
+            patterns.bottomSheetBase,
+            mobileSheetHeightClasses[mobileHeight],
+            'w-full rounded-t-2xl p-0 sm:max-w-none',
             className,
             contentClassName
           )}
         >
-          <div className="flex shrink-0 justify-center pt-3 pb-1">
-            <div className="h-1 w-10 rounded-full bg-muted-foreground/30" aria-hidden />
-          </div>
+          <SheetGrabber />
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-4 pb-4">
             {(title || description) && (
               <SheetHeader className="px-0 pt-2 text-left">
@@ -78,8 +90,8 @@ export function ResponsiveDialog({
                 {description && <SheetDescription>{description}</SheetDescription>}
               </SheetHeader>
             )}
-            <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
-            {footer && <SheetFooter className="mt-4 shrink-0 px-0">{footer}</SheetFooter>}
+            <div className="scrollbar-none min-h-0 flex-1 overflow-y-auto">{children}</div>
+            {footer && <SheetFooter className="mt-4 shrink-0 border-t border-border pt-4 px-0">{footer}</SheetFooter>}
           </div>
         </SheetContent>
       </Sheet>

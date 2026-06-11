@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { clearUserCache } from '@/lib/api-cache';
+import { invalidateUserAppData } from '@/lib/server-data-cache';
 
 // Helper functions for analytics
 function processMonthlyTrends(income: any[], expenses: any[], months: number) {
@@ -749,6 +750,7 @@ export async function POST(request: NextRequest) {
 
       // Clear cache to ensure Advisor/Dashboard see new data
       await clearUserCache(user.id);
+      invalidateUserAppData(user.id);
 
       return NextResponse.json({
         ...transaction,
@@ -817,6 +819,7 @@ export async function POST(request: NextRequest) {
 
       // Clear cache
       await clearUserCache(user.id);
+      invalidateUserAppData(user.id);
 
       return NextResponse.json({
         ...updated,
@@ -856,6 +859,7 @@ export async function POST(request: NextRequest) {
 
       // Clear cache
       await clearUserCache(user.id);
+      invalidateUserAppData(user.id);
 
       return NextResponse.json({
         id: deleted.id,
@@ -906,6 +910,7 @@ export async function POST(request: NextRequest) {
 
       // Clear cache
       await clearUserCache(user.id);
+      invalidateUserAppData(user.id);
 
       return NextResponse.json({
         success: true,
@@ -1386,6 +1391,7 @@ export async function POST(request: NextRequest) {
         }));
 
         await clearUserCache(user.id);
+      invalidateUserAppData(user.id);
 
         return NextResponse.json({
           message: 'Categorization complete',

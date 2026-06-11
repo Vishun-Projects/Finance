@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { format, differenceInCalendarDays, startOfDay } from 'date-fns';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import {
   AlarmClock,
   ArrowRight,
@@ -28,7 +28,6 @@ import { PlanVsActualSection } from '@/features/dashboard/components/plan-vs-act
 import type { GoalAdherence } from '@/lib/plan-adherence-service';
 import { cn, formatRupees } from '@/lib/utils';
 import { getTransactionDisplayName } from '@/lib/transaction-utils';
-import { MobileHeroMetric } from '@/components/ui/mobile-kpi-strip';
 import { CompactListRow } from '@/components/ui/compact-list-row';
 import { InsightBanner } from '@/components/ui/insight-banner';
 import { SegmentSplitBar } from '@/components/ui/segment-split-bar';
@@ -42,6 +41,7 @@ import { DashboardRecentActivity } from '@/features/dashboard/components/dashboa
 import { DashboardQuickActionGrid } from '@/features/dashboard/components/dashboard-quick-action-grid';
 import { DashboardExploreGrid } from '@/features/dashboard/components/dashboard-explore-grid';
 import { PageMandate } from '@/components/layout/page-mandate';
+import { TabPanelTransition } from '@/components/motion/tab-panel';
 import { useTheme } from '@/contexts/ThemeContext';
 import {
   buildContextBanner,
@@ -55,10 +55,9 @@ import {
   computeSafeToSpend,
   type DisciplineSummary,
 } from '@/lib/plans-discipline';
-import { AccountBalanceChip } from '@/components/finance/account-balance-chip';
-import { MonthAtGlanceKpis } from '@/components/finance/month-at-glance-kpis';
 import { useBreakpoint } from '@/hooks/use-breakpoint';
 import { useMobileRefreshRegister } from '@/contexts/MobileRefreshContext';
+import { useRouteBootstrap, clearRouteBootstrap } from '@/hooks/use-route-bootstrap';
 
 interface DashboardPageProps {
   data: DashboardBootstrap;
@@ -83,9 +82,10 @@ function deadlineDueLabel(dueDate: string) {
   return `Due in ${daysLeft} days`;
 }
 
-export default function DashboardPage({ data }: DashboardPageProps) {
+export default function DashboardPage({ data: serverData }: DashboardPageProps) {
   const router = useRouter();
-  const { stats, adherence, disciplineSummary: initialDisciplineSummary, planIncomeContext, accountBalance } = data;
+  const data = useRouteBootstrap('/dashboard', serverData);
+  const { stats, adherence, disciplineSummary: initialDisciplineSummary, planIncomeContext } = data;
   const { currentMonthStats, incomeBreakdown } = stats;
   const income = currentMonthStats.income;
   const expenses = currentMonthStats.expenses;
@@ -152,8 +152,6 @@ export default function DashboardPage({ data }: DashboardPageProps) {
   const mobileGoals = adherence.goals.slice(0, isMdUp ? 5 : 2);
   const overviewRecentTransactions = stats.recentTransactions.slice(0, 3);
   const recentTransactions = stats.recentTransactions.slice(0, isMdUp ? 8 : 4);
-  const recentActivityRef = useRef<HTMLElement>(null);
-  const [recentActivityHeight, setRecentActivityHeight] = useState<number>();
   const [mobileView, setMobileView] = useState<DashboardMobileView>('overview');
   const { setTheme, isLoading: themeLoading, isDark } = useTheme();
   const isDarkMode = !themeLoading && isDark;
@@ -167,8 +165,10 @@ export default function DashboardPage({ data }: DashboardPageProps) {
 
   useMobileRefreshRegister(
     useCallback(async () => {
+      clearRouteBootstrap('/dashboard');
       router.refresh();
-    }, [router])
+    }, [router]),
+    '/dashboard',
   );
 
   const safeToSpend = useMemo(() => {
@@ -179,30 +179,10 @@ export default function DashboardPage({ data }: DashboardPageProps) {
     return computeSafeToSpend(disciplineSummary, upcoming);
   }, [disciplineSummary]);
 
-  useEffect(() => {
-    const element = recentActivityRef.current;
-    if (!element) return;
-
-    const updateHeight = () => {
-      setRecentActivityHeight(element.offsetHeight);
-    };
-
-    updateHeight();
-    const observer = new ResizeObserver(updateHeight);
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, [adherence.goals.length, recentTransactions.length]);
-
   return (
-    <div
-      className={cn(
-        patterns.pageFluid,
-        'flex flex-col gap-5 pb-8',
-        'max-lg:min-h-0 max-lg:flex-1 max-lg:gap-0 max-lg:overflow-hidden max-lg:pb-0',
-      )}
-    >
-      {/* Mobile dashboard header — replaces global top bar on this route */}
-      <div className="safe-top shrink-0 -mx-4 flex items-start justify-between gap-2 px-4 pt-2 lg:hidden">
+    <div className={cn(patterns.pageFluid, 'flex flex-col gap-5 pb-4 lg:pb-8')}>
+      {/* Dashboard header — replaces global top bar on this route */}
+      <div className="safe-top shrink-0 -mx-4 flex items-start justify-between gap-2 px-4 pt-2">
         <PageMandate
           className="min-w-0 flex-1"
           title={adherence.monthLabel}
@@ -214,9 +194,8 @@ export default function DashboardPage({ data }: DashboardPageProps) {
               tone: displayNetFlow >= 0 ? 'success' : 'danger',
             },
             {
-              label: 'Spent / plan',
-              value: `${Math.round(spendingContext.spentOfPlanPercent)}%`,
-              tone: spendingContext.spentOfPlanPercent > 100 ? 'danger' : 'default',
+              label: 'Plan adherence',
+              value: `${combinedPlanScore}%`,
             },
             ...(safeToSpend
               ? [{
@@ -238,7 +217,7 @@ export default function DashboardPage({ data }: DashboardPageProps) {
                   : []),
           ]}
         />
-        <div className="flex shrink-0 flex-col items-center gap-1 pt-0.5">
+        <div className="flex shrink-0 flex-col items-center gap-1 pt-0.5 lg:hidden">
           <button
             type="button"
             onClick={() => setTheme(isDarkMode ? 'light' : 'dark')}
@@ -258,38 +237,15 @@ export default function DashboardPage({ data }: DashboardPageProps) {
         </div>
       </div>
 
-      <PageMandate
-        className="max-lg:hidden"
-        title={adherence.monthLabel}
-        mandate="This month at a glance — live transactions vs your phase plan and goals."
-        metrics={[
-          {
-            label: 'Net flow',
-            value: `${displayNetFlow >= 0 ? '+' : ''}${formatRupees(displayNetFlow)}`,
-            tone: displayNetFlow >= 0 ? 'success' : 'danger',
-          },
-          {
-            label: 'Plan adherence',
-            value: `${combinedPlanScore}%`,
-          },
-          ...(safeToSpend
-            ? [{ label: 'Safe to spend', value: formatDisciplineCurrency(safeToSpend.safeToSpend) }]
-            : []),
-        ]}
-      />
-
       <DashboardSegmentedNav
         active={mobileView}
         onChange={setMobileView}
         className="shrink-0 -mx-4 px-4 lg:hidden"
       />
 
-      {/* Mobile tab panels — fill remaining viewport above bottom nav */}
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden pb-bottom-bar lg:hidden">
+      <TabPanelTransition panelKey={mobileView} className="lg:hidden">
         {mobileView === 'plans' ? (
           <PlanVsActualSection
-            className="flex min-h-0 flex-1 flex-col"
-            fillHeight
             buckets={adherence.buckets}
             lineItems={adherence.lineItems}
             plannedTotal={adherence.plannedTotal}
@@ -301,18 +257,14 @@ export default function DashboardPage({ data }: DashboardPageProps) {
             incomeBreakdown={incomeBreakdown}
             budgetPlanName={adherence.budgetPlanName}
           />
-        ) : (
-          <div className="custom-scrollbar scroll-pb-bottom-bar flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain">
-        {mobileView === 'overview' && (
+        ) : mobileView === 'overview' ? (
           <div className="space-y-3">
             <DashboardSearchBar />
             <DashboardRecentActivity transactions={overviewRecentTransactions} />
             <DashboardQuickActionGrid />
             <DashboardExploreGrid />
           </div>
-        )}
-
-        {mobileView === 'activity' && (
+        ) : (
           <div className="space-y-3">
             <section className="card-base shrink-0 p-3">
               <div className="mb-3 flex items-center justify-between gap-2">
@@ -422,78 +374,10 @@ export default function DashboardPage({ data }: DashboardPageProps) {
 
           </div>
         )}
-          </div>
-        )}
-      </div>
+      </TabPanelTransition>
 
       {/* Desktop summary */}
       <div className="hidden space-y-3 lg:block">
-      <MobileHeroMetric
-        label={hasSettlementAdjustment ? 'Net flow (after settlements)' : 'Net flow'}
-        value={`${displayNetFlow >= 0 ? '+' : ''}${formatRupees(displayNetFlow)}`}
-        tone={displayNetFlow >= 0 ? 'success' : 'danger'}
-        subtitle={
-          <span>
-            Income {formatRupees(income)} · Spent {formatRupees(expenses)}
-            {hasSettlementAdjustment && (
-              <> · Before settlements {netFlow >= 0 ? '+' : ''}{formatRupees(netFlow)}</>
-            )}
-            {safeToSpend && (
-              <> · Fundable {formatDisciplineCurrency(safeToSpend.safeToSpend)}</>
-            )}
-          </span>
-        }
-        footer={
-          <div>
-            <div className="mb-1 flex items-center justify-between text-[10px] text-muted">
-              <span>Plan adherence {combinedPlanScore}%</span>
-              <span>
-                {adherence.activeGoals > 0
-                  ? `${adherence.goalsOnTrack}/${adherence.activeGoals} goals on track`
-                  : 'No goals set'}
-              </span>
-            </div>
-            <Progress value={combinedPlanScore} className="h-1.5" />
-          </div>
-        }
-      />
-
-      <div className="hidden grid-cols-2 gap-3 sm:grid-cols-2 md:grid lg:grid-cols-5">
-        <AccountBalanceChip balance={accountBalance} variant="kpi" className="col-span-2 sm:col-span-1" />
-        <div className="col-span-2 lg:col-span-3">
-          <MonthAtGlanceKpis
-            income={income}
-            expenses={expenses}
-            netFlow={netFlow}
-            displayNetFlow={displayNetFlow}
-            hasSettlementAdjustment={hasSettlementAdjustment}
-          />
-          {incomeBreakdown && incomeBreakdown.total > 0 && (
-            <p className="mt-1 hidden text-[10px] text-muted md:block">
-              Salary {formatRupees(incomeBreakdown.salary)}
-              {incomeBreakdown.family > 0 ? ` · Family ${formatRupees(incomeBreakdown.family)}` : ''}
-              {incomeBreakdown.other > 0 ? ` · Other ${formatRupees(incomeBreakdown.other)}` : ''}
-            </p>
-          )}
-          {hasSettlementAdjustment && (
-            <p className="mt-1 text-[10px] text-muted">
-              Before settlements {netFlow >= 0 ? '+' : ''}{formatRupees(netFlow)}
-            </p>
-          )}
-        </div>
-        <div className="card-base p-4">
-          <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-hint">Plan adherence</p>
-          <p className="mt-2 text-lg font-semibold tabular-nums text-foreground sm:text-xl">{combinedPlanScore}%</p>
-          <Progress value={combinedPlanScore} className="mt-2 h-1.5" />
-          <p className="mt-1 hidden text-[10px] text-muted md:block">
-            Budget {adherence.overallScore}% · Goals{' '}
-            {adherence.activeGoals > 0
-              ? `${adherence.goalsOnTrack}/${adherence.activeGoals} on track`
-              : 'none set'}
-          </p>
-        </div>
-      </div>
-
       {mobileAlerts.length > 0 && (
         <div className="card-base border-[var(--warning)]/30 bg-[var(--warning)]/5 p-4">
           <div className="mb-2 flex items-center gap-2 text-sm font-medium text-foreground">
@@ -516,7 +400,6 @@ export default function DashboardPage({ data }: DashboardPageProps) {
           lineItems={adherence.lineItems}
           plannedTotal={adherence.plannedTotal}
           actualTotal={adherence.actualTotal}
-          maxHeight={isMdUp ? recentActivityHeight : undefined}
           salaryReceived={salaryReceived}
           planBaseIncome={planBaseIncome}
           planIncomeSource={adherence.planIncomeSource}
@@ -568,7 +451,6 @@ export default function DashboardPage({ data }: DashboardPageProps) {
           </section>
 
           <section
-            ref={recentActivityRef}
             className="card-base p-4 max-lg:p-3"
           >
             <div className="mb-3 flex items-center justify-between gap-2">

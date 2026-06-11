@@ -1,57 +1,47 @@
-import { Suspense } from 'react';
-import { requireUser } from '@/lib/auth/server-auth';
-import { RouteLoadingState } from '@/components/feedback/route-fallbacks';
-import { loadGoals, loadDeadlines, loadWishlist } from '@/features/plans/loaders';
-import { loadDashboard } from '@/features/dashboard/loaders';
-import type { PlansBootstrap } from '@/features/plans/components/plans-page';
-import PlansPageClient from './page-client';
-
-const ALLOWED_TABS = ['overview', 'goals', 'deadlines', 'wishlist'] as const;
-type PlansTab = (typeof ALLOWED_TABS)[number];
-
-function isValidPlansTab(tab?: string): tab is PlansTab {
-  return Boolean(tab && ALLOWED_TABS.includes(tab as PlansTab));
-}
-
-type PlansPageProps = {
-  searchParams: Promise<{ tab?: string }>;
-};
-
-export const dynamic = 'force-dynamic';
-
-export default async function PlansPage({ searchParams }: PlansPageProps) {
-  const user = await requireUser({ redirectTo: '/auth?tab=login' });
-  const resolvedSearchParams = await searchParams;
-
-  const [goals, deadlines, wishlist, dashboard] = await Promise.all([
-    loadGoals(user.id),
-    loadDeadlines(user.id),
-    loadWishlist(user.id),
-    loadDashboard(user.id),
-  ]);
-
-  const bootstrap: PlansBootstrap = {
-    goals,
-    deadlines,
-    wishlist,
-    disciplineSummary: dashboard.disciplineSummary,
-    planIncomeContext: dashboard.planIncomeContext,
-    accountBalance: dashboard.accountBalance,
-  };
-
-  const defaultTab = isValidPlansTab(resolvedSearchParams?.tab) ? resolvedSearchParams.tab : 'overview';
-
-  return (
-    <Suspense
-      fallback={
-        <RouteLoadingState
-          title="Loading plans"
-          description="Collecting your goals, deadlines, and wishlist items…"
-          className="min-h-[50vh]"
-        />
-      }
-    >
-      <PlansPageClient bootstrap={bootstrap} userId={user.id} defaultTab={defaultTab} />
-    </Suspense>
-  );
-}
+import { Suspense } from 'react';
+import { AppRouteLoader } from '@/components/feedback/app-route-loader';
+import { requireUser } from '@/lib/auth/server-auth';
+import { loadPlansPageBootstrapCached } from '@/lib/server-data-cache';
+import type { PlansBootstrap } from '@/features/plans/components/plans-page';
+import PlansPageClient from './page-client';
+
+const ALLOWED_TABS = ['overview', 'goals', 'deadlines', 'wishlist'] as const;
+type PlansTab = (typeof ALLOWED_TABS)[number];
+
+function isValidPlansTab(tab?: string): tab is PlansTab {
+  return Boolean(tab && ALLOWED_TABS.includes(tab as PlansTab));
+}
+
+type PlansPageProps = {
+  searchParams: Promise<{ tab?: string }>;
+};
+
+export default function PlansPage({ searchParams }: PlansPageProps) {
+  return (
+    <Suspense fallback={<AppRouteLoader variant="plans" title="Loading plans" />}>
+      <PlansLoader searchParams={searchParams} />
+    </Suspense>
+  );
+}
+
+async function PlansLoader({ searchParams }: PlansPageProps) {
+  const user = await requireUser({ redirectTo: '/auth?tab=login' });
+  const resolvedSearchParams = await searchParams;
+
+  const { goals, deadlines, wishlist, dashboard } = await loadPlansPageBootstrapCached(user.id);
+
+  const bootstrap: PlansBootstrap = {
+    goals,
+    deadlines,
+    wishlist,
+    disciplineSummary: dashboard.disciplineSummary,
+    planIncomeContext: dashboard.planIncomeContext,
+    accountBalance: dashboard.accountBalance,
+  };
+
+  const defaultTab = isValidPlansTab(resolvedSearchParams?.tab) ? resolvedSearchParams.tab : 'overview';
+
+  return (
+    <PlansPageClient bootstrap={bootstrap} userId={user.id} defaultTab={defaultTab} />
+  );
+}

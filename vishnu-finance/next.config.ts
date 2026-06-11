@@ -52,7 +52,7 @@ const nextConfig: NextConfig = {
           },
           {
             key: 'Permissions-Policy',
-            value: 'camera=(), microphone=(), geolocation=(), browsing-topics=()'
+            value: 'camera=(), microphone=(), geolocation=(), payment=()'
           }
         ]
       }
@@ -61,6 +61,10 @@ const nextConfig: NextConfig = {
 
   // Performance optimizations
   experimental: {
+    staleTimes: {
+      dynamic: 300,
+      static: 600,
+    },
     // Enable modern React features and tree-shaking optimizations
     optimizePackageImports: [
       'lucide-react',

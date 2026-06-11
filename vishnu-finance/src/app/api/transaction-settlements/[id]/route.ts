@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth/server-auth';
 import { clearUserCache } from '@/lib/api-cache';
+import { invalidateUserAppData } from '@/lib/server-data-cache';
 import { deleteSettlement } from '@/lib/transaction-settlement-service';
 
 export const dynamic = 'force-dynamic';
@@ -18,6 +19,7 @@ export async function DELETE(
     const { id } = await params;
     await deleteSettlement(user.id, id);
     await clearUserCache(user.id);
+    invalidateUserAppData(user.id);
 
     return NextResponse.json({ success: true });
   } catch (error) {

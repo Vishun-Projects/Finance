@@ -17,9 +17,12 @@ export const patterns = {
     'sticky top-[calc(3rem+env(safe-area-inset-top))] z-30 lg:hidden glass-ultra-thin glass-text px-3 py-3',
   /** Minimum 44px touch target */
   touchTarget: 'min-h-11 min-w-11 inline-flex items-center justify-center',
-  /** Bottom sheet styling */
+  /** Bottom sheet base styling */
+  bottomSheetBase:
+    'glass-thick glass-text glass-sheet-bottom safe-bottom overflow-hidden flex flex-col',
+  /** Default bottom sheet (medium height) — prefer mobileSheetHeightClasses at call site */
   bottomSheet:
-    'glass-thick glass-text glass-sheet-bottom max-h-[min(92vh,calc(100dvh-env(safe-area-inset-top)))] safe-bottom overflow-y-auto',
+    'glass-thick glass-text glass-sheet-bottom max-h-[min(85dvh,640px)] safe-bottom overflow-hidden flex flex-col',
   /** Standard card list spacing for mobile table replacements */
   mobileCardList: 'space-y-3 lg:hidden',
   /** Horizontal scroll KPI strip on mobile */

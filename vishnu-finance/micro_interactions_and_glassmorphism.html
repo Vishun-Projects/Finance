@@ -1,0 +1,392 @@
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+.sec{font-size:11px;font-weight:500;letter-spacing:.07em;text-transform:uppercase;color:var(--color-text-tertiary);margin:28px 0 10px}
+.card{background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);padding:16px 18px;margin-bottom:10px}
+.head{display:flex;gap:11px;align-items:flex-start;margin-bottom:10px}
+.ico{width:30px;height:30px;border-radius:var(--border-radius-md);display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.title{font-size:14px;font-weight:500;color:var(--color-text-primary);margin-bottom:3px}
+.desc{font-size:13px;color:var(--color-text-secondary);line-height:1.6}
+.note{border-radius:var(--border-radius-md);padding:9px 13px;margin-top:10px;font-size:13px;display:flex;gap:8px;align-items:flex-start;line-height:1.5}
+.nw{background:var(--color-background-warning);border:0.5px solid var(--color-border-warning);color:var(--color-text-warning)}
+.ni{background:var(--color-background-info);border:0.5px solid var(--color-border-info);color:var(--color-text-info)}
+.tag{display:inline-block;font-size:11px;padding:2px 7px;border-radius:20px;font-weight:500;margin-left:6px}
+.tw{background:var(--color-background-warning);color:var(--color-text-warning)}
+.tr{background:var(--color-background-danger);color:var(--color-text-danger)}
+.tg{background:var(--color-background-success);color:var(--color-text-success)}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.bad,.good{border-radius:var(--border-radius-md);padding:10px 12px}
+.bad{background:var(--color-background-danger);border:0.5px solid var(--color-border-danger)}
+.good{background:var(--color-background-success);border:0.5px solid var(--color-border-success)}
+.lbl{font-size:11px;font-weight:500;letter-spacing:.05em;text-transform:uppercase;margin-bottom:5px}
+.bad .lbl{color:var(--color-text-danger)}.good .lbl{color:var(--color-text-success)}
+.bad p,.good p{font-size:13px;color:var(--color-text-secondary);line-height:1.5}
+code{font-size:12px;background:var(--color-background-secondary);padding:1px 5px;border-radius:4px;font-family:var(--font-mono)}
+
+/* ── LIVE DEMOS ── */
+
+/* 1. Cursor / hover */
+.demo-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+.btn-demo{font-size:13px;padding:8px 16px;border-radius:var(--border-radius-md);border:0.5px solid var(--color-border-secondary);background:var(--color-background-primary);color:var(--color-text-primary);cursor:pointer;transition:all .15s ease;user-select:none}
+.btn-demo:hover{background:var(--color-background-secondary);transform:translateY(-1px)}
+.btn-demo:active{transform:translateY(0) scale(.97)}
+.btn-fill{background:var(--color-text-primary);color:var(--color-background-primary);border-color:var(--color-text-primary)}
+.btn-fill:hover{opacity:.85;transform:translateY(-1px)}
+
+/* 2. Skeleton */
+.skel{border-radius:var(--border-radius-md);background:var(--color-background-secondary);overflow:hidden;position:relative}
+.skel::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent 0%,rgba(255,255,255,.18) 50%,transparent 100%);animation:shimmer 1.5s infinite}
+@keyframes shimmer{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
+.skel-row{display:flex;gap:10px;align-items:center;margin-bottom:10px}
+
+/* 3. Focus ring */
+.input-demo{width:100%;padding:8px 12px;border-radius:var(--border-radius-md);border:0.5px solid var(--color-border-secondary);background:var(--color-background-primary);color:var(--color-text-primary);font-size:13px;outline:none;transition:box-shadow .15s,border-color .15s}
+.input-demo:focus{border-color:var(--color-border-primary);box-shadow:0 0 0 3px rgba(0,0,0,.08)}
+
+/* 4. Checkbox */
+.cb-wrap{display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none;font-size:13px;color:var(--color-text-secondary)}
+.cb-box{width:18px;height:18px;border-radius:5px;border:1.5px solid var(--color-border-secondary);background:var(--color-background-primary);display:flex;align-items:center;justify-content:center;transition:all .12s ease;flex-shrink:0}
+.cb-box.checked{background:var(--color-text-primary);border-color:var(--color-text-primary)}
+.cb-box i{font-size:12px;color:var(--color-background-primary);opacity:0;transform:scale(.5);transition:all .12s ease}
+.cb-box.checked i{opacity:1;transform:scale(1)}
+
+/* 5. Toggle */
+.toggle{width:40px;height:22px;border-radius:11px;background:var(--color-border-secondary);cursor:pointer;position:relative;transition:background .2s;border:none;padding:0;flex-shrink:0}
+.toggle.on{background:var(--color-text-primary)}
+.toggle-thumb{width:16px;height:16px;border-radius:50%;background:#fff;position:absolute;top:3px;left:3px;transition:transform .2s cubic-bezier(.34,1.56,.64,1);box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.toggle.on .toggle-thumb{transform:translateX(18px)}
+.tog-row{display:flex;align-items:center;gap:12px;font-size:13px;color:var(--color-text-secondary);margin-bottom:8px}
+
+/* 6. Tooltip */
+.tip-wrap{position:relative;display:inline-block}
+.tip-wrap .tooltip{position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%) scale(.9);background:var(--color-text-primary);color:var(--color-background-primary);font-size:12px;padding:5px 10px;border-radius:6px;white-space:nowrap;pointer-events:none;opacity:0;transition:all .12s ease;transform-origin:bottom center}
+.tip-wrap:hover .tooltip{opacity:1;transform:translateX(-50%) scale(1)}
+.tip-wrap .tooltip::after{content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);border:4px solid transparent;border-top-color:var(--color-text-primary)}
+
+/* 7. Copy button */
+.copy-wrap{display:flex;align-items:center;gap:8px;background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:8px 12px;font-family:var(--font-mono);font-size:13px;color:var(--color-text-secondary)}
+.copy-btn{margin-left:auto;font-size:12px;padding:4px 8px;border-radius:6px;border:0.5px solid var(--color-border-secondary);background:var(--color-background-primary);color:var(--color-text-secondary);cursor:pointer;transition:all .12s;display:flex;align-items:center;gap:4px}
+.copy-btn:hover{background:var(--color-background-secondary)}
+.copy-btn.copied{background:var(--color-background-success);border-color:var(--color-border-success);color:var(--color-text-success)}
+
+/* 8. Number counter */
+.counter-val{font-size:32px;font-weight:500;color:var(--color-text-primary);font-variant-numeric:tabular-nums;transition:all .3s ease}
+
+/* ── GLASSMORPHISM ── */
+.glass-section{margin-top:10px;border-radius:var(--border-radius-lg);overflow:hidden;position:relative;min-height:260px}
+.glass-bg{position:absolute;inset:0;background:linear-gradient(135deg,#667eea,#764ba2 40%,#f093fb 70%,#4facfe)}
+.glass-blobs{position:absolute;inset:0;overflow:hidden}
+.blob{position:absolute;border-radius:50%;filter:blur(40px);opacity:.6}
+.blob1{width:200px;height:200px;background:#a78bfa;top:-40px;left:-40px}
+.blob2{width:160px;height:160px;background:#f472b6;top:60px;right:20px}
+.blob3{width:120px;height:120px;background:#60a5fa;bottom:-20px;left:120px}
+.glass-content{position:relative;z-index:1;padding:20px;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.glass-card{background:rgba(255,255,255,.12);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.25);border-radius:16px;padding:16px}
+.glass-card-dark{background:rgba(0,0,0,.15);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.12);border-radius:16px;padding:16px}
+.glass-label{font-size:11px;color:rgba(255,255,255,.7);margin-bottom:4px;letter-spacing:.05em;text-transform:uppercase}
+.glass-val{font-size:24px;font-weight:500;color:#fff}
+.glass-sub{font-size:12px;color:rgba(255,255,255,.6);margin-top:2px}
+.glass-btn{background:rgba(255,255,255,.2);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.3);border-radius:10px;padding:8px 16px;color:#fff;font-size:13px;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:6px;margin-top:10px}
+.glass-btn:hover{background:rgba(255,255,255,.3)}
+.glass-pill{display:inline-block;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.2);border-radius:20px;padding:3px 10px;font-size:11px;color:rgba(255,255,255,.9);margin-top:6px}
+
+/* code block */
+.code-block{background:var(--color-background-secondary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);padding:12px 14px;font-family:var(--font-mono);font-size:12px;color:var(--color-text-secondary);line-height:1.7;margin-top:10px;overflow-x:auto}
+.c-prop{color:var(--color-text-info)}.c-val{color:var(--color-text-success)}.c-comment{color:var(--color-text-tertiary)}
+</style>
+
+<div style="padding:1.5rem 0 1rem">
+<h2 class="sr-only">Micro-interactions guide and glassmorphism demo for developers</h2>
+
+<div class="sec">Micro-interactions developers always skip</div>
+
+<div class="card">
+  <div class="head">
+    <div class="ico" style="background:var(--color-background-warning)"><i class="ti ti-hand-finger" style="font-size:16px;color:var(--color-text-warning)" aria-hidden="true"></i></div>
+    <div>
+      <div class="title">1. Hover lift + active press — buttons feel dead without it <span class="tag tw">Most skipped</span></div>
+      <div class="desc">Devs add hover bg-change and call it done. The eye doesn't feel it. You need <code>translateY(-1px)</code> on hover and <code>scale(.97)</code> on active. Combined they give the illusion of physical depth — button lifts toward you, then presses in. Takes 3 lines of CSS.</div>
+    </div>
+  </div>
+  <div class="demo-row">
+    <button class="btn-demo" style="cursor:default;opacity:.5">No transition (dead)</button>
+    <button class="btn-demo">Hover + press me</button>
+    <button class="btn-demo btn-fill">Primary version</button>
+  </div>
+</div>
+
+<div class="card">
+  <div class="head">
+    <div class="ico" style="background:var(--color-background-warning)"><i class="ti ti-loader" style="font-size:16px;color:var(--color-text-warning)" aria-hidden="true"></i></div>
+    <div>
+      <div class="title">2. Skeleton screens instead of spinners <span class="tag tw">Always missing</span></div>
+      <div class="desc">A spinner says "wait." A skeleton says "here's where your content will be." Skeletons reduce perceived load time by 15–20% in studies because the brain starts placing content before it arrives. Use a shimmer animation — not a pulse.</div>
+    </div>
+  </div>
+  <div style="padding:12px;background:var(--color-background-secondary);border-radius:var(--border-radius-md);margin-top:10px">
+    <div class="skel-row">
+      <div class="skel" style="width:36px;height:36px;border-radius:50%;flex-shrink:0"></div>
+      <div style="flex:1">
+        <div class="skel" style="height:13px;width:60%;margin-bottom:6px"></div>
+        <div class="skel" style="height:11px;width:40%"></div>
+      </div>
+    </div>
+    <div class="skel-row">
+      <div class="skel" style="width:36px;height:36px;border-radius:50%;flex-shrink:0"></div>
+      <div style="flex:1">
+        <div class="skel" style="height:13px;width:75%;margin-bottom:6px"></div>
+        <div class="skel" style="height:11px;width:50%"></div>
+      </div>
+    </div>
+    <div class="skel-row" style="margin-bottom:0">
+      <div class="skel" style="width:36px;height:36px;border-radius:50%;flex-shrink:0"></div>
+      <div style="flex:1">
+        <div class="skel" style="height:13px;width:50%;margin-bottom:6px"></div>
+        <div class="skel" style="height:11px;width:35%"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="head">
+    <div class="ico" style="background:var(--color-background-warning)"><i class="ti ti-input-search" style="font-size:16px;color:var(--color-text-warning)" aria-hidden="true"></i></div>
+    <div>
+      <div class="title">3. Focus rings — accessibility AND feel <span class="tag tw">Always skipped</span></div>
+      <div class="desc">Devs do <code>outline: none</code> because the default browser ring is ugly. Then they never replace it. Every input needs a custom focus ring: <code>box-shadow: 0 0 0 3px rgba(0,0,0,.08)</code>. Subtle for sighted users, essential for keyboard users.</div>
+    </div>
+  </div>
+  <div style="margin-top:10px">
+    <input class="input-demo" placeholder="Click me — watch the focus ring appear" type="text">
+  </div>
+</div>
+
+<div class="card">
+  <div class="head">
+    <div class="ico" style="background:var(--color-background-warning)"><i class="ti ti-checkbox" style="font-size:16px;color:var(--color-text-warning)" aria-hidden="true"></i></div>
+    <div>
+      <div class="title">4. Checkboxes and toggles with spring animation <span class="tag tw">Always missing</span></div>
+      <div class="desc">Browser default checkboxes feel like 2005. Custom ones with <code>cubic-bezier(.34,1.56,.64,1)</code> — a spring curve that overshoots slightly — feel alive. The toggle thumb should bounce just past its target, then settle back. That overshoot is what makes iOS feel premium.</div>
+    </div>
+  </div>
+  <div style="margin-top:10px;display:flex;flex-direction:column;gap:0">
+    <div class="tog-row">
+      <button class="toggle on" id="tog1" onclick="this.classList.toggle('on')"><div class="toggle-thumb"></div></button>
+      <span>Push notifications</span>
+    </div>
+    <div class="tog-row">
+      <button class="toggle" id="tog2" onclick="this.classList.toggle('on')"><div class="toggle-thumb"></div></button>
+      <span>Email digest</span>
+    </div>
+    <div style="display:flex;gap:16px;margin-top:6px;flex-wrap:wrap">
+      <label class="cb-wrap" onclick="this.querySelector('.cb-box').classList.toggle('checked')">
+        <div class="cb-box checked"><i class="ti ti-check" aria-hidden="true"></i></div>Include travel reimbursement
+      </label>
+      <label class="cb-wrap" onclick="this.querySelector('.cb-box').classList.toggle('checked')">
+        <div class="cb-box"><i class="ti ti-check" aria-hidden="true"></i></div>ASP involvement panel
+      </label>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="head">
+    <div class="ico" style="background:var(--color-background-warning)"><i class="ti ti-message-circle" style="font-size:16px;color:var(--color-text-warning)" aria-hidden="true"></i></div>
+    <div>
+      <div class="title">5. Tooltips that animate in — not instant pop <span class="tag tw">Skipped</span></div>
+      <div class="desc">Tooltips that snap instantly feel like debug overlays. They should scale in from the anchor point: <code>transform: scale(.9) → scale(1)</code> with <code>opacity 0 → 1</code> over 120ms. Short enough to not feel slow. Long enough to feel intentional.</div>
+    </div>
+  </div>
+  <div class="demo-row" style="margin-top:10px">
+    <div class="tip-wrap">
+      <button class="btn-demo">Hover for tooltip</button>
+      <div class="tooltip">BM = Branch Manager</div>
+    </div>
+    <div class="tip-wrap">
+      <button class="btn-demo">ARCP ?</button>
+      <div class="tooltip">Annual Repair Claim Payable</div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="head">
+    <div class="ico" style="background:var(--color-background-warning)"><i class="ti ti-copy" style="font-size:16px;color:var(--color-text-warning)" aria-hidden="true"></i></div>
+    <div>
+      <div class="title">6. Copy button with confirmation state <span class="tag tw">Often missing</span></div>
+      <div class="desc">A copy button that does nothing visually after click makes users click it 3 times. The button should transition to "Copied ✓" for 1.5s then revert. Zero toast needed — the confirmation lives inline where the action happened.</div>
+    </div>
+  </div>
+  <div class="copy-wrap" style="margin-top:10px">
+    <span>26F031424</span>
+    <button class="copy-btn" id="copybtn" onclick="
+      this.classList.add('copied');
+      this.innerHTML='<i class=\'ti ti-check\'></i> Copied';
+      setTimeout(()=>{this.classList.remove('copied');this.innerHTML='<i class=\'ti ti-copy\'></i> Copy'},1500)
+    "><i class="ti ti-copy" aria-hidden="true"></i> Copy</button>
+  </div>
+</div>
+
+<div class="card">
+  <div class="head">
+    <div class="ico" style="background:var(--color-background-warning)"><i class="ti ti-sort-ascending-numbers" style="font-size:16px;color:var(--color-text-warning)" aria-hidden="true"></i></div>
+    <div>
+      <div class="title">7. Animating number changes — not just hard-swapping values <span class="tag tw">Premium feel</span></div>
+      <div class="desc">When a metric card updates — say from 4,978 to 5,012 — devs just swap the innerHTML. The number teleports. Counting up/down over 400–600ms makes the change feel real, not glitchy. Especially powerful for your ARCP metric cards updating while loading.</div>
+    </div>
+  </div>
+  <div style="margin-top:12px;display:flex;align-items:baseline;gap:16px">
+    <div>
+      <div style="font-size:11px;color:var(--color-text-tertiary);margin-bottom:4px">Open calls</div>
+      <div class="counter-val" id="cval">3,305</div>
+    </div>
+    <button class="btn-demo" onclick="animateCounter()" style="margin-top:0">Simulate update</button>
+  </div>
+</div>
+
+<div class="card">
+  <div class="head">
+    <div class="ico" style="background:var(--color-background-danger)"><i class="ti ti-cursor-text" style="font-size:16px;color:var(--color-text-danger)" aria-hidden="true"></i></div>
+    <div>
+      <div class="title">8. Cursor changes — pointer vs default vs not-allowed <span class="tag tr">Always wrong</span></div>
+      <div class="desc">Disabled buttons should have <code>cursor: not-allowed</code>, not <code>cursor: default</code>. Draggable elements need <code>cursor: grab / grabbing</code>. Clickable non-button elements need <code>cursor: pointer</code>. Resizable columns need <code>cursor: col-resize</code>. These are invisible affordances — users feel them before they see them.</div>
+    </div>
+  </div>
+  <div class="demo-row">
+    <button class="btn-demo" style="cursor:not-allowed;opacity:.4" disabled>Disabled</button>
+    <button class="btn-demo" style="cursor:grab">Draggable</button>
+    <div class="btn-demo" style="cursor:pointer">Div acting as button</div>
+    <div class="btn-demo" style="cursor:col-resize;border-style:dashed">Resize handle</div>
+  </div>
+</div>
+
+<div class="sec">Glassmorphism — done right vs done wrong</div>
+
+<div class="card">
+  <div class="desc" style="margin-bottom:10px">iPhone-style glassmorphism has 4 ingredients: a colourful blurred background, a semi-transparent frosted card, a subtle white border, and white text. Remove any one of them and it falls apart. The most common mistake is applying blur to a white/grey background — glass needs colour behind it to look like glass.</div>
+  <div class="glass-section">
+    <div class="glass-bg"></div>
+    <div class="glass-blobs">
+      <div class="blob blob1"></div>
+      <div class="blob blob2"></div>
+      <div class="blob blob3"></div>
+    </div>
+    <div class="glass-content">
+      <div class="glass-card">
+        <div class="glass-label">Amount payable</div>
+        <div class="glass-val">₹4,33,266</div>
+        <div class="glass-pill">This month</div>
+      </div>
+      <div class="glass-card-dark">
+        <div class="glass-label">Branch approved</div>
+        <div class="glass-val">₹3,32,081</div>
+        <div class="glass-sub">−₹1.01L from payable</div>
+      </div>
+      <div class="glass-card" style="grid-column:span 2">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div class="glass-label">Service lines</div>
+            <div class="glass-val" style="font-size:18px">849 <span style="font-size:13px;opacity:.7">+300 travel</span></div>
+          </div>
+          <button class="glass-btn"><i class="ti ti-file-type-pdf" aria-hidden="true"></i> View PDF</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="title" style="margin-bottom:10px">The CSS — 4 lines that matter</div>
+  <div class="code-block">
+<span class="c-comment">/* 1. The card */</span>
+.<span class="c-prop">glass-card</span> {
+  <span class="c-prop">background</span>: <span class="c-val">rgba(255, 255, 255, 0.12)</span>;   <span class="c-comment">/* low alpha */</span>
+  <span class="c-prop">backdrop-filter</span>: <span class="c-val">blur(12px)</span>;           <span class="c-comment">/* the frost */</span>
+  <span class="c-prop">-webkit-backdrop-filter</span>: <span class="c-val">blur(12px)</span>;  <span class="c-comment">/* Safari */</span>
+  <span class="c-prop">border</span>: <span class="c-val">1px solid rgba(255, 255, 255, 0.25)</span>; <span class="c-comment">/* glass edge */</span>
+  <span class="c-prop">border-radius</span>: <span class="c-val">16px</span>;
+}
+
+<span class="c-comment">/* 2. Background MUST have colour + blur source */</span>
+.<span class="c-prop">glass-bg</span> {
+  <span class="c-prop">background</span>: <span class="c-val">linear-gradient(135deg, #667eea, #764ba2, #f093fb)</span>;
+  <span class="c-prop">filter</span>: <span class="c-val">blur(0)</span>; <span class="c-comment">/* bg itself stays sharp */</span>
+}
+
+<span class="c-comment">/* 3. Floating colour blobs for depth */</span>
+.<span class="c-prop">blob</span> {
+  <span class="c-prop">border-radius</span>: <span class="c-val">50%</span>;
+  <span class="c-prop">filter</span>: <span class="c-val">blur(40px)</span>; <span class="c-comment">/* blobs blur, not the bg */</span>
+  <span class="c-prop">opacity</span>: <span class="c-val">0.6</span>;
+}</div>
+</div>
+
+<div class="card">
+  <div class="title" style="margin-bottom:10px">The rules — where glass works and where it breaks</div>
+  <div class="row2">
+    <div class="good"><div class="lbl">Works</div>
+      <p>Cards over rich colourful backgrounds. Modals and dropdowns over blurred page content. Navigation bars over photos. Notification toasts. Metric cards over gradient dashboards.</p>
+    </div>
+    <div class="bad"><div class="lbl">Breaks</div>
+      <p>Glass over a white background (nothing to blur). Glass over grey surfaces (looks dirty, not frosted). Too many glass layers stacked (blur-on-blur = muddy). Text-heavy content (contrast suffers).</p>
+    </div>
+  </div>
+  <div class="note nw"><i class="ti ti-alert-triangle" style="font-size:14px;flex-shrink:0;margin-top:1px" aria-hidden="true"></i><span><strong style="font-weight:500">Performance:</strong> <code>backdrop-filter: blur()</code> is GPU-intensive. Don't use it on more than 3–4 elements per page. On a data-heavy page like yours, keep glass for summary cards and modals only — not every table row.</span></div>
+</div>
+
+<div class="sec">The nuances list — things no tutorial mentions</div>
+
+<div class="card">
+  <div style="display:flex;flex-direction:column;gap:12px">
+    <div style="display:flex;gap:10px;font-size:13px;align-items:flex-start">
+      <i class="ti ti-point-filled" style="font-size:10px;color:var(--color-text-tertiary);flex-shrink:0;margin-top:4px" aria-hidden="true"></i>
+      <span style="color:var(--color-text-secondary)"><span style="color:var(--color-text-primary);font-weight:500">Transition only the properties you need</span> — <code>transition: all .2s</code> causes layout reflows. Write <code>transition: background .15s, transform .15s, opacity .15s</code> explicitly. It's faster and avoids animating width/height accidentally.</span>
+    </div>
+    <div style="display:flex;gap:10px;font-size:13px;align-items:flex-start">
+      <i class="ti ti-point-filled" style="font-size:10px;color:var(--color-text-tertiary);flex-shrink:0;margin-top:4px" aria-hidden="true"></i>
+      <span style="color:var(--color-text-secondary)"><span style="color:var(--color-text-primary);font-weight:500">Don't animate layout properties</span> — never transition <code>width</code>, <code>height</code>, <code>margin</code>, or <code>padding</code>. These trigger reflow on every frame. Use <code>transform: scaleX()</code> instead of width, <code>transform: translateY()</code> instead of margin-top.</span>
+    </div>
+    <div style="display:flex;gap:10px;font-size:13px;align-items:flex-start">
+      <i class="ti ti-point-filled" style="font-size:10px;color:var(--color-text-tertiary);flex-shrink:0;margin-top:4px" aria-hidden="true"></i>
+      <span style="color:var(--color-text-secondary)"><span style="color:var(--color-text-primary);font-weight:500">System font stack for numbers</span> — <code>font-variant-numeric: tabular-nums</code> on every column of numbers. Without it, digits have different widths and columns wobble as data updates.</span>
+    </div>
+    <div style="display:flex;gap:10px;font-size:13px;align-items:flex-start">
+      <i class="ti ti-point-filled" style="font-size:10px;color:var(--color-text-tertiary);flex-shrink:0;margin-top:4px" aria-hidden="true"></i>
+      <span style="color:var(--color-text-secondary)"><span style="color:var(--color-text-primary);font-weight:500">Prefers-reduced-motion</span> — wrap all animations in <code>@media (prefers-reduced-motion: no-preference)</code>. About 30% of users have vestibular disorders or motion sensitivity. Animations that feel premium to most feel nauseating to them.</span>
+    </div>
+    <div style="display:flex;gap:10px;font-size:13px;align-items:flex-start">
+      <i class="ti ti-point-filled" style="font-size:10px;color:var(--color-text-tertiary);flex-shrink:0;margin-top:4px" aria-hidden="true"></i>
+      <span style="color:var(--color-text-secondary)"><span style="color:var(--color-text-primary);font-weight:500">Line-height on dense tables</span> — most devs leave line-height at 1.5 everywhere. Table rows need 1.3–1.4. Too much line-height in a row makes numbers hard to align vertically and wastes precious row height.</span>
+    </div>
+    <div style="display:flex;gap:10px;font-size:13px;align-items:flex-start">
+      <i class="ti ti-point-filled" style="font-size:10px;color:var(--color-text-tertiary);flex-shrink:0;margin-top:4px" aria-hidden="true"></i>
+      <span style="color:var(--color-text-secondary)"><span style="color:var(--color-text-primary);font-weight:500">Text selection colour</span> — <code>::selection { background: rgba(0,0,0,.1) }</code>. Default blue selection on black text in a dark-themed tool looks jarring. One line, matches your design language.</span>
+    </div>
+    <div style="display:flex;gap:10px;font-size:13px;align-items:flex-start">
+      <i class="ti ti-point-filled" style="font-size:10px;color:var(--color-text-tertiary);flex-shrink:0;margin-top:4px" aria-hidden="true"></i>
+      <span style="color:var(--color-text-secondary)"><span style="color:var(--color-text-primary);font-weight:500">Scroll anchoring on data updates</span> — when new rows load or filters apply, the page shouldn't jump. Use <code>overflow-anchor: auto</code> and be careful about DOM insertions above the scroll position.</span>
+    </div>
+    <div style="display:flex;gap:10px;font-size:13px;align-items:flex-start;margin-bottom:0">
+      <i class="ti ti-point-filled" style="font-size:10px;color:var(--color-text-tertiary);flex-shrink:0;margin-top:4px" aria-hidden="true"></i>
+      <span style="color:var(--color-text-secondary)"><span style="color:var(--color-text-primary);font-weight:500">Don't block the UI thread during filter/sort</span> — if your filter runs synchronously on 5,000 rows, it freezes the input for 80–200ms. Debounce search inputs by 200–300ms. For heavy operations, use a Web Worker or requestIdleCallback so the UI stays responsive while computing.</span>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<script>
+function animateCounter(){
+  const el=document.getElementById('cval');
+  const start=3305,end=Math.random()>0.5?3412:3187;
+  const dur=500,startTime=performance.now();
+  function step(now){
+    const p=Math.min((now-startTime)/dur,1);
+    const ease=1-Math.pow(1-p,3);
+    const val=Math.round(start+(end-start)*ease);
+    el.textContent=val.toLocaleString('en-IN');
+    if(p<1)requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+</script>

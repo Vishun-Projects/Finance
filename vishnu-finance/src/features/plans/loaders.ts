@@ -1,5 +1,34 @@
-import { serverFetch, ServerFetchError } from '@/lib/server-fetch';
+import { prisma } from '@/lib/db';
 import type { DeadlinesResponse, Goal, WishlistResponse } from '@/features/plans/types';
+
+const EMPTY_DEADLINES: DeadlinesResponse = {
+  data: [],
+  pagination: {
+    page: 1,
+    pageSize: 100,
+    total: 0,
+    totalPages: 0,
+    hasNextPage: false,
+    hasPreviousPage: false,
+  },
+};
+
+const EMPTY_WISHLIST: WishlistResponse = {
+  data: [],
+  pagination: {
+    page: 1,
+    pageSize: 100,
+    total: 0,
+    totalPages: 0,
+    hasNextPage: false,
+    hasPreviousPage: false,
+  },
+};
+
+/** Serialize Prisma rows to plain JSON (dates → ISO strings) for RSC/client boundaries. */
+function toJson<T>(value: unknown): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
 
 export async function loadGoals(userId: string): Promise<Goal[]> {
   if (!userId) {
@@ -7,101 +36,89 @@ export async function loadGoals(userId: string): Promise<Goal[]> {
   }
 
   try {
-    const goals = await serverFetch<Goal[]>(`/api/goals?userId=${encodeURIComponent(userId)}`, {
-      cache: 'no-store',
-      description: 'goals-bootstrap',
-      revalidate: 60,
+    const goals = await prisma.goal.findMany({
+      where: { userId },
+      include: { contributions: { orderBy: { date: 'desc' } } },
+      orderBy: { createdAt: 'desc' },
     });
-    return goals ?? [];
+    return toJson(goals) as Goal[];
   } catch (error) {
-    if (error instanceof ServerFetchError && error.status === 404) {
-      return [];
-    }
     console.error('[goals] bootstrap fetch failed', error);
     return [];
   }
 }
 
 export async function loadDeadlines(userId: string): Promise<DeadlinesResponse> {
-  const empty: DeadlinesResponse = {
-    data: [],
-    pagination: {
-      page: 1,
-      pageSize: 100,
-      total: 0,
-      totalPages: 0,
-      hasNextPage: false,
-      hasPreviousPage: false,
-    },
-  };
-
   if (!userId) {
-    return empty;
+    return EMPTY_DEADLINES;
   }
 
+  const page = 1;
+  const pageSize = 100;
+
   try {
-    const response = await serverFetch<DeadlinesResponse>(
-      `/api/deadlines?userId=${encodeURIComponent(userId)}&page=1&pageSize=100&includeTotal=true`,
-      {
-        cache: 'no-store',
-        description: 'deadlines-bootstrap',
-        revalidate: 60,
-      },
-    );
-    if (!response) {
-      return empty;
-    }
+    const [totalCount, deadlines] = await Promise.all([
+      prisma.deadline.count({ where: { userId } }),
+      prisma.deadline.findMany({
+        where: { userId },
+        orderBy: { dueDate: 'asc' },
+        take: pageSize,
+      }),
+    ]);
+
     return {
-      data: response.data ?? [],
-      pagination: response.pagination ?? empty.pagination,
+      data: toJson(deadlines) as DeadlinesResponse['data'],
+      pagination: {
+        page,
+        pageSize,
+        total: totalCount,
+        totalPages: Math.ceil(totalCount / pageSize),
+        hasNextPage: pageSize < totalCount,
+        hasPreviousPage: false,
+      },
     };
   } catch (error) {
-    if (error instanceof ServerFetchError && error.status === 404) {
-      return empty;
-    }
     console.error('[deadlines] bootstrap fetch failed', error);
-    return empty;
+    return EMPTY_DEADLINES;
   }
 }
 
 export async function loadWishlist(userId: string): Promise<WishlistResponse> {
-  const empty: WishlistResponse = {
-    data: [],
-    pagination: {
-      page: 1,
-      pageSize: 100,
-      total: 0,
-      totalPages: 0,
-      hasNextPage: false,
-      hasPreviousPage: false,
-    },
-  };
-
   if (!userId) {
-    return empty;
+    return EMPTY_WISHLIST;
   }
 
+  const page = 1;
+  const pageSize = 100;
+
   try {
-    const response = await serverFetch<WishlistResponse>(
-      `/api/wishlist?userId=${encodeURIComponent(userId)}&page=1&pageSize=100&includeTotal=true`,
-      {
-        cache: 'no-store',
-        description: 'wishlist-bootstrap',
-        revalidate: 90,
-      },
-    );
-    if (!response) {
-      return empty;
-    }
+    const [totalCount, wishlistItems] = await Promise.all([
+      prisma.wishlistItem.count({ where: { userId } }),
+      prisma.wishlistItem.findMany({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+        take: pageSize,
+      }),
+    ]);
+
+    const data = wishlistItems.map((item) => ({
+      ...item,
+      tags: item.tags ? (JSON.parse(item.tags) as string[]) : [],
+    }));
+
     return {
-      data: response.data ?? [],
-      pagination: response.pagination ?? empty.pagination,
+      data: toJson(data) as WishlistResponse['data'],
+      pagination: {
+        page,
+        pageSize,
+        total: totalCount,
+        totalPages: Math.ceil(totalCount / pageSize),
+        hasNextPage: pageSize < totalCount,
+        hasPreviousPage: false,
+      },
     };
   } catch (error) {
-    if (error instanceof ServerFetchError && error.status === 404) {
-      return empty;
-    }
     console.error('[wishlist] bootstrap fetch failed', error);
-    return empty;
+    return EMPTY_WISHLIST;
   }
 }

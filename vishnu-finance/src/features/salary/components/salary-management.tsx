@@ -631,7 +631,7 @@ export default function SalaryStructureManagement() {
 
   return (
     <>
-      <div className="flex flex-col gap-4 lg:max-h-[calc(100vh-7rem)]">
+      <div className="flex flex-col gap-4">
         {/* Header — one line */}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0 max-lg:hidden">
@@ -645,7 +645,7 @@ export default function SalaryStructureManagement() {
               {activeStructure.location ? ` · ${activeStructure.location}` : ''}
             </p>
           </div>
-          <div className="flex shrink-0 flex-wrap items-center gap-2 max-lg:w-full max-lg:justify-end">
+          <div className="hidden shrink-0 flex-wrap items-center gap-2 max-lg:w-full max-lg:justify-end lg:flex">
             <Button size="sm" variant="outline" onClick={() => handleEdit(activeStructure)} className="max-lg:px-2">
               <Edit className="size-3.5 sm:mr-1.5" />
               <span className="max-lg:hidden">Edit current</span>

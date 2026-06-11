@@ -6,6 +6,7 @@ import { rateLimitMiddleware, getRouteType } from '@/lib/rate-limit';
 import { TransactionCategory } from '@/types';
 import { TRANSACTION_PAGE_SIZE_MAX } from '@/features/transactions/constants';
 import { globalCache } from '@/lib/cache-singleton';
+import { invalidateUserAppData } from '@/lib/server-data-cache';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 60; // Revalidate every minute
@@ -486,6 +487,9 @@ export async function POST(request: NextRequest) {
         category: true,
       },
     });
+
+    globalCache.clear();
+    invalidateUserAppData(user.id);
 
     return NextResponse.json({
       ...transaction,

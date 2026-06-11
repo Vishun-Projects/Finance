@@ -3,10 +3,9 @@ import Link from 'next/link';
 import { ArrowLeft, ArrowRight, Minus } from 'lucide-react';
 import BriefingImage from '@/features/education/components/briefing-image';
 import HistoryCalendar from '@/features/education/components/history-calendar';
-import { PageHero } from '@/components/ui/hero';
-import { SectionLabel } from '@/components/ui/section-label';
 import { Chip } from '@/components/ui/chip';
 import { Card } from '@/components/ui/card';
+import { SectionLabel } from '@/components/ui/section-label';
 import { patterns } from '@/design/patterns';
 import { getSentimentChipVariant } from '@/design/tokens';
 import { chipVariants } from '@/design/variants';
@@ -33,7 +32,7 @@ export default async function DailyBriefingHistoryPage() {
   const availableDates = allDates.map((b) => b.date.toISOString());
 
   return (
-    <div className={cn(patterns.pageShell, 'flex h-full flex-col overflow-y-auto text-muted custom-scrollbar')}>
+    <div className="space-y-6 text-muted">
       <div className="sticky top-0 z-30 hidden h-14 shrink-0 items-center border-b border-border bg-background/80 px-8 backdrop-blur lg:flex">
         <Link
           href="/education"
@@ -44,7 +43,7 @@ export default async function DailyBriefingHistoryPage() {
         </Link>
       </div>
 
-      <main className={cn(patterns.pageFluid, 'space-y-6 pt-20 lg:pt-8')}>
+      <div className={cn(patterns.pageFluid, 'space-y-6 pt-4 lg:pt-0')}>
         <div className="lg:hidden">
           <Link
             href="/education"
@@ -55,11 +54,13 @@ export default async function DailyBriefingHistoryPage() {
           </Link>
         </div>
 
-        <PageHero
-          tag="Market Archives"
-          title="Daily briefings"
-          subtitle="A chronological record of AI-generated market intelligence. Track the pulse of the economy day by day."
-        />
+        <div>
+          <SectionLabel className="mb-1">Market Archives</SectionLabel>
+          <h1 className="text-2xl font-semibold text-foreground">Daily briefings</h1>
+          <p className="mt-1 text-sm text-muted">
+            A chronological record of AI-generated market intelligence.
+          </p>
+        </div>
 
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-4">
           <div className="relative ml-2 space-y-6 border-l border-border pl-6 lg:col-span-3 lg:ml-0 lg:space-y-8 lg:pl-10">
@@ -146,7 +147,7 @@ export default async function DailyBriefingHistoryPage() {
             </div>
           </div>
         </div>
-      </main>
+      </div>
     </div>
   );
 }

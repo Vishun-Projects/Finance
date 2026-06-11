@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowRight, Loader2 } from 'lucide-react';
 import { PageMandate } from '@/components/layout/page-mandate';
@@ -8,31 +8,44 @@ import { cn } from '@/lib/utils';
 import type { AdvisorInsightsPayload } from '@/lib/dashboard-insights';
 
 interface FinancialInsightsPanelProps {
+  insights: AdvisorInsightsPayload;
   className?: string;
   onPromptSelect?: (prompt: string) => void;
+  onRegisterRefresh?: (refetch: () => Promise<void>) => void;
 }
 
-export function FinancialInsightsPanel({ className, onPromptSelect }: FinancialInsightsPanelProps) {
-  const [data, setData] = useState<AdvisorInsightsPayload | null>(null);
-  const [loading, setLoading] = useState(true);
+export function FinancialInsightsPanel({
+  insights: initialInsights,
+  className,
+  onPromptSelect,
+  onRegisterRefresh,
+}: FinancialInsightsPanelProps) {
+  const [data, setData] = useState<AdvisorInsightsPayload>(initialInsights);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    async function load() {
-      try {
-        const res = await fetch('/api/advisor/insights');
-        if (res.ok) {
-          setData(await res.json());
-        }
-      } catch (error) {
-        console.error('Failed to load advisor insights', error);
-      } finally {
-        setLoading(false);
+    setData(initialInsights);
+  }, [initialInsights]);
+
+  const loadInsights = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      const res = await fetch('/api/advisor/insights');
+      if (res.ok) {
+        setData(await res.json());
       }
+    } catch (error) {
+      console.error('Failed to load advisor insights', error);
+    } finally {
+      setRefreshing(false);
     }
-    load();
   }, []);
 
-  if (loading) {
+  useEffect(() => {
+    onRegisterRefresh?.(loadInsights);
+  }, [onRegisterRefresh, loadInsights]);
+
+  if (refreshing && !data) {
     return (
       <div className={cn('flex items-center justify-center p-8', className)}>
         <Loader2 className="size-5 animate-spin text-muted" />
@@ -50,6 +63,13 @@ export function FinancialInsightsPanel({ className, onPromptSelect }: FinancialI
 
   return (
     <aside className={cn('flex flex-col gap-4 p-4 custom-scrollbar', className)}>
+      {refreshing ? (
+        <div className="flex items-center gap-2 text-xs text-muted">
+          <Loader2 className="size-3.5 animate-spin" />
+          Refreshing insights…
+        </div>
+      ) : null}
+
       <PageMandate
         className="max-lg:hidden"
         title="Advisor"

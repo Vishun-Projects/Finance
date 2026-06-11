@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '../../../lib/db';
 import { rateLimitMiddleware, getRouteType } from '../../../lib/rate-limit';
+import { invalidateUserAppData } from '@/lib/server-data-cache';
 
 // Configure route caching - user-specific dynamic data
 export const dynamic = 'force-dynamic';
@@ -127,6 +128,7 @@ export async function POST(request: NextRequest) {
       }
     });
 
+    invalidateUserAppData(userId);
     return NextResponse.json(newDeadline);
   } catch (error) {
     console.error('❌ DEADLINES POST - Error:', error);
@@ -156,6 +158,7 @@ export async function PATCH(request: NextRequest) {
       }
     });
 
+    if (updatedDeadline?.userId) invalidateUserAppData(updatedDeadline.userId);
     return NextResponse.json(updatedDeadline);
   } catch (error) {
     console.error('❌ DEADLINES PATCH - Error:', error);
@@ -174,10 +177,12 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Delete from database
+    const existing = await (prisma as any).deadline.findUnique({ where: { id }, select: { userId: true } });
     await (prisma as any).deadline.delete({
       where: { id }
     });
 
+    if (existing?.userId) invalidateUserAppData(existing.userId);
     return NextResponse.json({ message: 'Deadline deleted successfully' });
   } catch (error) {
     console.error('❌ DEADLINES DELETE - Error:', error);

@@ -1,13 +1,21 @@
 import { Suspense } from 'react';
 import SettingsPageClient from './page-client';
 import { requireUser } from '@/lib/auth/server-auth';
-import { RouteLoadingState } from '@/components/feedback/route-fallbacks';
+import { AppRouteLoader } from '@/components/feedback/app-route-loader';
 import { loadUserDocuments, loadUserPreferences } from '@/features/settings/loaders';
 import { loadUserProfile } from '@/features/settings/loaders-profile';
 
 export const dynamic = 'force-dynamic';
 
-export default async function SettingsPage() {
+export default function SettingsPage() {
+  return (
+    <Suspense fallback={<AppRouteLoader variant="generic" title="Loading settings" />}>
+      <SettingsLoader />
+    </Suspense>
+  );
+}
+
+async function SettingsLoader() {
   const user = await requireUser({ redirectTo: '/auth?tab=login' });
 
   const [documents, preferences, profile] = await Promise.all([
@@ -17,20 +25,10 @@ export default async function SettingsPage() {
   ]);
 
   return (
-    <Suspense
-      fallback={
-        <RouteLoadingState
-          title="Loading settings"
-          description="Preparing your account preferences…"
-          className="min-h-[40vh]"
-        />
-      }
-    >
-      <SettingsPageClient
-        initialDocuments={documents}
-        initialPreferences={preferences}
-        initialProfile={profile}
-      />
-    </Suspense>
+    <SettingsPageClient
+      initialDocuments={documents}
+      initialPreferences={preferences}
+      initialProfile={profile}
+    />
   );
 }

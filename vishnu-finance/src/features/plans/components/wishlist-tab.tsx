@@ -301,29 +301,7 @@ export default function WishlistPageClient({
               </Button>
             </div>
           </div>
-        ) : (
-          <div className="hidden flex-col gap-2 sm:flex sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-foreground">Wishlist</h2>
-              <p className="text-xs text-muted-foreground">Dream purchases and future buys.</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                size="sm"
-                className="gap-2 border border-border bg-card text-foreground hover:bg-muted"
-                onClick={refreshWishlist}
-                disabled={isRefreshing}
-              >
-                <RefreshCw className={cn('h-3 w-3', isRefreshing && 'animate-spin')} />
-                Refresh
-              </Button>
-              <Button size="sm" className="gap-2" onClick={openCreateDialog}>
-                <Plus className="h-3 w-3" />
-                <span className="hidden sm:inline">Add</span>
-              </Button>
-            </div>
-          </div>
-        )}
+        ) : null}
 
         {!isEmbedded ? (
           <section className={cn(patterns.cardGrid, 'lg:grid-cols-4')}>

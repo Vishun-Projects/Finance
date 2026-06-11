@@ -17,17 +17,17 @@ import {
   Target,
 } from "lucide-react";
 import { NavPill, NavPillGroup } from "@/components/ui/nav-pill";
-import { PageHero } from "@/components/ui/hero";
 import { CompactListRow } from "@/components/ui/compact-list-row";
 import { useIsMobile } from "@/hooks/use-breakpoint";
-import { useMobileRefreshRegister } from "@/contexts/MobileRefreshContext";
+import { useMobileRefreshRegister } from '@/contexts/MobileRefreshContext';
+import { useRouteBootstrap, clearRouteBootstrap } from '@/hooks/use-route-bootstrap';
 import { normalizeGoals } from "@/lib/utils/goal-normalize";
 import {
   formatCurrency,
   formatDateLabel,
   usePlansInsights,
 } from "@/features/plans/hooks/use-plans-insights";
-import { cn, formatCompactRupees } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { patterns } from "@/design/patterns";
 import { groupDeadlinesForCurrentMonth } from "@/lib/utils/deadline-utils";
 import {
@@ -40,6 +40,7 @@ import type { PlanIncomeContext } from "@/lib/plan-income";
 import type { CurrentAccountBalance } from "@/lib/account-balance-service";
 import { PlanCapacityBanner } from "@/features/plans/components/plan-capacity-banner";
 import { PageMandate } from '@/components/layout/page-mandate';
+import { TabPanelTransition } from '@/components/motion/tab-panel';
 import { useTheme } from '@/contexts/ThemeContext';
 import GoalsTab from "@/features/plans/components/goals-tab";
 import DeadlinesTab from "@/features/plans/components/deadlines-tab";
@@ -94,6 +95,7 @@ function addLabelForTab(tab: TabLabel): string {
 
 export default function PlansPage({ bootstrap, userId, defaultTab = "overview" }: PlansPageClientProps) {
   const isMobile = useIsMobile();
+  const cachedBootstrap = useRouteBootstrap('/plans', bootstrap);
   const { setTheme, isLoading: themeLoading, isDark } = useTheme();
   const isDarkMode = !themeLoading && isDark;
   const searchParams = useSearchParams();
@@ -101,34 +103,34 @@ export default function PlansPage({ bootstrap, userId, defaultTab = "overview" }
     TAB_FROM_PARAM[defaultTab.toLowerCase()] ?? 'Overview',
   );
   const router = useRouter();
-  const [goals, setGoals] = useState<Goal[]>(() => normalizeGoals(bootstrap.goals));
-  const [deadlines, setDeadlines] = useState<Deadline[]>(() => bootstrap.deadlines.data ?? []);
-  const [wishlistItems, setWishlistItems] = useState<WishlistItem[]>(() => bootstrap.wishlist.data ?? []);
+  const [goals, setGoals] = useState<Goal[]>(() => normalizeGoals(cachedBootstrap.goals));
+  const [deadlines, setDeadlines] = useState<Deadline[]>(() => cachedBootstrap.deadlines.data ?? []);
+  const [wishlistItems, setWishlistItems] = useState<WishlistItem[]>(() => cachedBootstrap.wishlist.data ?? []);
   const [disciplineSummary, setDisciplineSummary] = useState<DisciplineSummary | null>(
-    bootstrap.disciplineSummary ?? null,
+    cachedBootstrap.disciplineSummary ?? null,
   );
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const deadlinesResponse = useMemo<DeadlinesResponse>(
-    () => ({ ...bootstrap.deadlines, data: deadlines }),
-    [bootstrap.deadlines, deadlines],
+    () => ({ ...cachedBootstrap.deadlines, data: deadlines }),
+    [cachedBootstrap.deadlines, deadlines],
   );
   const wishlistResponse = useMemo<WishlistResponse>(
-    () => ({ ...bootstrap.wishlist, data: wishlistItems }),
-    [bootstrap.wishlist, wishlistItems],
+    () => ({ ...cachedBootstrap.wishlist, data: wishlistItems }),
+    [cachedBootstrap.wishlist, wishlistItems],
   );
 
   useEffect(() => {
-    setGoals(normalizeGoals(bootstrap.goals));
-  }, [bootstrap.goals]);
+    setGoals(normalizeGoals(cachedBootstrap.goals));
+  }, [cachedBootstrap.goals]);
 
   useEffect(() => {
-    setDeadlines(bootstrap.deadlines.data ?? []);
-  }, [bootstrap.deadlines.data]);
+    setDeadlines(cachedBootstrap.deadlines.data ?? []);
+  }, [cachedBootstrap.deadlines.data]);
 
   useEffect(() => {
-    setWishlistItems(bootstrap.wishlist.data ?? []);
-  }, [bootstrap.wishlist.data]);
+    setWishlistItems(cachedBootstrap.wishlist.data ?? []);
+  }, [cachedBootstrap.wishlist.data]);
 
   useEffect(() => {
     const tabParam = searchParams.get('tab');
@@ -138,8 +140,8 @@ export default function PlansPage({ bootstrap, userId, defaultTab = "overview" }
   }, [searchParams]);
 
   useEffect(() => {
-    setDisciplineSummary(bootstrap.disciplineSummary ?? null);
-  }, [bootstrap.disciplineSummary]);
+    setDisciplineSummary(cachedBootstrap.disciplineSummary ?? null);
+  }, [cachedBootstrap.disciplineSummary]);
 
   const loadDiscipline = useCallback(async () => {
     try {
@@ -189,6 +191,7 @@ export default function PlansPage({ bootstrap, userId, defaultTab = "overview" }
   const refreshModule = useCallback(async () => {
     setIsRefreshing(true);
     try {
+      clearRouteBootstrap('/plans');
       router.refresh();
       await loadDiscipline();
     } finally {
@@ -196,7 +199,7 @@ export default function PlansPage({ bootstrap, userId, defaultTab = "overview" }
     }
   }, [router, loadDiscipline]);
 
-  useMobileRefreshRegister(refreshModule);
+  useMobileRefreshRegister(refreshModule, '/plans');
 
   const handleCreate = () => {
     if (activeTab === 'Goals') router.push('/plans?tab=goals&action=new');
@@ -206,14 +209,10 @@ export default function PlansPage({ bootstrap, userId, defaultTab = "overview" }
   };
 
   return (
-    <div className={cn(
-      patterns.pageColumn,
-      'min-w-0',
-      'max-lg:flex max-lg:min-h-0 max-lg:flex-1 max-lg:flex-col max-lg:overflow-hidden',
-    )}>
-      <div className="safe-top shrink-0 -mx-4 flex items-start justify-between gap-2 px-4 pt-2 lg:hidden">
+    <div className={cn(patterns.pageColumn, 'min-w-0')}>
+      <div className="safe-top shrink-0 -mx-4 flex items-start justify-between gap-2 px-4 pt-2">
         <PageMandate
-          className="min-w-0 flex-1"
+          className="min-w-0 flex-1 mb-4"
           title="Plans"
           mandate={
             activeTab === 'Bills & dues'
@@ -255,62 +254,12 @@ export default function PlansPage({ bootstrap, userId, defaultTab = "overview" }
         <button
           type="button"
           onClick={() => setTheme(isDarkMode ? 'light' : 'dark')}
-          className="btn-touch flex size-9 shrink-0 items-center justify-center rounded-full border border-border/60 text-muted hover:bg-surface hover:text-foreground"
+          className="btn-touch flex size-9 shrink-0 items-center justify-center rounded-full border border-border/60 text-muted hover:bg-surface hover:text-foreground lg:hidden"
           aria-label="Toggle theme"
           suppressHydrationWarning
         >
           {isDarkMode ? <Moon className="size-4" /> : <Sun className="size-4" />}
         </button>
-      </div>
-
-      <PageMandate
-        className="mb-4 hidden shrink-0 lg:block"
-        title="Plans"
-        mandate={
-          activeTab === 'Bills & dues'
-            ? 'Your dues plus subscriptions active this month.'
-            : 'Your commitments — goals, bills, and wishlist funding.'
-        }
-        metrics={
-          activeTab === 'Bills & dues'
-            ? [
-                { label: 'Due this month', value: String(deadlineStats.overdue + deadlineStats.upcoming) },
-                { label: 'Overdue', value: String(deadlineStats.overdue), tone: deadlineStats.overdue > 0 ? 'danger' : 'default' },
-                {
-                  label: 'Required/mo',
-                  value: disciplineSummary
-                    ? formatDisciplineCurrency(disciplineSummary.totalRequiredPerMonth)
-                    : '—',
-                },
-              ]
-            : [
-                {
-                  label: 'Due this month',
-                  value: String(deadlineStats.overdue + deadlineStats.upcoming),
-                  href: '/plans?tab=deadlines',
-                },
-                {
-                  label: 'Required/mo',
-                  value: disciplineSummary
-                    ? formatDisciplineCurrency(disciplineSummary.totalRequiredPerMonth)
-                    : '—',
-                },
-                {
-                  label: 'Active goals',
-                  value: String(goalStats.active),
-                  href: '/plans?tab=goals',
-                },
-              ]
-        }
-      />
-
-      <div className="mb-5 hidden lg:block">
-        <PageHero
-          tag="Financial planning"
-          title="Plans"
-          subtitle="Track goals, dues, and wishlist — and see if your monthly commitments fit."
-          className="mb-0"
-        />
       </div>
 
       <div className="mb-3 flex shrink-0 flex-col gap-2 max-lg:mb-2 lg:mb-5 lg:flex-row lg:flex-wrap lg:items-center lg:gap-3">
@@ -343,8 +292,7 @@ export default function PlansPage({ bootstrap, userId, defaultTab = "overview" }
         </div>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden pb-bottom-bar lg:overflow-visible lg:pb-0">
-        <div className="custom-scrollbar scroll-pb-bottom-bar min-h-0 flex-1 overflow-y-auto overscroll-contain lg:overflow-visible">
+      <TabPanelTransition panelKey={activeTab}>
       {activeTab === 'Overview' && (
         <div className="space-y-5 lg:space-y-6">
           {disciplineSummary && (
@@ -354,37 +302,6 @@ export default function PlansPage({ bootstrap, userId, defaultTab = "overview" }
               planIncomeSource={disciplineSummary.capacity.planIncomeSource}
             />
           )}
-
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
-            <div className="card-base p-3">
-              <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-hint">Active goals</p>
-              <p className="mt-1 text-xl font-semibold tabular-nums numeric">{goalStats.active}</p>
-              <p className="mt-0.5 text-[10px] text-muted">{goalStats.progressPercent}% saved</p>
-            </div>
-            <div className="card-base p-3">
-              <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-hint">Due this month</p>
-              <p className="mt-1 text-xl font-semibold tabular-nums numeric">
-                {deadlineStats.overdue + deadlineStats.upcoming}
-              </p>
-              <p className="mt-0.5 text-[10px] text-muted">{deadlineStats.overdue} overdue</p>
-            </div>
-            <div className="card-base p-3">
-              <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-hint">Wishlist</p>
-              <p className="mt-1 text-xl font-semibold tabular-nums numeric">{wishlistStats.pending}</p>
-              <p className="mt-0.5 truncate text-[10px] text-muted" title={formatCurrency(wishlistStats.totalCost)}>
-                {formatCompactRupees(wishlistStats.totalCost)} total
-              </p>
-            </div>
-            <div className="card-base p-3">
-              <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-hint">Required/mo</p>
-              <p className="mt-1 text-xl font-semibold tabular-nums numeric">
-                {disciplineSummary
-                  ? formatDisciplineCurrency(disciplineSummary.totalRequiredPerMonth)
-                  : '—'}
-              </p>
-              <p className="mt-0.5 text-[10px] text-muted">Commitments total</p>
-            </div>
-          </div>
 
           {(deadlineGroups.overdue.length > 0 ||
             deadlineGroups.thisMonthUpcoming.length > 0 ||
@@ -460,8 +377,7 @@ export default function PlansPage({ bootstrap, userId, defaultTab = "overview" }
           onWishlistChange={setWishlistItems}
         />
       )}
-        </div>
-      </div>
+      </TabPanelTransition>
     </div>
   );
 }

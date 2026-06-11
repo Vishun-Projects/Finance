@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
+import { invalidateUserAppData } from '@/lib/server-data-cache';
 import { prisma } from '../../../lib/db';
 import { addImageGenerationJob } from '@/lib/services/image-queue';
 import { ImageJobType } from '@prisma/client';
@@ -78,6 +79,7 @@ export async function POST(request: NextRequest) {
 
     revalidatePath('/');
     revalidatePath('/plans');
+    invalidateUserAppData(userId);
     return NextResponse.json(newGoal);
   } catch (error) {
     console.error('❌ GOALS POST - Error:', error);
@@ -176,6 +178,8 @@ export async function PUT(request: NextRequest) {
 
     revalidatePath('/');
     revalidatePath('/plans');
+    const uid = updateData.userId ?? updatedGoal?.userId;
+    if (uid) invalidateUserAppData(uid);
     return NextResponse.json(updatedGoal);
   } catch (error) {
     console.error('❌ GOALS PUT - Error:', error);
@@ -193,12 +197,14 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Delete from database
+    const existing = await prisma.goal.findUnique({ where: { id }, select: { userId: true } });
     await prisma.goal.delete({
       where: { id }
     });
 
     revalidatePath('/');
     revalidatePath('/plans');
+    if (existing?.userId) invalidateUserAppData(existing.userId);
     return NextResponse.json({ message: 'Goal deleted successfully' });
   } catch (error) {
     console.error('❌ GOALS DELETE - Error:', error);

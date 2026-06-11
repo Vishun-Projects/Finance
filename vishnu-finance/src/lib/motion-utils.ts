@@ -23,25 +23,64 @@ export const EASING = {
   EASE_IN_OUT: [0.4, 0, 0.2, 1] as [number, number, number, number],
 } as const;
 
-// Framer Motion variants that respect reduced motion
+// Framer Motion variants that respect reduced motion (resolve at call time, not module load)
 export const createMotionVariants = (variants: {
   hidden?: Record<string, any>;
   visible?: Record<string, any>;
   exit?: Record<string, any>;
 }) => {
-  const reduced = prefersReducedMotion();
-  
-  if (reduced) {
-    // For reduced motion, only animate opacity
+  if (prefersReducedMotion()) {
     return {
       hidden: { opacity: 0 },
       visible: { opacity: 1 },
       exit: { opacity: 0 },
     };
   }
-  
+
   return variants;
 };
+
+/** Shared spring for pills, pages, sheets */
+export const springTransition = (reduced?: boolean) =>
+  reduced ?? prefersReducedMotion()
+    ? { duration: 0 }
+    : { type: 'spring' as const, stiffness: 380, damping: 32, mass: 0.85 };
+
+/** Tab panel crossfade — call at render time so reduced motion is respected after hydration */
+export function getTabPanelVariants() {
+  return createMotionVariants({
+    hidden: { opacity: 0, y: 8 },
+    visible: { opacity: 1, y: 0, transition: springTransition() },
+    exit: { opacity: 0, y: -4, transition: { duration: TIMING.SMALL } },
+  });
+}
+
+/** Medium route enter (mobile shell) */
+export function getPageEnterVariants() {
+  return createMotionVariants({
+    hidden: { opacity: 0, y: 12 },
+    visible: { opacity: 1, y: 0, transition: springTransition() },
+    exit: { opacity: 0, transition: { duration: TIMING.SMALL } },
+  });
+}
+
+/** Backdrop fade variants */
+export function getOverlayVariants() {
+  return createMotionVariants({
+    hidden: { opacity: 0 },
+    visible: { opacity: 1, transition: { duration: TIMING.SMALL } },
+    exit: { opacity: 0, transition: { duration: TIMING.SMALL } },
+  });
+}
+
+/** Bottom sheet slide-up */
+export function getFadeSlideUpVariants() {
+  return createMotionVariants({
+    hidden: { opacity: 0, y: '100%' },
+    visible: { opacity: 1, y: 0, transition: springTransition() },
+    exit: { opacity: 0, y: '100%', transition: { duration: TIMING.SMALL } },
+  });
+}
 
 // Scale animation for buttons (respects reduced motion)
 export const getScaleAnimation = () => {
@@ -128,5 +167,16 @@ export const getStaggerChildren = (delay = 0.05) => {
     delayChildren: delay,
     staggerChildren: delay,
   };
+};
+
+/** Pill / CTA tap feedback */
+export const tapScale = () => (prefersReducedMotion() ? {} : { scale: 0.97 });
+
+export type MobileSheetHeight = 'compact' | 'medium' | 'full';
+
+export const mobileSheetHeightClasses: Record<MobileSheetHeight, string> = {
+  compact: 'max-h-[min(72dvh,520px)]',
+  medium: 'max-h-[min(85dvh,640px)]',
+  full: 'max-h-[min(92dvh,calc(100dvh-env(safe-area-inset-top)))]',
 };
 

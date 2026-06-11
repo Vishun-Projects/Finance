@@ -393,31 +393,7 @@ export default function DeadlinesPageClient({
               </Button>
             </div>
           </div>
-        ) : (
-          <div className="hidden flex-col gap-2 sm:flex sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-foreground">Bills & dues</h2>
-              <p className="text-xs text-muted-foreground">
-                {stats.monthLabel} — detected bills and your upcoming dues
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                size="sm"
-                className="gap-2 border border-border bg-card text-foreground hover:bg-muted"
-                onClick={() => refreshDeadlines()}
-                disabled={isRefreshing}
-              >
-                <RefreshCw className={cn('h-3 w-3', isRefreshing && 'animate-spin')} />
-                Refresh
-              </Button>
-              <Button size="sm" className="gap-2" onClick={openCreateDialog}>
-                <Plus className="h-3 w-3" />
-                <span className="hidden sm:inline">Add</span>
-              </Button>
-            </div>
-          </div>
-        )}
+        ) : null}
 
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <NavPillGroup className="w-full sm:w-auto">

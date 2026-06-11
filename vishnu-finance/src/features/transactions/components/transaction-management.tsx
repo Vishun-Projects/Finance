@@ -26,13 +26,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Chip } from '@/components/ui/chip';
 import { Callout } from '@/components/ui/callout';
-import { PageHero } from '@/components/ui/hero';
-import FabButton from '@/components/ui/fab-button';
 import { useMobileRefreshRegister } from '@/contexts/MobileRefreshContext';
+import { useScrollOwner } from '@/contexts/scroll-owner-context';
 import { NavPill, NavPillGroup } from '@/components/ui/nav-pill';
 import { patterns } from '@/design/patterns';
 import { Combobox } from '@/components/ui/combobox';
 import { Button } from '@/components/ui/button';
+import { MotionButton } from '@/components/ui/motion-button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { calculateTotalsByCategory, formatCurrency } from '@/lib/transaction-utils';
@@ -41,12 +41,15 @@ import { getTransactionDisplayName } from '@/lib/transaction-utils';
 import type { ISODateRange } from '@/lib/date-range';
 import DeleteConfirmationDialog from './delete-confirmation-dialog';
 import ParsedTransactionsReviewModal from './parsed-transactions-review-modal';
+import { DocumentImportSheet } from './document-import-sheet';
+import { ResponsiveDialog } from '@/components/ui/responsive-dialog';
 import SpendingCalendar, { type DailySpendEntry } from './spending-calendar';
 import { TRANSACTION_PAGE_SIZE } from '@/features/transactions/constants';
 import { toLocalISODate } from '@/lib/date-range';
 import { AccountBalanceChip } from '@/components/finance/account-balance-chip';
 import { MonthAtGlanceKpis } from '@/components/finance/month-at-glance-kpis';
 import { PageMandate } from '@/components/layout/page-mandate';
+import { clearRouteBootstrap, useRouteBootstrap } from '@/hooks/use-route-bootstrap';
 import type { CurrentAccountBalance } from '@/lib/account-balance-service';
 import type { ImportPreviewResult } from '@/lib/import-preview-service';
 import {
@@ -112,16 +115,22 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
   const { theme, setTheme, isDark } = useTheme();
 
   const resolvedUserId = user?.id ?? bootstrap?.userId ?? null;
-  const bootstrapRange = bootstrap?.range;
+  const activeBootstrap = useRouteBootstrap('/transactions', bootstrap ?? {
+    transactions: [],
+    categories: [],
+    totals: null,
+    userId: resolvedUserId ?? '',
+  });
+  const bootstrapRange = activeBootstrap?.range;
 
   // State
-  const [transactions, setTransactions] = useState<Transaction[]>(bootstrap?.transactions ?? []);
+  const [transactions, setTransactions] = useState<Transaction[]>(activeBootstrap?.transactions ?? []);
   const [categories, setCategories] = useState<{ id: string; name: string; type: 'INCOME' | 'EXPENSE'; color?: string }[]>(
-    bootstrap?.categories ?? [],
+    activeBootstrap?.categories ?? [],
   );
-  const [isLoading, setIsLoading] = useState(!(bootstrap?.transactions && bootstrap.transactions.length > 0));
-  const [pagination, setPagination] = useState(bootstrap?.pagination ?? { total: 0, page: 1, pageSize: 50, totalPages: 0 });
-  const [apiTotals, setApiTotals] = useState<{ income: number; expense: number } | null>(bootstrap?.totals ?? null);
+  const [isLoading, setIsLoading] = useState(!(activeBootstrap?.transactions && activeBootstrap.transactions.length > 0));
+  const [pagination, setPagination] = useState(activeBootstrap?.pagination ?? { total: 0, page: 1, pageSize: 50, totalPages: 0 });
+  const [apiTotals, setApiTotals] = useState<{ income: number; expense: number } | null>(activeBootstrap?.totals ?? null);
   const [dailySpend, setDailySpend] = useState<DailySpendEntry[]>([]);
   const [isDailySpendLoading, setIsDailySpendLoading] = useState(false);
   const [categoryBreakdown, setCategoryBreakdown] = useState<Array<{ name: string; expense: number; count: number }>>([]);
@@ -159,6 +168,14 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
   const [period, setPeriod] = useState<'daily' | 'weekly' | 'monthly' | 'custom'>('monthly');
   const [mobilePanel, setMobilePanel] = useState<'list' | 'calendar' | 'breakdown'>('list');
   const [mobileToolsOpen, setMobileToolsOpen] = useState(false);
+  const scrollOwner = useScrollOwner();
+  const bindPanelScrollRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      scrollOwner?.registerPanelScroller(node);
+    },
+    [scrollOwner],
+  );
+  const isDarkMode = isDark;
 
 
   // PDF Import state
@@ -748,7 +765,8 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
   useMobileRefreshRegister(
     useCallback(async () => {
       await fetchTransactions({ showSpinner: false });
-    }, [fetchTransactions])
+    }, [fetchTransactions]),
+    '/transactions',
   );
 
   const refreshImportMeta = useCallback(async () => {
@@ -1031,7 +1049,15 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
 
   const openImportDialog = useCallback(() => {
     setShowFileDialog(true);
-  }, [setShowFileDialog]);
+  }, []);
+
+  const closeImportDialog = useCallback(() => {
+    setShowFileDialog(false);
+    setSelectedFile(null);
+    setFileError(null);
+    setParsedTransactions([]);
+    setShowCsvPreview(false);
+  }, []);
 
   const handleBulkDelete = useCallback(async () => {
     if (selectedIds.size === 0) {
@@ -2138,6 +2164,9 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
 
       success('Imported', message);
       setImportProgress(100);
+      clearRouteBootstrap('/dashboard');
+      clearRouteBootstrap('/plans');
+      clearRouteBootstrap('/transactions');
 
       if (shouldExpandDateFilter && importRange) {
         updateURLParams({
@@ -2210,22 +2239,38 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
   }), [currentSearchTerm, selectedCategoryId, financialCategory, amountPreset, quickRange, startDateParam, endDateParam, categories, applyDraftFilters, resetDraftFilters, computeRange]);
 
   return (
-    <div className={cn(patterns.pageFluid, 'transactions-layout-root flex flex-col pb-8 lg:pb-4')}>
+    <div
+      data-scroll-mode="table"
+      className={cn(patterns.pageFluid, 'transactions-layout-root flex min-h-0 flex-1 flex-col lg:pb-4')}
+    >
 
       {!isLoading && (
-        <PageMandate
-          className="mb-3 shrink-0 lg:hidden"
-          title="Transactions"
-          mandate="All money movement — import, categorize, search, and export."
-          metrics={[
-            {
-              label: 'Bank balance',
-              value: accountBalance?.amount != null ? formatAmount(accountBalance.amount) : '—',
-            },
-            { label: 'Income', value: formatAmount(income), tone: 'success' },
-            { label: 'Expenses', value: formatAmount(expense), tone: 'danger' },
-          ]}
-        />
+        <div className="safe-top mb-3 flex shrink-0 items-start justify-between gap-2 lg:hidden">
+          <PageMandate
+            className="min-w-0 flex-1"
+            title="Transactions"
+            mandate="All money movement — import, categorize, search, and export."
+            metrics={[
+              {
+                label: 'Bank balance',
+                value: accountBalance?.amount != null ? formatAmount(accountBalance.amount) : '—',
+              },
+              { label: 'Income', value: formatAmount(income), tone: 'success' },
+              { label: 'Expenses', value: formatAmount(expense), tone: 'danger' },
+            ]}
+          />
+          <div className="flex shrink-0 flex-col items-center gap-1 pt-0.5">
+            <button
+              type="button"
+              onClick={() => setTheme(isDarkMode ? 'light' : 'dark')}
+              className="btn-touch flex size-9 items-center justify-center rounded-full border border-border/60 text-muted hover:bg-surface hover:text-foreground"
+              aria-label="Toggle theme"
+              suppressHydrationWarning
+            >
+              {isDarkMode ? <Moon className="size-4" /> : <Sun className="size-4" />}
+            </button>
+          </div>
+        </div>
       )}
 
       <div className="mb-4 hidden shrink-0 flex-wrap items-center gap-2 md:flex">
@@ -2302,8 +2347,8 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
         </Callout>
       )}
 
-      {/* Mobile search + quick actions */}
-      <div className="mb-3 flex flex-col gap-2 lg:hidden">
+      {/* Mobile chrome — shrink-0 so list panel gets remaining height */}
+      <div className="mb-3 flex shrink-0 flex-col gap-2 lg:hidden">
         <div className="flex items-center gap-2">
           <div className="relative min-w-0 flex-1">
             <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-hint" />
@@ -2424,13 +2469,13 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
         )}
       </div>
 
-      <div className="transactions-layout-grid grid min-h-0 grid-cols-1 gap-4 lg:min-h-[28rem] lg:grid-cols-[minmax(0,1fr)_17.5rem] xl:grid-cols-[minmax(0,1fr)_19rem]">
+      <div className="transactions-layout-grid grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_17.5rem] xl:grid-cols-[minmax(0,1fr)_19rem]">
         <div className={cn(
           'flex h-full min-h-0 min-w-0 flex-col overflow-hidden',
           mobilePanel !== 'list' && 'hidden lg:flex'
         )}>
             <section className="card-base hidden h-full min-h-0 flex-col overflow-hidden lg:flex">
-              <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto custom-scrollbar">
+              <div className="scrollbar-none min-h-0 flex-1 overflow-x-hidden overflow-y-auto max-lg:scroll-pb-bottom-bar max-lg:pb-bottom-bar">
               <table className="w-full table-fixed text-left text-sm">
                 <thead className="sticky top-0 z-10 bg-surface">
                   <tr className="border-b border-border">
@@ -2541,8 +2586,11 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
               )}
             </section>
 
-            <div className="card-base mt-5 flex flex-col lg:hidden lg:mt-0">
-              <div className="custom-scrollbar">
+            <div className="card-base flex min-h-0 flex-1 flex-col overflow-hidden lg:hidden">
+              <div
+                ref={mobilePanel === 'list' ? bindPanelScrollRef : undefined}
+                className="scrollbar-none min-h-0 flex-1 overflow-y-auto pb-bottom-bar scroll-pb-bottom-bar"
+              >
               {isLoading && !transactions.length ? (
                 <div className="space-y-4 p-4">
                   {[1, 2, 3].map((i) => (
@@ -2658,19 +2706,30 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
             </div>
           )}
 
-          <div className={cn(mobilePanel === 'breakdown' && 'hidden lg:block')}>
-          <SpendingCalendar
-            dailySpend={dailySpend}
-            formatAmount={formatAmount}
-            rangeEnd={endDate || startDate}
-            isLoading={isDailySpendLoading}
-          />
+          <div
+            className={cn(
+              'flex min-h-0 flex-1 flex-col overflow-hidden lg:hidden',
+              mobilePanel === 'breakdown' && 'hidden',
+            )}
+          >
+            <div
+              ref={mobilePanel === 'calendar' ? bindPanelScrollRef : undefined}
+              className="scrollbar-none min-h-0 flex-1 overflow-y-auto pb-bottom-bar scroll-pb-bottom-bar"
+            >
+              <SpendingCalendar
+                dailySpend={dailySpend}
+                formatAmount={formatAmount}
+                rangeEnd={endDate || startDate}
+                isLoading={isDailySpendLoading}
+              />
+            </div>
           </div>
 
           <div className={cn(
             'flex min-h-0 flex-1 flex-col overflow-hidden',
-            mobilePanel === 'calendar' && 'hidden lg:flex'
+            mobilePanel === 'calendar' && 'hidden lg:flex',
           )}>
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
           <div className="flex shrink-0 items-center justify-between border-b border-border px-3 py-2">
             <div>
               <h2 className="text-xs font-medium text-foreground">Breakdown</h2>
@@ -2718,7 +2777,10 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
             </div>
           )}
 
-          <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3 custom-scrollbar">
+          <div
+            ref={mobilePanel === 'breakdown' ? bindPanelScrollRef : undefined}
+            className="scrollbar-none min-h-0 flex-1 space-y-2 overflow-y-auto p-3 max-lg:scroll-pb-bottom-bar max-lg:pb-bottom-bar"
+          >
             {isCategoryBreakdownLoading ? (
               <div className="space-y-2">
                 {[1, 2, 3].map((i) => (
@@ -2746,6 +2808,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
             )}
           </div>
           </div>
+          </div>
         </aside>
       </div>
 
@@ -2762,27 +2825,59 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
       </FilterSheet>
 
       {/* Bulk Categorize Modal */}
-      {
-        showBulkCategorize && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => {
+      <ResponsiveDialog
+        open={showBulkCategorize}
+        onOpenChange={(open) => {
+          if (!open) {
             setShowBulkCategorize(false);
             setBulkCategoryId('');
-          }}>
-            <div className="bg-card rounded-none border shadow-lg max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
-              <div className="p-4 md:p-6 border-b flex items-center justify-between">
-                <h2 className="text-lg md:text-xl font-semibold">Categorize {selectedIds.size} Transaction{selectedIds.size !== 1 ? 's' : ''}</h2>
-                <button
-                  onClick={() => {
-                    setShowBulkCategorize(false);
-                    setBulkCategoryId('');
-                  }}
-                  className="p-1 rounded-md hover:bg-muted"
-                  aria-label="Close"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-              <div className="overflow-y-auto flex-1 p-4 md:p-6">
+          }
+        }}
+        title={`Categorize ${selectedIds.size} transaction${selectedIds.size !== 1 ? 's' : ''}`}
+        mobileHeight="medium"
+        maxWidth="2xl"
+        footer={
+          <div className="w-full space-y-3">
+            <MotionButton
+              variant="outline"
+              className="w-full"
+              onClick={handleAutoCategorizeSelected}
+              disabled={isBulkUpdating}
+            >
+              <Sparkles className="mr-2 size-4" />
+              Auto-categorize by UPI/Account
+            </MotionButton>
+            <MotionButton
+              variant="default"
+              className="w-full"
+              onClick={handleAutoCategorizeSelected}
+              disabled={isBulkUpdating}
+            >
+              <BrainCircuit className="mr-2 size-4" />
+              Auto-categorize selected (AI)
+            </MotionButton>
+            <div className="flex gap-2">
+              <MotionButton
+                className="flex-1"
+                onClick={handleBulkCategorize}
+                disabled={!bulkCategoryId || isBulkUpdating || categories.length === 0}
+              >
+                {isBulkUpdating ? 'Updating…' : bulkCategoryId ? `Apply to ${selectedIds.size}` : 'Select a category'}
+              </MotionButton>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowBulkCategorize(false);
+                  setBulkCategoryId('');
+                }}
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        }
+      >
+              <div className="pb-2">
                 {categories.length === 0 ? (
                   <div className="text-center py-8">
                     <Tag className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
@@ -2956,49 +3051,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                   </div>
                 )}
               </div>
-              <div className="p-4 md:p-6 border-t space-y-3">
-                {/* Auto-categorize by UPI/Account */}
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={handleAutoCategorizeSelected}
-                  disabled={isBulkUpdating}
-                >
-                  <Sparkles className="w-4 h-4 mr-2" />
-                  Auto-categorize by UPI/Account Number
-                </Button>
-                <Button
-                  variant="default"
-                  className="w-full bg-primary hover:bg-primary/90 text-primary-foreground border-0"
-                  onClick={handleAutoCategorizeSelected}
-                  disabled={isBulkUpdating}
-                >
-                  <BrainCircuit className="w-4 h-4 mr-2" />
-                  Auto-Categorize Selected (AI)
-                </Button>
-                <div className="flex gap-2">
-                  <Button
-                    className="flex-1"
-                    onClick={handleBulkCategorize}
-                    disabled={!bulkCategoryId || isBulkUpdating || categories.length === 0}
-                  >
-                    {isBulkUpdating ? 'Updating...' : bulkCategoryId ? `Apply to ${selectedIds.size} Transaction${selectedIds.size !== 1 ? 's' : ''}` : 'Select a Category'}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setShowBulkCategorize(false);
-                      setBulkCategoryId('');
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              </div>
-            </div >
-          </div >
-        )
-      }
+      </ResponsiveDialog>
 
 
 
@@ -3024,175 +3077,28 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
         }}
       />
 
-      {/* File Parse Dialog */}
-      {
-        showFileDialog && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => {
-            setShowFileDialog(false);
-            setSelectedFile(null);
-            setFileError(null);
-            setParsedTransactions([]);
-            setShowCsvPreview(false);
-          }}>
-            <div className="bg-card rounded-none border shadow-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-              <div className="p-4 md:p-6 border-b flex items-center justify-between">
-                <h3 className="text-xl font-bold text-foreground">Parse Financial Documents</h3>
-                <button
-                  onClick={() => {
-                    setShowFileDialog(false);
-                    setSelectedFile(null);
-                    setFileError(null);
-                    setParsedTransactions([]);
-                    setShowCsvPreview(false);
-                  }}
-                  className="p-2 rounded-md hover:bg-muted"
-                  aria-label="Close"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              <div className="p-4 md:p-6 space-y-6 overflow-y-auto">
-                {/* Instructions */}
-                <div className="bg-muted/50 rounded-none p-4 border border-border">
-                  <div className="flex items-start space-x-3">
-                    <FileText className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
-                    <div className="flex-1">
-                      <h4 className="font-semibold text-foreground mb-2">Supported File Formats:</h4>
-                      <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
-                        <li><strong>PDF:</strong> Bank statements, transaction reports</li>
-                        <li><strong>Excel:</strong> .xls, .xlsx transaction sheets</li>
-                        <li><strong>Text:</strong> .txt, .csv flat files</li>
-                      </ul>
-                      <p className="text-xs text-muted-foreground mt-2">
-                        Duplicates will be automatically skipped during import
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* File Input with Drag and Drop */}
-                <div>
-                  <label className="block text-sm font-semibold text-foreground mb-3">
-                    Select File
-                  </label>
-                  <div
-                    onDragEnter={handleDragEnter}
-                    onDragOver={handleDragOver}
-                    onDragLeave={handleDragLeave}
-                    onDrop={handleDrop}
-                    className={`border-2 border-dashed rounded-none p-8 text-center transition-colors ${isDragging
-                      ? 'border-primary bg-primary/10'
-                      : 'border-border hover:border-primary/50'
-                      }`}
-                  >
-                    <Upload className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-                    <p className="text-sm text-muted-foreground mb-2">
-                      {isDragging ? 'Drop file here' : 'Drag and drop your file here, or click to browse'}
-                    </p>
-                    <input
-                      type="file"
-                      accept=".pdf,.xls,.xlsx,.txt,.csv,application/pdf,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/plain,text/csv"
-                      onChange={handleMultiFormatFileSelect}
-                      className="hidden"
-                      id="file-upload-transactions"
-                    />
-                    <label htmlFor="file-upload-transactions" className="inline-block px-4 py-2 bg-primary text-primary-foreground rounded-md cursor-pointer hover:bg-primary/90 transition-colors">
-                      Choose File
-                    </label>
-                  </div>
-                  {selectedFile && (
-                    <p className="text-sm text-success mt-2">
-                      Selected: {selectedFile.name}
-                    </p>
-                  )}
-
-
-                </div>
-
-                {/* Error Display */}
-                {fileError && (
-                  <div className="bg-destructive/10 border border-destructive rounded-none p-4">
-                    <div className="flex items-center space-x-3">
-                      <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0" />
-                      <span className="text-destructive text-sm">{fileError}</span>
-                    </div>
-                  </div>
-                )}
-
-                {/* Password, Bank selector and Parse Button */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-sm font-semibold text-foreground mb-3">
-                      PDF Password (if any)
-                    </label>
-                    <Input
-                      type="password"
-                      placeholder="Enter password"
-                      value={pdfPassword}
-                      onChange={(e) => setPdfPassword(e.target.value)}
-                      className="bg-background"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-foreground mb-3">
-                      Bank (optional)
-                    </label>
-                    <Combobox
-                      options={[
-                        { value: '', label: 'Auto-detect' },
-                        { value: 'sbi', label: 'SBI' },
-                        { value: 'hdfc', label: 'HDFC' },
-                        { value: 'icici', label: 'ICICI' },
-                        { value: 'axis', label: 'Axis' },
-                        { value: 'bob', label: 'Bank of Baroda' },
-                        { value: 'kotak', label: 'Kotak' },
-                        { value: 'yes', label: 'YES Bank' }
-                      ]}
-                      value={selectedBank}
-                      onValueChange={(value) => setSelectedBank(value || '')}
-                      placeholder="Auto-detect"
-                      searchPlaceholder="Search banks..."
-                    />
-                  </div>
-                  <div className="flex items-end">
-                    <button
-                      onClick={(e) => {
-                        e.preventDefault();
-                        handleParseFile();
-                      }}
-                      disabled={!selectedFile || isParsingFile}
-                      className="w-full px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-                    >
-                      {isParsingFile ? (
-                        <div className="flex items-center">
-                          <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                          Parsing File...
-                        </div>
-                      ) : (
-                        <div className="flex items-center">
-                          <FileText className="w-4 h-4 mr-2" />
-                          Parse File
-                        </div>
-                      )}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Parse Progress */}
-                {isParsingFile && parseProgress > 0 && (
-                  <div className="space-y-2">
-                    <div className="w-full bg-muted rounded-full h-2">
-                      <div className="bg-primary h-2 rounded-full transition-all" style={{ width: `${parseProgress}%` }}></div>
-                    </div>
-                    <div className="text-xs text-muted-foreground text-center">Parsing... {parseProgress}%</div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )
-      }
+      <DocumentImportSheet
+        open={showFileDialog}
+        onOpenChange={(open) => {
+          if (!open) closeImportDialog();
+          else setShowFileDialog(true);
+        }}
+        selectedFile={selectedFile}
+        fileError={fileError}
+        isParsingFile={isParsingFile}
+        parseProgress={parseProgress}
+        pdfPassword={pdfPassword}
+        selectedBank={selectedBank}
+        isDragging={isDragging}
+        onPdfPasswordChange={setPdfPassword}
+        onSelectedBankChange={setSelectedBank}
+        onFileSelect={handleMultiFormatFileSelect}
+        onDragEnter={handleDragEnter}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        onParse={() => void handleParseFile()}
+      />
 
       <ParsedTransactionsReviewModal
         open={showCsvPreview}
@@ -3309,15 +3215,6 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
         actionType="delete"
       />
 
-      <FabButton
-        label="Add"
-        icon={<Plus className="size-5" />}
-        onClick={() => {
-          setEditingTransaction(null);
-          setShowForm(true);
-        }}
-        aria-label="Add transaction"
-      />
     </div >
   );
 }

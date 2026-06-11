@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '../../../lib/db';
 import { rateLimitMiddleware, getRouteType } from '../../../lib/rate-limit';
+import { invalidateUserAppData } from '@/lib/server-data-cache';
 
 // Configure route caching - user-specific dynamic data
 export const dynamic = 'force-dynamic';
@@ -133,6 +134,7 @@ export async function POST(request: NextRequest) {
     await addImageGenerationJob(newWishlistItem.id, ImageJobType.WISHLIST_ITEM, title);
     triggerImmediateProcessing();
 
+    invalidateUserAppData(userId);
     return NextResponse.json(newWishlistItem);
   } catch (error) {
     console.error('❌ WISHLIST POST - Error:', error);
@@ -169,6 +171,7 @@ export async function PUT(request: NextRequest) {
     await addImageGenerationJob(updatedWishlistItem.id, ImageJobType.WISHLIST_ITEM, updatedWishlistItem.title);
     triggerImmediateProcessing();
 
+    if (updatedWishlistItem?.userId) invalidateUserAppData(updatedWishlistItem.userId);
     return NextResponse.json(updatedWishlistItem);
   } catch (error) {
     console.error('❌ WISHLIST PUT - Error:', error);
@@ -186,11 +189,12 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'ID is required' }, { status: 400 });
     }
 
-    // Delete from database
+    const existing = await (prisma as any).wishlistItem.findUnique({ where: { id }, select: { userId: true } });
     await (prisma as any).wishlistItem.delete({
       where: { id }
     });
 
+    if (existing?.userId) invalidateUserAppData(existing.userId);
     return NextResponse.json({ message: 'Wishlist item deleted successfully' });
   } catch (error) {
     console.error('❌ WISHLIST DELETE - Error:', error);

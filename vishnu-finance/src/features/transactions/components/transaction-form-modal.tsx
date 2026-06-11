@@ -1,11 +1,13 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Save, Store, User, X } from 'lucide-react';
+import { Save, Store, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Transaction, TransactionCategory } from '@/types';
 import { Combobox, ComboboxOption } from '@/components/ui/combobox';
 import { Button } from '@/components/ui/button';
+import { MotionButton } from '@/components/ui/motion-button';
+import { ResponsiveSheet } from '@/components/ui/responsive-sheet';
 import { detectEntityType, suggestCategory } from '@/lib/entity-detection';
 
 interface TransactionFormModalProps {
@@ -176,31 +178,41 @@ export default function TransactionFormModal({
     label: c.name,
   }));
 
-  if (!open) return null;
+  const formFooter = (
+    <div className="flex w-full items-center gap-3">
+      <Button
+        type="button"
+        variant="outline"
+        onClick={onClose}
+        disabled={isSaving}
+        className="flex-1"
+      >
+        Cancel
+      </Button>
+      <MotionButton
+        type="submit"
+        form="transaction-form"
+        disabled={isSaving}
+        className="flex-[2]"
+      >
+        <Save className="mr-2 size-4" />
+        {isSaving ? 'Saving…' : transaction ? 'Update' : 'Save'}
+      </MotionButton>
+    </div>
+  );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm sm:items-center sm:p-4 md:p-6" onClick={onClose}>
-      <div
-        className="flex max-h-[95dvh] w-full max-w-2xl flex-col overflow-hidden glass-thick glass-text glass-sheet-bottom animate-in slide-in-from-bottom duration-200 sm:max-h-[90vh] sm:rounded-[20px] sm:animate-in sm:zoom-in-95"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header - Fixed */}
-        <div className="flex shrink-0 items-center justify-between border-b border-border/50 px-5 py-4">
-          <h3 className="text-lg font-bold font-display tracking-tight">
-            {transaction ? 'Edit Transaction' : 'Add Transaction'}
-          </h3>
-          <button
-            onClick={onClose}
-            className="text-muted-foreground hover:text-foreground p-2 rounded-full hover:bg-muted transition-colors"
-            aria-label="Close"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar p-5">
-          <form id="transaction-form" onSubmit={handleSubmit} className="space-y-5">
+    <ResponsiveSheet
+      open={open}
+      onOpenChange={(isOpen) => {
+        if (!isOpen) onClose();
+      }}
+      title={transaction ? 'Edit transaction' : 'Add transaction'}
+      mobileHeight="medium"
+      contentClassName="sm:max-w-2xl"
+      footer={formFooter}
+    >
+      <form id="transaction-form" onSubmit={handleSubmit} className="space-y-5 pb-2">
             {/* Financial Category Type */}
             <div>
               <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-3 block">Type</label>
@@ -367,30 +379,6 @@ export default function TransactionFormModal({
               />
             </div>
           </form>
-        </div>
-
-        {/* Footer - Fixed */}
-        <div className="flex shrink-0 items-center gap-3 border-t border-border/50 p-4">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onClose}
-            disabled={isSaving}
-            className="flex-1 h-11 rounded-xl font-bold uppercase tracking-widest text-xs"
-          >
-            Cancel
-          </Button>
-          <Button
-            type="submit"
-            form="transaction-form"
-            disabled={isSaving}
-            className="flex-[2] h-11 rounded-xl font-bold uppercase tracking-widest text-xs shadow-lg shadow-primary/20"
-          >
-            <Save className="w-4 h-4 mr-2" />
-            {isSaving ? 'Saving...' : transaction ? 'Update Transaction' : 'Save Transaction'}
-          </Button>
-        </div>
-      </div>
-    </div>
+    </ResponsiveSheet>
   );
 }

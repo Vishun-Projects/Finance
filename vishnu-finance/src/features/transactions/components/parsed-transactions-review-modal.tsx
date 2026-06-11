@@ -2,7 +2,6 @@
 
 import React from 'react';
 import {
-  X,
   Upload,
   RefreshCw,
   FileText,
@@ -10,8 +9,12 @@ import {
   Check,
   TrendingUp,
 } from 'lucide-react';
+import { TabPanelTransition } from '@/components/motion/tab-panel';
+import { ResponsiveSheet } from '@/components/ui/responsive-sheet';
+import { NavPill, NavPillGroup } from '@/components/ui/nav-pill';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { MotionButton } from '@/components/ui/motion-button';
 import { Callout } from '@/components/ui/callout';
 import { Chip } from '@/components/ui/chip';
 import { cn, formatRupees } from '@/lib/utils';
@@ -126,67 +129,79 @@ export default function ParsedTransactionsReviewModal({
   formatPreviewDate,
   getPreviewDescription,
 }: ParsedTransactionsReviewModalProps) {
-  if (!open) return null;
-
   const importDisabled =
     isImporting || filteredParsed.length === 0 || (parseValidation?.valid === false && !allowImportDespiteValidation);
 
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-0 md:items-center md:p-3 md:p-6"
-      onClick={onClose}
-    >
-      <div
-        className="flex max-h-[95dvh] w-full max-w-[min(100%,72rem)] flex-col overflow-hidden rounded-t-2xl border bg-card shadow-2xl md:max-h-[92vh] md:rounded-lg"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="px-5 py-4 border-b flex items-start justify-between gap-4 shrink-0">
-          <div className="min-w-0">
-            <h3 className="text-lg font-semibold text-foreground">Review parsed transactions</h3>
-            <p className="text-sm text-muted-foreground mt-1 truncate">
-              {fileName || 'Bank statement'}
-              {' · '}
-              {filteredParsed.length} of {parsedTransactions.length} transactions
-              {parserMethod ? ` · ${parserMethod.replace(/_/g, ' ')}` : ''}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-2 rounded-md hover:bg-muted shrink-0"
-            aria-label="Close"
-          >
-            <X className="w-5 h-5" />
-          </button>
+  const importFooter = (
+    <div className="w-full space-y-3">
+      {isImporting ? (
+        <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+          <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${importProgress}%` }} />
         </div>
+      ) : null}
+      <MotionButton type="button" className="w-full" disabled={importDisabled} onClick={onImport}>
+        {isImporting ? (
+          <>
+            <RefreshCw className="mr-2 size-4 animate-spin" />
+            Importing… {importProgress}%
+          </>
+        ) : (
+          <>
+            <Upload className="mr-2 size-4" />
+            Import {filteredParsed.length} transactions
+          </>
+        )}
+      </MotionButton>
+      <p className="text-center text-xs text-muted-foreground">
+        {importPreview
+          ? `${importPreview.counts.new} new · ${importPreview.counts.duplicate} duplicates skipped unless you update existing`
+          : 'Credits → Income · Debits → Expenses'}
+      </p>
+    </div>
+  );
 
-        <div className="flex border-b px-5 bg-muted/20 shrink-0 overflow-x-auto">
+  return (
+    <ResponsiveSheet
+      open={open}
+      onOpenChange={(isOpen) => {
+        if (!isOpen) onClose();
+      }}
+      title="Review parsed transactions"
+      description={
+        <>
+          {fileName || 'Bank statement'}
+          {' · '}
+          {filteredParsed.length} of {parsedTransactions.length} transactions
+          {parserMethod ? ` · ${parserMethod.replace(/_/g, ' ')}` : ''}
+        </>
+      }
+      mobileHeight="full"
+      desktopSide="right"
+      contentClassName="sm:max-w-[min(100%,72rem)]"
+      footer={importFooter}
+    >
+      <div className="space-y-4 pb-2">
+        <NavPillGroup className="w-full overflow-x-auto">
           {(
             [
               ['import-check', 'Import check'],
               ['payees', 'Payees'],
-              ['transactions', `Transactions (${filteredParsed.length})`],
+              ['transactions', `Txns (${filteredParsed.length})`],
               ['raw', 'Debug'],
               ['json', 'JSON'],
             ] as const
           ).map(([mode, label]) => (
-            <button
+            <NavPill
               key={mode}
-              type="button"
+              label={label}
+              active={parsingViewMode === mode}
               onClick={() => onParsingViewModeChange(mode)}
-              className={cn(
-                'px-4 py-3 text-sm font-medium border-b-2 transition-colors',
-                parsingViewMode === mode
-                  ? 'border-primary text-primary'
-                  : 'border-transparent text-muted-foreground hover:text-foreground',
-              )}
-            >
-              {label}
-            </button>
+            />
           ))}
-        </div>
+        </NavPillGroup>
 
-        <div className="overflow-y-auto flex-1 min-h-0 p-5">
+        <TabPanelTransition panelKey={parsingViewMode}>
+        <div>
           {parsingViewMode === 'import-check' && (
             <div className="space-y-4">
               {importPreviewLoading && (
@@ -660,33 +675,8 @@ export default function ParsedTransactionsReviewModal({
             </div>
           )}
         </div>
-
-        <div className="border-t px-5 py-4 shrink-0 bg-card space-y-3">
-          {isImporting && (
-            <div className="w-full bg-muted rounded-full h-2">
-              <div className="bg-primary h-2 rounded-full transition-all" style={{ width: `${importProgress}%` }} />
-            </div>
-          )}
-          <Button type="button" className="w-full" disabled={importDisabled} onClick={onImport}>
-            {isImporting ? (
-              <>
-                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                Importing… {importProgress}%
-              </>
-            ) : (
-              <>
-                <Upload className="w-4 h-4 mr-2" />
-                Import {filteredParsed.length} transactions
-              </>
-            )}
-          </Button>
-          <p className="text-xs text-center text-muted-foreground">
-            {importPreview
-              ? `${importPreview.counts.new} new · ${importPreview.counts.duplicate} duplicates skipped unless you update existing`
-              : 'Credits → Income · Debits → Expenses'}
-          </p>
-        </div>
+        </TabPanelTransition>
       </div>
-    </div>
+    </ResponsiveSheet>
   );
 }

@@ -6,10 +6,30 @@
 @tailwind components;
 @tailwind utilities;
 
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes nav-progress {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(400%);
+  }
+}
+
 @layer base {
   :root {
     /* Clearance for fixed bottom nav pill + FAB (mobile) */
-    --app-bottom-inset: calc(5rem + env(safe-area-inset-bottom));
+    --app-bottom-inset: calc(4.5rem + env(safe-area-inset-bottom));
+    /* Extra gap at scroll end on page-scroll routes (stacked with main padding) */
+    --app-scroll-end-gap: 1.25rem;
   }
 
   * {
@@ -91,6 +111,15 @@
   }
 }
 
+.scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
 .custom-scrollbar::-webkit-scrollbar {
   width: 4px;
 }
@@ -124,19 +153,26 @@
   grid-template-columns: minmax(0, 1fr) 6.5rem auto;
 }
 
-/* Transactions page: lock table + breakdown to the same height; scroll inside cards only. */
+/* Transactions page: lock table + breakdown to viewport height; scroll inside panels only. */
+.transactions-layout-root {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.transactions-layout-grid {
+  flex: 1 1 0%;
+  min-height: 0;
+  overflow: hidden;
+  align-items: stretch;
+}
+
 @media (min-width: 1024px) {
   .transactions-layout-root {
-    height: calc(150svh - 4rem);
-    max-height: calc(150svh - 4rem);
-    min-height: 0;
-    overflow: hidden;
-  }
-
-  .transactions-layout-grid {
     flex: 1 1 0%;
     min-height: 0;
-    overflow: hidden;
-    align-items: stretch;
+    max-height: none;
   }
 }

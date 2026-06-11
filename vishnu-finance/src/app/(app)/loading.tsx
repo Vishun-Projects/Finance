@@ -1,6 +1,5 @@
-import PageSkeleton from '@/components/feedback/page-skeleton';
+import { AppRouteLoader } from '@/components/feedback/app-route-loader';
 
 export default function AppLoading() {
-  return <PageSkeleton />;
+  return <AppRouteLoader variant="generic" title="Loading page" />;
 }
-

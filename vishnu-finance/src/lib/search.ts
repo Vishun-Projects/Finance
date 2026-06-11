@@ -6,7 +6,6 @@ export interface SearchResult {
 
 export async function searchInternet(query: string): Promise<SearchResult[]> {
     try {
-        console.log(`Performing RSS search for: ${query}`);
         // Use Google News RSS Search which supports queries
         const encodedQuery = encodeURIComponent(query);
         const rssUrl = `https://news.google.com/rss/search?q=${encodedQuery}&hl=en-IN&gl=IN&ceid=IN:en`;

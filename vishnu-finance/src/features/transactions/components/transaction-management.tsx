@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import Link from 'next/link';
 import { Plus, Search, Filter, X, RefreshCw, CheckSquare, Square, Trash2, RotateCw, Tag, Layers, ChevronLeft, ChevronRight, Sparkles, Check, Calendar as CalendarIcon, FileText, Upload, AlertCircle, TrendingUp, ChevronDown, Edit, Download, ArrowUp, ShoppingCart, Utensils, Zap, ShoppingBag, BrainCircuit, Sun, Moon, Link2, MoreHorizontal } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { ChartContainer } from '@/components/ui/chart-container';
@@ -26,6 +27,8 @@ import { Badge } from '@/components/ui/badge';
 import { Chip } from '@/components/ui/chip';
 import { Callout } from '@/components/ui/callout';
 import { PageHero } from '@/components/ui/hero';
+import FabButton from '@/components/ui/fab-button';
+import { useMobileRefreshRegister } from '@/contexts/MobileRefreshContext';
 import { NavPill, NavPillGroup } from '@/components/ui/nav-pill';
 import { patterns } from '@/design/patterns';
 import { Combobox } from '@/components/ui/combobox';
@@ -41,7 +44,11 @@ import ParsedTransactionsReviewModal from './parsed-transactions-review-modal';
 import SpendingCalendar, { type DailySpendEntry } from './spending-calendar';
 import { TRANSACTION_PAGE_SIZE } from '@/features/transactions/constants';
 import { toLocalISODate } from '@/lib/date-range';
-import { MobileKpiStrip } from '@/components/ui/mobile-kpi-strip';
+import { AccountBalanceChip } from '@/components/finance/account-balance-chip';
+import { MonthAtGlanceKpis } from '@/components/finance/month-at-glance-kpis';
+import { PageMandate } from '@/components/layout/page-mandate';
+import type { CurrentAccountBalance } from '@/lib/account-balance-service';
+import type { ImportPreviewResult } from '@/lib/import-preview-service';
 import {
   Sheet,
   SheetContent,
@@ -179,7 +186,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
     progress: number;
     isActive: boolean;
   } | null>(null);
-  const [parsingViewMode, setParsingViewMode] = useState<'transactions' | 'raw' | 'json'>('transactions');
+  const [parsingViewMode, setParsingViewMode] = useState<'transactions' | 'import-check' | 'payees' | 'raw' | 'json'>('import-check');
   const [autoCatCount, setAutoCatCount] = useState(0);
   const [parserMethod, setParserMethod] = useState<string>('primary');
   const [parseValidation, setParseValidation] = useState<{
@@ -190,6 +197,11 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
     closing_balance?: number;
   } | null>(null);
   const [allowImportDespiteValidation, setAllowImportDespiteValidation] = useState(false);
+  const [forceInsertOnImport, setForceInsertOnImport] = useState(false);
+  const [updateExistingOnImport, setUpdateExistingOnImport] = useState(false);
+  const [importPreview, setImportPreview] = useState<ImportPreviewResult | null>(null);
+  const [importPreviewLoading, setImportPreviewLoading] = useState(false);
+  const [categoryOverrides, setCategoryOverrides] = useState<Record<string, string>>({});
 
   const hasBootstrapTransactionsRef = useRef(Boolean(bootstrap?.transactions?.length));
   const hasBootstrapCategoriesRef = useRef(Boolean(bootstrap?.categories?.length));
@@ -236,6 +248,29 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
   const [amountPreset, setAmountPreset] = useState<'all' | 'lt1k' | '1to10k' | '10to50k' | '50to100k' | 'gt100k'>((searchParams.get('amountPreset') as any) || 'all');
   const [selectedCategoryId, setSelectedCategoryId] = useState(searchParams.get('categoryId') || '');
   const [quickRange, setQuickRange] = useState<QuickRange>(quickRangeParam);
+  const [lineItemFilter, setLineItemFilter] = useState<string | null>(searchParams.get('lineItem'));
+  const [lineItemContext, setLineItemContext] = useState<{
+    label: string;
+    planned: number;
+    actual: number;
+    remaining: number;
+    status: string;
+    monthLabel: string;
+  } | null>(null);
+  const [lineItemTxnIds, setLineItemTxnIds] = useState<Set<string> | null>(null);
+  const [importStatements, setImportStatements] = useState<
+    Array<{
+      id: string;
+      bankCode: string;
+      transactionCount: number;
+      importedAt: string;
+      closingBalance?: number;
+      statementStartDate?: string;
+      statementEndDate?: string;
+      isCurrentBalanceSource?: boolean;
+    }>
+  >([]);
+  const [accountBalance, setAccountBalance] = useState<CurrentAccountBalance | null>(null);
 
 
 
@@ -244,11 +279,58 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
   useEffect(() => {
     const lineItem = searchParams.get('lineItem');
     setFinancialCategory((searchParams.get('type') as TransactionCategory | 'ALL') || 'ALL');
-    setCurrentSearchTerm(searchParams.get('search') || lineItem || '');
+    if (lineItem) {
+      setLineItemFilter(lineItem);
+      setCurrentSearchTerm('');
+      setLocalSearch('');
+    } else {
+      setLineItemFilter(null);
+      setLineItemContext(null);
+      setLineItemTxnIds(null);
+      setCurrentSearchTerm(searchParams.get('search') || '');
+    }
     setAmountPreset((searchParams.get('amountPreset') as any) || 'all');
     setSelectedCategoryId(searchParams.get('categoryId') || '');
     setQuickRange((searchParams.get('range') as QuickRange) || 'month');
   }, [searchParams]);
+
+  useEffect(() => {
+    if (!lineItemFilter) {
+      setLineItemContext(null);
+      setLineItemTxnIds(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadLineItemFilter() {
+      if (!lineItemFilter) return;
+      try {
+        const res = await fetch(
+          `/api/plan-adherence/line-item-transactions?label=${encodeURIComponent(lineItemFilter)}`,
+        );
+        if (!res.ok || cancelled) return;
+        const data = await res.json();
+        if (cancelled) return;
+        setLineItemContext({
+          label: data.label,
+          planned: data.planned,
+          actual: data.actual,
+          remaining: data.remaining,
+          status: data.status,
+          monthLabel: data.monthLabel,
+        });
+        setLineItemTxnIds(new Set(Array.isArray(data.transactionIds) ? data.transactionIds : []));
+      } catch (error) {
+        console.error('[transactions] line item filter failed', error);
+      }
+    }
+
+    void loadLineItemFilter();
+    return () => {
+      cancelled = true;
+    };
+  }, [lineItemFilter]);
 
   const [loadedPage, setLoadedPage] = useState(1);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -663,6 +745,32 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
     fetchTransactions({ showSpinner });
   }, [resolvedUserId, fetchTransactions]);
 
+  useMobileRefreshRegister(
+    useCallback(async () => {
+      await fetchTransactions({ showSpinner: false });
+    }, [fetchTransactions])
+  );
+
+  const refreshImportMeta = useCallback(async () => {
+    try {
+      const statementsRes = await fetch('/api/account-statements');
+      if (statementsRes.ok) {
+        const data = await statementsRes.json();
+        setImportStatements(data.statements ?? []);
+        if (data.currentBalance) {
+          setAccountBalance(data.currentBalance);
+        }
+      }
+    } catch (error) {
+      console.error('[transactions] import meta failed', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!resolvedUserId) return;
+    void refreshImportMeta();
+  }, [resolvedUserId, refreshImportMeta]);
+
   useEffect(() => {
     if (!resolvedUserId) return;
     fetchDailySpend();
@@ -710,7 +818,12 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
   }, [debouncedSearch]);
 
   // Filters are applied server-side; client list mirrors fetched pages.
-  const filteredTransactions = transactions;
+  const filteredTransactions = useMemo(() => {
+    if (lineItemTxnIds && lineItemTxnIds.size > 0) {
+      return transactions.filter((tx) => lineItemTxnIds.has(tx.id));
+    }
+    return transactions;
+  }, [transactions, lineItemTxnIds]);
 
   // Sidebar breakdown uses full-period API aggregates (not paginated rows).
   const sidebarAnalytics = useMemo(() => {
@@ -1005,7 +1118,6 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
         return;
       }
 
-      // console.log(`🤖 Starting auto-categorization for ${selectedTransactions.length} transactions...`);
 
       // Prepare transactions for categorization API
       const transactionsToCategorize = selectedTransactions.map(t => {
@@ -1639,10 +1751,42 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
       setParserMethod(data.parserMethod || data.metadata?.parserMethod || 'primary');
       setParseValidation(data.metadata?.validation || null);
       setAllowImportDespiteValidation(false);
+      setForceInsertOnImport(false);
+      setUpdateExistingOnImport(false);
+      setCategoryOverrides({});
+      setImportPreview(null);
+      setParsingViewMode('import-check');
       setTempFiles(data.tempFiles || []);
       setRemoteFile(data.remoteFile || null);
       setShowCsvPreview(true);
       setShowFileDialog(false);
+
+      setImportPreviewLoading(true);
+      try {
+        const previewRes = await fetch('/api/import-bank-statement/preview', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            records: transactionsToSet,
+            metadata: data.metadata || null,
+          }),
+        });
+        if (previewRes.ok) {
+          const preview = await previewRes.json();
+          setImportPreview(preview);
+          const initialOverrides: Record<string, string> = {};
+          for (const payee of preview.payees ?? []) {
+            if (payee.suggestedCategoryId && payee.bucket !== 'new') {
+              initialOverrides[payee.key] = payee.suggestedCategoryId;
+            }
+          }
+          setCategoryOverrides(initialOverrides);
+        }
+      } catch (previewError) {
+        console.error('[transactions] import preview failed', previewError);
+      } finally {
+        setImportPreviewLoading(false);
+      }
 
       success('PDF Parsed', `Extracted ${data.count || transactionsToSet.length} transactions`);
       setParseProgress(100);
@@ -1862,7 +2006,6 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
     }
 
     setImportProgress(10);
-    console.log('📤 Sending import request with AI categorization and balance validation...');
 
     // Use bank statement import API which handles bank-specific fields
     // Note: type is optional, API will infer from credit/debit amounts
@@ -1883,8 +2026,9 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
       useAICategorization: true, // Enable AI categorization
       categorizeInBackground: useBackgroundCategorization, // Use background for large imports
       validateBalance: true, // Enable balance validation
-      forceInsert: allowImportDespiteValidation,
-      updateExisting: true, // Refresh payee/store on duplicate transactions
+      forceInsert: forceInsertOnImport,
+      updateExisting: updateExistingOnImport,
+      categoryOverrides,
       ...(documentMeta ? { document: documentMeta } : {}),
     };
 
@@ -2006,6 +2150,8 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
         await fetchTransactions();
       }
 
+      await refreshImportMeta();
+
       // Clean up temporary files after successful import
       if (tempFiles.length > 0) {
         const filesToCleanup = documentMeta
@@ -2024,12 +2170,12 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
             console.warn('⚠️ Cleanup error, but import succeeded:', error);
           }
         }
+      }
 
-        // Close preview dialog
-        if (isMountedRef.current) {
-          setShowCsvPreview(false);
-          setParsedTransactions([]);
-        }
+      if (isMountedRef.current) {
+        setShowCsvPreview(false);
+        setParsedTransactions([]);
+        setImportPreview(null);
       }
     } catch (e) {
       if (isMountedRef.current) {
@@ -2065,6 +2211,22 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
 
   return (
     <div className={cn(patterns.pageFluid, 'transactions-layout-root flex flex-col pb-8 lg:pb-4')}>
+
+      {!isLoading && (
+        <PageMandate
+          className="mb-3 shrink-0 lg:hidden"
+          title="Transactions"
+          mandate="All money movement — import, categorize, search, and export."
+          metrics={[
+            {
+              label: 'Bank balance',
+              value: accountBalance?.amount != null ? formatAmount(accountBalance.amount) : '—',
+            },
+            { label: 'Income', value: formatAmount(income), tone: 'success' },
+            { label: 'Expenses', value: formatAmount(expense), tone: 'danger' },
+          ]}
+        />
+      )}
 
       <div className="mb-4 hidden shrink-0 flex-wrap items-center gap-2 md:flex">
         <div className="relative min-w-[160px] flex-1 basis-[200px]">
@@ -2110,8 +2272,38 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
         </Callout>
       )}
 
+      {lineItemContext && (
+        <Callout
+          variant={lineItemContext.status === 'over' ? 'danger' : 'info'}
+          title={`Plan line: ${lineItemContext.label}`}
+          className="mb-5"
+        >
+          <p className="text-sm text-muted">
+            {lineItemContext.monthLabel} · Spent {formatAmount(lineItemContext.actual)} of{' '}
+            {formatAmount(lineItemContext.planned)} planned
+            {lineItemContext.remaining > 0
+              ? ` · ${formatAmount(lineItemContext.remaining)} left in plan`
+              : lineItemContext.status === 'over'
+                ? ` · ${formatAmount(lineItemContext.actual - lineItemContext.planned)} over plan`
+                : ''}
+          </p>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="mt-2 h-7 px-2 text-xs"
+            onClick={() => {
+              const params = new URLSearchParams(searchParams.toString());
+              params.delete('lineItem');
+              router.replace(`/transactions?${params.toString()}`);
+            }}
+          >
+            Clear plan line filter
+          </Button>
+        </Callout>
+      )}
+
       {/* Mobile search + quick actions */}
-      <div className="mb-3 flex flex-col gap-2 md:hidden">
+      <div className="mb-3 flex flex-col gap-2 lg:hidden">
         <div className="flex items-center gap-2">
           <div className="relative min-w-0 flex-1">
             <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-hint" />
@@ -2167,7 +2359,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
       </div>
 
       <Sheet open={mobileToolsOpen} onOpenChange={setMobileToolsOpen}>
-        <SheetContent side="bottom" className={cn(patterns.bottomSheet, 'rounded-t-2xl p-4 md:hidden')}>
+        <SheetContent side="bottom" className={cn(patterns.bottomSheet, 'rounded-t-2xl p-4 lg:hidden')}>
           <SheetHeader className="mb-3 text-left">
             <SheetTitle className="text-base">Actions</SheetTitle>
           </SheetHeader>
@@ -2185,42 +2377,44 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
               <Sparkles className={cn('size-4', isBulkUpdating && 'animate-spin')} /> Auto categorize
             </Button>
           </div>
+          {importStatements.length > 0 && (
+            <div className="mt-4 border-t border-border pt-3">
+              <p className="mb-2 text-xs font-medium text-foreground">Statement imports</p>
+              <ul className="max-h-40 space-y-2 overflow-y-auto text-[11px] text-muted">
+                {importStatements.slice(0, 5).map((stmt) => (
+                  <li key={stmt.id} className="rounded-md border border-border bg-surface/40 p-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-medium text-foreground">{stmt.bankCode}</span>
+                      {stmt.isCurrentBalanceSource && (
+                        <Badge variant="outline" className="text-[9px]">Current balance</Badge>
+                      )}
+                    </div>
+                    <p className="mt-0.5 tabular-nums">
+                      {stmt.closingBalance != null ? formatAmount(stmt.closingBalance) : '—'} closing ·{' '}
+                      {stmt.transactionCount} txns
+                    </p>
+                    <p className="text-[10px]">
+                      {stmt.statementStartDate && stmt.statementEndDate
+                        ? `${new Date(stmt.statementStartDate).toLocaleDateString()} – ${new Date(stmt.statementEndDate).toLocaleDateString()}`
+                        : 'Period unknown'}{' '}
+                      · uploaded {new Date(stmt.importedAt).toLocaleDateString()}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </SheetContent>
       </Sheet>
 
-      {!isLoading && (
-        <MobileKpiStrip
-          className="mb-3 shrink-0"
-          items={[
-            { label: 'Income', value: formatAmount(income), tone: 'success' },
-            { label: 'Expenses', value: formatAmount(expense), tone: 'danger' },
-            {
-              label: 'Net',
-              value: `${net > 0 ? '+' : ''}${formatAmount(net)}`,
-              tone: net >= 0 ? 'success' : 'danger',
-            },
-          ]}
-        />
-      )}
-
-      <div className={cn(patterns.cardGrid, 'mb-5 hidden shrink-0 md:grid lg:grid-cols-4')}>
+      <div className={cn(patterns.cardGrid, 'mb-5 hidden shrink-0 md:grid lg:grid-cols-5')}>
         {isLoading ? (
-          [1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-20 w-full rounded-md" />)
+          [1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-20 w-full rounded-md" />)
         ) : (
           <>
-            <div className="card-base p-4">
-              <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-hint">Income</p>
-              <p className="mt-2 text-xl font-medium tabular-nums text-[var(--success)]">{formatAmount(income)}</p>
-            </div>
-            <div className="card-base p-4">
-              <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-hint">Expenses</p>
-              <p className="mt-2 text-xl font-medium tabular-nums text-[var(--danger)]">{formatAmount(expense)}</p>
-            </div>
-            <div className="card-base p-4">
-              <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-hint">Net</p>
-              <p className={cn('mt-2 text-xl font-medium tabular-nums', net >= 0 ? 'text-[var(--success)]' : 'text-[var(--danger)]')}>
-                {net > 0 ? '+' : ''}{formatAmount(net)}
-              </p>
+            <AccountBalanceChip balance={accountBalance} variant="kpi" />
+            <div className="col-span-2 lg:col-span-3">
+              <MonthAtGlanceKpis income={income} expenses={expense} netFlow={net} />
             </div>
             <div className="card-base hidden p-4 md:block">
               <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-hint">Count</p>
@@ -2233,9 +2427,9 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
       <div className="transactions-layout-grid grid min-h-0 grid-cols-1 gap-4 lg:min-h-[28rem] lg:grid-cols-[minmax(0,1fr)_17.5rem] xl:grid-cols-[minmax(0,1fr)_19rem]">
         <div className={cn(
           'flex h-full min-h-0 min-w-0 flex-col overflow-hidden',
-          mobilePanel !== 'list' && 'hidden md:flex'
+          mobilePanel !== 'list' && 'hidden lg:flex'
         )}>
-            <section className="card-base hidden h-full min-h-0 flex-col overflow-hidden md:flex">
+            <section className="card-base hidden h-full min-h-0 flex-col overflow-hidden lg:flex">
               <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto custom-scrollbar">
               <table className="w-full table-fixed text-left text-sm">
                 <thead className="sticky top-0 z-10 bg-surface">
@@ -2347,7 +2541,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
               )}
             </section>
 
-            <div className="card-base mt-5 flex flex-col md:hidden md:mt-0">
+            <div className="card-base mt-5 flex flex-col lg:hidden lg:mt-0">
               <div className="custom-scrollbar">
               {isLoading && !transactions.length ? (
                 <div className="space-y-4 p-4">
@@ -2434,9 +2628,37 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
 
         <aside className={cn(
           'card-base flex h-full min-h-0 w-full shrink-0 flex-col overflow-hidden',
-          mobilePanel === 'list' ? 'hidden md:flex' : 'flex'
+          mobilePanel === 'list' ? 'hidden lg:flex' : 'flex'
         )}>
-          <div className={cn(mobilePanel === 'breakdown' && 'hidden md:block')}>
+          {importStatements.length > 0 && (
+            <div className="hidden shrink-0 border-b border-border px-3 py-3 md:block">
+              <p className="mb-2 text-[10px] font-medium uppercase tracking-[0.08em] text-hint">Statement imports</p>
+              <ul className="max-h-28 space-y-2 overflow-y-auto text-[11px]">
+                {importStatements.slice(0, 4).map((stmt) => (
+                  <li key={stmt.id} className="rounded-md border border-border bg-surface/40 p-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-medium text-foreground">{stmt.bankCode}</span>
+                      {stmt.isCurrentBalanceSource && (
+                        <Badge variant="outline" className="text-[9px]">Current balance</Badge>
+                      )}
+                    </div>
+                    <p className="mt-0.5 tabular-nums text-muted">
+                      {stmt.closingBalance != null ? formatAmount(stmt.closingBalance) : '—'} closing ·{' '}
+                      {stmt.transactionCount} txns
+                    </p>
+                    <p className="text-[10px] text-muted">
+                      {stmt.statementStartDate && stmt.statementEndDate
+                        ? `${new Date(stmt.statementStartDate).toLocaleDateString()} – ${new Date(stmt.statementEndDate).toLocaleDateString()}`
+                        : 'Period unknown'}{' '}
+                      · {new Date(stmt.importedAt).toLocaleDateString()}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <div className={cn(mobilePanel === 'breakdown' && 'hidden lg:block')}>
           <SpendingCalendar
             dailySpend={dailySpend}
             formatAmount={formatAmount}
@@ -2447,7 +2669,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
 
           <div className={cn(
             'flex min-h-0 flex-1 flex-col overflow-hidden',
-            mobilePanel === 'calendar' && 'hidden md:flex'
+            mobilePanel === 'calendar' && 'hidden lg:flex'
           )}>
           <div className="flex shrink-0 items-center justify-between border-b border-border px-3 py-2">
             <div>
@@ -2455,13 +2677,10 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
               <p className="text-[10px] text-muted">Full period · all transactions</p>
             </div>
             <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => {
-              const csv = transactions.map(t => `${t.transactionDate},${t.description},${t.debitAmount || 0},${t.creditAmount || 0}`).join('\n');
-              const blob = new Blob([csv], { type: 'text/csv' });
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement('a');
-              a.href = url;
-              a.download = 'transactions.csv';
-              a.click();
+              const params = new URLSearchParams({ format: 'csv' });
+              if (startDateParam) params.set('startDate', startDateParam);
+              if (endDateParam) params.set('endDate', endDateParam);
+              window.location.href = `/api/export/transactions?${params.toString()}`;
             }}>
               <Download className="mr-1 size-3" />
               Export
@@ -3000,6 +3219,17 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
         totalPages={totalPages}
         allowImportDespiteValidation={allowImportDespiteValidation}
         onAllowImportDespiteValidationChange={setAllowImportDespiteValidation}
+        forceInsertOnImport={forceInsertOnImport}
+        onForceInsertOnImportChange={setForceInsertOnImport}
+        updateExistingOnImport={updateExistingOnImport}
+        onUpdateExistingOnImportChange={setUpdateExistingOnImport}
+        importPreview={importPreview}
+        importPreviewLoading={importPreviewLoading}
+        categories={categories}
+        categoryOverrides={categoryOverrides}
+        onCategoryOverrideChange={(payeeKey, categoryId) =>
+          setCategoryOverrides((prev) => ({ ...prev, [payeeKey]: categoryId }))
+        }
         isImporting={isImporting}
         importProgress={importProgress}
         onImport={handleImportParsedTransactions}
@@ -3018,7 +3248,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
               <div className="size-8 rounded-full bg-background/10 flex items-center justify-center font-bold text-sm shrink-0">
                 {selectedIds.size}
               </div>
-              <p className="text-sm font-bold tracking-tight hidden md:block">Selected</p>
+              <p className="text-sm font-bold tracking-tight hidden lg:block">Selected</p>
             </div>
 
             <div className="flex items-center gap-1 md:gap-2 flex-1 justify-center">
@@ -3077,6 +3307,16 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
         deleting={isDeleting}
         count={selectedIds.size}
         actionType="delete"
+      />
+
+      <FabButton
+        label="Add"
+        icon={<Plus className="size-5" />}
+        onClick={() => {
+          setEditingTransaction(null);
+          setShowForm(true);
+        }}
+        aria-label="Add transaction"
       />
     </div >
   );
@@ -3217,7 +3457,7 @@ const MobileTransactionCard = React.memo(({
     <div
       onClick={onPress}
       className={cn(
-        'relative flex items-center gap-3 px-3 py-2.5 transition-all active:bg-muted/30 md:hidden',
+        'relative flex items-center gap-3 px-3 py-2.5 transition-all active:bg-muted/30 lg:hidden',
         isSelected && 'bg-primary/5 shadow-inner'
       )}
     >

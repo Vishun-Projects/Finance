@@ -7,7 +7,6 @@ import { prisma } from '@/lib/db';
 
 export async function GET(request: NextRequest) {
   const startTime = Date.now();
-  console.log('🔐 OAUTH CALLBACK - Starting OAuth callback');
 
   try {
     const searchParams = request.nextUrl.searchParams;
@@ -55,15 +54,12 @@ export async function GET(request: NextRequest) {
     cookieStore.delete('oauth_provider');
 
     // Exchange code for tokens
-    console.log('🔐 OAUTH CALLBACK - Exchanging code for tokens');
     const { idToken } = await exchangeCodeForTokens(code, storedCodeVerifier);
 
     // Verify ID token and get user info
-    console.log('🔐 OAUTH CALLBACK - Verifying ID token');
     const googleUser = await verifyGoogleIdToken(idToken);
 
     // Find or create user
-    console.log('🔐 OAUTH CALLBACK [GOOGLE] - Finding or creating user');
     const user = await AuthService.findOrCreateOAuthUser(googleUser, 'google');
 
     if (!user.isActive) {
@@ -87,11 +83,9 @@ export async function GET(request: NextRequest) {
       role: user.role,
     });
 
-    console.log('🔐 OAUTH CALLBACK - Generated JWT length:', token.length);
 
     // Superuser Security Enforcement: Force OTP challenge even for OAuth
     if (user.email === 'vishun@finance.com') {
-      console.log('🛡️ SUPERUSER OAUTH - Intercepting login for mandatory OTP challenge');
       await AuthService.generateOTP(user.email);
 
       const isMobileString = state.includes(':mobile');
@@ -100,7 +94,6 @@ export async function GET(request: NextRequest) {
 
       if (isMobile) {
         const mobileOtpUrl = `https://vishun-finance.vercel.app/oauth-callback?challenge=otp&email=${encodeURIComponent(user.email)}`;
-        console.log('🛡️ SUPERUSER OAUTH - Mobile redirect to OTP challenge:', mobileOtpUrl);
         return NextResponse.redirect(mobileOtpUrl);
       }
 
@@ -114,11 +107,9 @@ export async function GET(request: NextRequest) {
     const isMobileParam = searchParams.get('platform') === 'mobile';
     const isMobile = isMobileString || isMobileParam;
 
-    console.log('📱 OAUTH CALLBACK - Platform detection:', { isMobileString, isMobileParam, isMobile });
 
     if (isMobile) {
       const mobileRedirectUrl = `https://vishun-finance.vercel.app/oauth-callback?token=${token}`;
-      console.log('📱 OAUTH CALLBACK - Executing mobile App Link redirect:', mobileRedirectUrl);
       return NextResponse.redirect(mobileRedirectUrl);
     }
 
@@ -153,7 +144,6 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    console.log(`✅ OAUTH CALLBACK - OAuth flow complete in ${Date.now() - startTime}ms`);
     return response;
   } catch (error) {
     console.error('❌ OAUTH CALLBACK - Error:', error);

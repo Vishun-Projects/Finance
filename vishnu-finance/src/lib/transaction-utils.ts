@@ -91,6 +91,8 @@ export function parseBankSlashCounterparty(description?: string | null): string 
     .join(' ');
 }
 
+const WEAK_PERSON_NAMES = new Set(['man', 'botm', 'mandate', 'mandaterequest', 'branch', 'atm']);
+
 export function getTransactionDisplayName(transaction: {
   description?: string | null;
   store?: string | null;
@@ -101,13 +103,14 @@ export function getTransactionDisplayName(transaction: {
     ? ''
     : (transaction.personName?.trim() || '');
   const storeIsPaymentRail = store && PAYMENT_RAIL_STORES.has(store.toLowerCase());
-
-  if (personName && (!store || storeIsPaymentRail)) {
-    return personName;
-  }
+  const personIsWeak = personName && WEAK_PERSON_NAMES.has(personName.toLowerCase());
 
   if (store && !storeIsPaymentRail) {
     return store;
+  }
+
+  if (personName && !personIsWeak && (!store || storeIsPaymentRail)) {
+    return personName;
   }
 
   const fromDescription = parseBankSlashCounterparty(transaction.description);

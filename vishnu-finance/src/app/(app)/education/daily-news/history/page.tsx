@@ -44,7 +44,7 @@ export default async function DailyBriefingHistoryPage() {
         </Link>
       </div>
 
-      <main className={cn(patterns.pageContentWide, 'space-y-6 pb-24 pt-20 lg:pt-8')}>
+      <main className={cn(patterns.pageFluid, 'space-y-6 pt-20 lg:pt-8')}>
         <div className="lg:hidden">
           <Link
             href="/education"
@@ -87,7 +87,7 @@ export default async function DailyBriefingHistoryPage() {
                       )}
                     >
                       <div className="grid h-full grid-cols-1 md:grid-cols-5">
-                        <div className="relative h-40 overflow-hidden md:col-span-2 md:h-auto">
+                        <div className="relative h-40 overflow-hidden lg:col-span-2 md:h-auto">
                           <BriefingImage
                             src={briefing.heroImage}
                             title={briefing.title || 'Market Briefing'}
@@ -97,7 +97,7 @@ export default async function DailyBriefingHistoryPage() {
                           />
                           <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-transparent to-transparent md:bg-gradient-to-r md:from-transparent md:to-card/40" />
 
-                          <div className="absolute left-3 top-3 md:hidden">
+                          <div className="absolute left-3 top-3 lg:hidden">
                             <Chip variant="neutral">
                               {new Date(briefing.date).toLocaleDateString(undefined, {
                                 month: 'short',

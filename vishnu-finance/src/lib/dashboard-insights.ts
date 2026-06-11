@@ -1,5 +1,6 @@
 import type { SimpleDashboardData } from '@/types/dashboard';
 import type { BucketAdherence, LineItemAdherence, PlanAdherenceResult } from '@/lib/plan-adherence-service';
+import type { DisciplineSummary } from '@/lib/plans-discipline';
 import { formatRupees } from '@/lib/utils';
 
 export type InsightTone = 'info' | 'warning' | 'success' | 'neutral';
@@ -74,11 +75,15 @@ export function computeSpendingContext(
 }
 
 export function computeNeedsWantsSavingsSplit(buckets: BucketAdherence[]): SegmentSplit {
-  const needs = buckets.find((b) => b.key === 'needs')?.actual ?? 0;
-  const wants = buckets.find((b) => b.key === 'wants')?.actual ?? 0;
-  const savings =
-    (buckets.find((b) => b.key === 'investments')?.actual ?? 0) +
-    (buckets.find((b) => b.key === 'insurance')?.actual ?? 0);
+  const needs = buckets
+    .filter((b) => b.key === 'needs' || b.variant === 'needs' || b.variant === 'emi')
+    .reduce((sum, b) => sum + b.actual, 0);
+  const wants = buckets
+    .filter((b) => b.key === 'wants' || b.variant === 'wants')
+    .reduce((sum, b) => sum + b.actual, 0);
+  const savings = buckets
+    .filter((b) => b.key === 'savings' || b.variant === 'invest' || b.variant === 'insurance')
+    .reduce((sum, b) => sum + b.actual, 0);
   const total = needs + wants + savings || 1;
 
   return {
@@ -213,6 +218,7 @@ export type AdvisorInsightsPayload = {
   unstartedLines: LineItemAdherence[];
   monthlyTrends: SimpleDashboardData['monthlyTrends'];
   dynamicInsights: DashboardInsight[];
+  disciplineSummary?: DisciplineSummary;
   adherence: Pick<
     PlanAdherenceResult,
     'plannedTotal' | 'actualTotal' | 'overallScore' | 'monthLabel'

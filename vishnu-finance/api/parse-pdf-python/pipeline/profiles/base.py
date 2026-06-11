@@ -67,17 +67,28 @@ _BRAND_MAP = {
     "axio": "AXIO",
     "aj nursery": "A J Nursery",
     "nirvi": "Nirvi Medicals",
-    "shree mahal": "Shree Mahalaxmi",
+    "spotify": "Spotify",
+    "spotifyindia": "Spotify",
+    "uber": "Uber",
+    "uberindia": "Uber",
+    "airtel": "Airtel",
+    "razorpay": "Razorpay",
+    "rzp": "Razorpay",
+    "western": "Western",
+    "netflix": "Netflix",
+    "hotstar": "Disney+ Hotstar",
 }
 _UPI_COLON_RE = re.compile(r'UPI:\d+:([^@(]+)@[^@(]+\(([^)]+)\)?', re.IGNORECASE)
 _BANK_UPI_SLASH_RE = re.compile(r'[A-Z]{4}0[A-Z0-9]*UPI/([^/]+)', re.IGNORECASE)
 _BANK_CODE_SLASH_RE = re.compile(r'[A-Z]{4}\d+/([^/]+?)(?:\s*/|\s*$)', re.IGNORECASE)
 _VPA_RE = re.compile(r'[a-z0-9._-]+@[a-z0-9._-]+', re.IGNORECASE)
-_MERCHANT_FRAGS = {"ZOMATO", "SWIGGY", "BLINKIT", "ZEPTO", "AMAZON", "FLIPKART", "GOOGLE", "BAJAJ", "SIMPL", "JIO", "RECHARGE", "PAYTM", "VRL", "AXIO", "ZOMATO4", "BAJAJFINANCE", "BLINKIT.PAYU"}
+_MERCHANT_FRAGS = {"ZOMATO", "SWIGGY", "BLINKIT", "ZEPTO", "AMAZON", "FLIPKART", "GOOGLE", "BAJAJ", "SIMPL", "JIO", "RECHARGE", "PAYTM", "VRL", "AXIO", "ZOMATO4", "BAJAJFINANCE", "BLINKIT.PAYU", "SPOTIFY", "UBER", "AIRTEL", "NETFLIX", "RAZORPAY", "WESTERN"}
 _PAYMENT_RAIL_BRANDS = {
     "PAYTM", "PHONEPE", "GPAY", "GOOGLE PAY", "BHARATPE", "PAYZAPP", "MOBIKWIK",
 }
 _COMPANY_MARKERS = ("LIMITED", "PRIVATE", "PVT", "LLP", "SYSTEMS", "ENTERPRISES", "SERVICES", "CORP", "INC")
+_JUNK_PERSON_NAMES = {"MAN", "MANDATE", "MANDATEREQUEST", "BOTM", "BRANCH", "ATM", "UPI", "NEFT", "RTGS", "IMPS", "INR", "REF", "RE"}
+_NEFT_BANK_CODES = {"BOTM", "HDFC", "ICIC", "SBIN", "YESB", "UTIB", "AXIS", "IDFB", "CNRB", "BARB", "MAHB", "BKID", "KKBK", "AIRP", "UNBA"}
 
 class BaseStyle:
     """
@@ -155,7 +166,61 @@ class BaseStyle:
             return True
         if upper in _PAYMENT_RAIL_BRANDS:
             return True
+        compact = re.sub(r'\s+', '', upper)
+        if compact in _JUNK_PERSON_NAMES:
+            return True
+        if 'MANDATE' in upper:
+            return True
         return False
+
+    def _is_junk_person_name(self, name: str) -> bool:
+        if self._is_invalid_entity(name):
+            return True
+        upper = re.sub(r'\s+', '', name.upper())
+        if upper in _JUNK_PERSON_NAMES:
+            return True
+        if 'MANDATE' in upper:
+            return True
+        if len(name.strip()) < 4:
+            return True
+        return False
+
+    def _extract_neft_remitter(self, cleaned: str) -> Optional[str]:
+        if 'NEFT' not in cleaned.upper() and 'TRANSFER FROM' not in cleaned.upper():
+            return None
+
+        remitter_match = re.search(
+            r'(?i)NEFT[/\s-]+(?:[^/\s]+[/\s-]+)*[^/\s]*[/\s-]+([A-Z][A-Z0-9\s&\.]{2,50}?)(?:[/\s]|//|$)',
+            cleaned,
+        )
+        if remitter_match:
+            candidate = self._normalize_entity_name(remitter_match.group(1))
+            if candidate and not self._is_junk_person_name(candidate):
+                compact = re.sub(r'\s+', '', candidate.upper())
+                if compact not in _NEFT_BANK_CODES:
+                    return candidate
+
+        after_neft = re.split(r'(?i)NEFT', cleaned, maxsplit=1)
+        if len(after_neft) < 2:
+            return None
+
+        segments = [s.strip() for s in re.split(r'[/\s-]+', after_neft[1]) if s.strip()]
+        candidates: List[str] = []
+        for seg in segments:
+            if re.match(r'^\d+$', seg):
+                continue
+            if seg.upper() in _NEFT_BANK_CODES:
+                continue
+            if re.match(r'^[A-Z0-9]{10,}$', seg):
+                continue
+            if len(seg) >= 4:
+                candidates.append(seg)
+
+        for seg in reversed(candidates):
+            name = self._normalize_entity_name(seg)
+            if name and not self._is_junk_person_name(name):
+                return name
+        return None
 
     def _extract_upi_note(self, cleaned: str) -> Optional[str]:
         match = re.search(r'(?i)/UPI/\d[\d\s]*/([^/]+?)(?:/\s*(?:BR|BRANCH)|$)', cleaned)
@@ -257,6 +322,25 @@ class BaseStyle:
             return upi_match.group(1).strip()
         return None
 
+    def extract_transaction_id(self, text: str) -> Optional[str]:
+        if not text:
+            return None
+        patterns = [
+            r'(?i)/UPI/(\d{10,})/',
+            r'(?i)UPI:(\d{10,}):',
+            r'(?i)UPI[:\/\s-]+(\d{10,})',
+            r'(?i)NEFT[\/\s-]+([A-Z0-9]{8,24})',
+            r'(?i)IMPS[\/\s-]+([A-Z0-9]{8,24})',
+        ]
+        for pattern in patterns:
+            match = re.search(pattern, text)
+            if match and match.group(1):
+                return match.group(1).strip()
+        long_nums = re.findall(r'\b(\d{12,})\b', text)
+        if long_nums:
+            return long_nums[-1]
+        return None
+
     def extract_entities(self, text: str) -> Tuple[Optional[str], Optional[str], float, str, Optional[str]]:
         """
         Approach B: Scoring Engine.
@@ -317,6 +401,10 @@ class BaseStyle:
 
         upi_id = self._extract_upi_id(cleaned)
 
+        neft_remitter = self._extract_neft_remitter(cleaned)
+        if neft_remitter:
+            return neft_remitter, None, 0.93, commodity, upi_id
+
         # ── Priority 1: YES/HDFC slash format ───────────────────────────────
         # YESB0MCHUPI/Vinod INR Singh Rajput /XXXXX /paytm...@pty ...
         slash_name = self._extract_bank_upi_slash_name(cleaned)
@@ -369,16 +457,21 @@ class BaseStyle:
                 score -= 0.3
             if self._looks_like_company(normalized) or any(kw in normalized.upper() for kw in self.STORE_KEYWORDS):
                 store_candidates.append((normalized, min(score + 0.2, 1.0)))
-            else:
+            elif not self._is_junk_person_name(normalized):
                 person_candidates.append((normalized, min(score, 1.0)))
-
-        if person_candidates:
-            best_person = max(person_candidates, key=lambda x: x[1])
-            return None, best_person[0], best_person[1], commodity, upi_id
 
         if store_candidates:
             best_store = max(store_candidates, key=lambda x: x[1])
             return best_store[0], None, best_store[1], commodity, upi_id
+
+        person_candidates = [
+            (name, score)
+            for name, score in person_candidates
+            if not self._is_junk_person_name(name)
+        ]
+        if person_candidates:
+            best_person = max(person_candidates, key=lambda x: x[1])
+            return None, best_person[0], best_person[1], commodity, upi_id
 
         upi_note = self._extract_upi_note(cleaned)
         if upi_note:

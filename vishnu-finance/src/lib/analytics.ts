@@ -46,14 +46,12 @@ export const trackEvent = (
     
     // Log to console in development
     if (process.env.NODE_ENV === 'development') {
-      console.debug('[Analytics]', event, metadata);
     }
     
     // In production, you might want to send to analytics service
     // Example: analytics.track(event, metadata);
   } catch (error) {
     // Silently fail analytics tracking
-    console.debug('Analytics tracking error:', error);
   }
 };
 

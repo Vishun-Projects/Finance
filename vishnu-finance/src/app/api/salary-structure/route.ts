@@ -6,26 +6,20 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 600; // Revalidate every 10 minutes (salary changes rarely)
 
 export async function GET(request: NextRequest) {
-  console.log('🔍 SALARY STRUCTURE GET - Starting request');
   try {
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
-    console.log('🔍 SALARY STRUCTURE GET - User ID:', userId);
 
     if (!userId) {
-      console.log('❌ SALARY STRUCTURE GET - No user ID provided');
       return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
     }
 
-    console.log('🔍 SALARY STRUCTURE GET - Fetching from database for user:', userId);
     // Fetch salary structures from database using type assertion
     const salaryStructures = await (prisma as any).salaryStructure.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' }
     });
 
-    console.log('✅ SALARY STRUCTURE GET - Found salary structures:', salaryStructures.length, 'records');
-    console.log('📊 SALARY STRUCTURE GET - Salary structures data:', JSON.stringify(salaryStructures, null, 2));
     return NextResponse.json(salaryStructures);
   } catch (error) {
     console.error('❌ SALARY STRUCTURE GET - Error:', error);
@@ -35,10 +29,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  console.log('➕ SALARY STRUCTURE POST - Starting request');
   try {
     const body = await request.json();
-    console.log('➕ SALARY STRUCTURE POST - Request body:', JSON.stringify(body, null, 2));
 
     const {
       jobTitle,
@@ -59,39 +51,17 @@ export async function POST(request: NextRequest) {
       changeReason
     } = body;
 
-    console.log('➕ SALARY STRUCTURE POST - Extracted data:', {
-      jobTitle,
-      company,
-      baseSalary,
-      allowances,
-      deductions,
-      employerContributions,
-      effectiveDate,
-      endDate,
-      currency,
-      location,
-      department,
-      grade,
-      notes,
-      userId,
-      changeType,
-      changeReason
-    });
-
     // Validate required fields
     if (!jobTitle || !company || !baseSalary || !effectiveDate || !userId) {
-      console.log('❌ SALARY STRUCTURE POST - Missing required fields');
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    console.log('➕ SALARY STRUCTURE POST - Creating salary structure in database...');
 
     // First, deactivate all existing salary structures for this user
     await (prisma as any).salaryStructure.updateMany({
       where: { userId: userId, isActive: true },
       data: { isActive: false }
     });
-    console.log('➕ SALARY STRUCTURE POST - Deactivated previous structures');
 
     // Create new salary structure in database using type assertion
     const newSalaryStructure = await (prisma as any).salaryStructure.create({
@@ -114,10 +84,8 @@ export async function POST(request: NextRequest) {
       }
     });
 
-    console.log('✅ SALARY STRUCTURE POST - Successfully created salary structure:', JSON.stringify(newSalaryStructure, null, 2));
 
     // Always create salary history entry for timeline tracking
-    console.log('➕ SALARY STRUCTURE POST - Creating salary history entry...');
     await (prisma as any).salaryHistory.create({
       data: {
         salaryStructureId: newSalaryStructure.id,
@@ -138,7 +106,6 @@ export async function POST(request: NextRequest) {
         userId: userId
       }
     });
-    console.log('✅ SALARY STRUCTURE POST - Successfully created salary history entry');
 
     return NextResponse.json(newSalaryStructure);
   } catch (error) {
@@ -149,19 +116,15 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
-  console.log('✏️ SALARY STRUCTURE PUT - Starting request');
   try {
     const body = await request.json();
     // Extract changeType and changeReason separately - they go to SalaryHistory, not SalaryStructure
     const { id, changeType, changeReason, userId, historyId, ...updateData } = body;
-    console.log('✏️ SALARY STRUCTURE PUT - Update data:', JSON.stringify({ id, historyId, ...updateData }, null, 2));
 
     if (!id) {
-      console.log('❌ SALARY STRUCTURE PUT - No ID provided');
       return NextResponse.json({ error: 'ID is required' }, { status: 400 });
     }
 
-    console.log('✏️ SALARY STRUCTURE PUT - Updating salary structure in database...');
     // Update salary structure in database using type assertion
     const updatedSalaryStructure = await (prisma as any).salaryStructure.update({
       where: { id },
@@ -183,11 +146,9 @@ export async function PUT(request: NextRequest) {
       }
     });
 
-    console.log('✅ SALARY STRUCTURE PUT - Successfully updated salary structure:', JSON.stringify(updatedSalaryStructure, null, 2));
 
     // Update salary history — specific revision when historyId is provided, else latest for structure
     if (userId) {
-      console.log('✏️ SALARY STRUCTURE PUT - Updating salary history entry...');
       const historyData = {
         jobTitle: updatedSalaryStructure.jobTitle,
         company: updatedSalaryStructure.company,
@@ -217,7 +178,6 @@ export async function PUT(request: NextRequest) {
               changeReason: changeReason || existingHistory.changeReason,
             },
           });
-          console.log('✅ SALARY STRUCTURE PUT - Successfully updated specific salary history entry');
         }
       } else {
         const existingHistory = await (prisma as any).salaryHistory.findFirst({
@@ -234,7 +194,6 @@ export async function PUT(request: NextRequest) {
               changeReason: changeReason || existingHistory.changeReason,
             },
           });
-          console.log('✅ SALARY STRUCTURE PUT - Successfully updated salary history entry');
         }
       }
     }
@@ -248,24 +207,19 @@ export async function PUT(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  console.log('🗑️ SALARY STRUCTURE DELETE - Starting request');
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
-    console.log('🗑️ SALARY STRUCTURE DELETE - ID to delete:', id);
 
     if (!id) {
-      console.log('❌ SALARY STRUCTURE DELETE - No ID provided');
       return NextResponse.json({ error: 'ID is required' }, { status: 400 });
     }
 
-    console.log('🗑️ SALARY STRUCTURE DELETE - Deleting from database...');
     // Delete from database using type assertion
     await (prisma as any).salaryStructure.delete({
       where: { id }
     });
 
-    console.log('✅ SALARY STRUCTURE DELETE - Successfully deleted salary structure');
     return NextResponse.json({ message: 'Salary structure deleted successfully' });
   } catch (error) {
     console.error('❌ SALARY STRUCTURE DELETE - Error:', error);
@@ -275,7 +229,6 @@ export async function DELETE(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
-  console.log('🔄 SALARY STRUCTURE PATCH - Starting request');
   try {
     const body = await request.json();
     const { id, action, userId } = body;
@@ -296,7 +249,6 @@ export async function PATCH(request: NextRequest) {
       data: { isActive: true }
     });
 
-    console.log(`✅ Activated salary structure ${id}`);
     return NextResponse.json(updatedStructure);
   } catch (error) {
     console.error('❌ SALARY STRUCTURE PATCH - Error:', error);

@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Loader2, Link2 } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -52,6 +53,8 @@ export function LineItemTransactionsSheet({
   const [transactions, setTransactions] = useState<LineItemTransaction[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [savingKey, setSavingKey] = useState<string | null>(null);
+  const [merchantAlias, setMerchantAlias] = useState('');
+  const [mappingSaving, setMappingSaving] = useState(false);
 
   const loadTransactions = useCallback(async () => {
     if (!lineItemLabel) return;
@@ -213,6 +216,51 @@ export function LineItemTransactionsSheet({
           <p className="mt-2 text-center text-xs text-[var(--danger)]">{error}</p>
         )}
       </div>
+
+      {lineItemLabel && (
+        <div className="mt-4 space-y-2 rounded-md border border-border bg-surface/40 p-3">
+          <p className="text-xs font-medium text-foreground">Merchant rule</p>
+          <p className="text-[10px] text-muted">
+            Normalize payee names for transactions in {lineItemLabel}.
+          </p>
+          <div className="flex gap-2">
+            <Input
+              value={merchantAlias}
+              onChange={(e) => setMerchantAlias(e.target.value)}
+              placeholder="e.g. Swiggy"
+              className="h-8 text-xs"
+            />
+            <Button
+              type="button"
+              size="sm"
+              className="h-8 shrink-0"
+              disabled={!merchantAlias.trim() || mappingSaving || transactions.length === 0}
+              onClick={async () => {
+                setMappingSaving(true);
+                try {
+                  const res = await fetch('/api/plan-adherence/rename-entity', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      transactionIds: transactions.map((tx) => tx.id),
+                      newName: merchantAlias.trim(),
+                    }),
+                  });
+                  if (!res.ok) throw new Error('Failed to save mapping');
+                  await loadTransactions();
+                  onUpdated?.();
+                } catch (err) {
+                  setError(err instanceof Error ? err.message : 'Failed to save mapping');
+                } finally {
+                  setMappingSaving(false);
+                }
+              }}
+            >
+              {mappingSaving ? <Loader2 className="size-3.5 animate-spin" /> : 'Apply'}
+            </Button>
+          </div>
+        </div>
+      )}
 
       {lineItemLabel && (
         <Button variant="outline" size="sm" className="mt-4 w-full" asChild>

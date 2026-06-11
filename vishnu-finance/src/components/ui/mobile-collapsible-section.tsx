@@ -28,7 +28,7 @@ export function MobileCollapsibleSection({
       <button
         type="button"
         className={cn(
-          'flex w-full items-center justify-between gap-3 px-4 py-3 text-left md:hidden',
+          'flex w-full items-center justify-between gap-3 px-4 py-3 text-left lg:hidden',
           patterns.touchTarget
         )}
         onClick={() => setOpen((v) => !v)}
@@ -41,8 +41,8 @@ export function MobileCollapsibleSection({
         <ChevronDown className={cn('size-4 shrink-0 text-muted transition-transform', open && 'rotate-180')} />
       </button>
 
-      <div className={cn('hidden md:block')}>{children}</div>
-      <div className={cn('md:hidden', open ? 'block border-t border-border' : 'hidden')}>{children}</div>
+      <div className={cn('hidden lg:block')}>{children}</div>
+      <div className={cn('lg:hidden', open ? 'block border-t border-border' : 'hidden')}>{children}</div>
     </div>
   );
 }
@@ -61,7 +61,7 @@ export function MobileExpandTrigger({ label, expandedLabel, open, onToggle, clas
       type="button"
       variant="ghost"
       size="sm"
-      className={cn('h-8 w-full text-xs md:hidden', className)}
+      className={cn('h-8 w-full text-xs lg:hidden', className)}
       onClick={onToggle}
     >
       {open ? (expandedLabel ?? 'Show less') : label}

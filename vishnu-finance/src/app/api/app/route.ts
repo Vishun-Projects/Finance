@@ -1241,7 +1241,6 @@ export async function POST(request: NextRequest) {
         };
 
         // DEBUG: Log categories available
-        console.log('[AutoCat] Categories available:', Array.from(categoryByName.keys()));
 
         // Fetch Batch of Uncategorized
         const batchSize = 100;
@@ -1353,11 +1352,7 @@ export async function POST(request: NextRequest) {
           }));
 
           try {
-            console.log(`[AI Batch] Sending ${mappedForAi.length} items to AI`);
             const aiResults = await categorizeTransactionsBatch(mappedForAi, categories.map((c: any) => ({ id: c.id, name: c.name, type: c.type })));
-
-            console.log(`[AI Batch] Received ${aiResults.length} results`);
-            if (aiResults.length > 0) console.log(`[AI Batch] Sample result:`, aiResults[0]);
 
             for (const res of aiResults) {
               if (res.categoryId && res.confidence > 0.5 && res.categoryId !== otherCategoryId) {
@@ -1666,33 +1661,6 @@ export async function POST(request: NextRequest) {
       });
 
       return NextResponse.json({ user: updatedUser, message: 'Profile updated successfully' });
-    }
-
-    // Dashboard
-    if (action === 'dashboard_get') {
-      const { userId } = body || {};
-      if (!userId) return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
-      const { RealDataService } = await import('@/lib/real-data-service');
-      const dashboardData = await RealDataService.getDashboardData(userId);
-      return NextResponse.json(dashboardData);
-    }
-
-    // Dashboard Simple
-    if (action === 'dashboard_simple_get') {
-      const { userId } = body || {};
-      if (!userId) return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
-      const { RealDataService } = await import('@/lib/real-data-service');
-      const dashboardData = await RealDataService.getDashboardData(userId);
-      return NextResponse.json(dashboardData);
-    }
-
-    // Dashboard Fallback
-    if (action === 'dashboard_fallback_get') {
-      const { userId } = body || {};
-      if (!userId) return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
-      const { RealDataService } = await import('@/lib/real-data-service');
-      const dashboardData = await RealDataService.getDashboardData(userId);
-      return NextResponse.json(dashboardData);
     }
 
     // Income - Get

@@ -82,7 +82,6 @@ export async function GET() {
         try {
           await unlink(filepath);
           results.deleted.push(filepath);
-          console.log('✅ Auto-cleaned up old file:', filepath);
         } catch (error) {
           const errorMsg = error instanceof Error ? error.message : 'Unknown error';
           results.failed.push({ file: filepath, error: errorMsg });
@@ -129,7 +128,6 @@ export async function POST(request: NextRequest) {
       try {
         await unlink(filepath);
         results.deleted.push(filepath);
-        console.log('✅ Cleaned up:', filepath);
       } catch (error) {
         const errorMsg = error instanceof Error ? error.message : 'Unknown error';
         results.failed.push({ file: filepath, error: errorMsg });

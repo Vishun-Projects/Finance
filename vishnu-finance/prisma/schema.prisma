@@ -98,6 +98,11 @@ model User {
   upiMappings             UpiFieldMapping[]
   preferences          UserPreferences?
   wishlistItems        WishlistItem[]
+  assets               UserAsset[]
+  liabilities          UserLiability[]
+  casUploads           CasUpload[]
+  casHoldings          CasHolding[]
+  incomeBudgetPlans    IncomeBudgetPlan[]
 
   @@map("users")
 }
@@ -786,4 +791,124 @@ enum ImageJobType {
   GOAL
   GENERIC
   WISHLIST_ITEM
+}
+
+enum AssetType {
+  BANK_ACCOUNT
+  CASH
+  INVESTMENT
+  PROPERTY
+  GOLD
+  OTHER
+}
+
+enum LiabilityType {
+  LOAN
+  CREDIT_CARD
+  MORTGAGE
+  OTHER
+}
+
+model UserAsset {
+  id          String    @id @default(cuid())
+  userId      String
+  name        String
+  type        AssetType @default(OTHER)
+  value       Decimal   @db.Decimal(14, 2)
+  currency    String    @default("INR")
+  notes       String?
+  asOfDate    DateTime  @default(now())
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("user_assets")
+}
+
+model UserLiability {
+  id          String        @id @default(cuid())
+  userId      String
+  name        String
+  type        LiabilityType @default(OTHER)
+  balance     Decimal       @db.Decimal(14, 2)
+  currency    String        @default("INR")
+  notes       String?
+  asOfDate    DateTime      @default(now())
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("user_liabilities")
+}
+
+model CasUpload {
+  id            String       @id @default(cuid())
+  userId        String
+  fileName      String
+  sizeBytes     Int
+  isLikelyCas   Boolean      @default(false)
+  folioCount    Int          @default(0)
+  holderName    String?
+  pan           String?
+  statementDate String?
+  registrar     String?
+  parseWarning  String?
+  totalValue    Decimal?     @db.Decimal(14, 2)
+  createdAt     DateTime     @default(now())
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  holdings      CasHolding[]
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("cas_uploads")
+}
+
+model CasHolding {
+  id         String    @id @default(cuid())
+  uploadId   String
+  userId     String
+  schemeName String
+  folio      String?
+  units      Decimal?  @db.Decimal(18, 4)
+  nav        Decimal?  @db.Decimal(14, 4)
+  value      Decimal?  @db.Decimal(14, 2)
+  isin       String?
+  createdAt  DateTime  @default(now())
+  upload     CasUpload @relation(fields: [uploadId], references: [id], onDelete: Cascade)
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([uploadId])
+  @@map("cas_holdings")
+}
+
+model IncomeBudgetPlan {
+  id         String               @id @default(cuid())
+  userId     String
+  name       String               @default("My budget")
+  templateId String               @default("50-30-20")
+  isActive   Boolean              @default(true)
+  createdAt  DateTime             @default(now())
+  updatedAt  DateTime             @updatedAt
+  user       User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  buckets    IncomeBudgetBucket[]
+
+  @@index([userId, isActive])
+  @@map("income_budget_plans")
+}
+
+model IncomeBudgetBucket {
+  id         String           @id @default(cuid())
+  planId     String
+  key        String
+  label      String
+  percentage Float
+  variant    String           @default("needs")
+  mapFrom    String           @default("[]")
+  sortOrder  Int              @default(0)
+  plan       IncomeBudgetPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@unique([planId, key])
+  @@map("income_budget_buckets")
 }

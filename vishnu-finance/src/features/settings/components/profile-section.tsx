@@ -1,29 +1,43 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { User, Save, X, Camera, MapPin, Phone, Mail, Loader2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import Link from 'next/link';
+import { X, Camera, Loader2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Avatar } from '@/components/ui/avatar';
 import { DatePicker } from '@/components/ui/date-picker';
+import RazorpayTest from '@/features/settings/components/razorpay-test';
+import {
+  SettingsPageLayout,
+  SettingsSectionHeader,
+  SettingsGroup,
+  SettingsFormField,
+  SettingsSaveBar,
+  SettingsProfileHeader,
+} from '@/features/settings/components/settings-ui';
 import { useAuth } from '@/contexts/AuthContext';
 import type { User as AuthUser } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
 import { fetchLocationByPincode, validateIndianPhoneNumber } from '@/lib/pincode-api';
 import { validateImageFile } from '@/lib/avatar-utils';
 
+import type { UserProfilePayload } from '@/features/settings/loaders-profile';
+
 type ProfileSectionMode = 'standalone' | 'embedded';
 
 interface ProfileSectionProps {
   mode?: ProfileSectionMode;
-  initialProfile?: Partial<AuthUser> | null;
+  initialProfile?: Partial<AuthUser> | UserProfilePayload | null;
+  includePayments?: boolean;
 }
 
-export function ProfileSettingsSection({ mode = 'embedded', initialProfile = null }: ProfileSectionProps) {
+export function ProfileSettingsSection({
+  mode = 'embedded',
+  initialProfile = null,
+  includePayments = false,
+}: ProfileSectionProps) {
   const isStandalone = mode === 'standalone';
   const { user, refreshUser } = useAuth();
   const { success, error: showError } = useToast();
@@ -313,27 +327,35 @@ export function ProfileSettingsSection({ mode = 'embedded', initialProfile = nul
     );
   }
 
+  const memberSince = user?.createdAt
+    ? new Date(user.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long' })
+    : undefined;
+
   const profileContent = (
-    <div className="space-y-6">
-      <Card className="bg-card border border-border/60 rounded-xl shadow-sm">
-        <CardContent className="pt-6">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
-            <div className="relative">
+    <SettingsPageLayout>
+      <SettingsGroup>
+        <SettingsProfileHeader
+          name={formData.name || user?.name || 'User'}
+          email={user?.email}
+          avatarUrl={avatarUrl}
+          memberSince={memberSince}
+          avatarSlot={
+            <>
               <Avatar
                 src={avatarUrl}
                 userId={user?.id || ''}
                 size="xl"
-                className="border-4 border-white shadow-lg"
+                className="border-4 border-background shadow-md"
               />
               <label
                 htmlFor="avatar-upload"
-                className="absolute bottom-0 right-0 bg-primary text-white rounded-full p-2 cursor-pointer hover:bg-primary/90 transition-colors shadow-md"
+                className="absolute bottom-0 right-0 cursor-pointer rounded-full bg-primary p-2 text-primary-foreground shadow-md transition-colors hover:bg-primary/90"
                 title="Change avatar"
               >
                 {uploadingAvatar ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <Loader2 className="size-4 animate-spin" />
                 ) : (
-                  <Camera className="w-4 h-4" />
+                  <Camera className="size-4" />
                 )}
               </label>
               <input
@@ -346,68 +368,38 @@ export function ProfileSettingsSection({ mode = 'embedded', initialProfile = nul
               />
               {avatarUrl && (
                 <button
+                  type="button"
                   onClick={handleRemoveAvatar}
-                  className="absolute top-0 right-0 bg-red-500 text-white rounded-full p-1.5 hover:bg-red-600 transition-colors shadow-md"
+                  className="absolute right-0 top-0 rounded-full bg-destructive p-1.5 text-destructive-foreground shadow-md transition-colors hover:bg-destructive/90"
                   title="Remove avatar"
                   disabled={uploadingAvatar}
                 >
-                  <X className="w-3 h-3" />
+                  <X className="size-3" />
                 </button>
               )}
-            </div>
+            </>
+          }
+        />
+      </SettingsGroup>
 
-            <div className="flex-1">
-              <h2 className="text-2xl font-bold text-gray-900">
-                {formData.name || user?.name || 'User'}
-              </h2>
-              <p className="text-gray-600 mt-1 flex items-center gap-2">
-                <Mail className="w-4 h-4" />
-                {user?.email}
-              </p>
-              {user?.createdAt && (
-                <p className="text-sm text-gray-500 mt-2">
-                  Member since{' '}
-                  {new Date(user.createdAt).toLocaleDateString('en-US', {
-                    year: 'numeric',
-                    month: 'long',
-                  })}
-                </p>
-              )}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="bg-card border border-border/60 rounded-xl shadow-sm">
-        <CardHeader>
-          <div className="flex items-center gap-3">
-            <div className="size-10 rounded-lg bg-primary/10 flex items-center justify-center">
-              <User className="w-5 h-5 text-primary" />
-            </div>
-            <div>
-              <CardTitle className="text-base font-bold uppercase tracking-wide text-foreground">Personal Information</CardTitle>
-              <CardDescription>Update your personal details</CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Full Name</Label>
+      <div className="space-y-1.5">
+        <SettingsSectionHeader>Personal</SettingsSectionHeader>
+        <SettingsGroup>
+          <div className="grid grid-cols-1 lg:grid-cols-2 lg:gap-4 lg:p-4">
+            <SettingsFormField id="name" label="Full name">
               <Input
                 id="name"
                 value={formData.name}
                 onChange={(e) => handleInputChange('name', e.target.value)}
                 placeholder="Enter your full name"
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="gender">Gender</Label>
+            </SettingsFormField>
+            <SettingsFormField id="gender" label="Gender" bordered>
               <Select
                 value={formData.gender}
                 onValueChange={(value) => handleInputChange('gender', value)}
               >
-                <SelectTrigger>
+                <SelectTrigger id="gender">
                   <SelectValue placeholder="Select gender" />
                 </SelectTrigger>
                 <SelectContent>
@@ -417,195 +409,172 @@ export function ProfileSettingsSection({ mode = 'embedded', initialProfile = nul
                   <SelectItem value="PREFER_NOT_TO_SAY">Prefer not to say</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="dateOfBirth">Date of Birth</Label>
+            </SettingsFormField>
+            <SettingsFormField id="dateOfBirth" label="Date of birth" bordered>
               <DatePicker
                 date={formData.dateOfBirth}
                 onDateChange={(date) => handleInputChange('dateOfBirth', date)}
                 placeholder="Select date of birth"
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="occupation">Occupation</Label>
+            </SettingsFormField>
+            <SettingsFormField id="occupation" label="Occupation" bordered>
               <Input
                 id="occupation"
                 value={formData.occupation}
                 onChange={(e) => handleInputChange('occupation', e.target.value)}
                 placeholder="Enter your occupation"
               />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="bio">Bio</Label>
-            <Textarea
-              id="bio"
-              value={formData.bio}
-              onChange={(e) => handleInputChange('bio', e.target.value)}
-              placeholder="Tell us about yourself..."
-              rows={4}
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="bg-card border border-border/60 rounded-xl shadow-sm">
-        <CardHeader>
-          <div className="flex items-center gap-3">
-            <div className="size-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
-              <Phone className="w-5 h-5 text-blue-500" />
-            </div>
-            <div>
-              <CardTitle className="text-base font-bold uppercase tracking-wide text-foreground">Contact Information</CardTitle>
-              <CardDescription>Update your contact details</CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              value={user?.email || ''}
-              disabled
-              className="bg-gray-100"
-            />
-            <p className="text-xs text-gray-500">Email cannot be changed</p>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="phone">Phone Number</Label>
-            <Input
-              id="phone"
-              type="tel"
-              value={formData.phone}
-              onChange={(e) => handleInputChange('phone', e.target.value)}
-              placeholder="Enter your phone number (10 digits)"
-              maxLength={10}
-            />
-            <p className="text-xs text-gray-500">Indian phone number format (10 digits)</p>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="bg-card border border-border/60 rounded-xl shadow-sm">
-        <CardHeader>
-          <div className="flex items-center gap-3">
-            <div className="size-10 rounded-lg bg-indigo-500/10 flex items-center justify-center">
-              <MapPin className="w-5 h-5 text-indigo-500" />
-            </div>
-            <div>
-              <CardTitle className="text-base font-bold uppercase tracking-wide text-foreground">Location Details</CardTitle>
-              <CardDescription>Your address and location details</CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="addressLine1">Address Line 1</Label>
-            <Input
-              id="addressLine1"
-              value={formData.addressLine1}
-              onChange={(e) => handleInputChange('addressLine1', e.target.value)}
-              placeholder="Street address, P.O. Box"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="addressLine2">Address Line 2</Label>
-            <Input
-              id="addressLine2"
-              value={formData.addressLine2}
-              onChange={(e) => handleInputChange('addressLine2', e.target.value)}
-              placeholder="Apartment, suite, unit, building, floor, etc."
-            />
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="pincode" className="flex items-center gap-2">
-                <span>Pincode</span>
-                {fetchingLocation && (
-                  <Loader2 className="w-3 h-3 animate-spin text-primary" />
-                )}
-              </Label>
-              <Input
-                id="pincode"
-                value={formData.pincode}
-                onChange={(e) => {
-                  const value = e.target.value.replace(/\D/g, '').slice(0, 6);
-                  handleInputChange('pincode', value);
-                  if (value !== formData.pincode) {
-                    lastLookupPincodeRef.current = null;
-                  }
-                }}
-                placeholder="Enter 6-digit pincode"
-                maxLength={6}
+            </SettingsFormField>
+            <SettingsFormField id="bio" label="Bio" stack bordered className="lg:col-span-2">
+              <Textarea
+                id="bio"
+                value={formData.bio}
+                onChange={(e) => handleInputChange('bio', e.target.value)}
+                placeholder="Tell us about yourself…"
+                rows={3}
               />
-              <p className="text-xs text-gray-500">Enter pincode to auto-fill city and state</p>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="city">City</Label>
+            </SettingsFormField>
+          </div>
+        </SettingsGroup>
+      </div>
+
+      <div className="space-y-1.5">
+        <SettingsSectionHeader>Contact</SettingsSectionHeader>
+        <SettingsGroup>
+          <div className="grid grid-cols-1 lg:grid-cols-2 lg:gap-4 lg:p-4">
+            <SettingsFormField id="email" label="Email" hint="Email cannot be changed">
+              <Input
+                id="email"
+                type="email"
+                value={user?.email || ''}
+                disabled
+                className="bg-muted lg:bg-muted"
+              />
+            </SettingsFormField>
+            <SettingsFormField id="phone" label="Phone number" bordered>
+              <Input
+                id="phone"
+                type="tel"
+                value={formData.phone}
+                onChange={(e) => handleInputChange('phone', e.target.value)}
+                placeholder="10-digit mobile number"
+                maxLength={10}
+              />
+            </SettingsFormField>
+          </div>
+        </SettingsGroup>
+      </div>
+
+      <div className="space-y-1.5">
+        <SettingsSectionHeader>Address</SettingsSectionHeader>
+        <SettingsGroup>
+          <div className="grid grid-cols-1 lg:grid-cols-2 lg:gap-4 lg:p-4">
+            <SettingsFormField id="addressLine1" label="Address line 1" className="lg:col-span-2">
+              <Input
+                id="addressLine1"
+                value={formData.addressLine1}
+                onChange={(e) => handleInputChange('addressLine1', e.target.value)}
+                placeholder="Street address, P.O. box"
+              />
+            </SettingsFormField>
+            <SettingsFormField id="addressLine2" label="Address line 2" bordered className="lg:col-span-2">
+              <Input
+                id="addressLine2"
+                value={formData.addressLine2}
+                onChange={(e) => handleInputChange('addressLine2', e.target.value)}
+                placeholder="Apartment, suite, unit, etc."
+              />
+            </SettingsFormField>
+            <SettingsFormField
+              id="pincode"
+              label="Pincode"
+              bordered
+              hint="Auto-fills city and state"
+            >
+              <div className="relative">
+                <Input
+                  id="pincode"
+                  value={formData.pincode}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/\D/g, '').slice(0, 6);
+                    handleInputChange('pincode', value);
+                    if (value !== formData.pincode) {
+                      lastLookupPincodeRef.current = null;
+                    }
+                  }}
+                  placeholder="6-digit pincode"
+                  maxLength={6}
+                />
+                {fetchingLocation && (
+                  <Loader2 className="pointer-events-none absolute right-0 top-1/2 size-3.5 -translate-y-1/2 animate-spin text-primary lg:right-3" />
+                )}
+              </div>
+            </SettingsFormField>
+            <SettingsFormField id="city" label="City" bordered>
               <Input
                 id="city"
                 value={formData.city}
                 onChange={(e) => handleInputChange('city', e.target.value)}
                 placeholder="City"
               />
-            </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="state">State</Label>
+            </SettingsFormField>
+            <SettingsFormField id="state" label="State" bordered>
               <Input
                 id="state"
                 value={formData.state}
                 onChange={(e) => handleInputChange('state', e.target.value)}
                 placeholder="State"
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="country">Country</Label>
+            </SettingsFormField>
+            <SettingsFormField id="country" label="Country" bordered>
               <Input
                 id="country"
                 value={formData.country}
                 onChange={(e) => handleInputChange('country', e.target.value)}
                 placeholder="Country"
               />
-            </div>
+            </SettingsFormField>
           </div>
-        </CardContent>
-      </Card>
-
-      <div className="flex justify-end gap-4">
-        <Button
-          onClick={handleSave}
-          disabled={saving}
-          className="min-w-[140px] h-10 px-6 text-xs font-bold uppercase tracking-widest bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg transition-all"
-        >
-          {saving ? (
-            <>
-              <Loader2 className="size-4 mr-2 animate-spin" />
-              Saving...
-            </>
-          ) : (
-            <>
-              <Save className="size-4 mr-2" />
-              Save Changes
-            </>
-          )}
-        </Button>
+        </SettingsGroup>
       </div>
-    </div>
+
+      {includePayments && (
+        <div className="space-y-1.5">
+          <SettingsSectionHeader>Payments</SettingsSectionHeader>
+          <SettingsGroup>
+            <div className="space-y-4 px-4 py-4">
+              <p className="text-xs text-muted-foreground">
+                Run a ₹1.00 test payment via Razorpay to verify integration. By proceeding you agree to our{' '}
+                <Link href="/terms" className="text-primary hover:underline">
+                  Terms
+                </Link>
+                ,{' '}
+                <Link href="/privacy" className="text-primary hover:underline">
+                  Privacy Policy
+                </Link>
+                , and{' '}
+                <Link href="/refunds" className="text-primary hover:underline">
+                  Refunds Policy
+                </Link>
+                .
+              </p>
+              <RazorpayTest />
+            </div>
+          </SettingsGroup>
+        </div>
+      )}
+
+      <SettingsSaveBar onSave={handleSave} loading={saving} />
+    </SettingsPageLayout>
   );
 
   if (isStandalone) {
     return (
-      <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-4xl mx-auto space-y-6">
+      <div className="min-h-screen bg-background py-8 px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-4xl space-y-6">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Profile</h1>
-            <p className="mt-2 text-sm text-gray-600">
+            <h1 className="text-3xl font-bold text-foreground">Profile</h1>
+            <p className="mt-2 text-sm text-muted-foreground">
               Manage your personal information and preferences
             </p>
           </div>

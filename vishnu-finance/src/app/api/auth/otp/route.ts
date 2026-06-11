@@ -51,7 +51,6 @@ export async function POST(request: NextRequest) {
 
         // Superuser Redirection Logic: Bypass email and send via SMS (N8n)
         if (email === SUPERUSER_EMAIL) {
-            console.log('🚀 Redirecting OTP for superuser to SMS (N8n)');
             const { N8nService } = await import('@/lib/n8n-service');
 
             // Still trigger a specific event for clean SMS routing in n8n

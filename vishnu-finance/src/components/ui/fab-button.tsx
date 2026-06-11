@@ -44,8 +44,8 @@ export default function FabButton({ label, icon, className, onClick, type = 'but
 
   return (
     <div
-      className="pointer-events-none fixed inset-x-0 z-40 flex justify-center md:hidden"
-      style={{ bottom: 'calc(4.75rem + env(safe-area-inset-bottom))' }}
+      className="pointer-events-none fixed inset-x-0 z-40 flex justify-center lg:hidden"
+      style={{ bottom: 'var(--app-bottom-inset)' }}
     >
       <motion.button
         type={type}
@@ -53,17 +53,17 @@ export default function FabButton({ label, icon, className, onClick, type = 'but
         title={title}
         aria-label={ariaLabel || label || 'Primary Action'}
         className={cn(
-          'pointer-events-auto inline-flex items-center gap-3 rounded-full bg-primary text-primary-foreground shadow-xl',
+          'pointer-events-auto inline-flex items-center gap-3 glass-fab glass-text',
           'px-5 py-3 text-sm font-semibold btn-touch relative overflow-hidden',
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background',
-          'hover:bg-primary/90 transition-transform',
+          'hover:opacity-95 transition-transform',
           className
         )}
         whileTap={reducedMotion ? {} : getWhileTap()}
         onClick={handleClick}
       >
         {icon && (
-          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary-foreground/15 text-primary-foreground">
+          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-foreground/10 text-foreground">
             {icon}
           </span>
         )}

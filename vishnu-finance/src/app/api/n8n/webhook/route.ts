@@ -52,7 +52,6 @@ export async function POST(request: NextRequest) {
             case 'NOTIFICATION':
             case 'notification':
                 // This is just a loop-back of the notification from n8n
-                console.log('✅ Notification loop-back confirmed:', data);
                 break;
 
             case 'DAILY_NEWS':
@@ -89,7 +88,6 @@ export async function POST(request: NextRequest) {
 
             case 'BANK_STATEMENT_PROCESSED':
                 // Handle processed bank statement (Gemini OCR)
-                console.log('Processed statement received:', data);
                 break;
 
             default:

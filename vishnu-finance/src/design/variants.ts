@@ -40,13 +40,26 @@ export const calloutVariants = cva('rounded-[var(--radius-md)] border px-5 py-4'
 });
 
 export const navPillVariants = cva(
-  'inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[var(--radius-pill)] border px-3.5 py-1.5 text-xs font-medium transition-all duration-150',
+  'inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[var(--radius-pill)] border border-transparent px-3.5 py-1.5 text-xs font-medium transition-colors duration-150',
   {
     variants: {
       active: {
-        true: 'border-accent bg-accent text-[var(--primary-foreground)]',
-        false:
-          'border-border bg-transparent text-muted hover:bg-surface hover:text-foreground',
+        true: 'text-[var(--primary-foreground)]',
+        false: 'bg-transparent text-muted hover:text-foreground',
+      },
+    },
+    defaultVariants: { active: false },
+  }
+);
+
+/** Uber-style underline segmented control — dashboard mobile */
+export const segmentedNavPillVariants = cva(
+  'relative inline-flex shrink-0 items-center gap-1.5 px-4 py-3 text-sm font-medium transition-colors duration-150',
+  {
+    variants: {
+      active: {
+        true: 'text-foreground',
+        false: 'text-muted hover:text-foreground',
       },
     },
     defaultVariants: { active: false },

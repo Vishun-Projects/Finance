@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { AuthService } from '@/lib/auth';
 import { loadDashboard } from '@/features/dashboard/loaders';
+import { loadGoals, loadDeadlines, loadWishlist } from '@/features/plans/loaders';
 import {
   buildDynamicInsights,
   computeNeedsWantsSavingsSplit,
@@ -25,7 +26,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { stats, adherence } = await loadDashboard(user.id);
+    const dashboard = await loadDashboard(user.id);
+    const { stats, adherence, disciplineSummary } = dashboard;
+
+    const [goals, deadlines, wishlist] = await Promise.all([
+      loadGoals(user.id),
+      loadDeadlines(user.id),
+      loadWishlist(user.id),
+    ]);
 
     const segmentSplit = computeNeedsWantsSavingsSplit(adherence.buckets);
     const spendingContext = computeSpendingContext(currentMonthStatsFrom(stats), adherence.plannedTotal);
@@ -55,6 +63,7 @@ export async function GET(request: NextRequest) {
       unstartedLines,
       dynamicInsights,
       monthlyTrends,
+      disciplineSummary,
       adherence: {
         plannedTotal: adherence.plannedTotal,
         actualTotal: adherence.actualTotal,

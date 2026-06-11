@@ -1,0 +1,214 @@
+/**
+ * iOS-accurate glass materials — accent/overlay surfaces ONLY.
+ * Do not apply to page backgrounds, base cards, table rows, or primary buttons.
+ */
+
+:root {
+  --glass-blur: 20px;
+  --glass-saturate: 180%;
+  --glass-radius-card: 13px;
+  --glass-radius-sheet: 20px;
+  --glass-radius-chip: 10px;
+  --glass-text-light: rgba(0, 0, 0, 0.85);
+  --glass-text-dark: rgba(255, 255, 255, 0.92);
+  --glass-bg-regular: rgba(255, 255, 255, 0.72);
+  --glass-border-regular: rgba(255, 255, 255, 0.36);
+  --glass-inset-regular: 0 0 0 0.5px rgba(0, 0, 0, 0.04) inset;
+  --glass-shadow-ambient: 0 2px 12px rgba(0, 0, 0, 0.08);
+  --glass-shadow-key: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --glass-bg-thick: rgba(255, 255, 255, 0.82);
+  --glass-bg-thin: rgba(255, 255, 255, 0.62);
+  --glass-bg-ultra: rgba(255, 255, 255, 0.48);
+}
+
+.dark {
+  --glass-text-light: rgba(255, 255, 255, 0.92);
+  --glass-bg-regular: rgba(28, 28, 30, 0.78);
+  --glass-border-regular: rgba(255, 255, 255, 0.1);
+  --glass-inset-regular: 0 0 0 0.5px rgba(255, 255, 255, 0.06) inset;
+  --glass-shadow-ambient: 0 2px 12px rgba(0, 0, 0, 0.3);
+  --glass-shadow-key: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --glass-bg-thick: rgba(28, 28, 30, 0.88);
+  --glass-bg-thin: rgba(28, 28, 30, 0.72);
+  --glass-bg-ultra: rgba(28, 28, 30, 0.58);
+}
+
+/* Shared glass base */
+.glass-regular,
+.glass-accent,
+.glass-thick,
+.glass-thin,
+.glass-ultra-thin,
+.glass-fab {
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  border: 0.5px solid var(--glass-border-regular);
+  box-shadow: var(--glass-inset-regular), var(--glass-shadow-ambient), var(--glass-shadow-key);
+  will-change: transform;
+}
+
+.glass-regular,
+.glass-accent {
+  background: var(--glass-bg-regular);
+  border-radius: var(--glass-radius-card);
+}
+
+.glass-thick {
+  background: var(--glass-bg-thick);
+  border-radius: var(--glass-radius-sheet);
+}
+
+.glass-thin {
+  background: var(--glass-bg-thin);
+  border-radius: var(--glass-radius-card);
+}
+
+.glass-ultra-thin {
+  background: var(--glass-bg-ultra);
+  border-radius: var(--glass-radius-card);
+}
+
+.glass-fab {
+  background: var(--glass-bg-thin);
+  border-radius: 9999px;
+}
+
+.glass-sheet-bottom {
+  border-radius: var(--glass-radius-sheet) var(--glass-radius-sheet) 0 0;
+}
+
+.glass-chip {
+  background: var(--glass-bg-ultra);
+  border-radius: var(--glass-radius-chip);
+  -webkit-backdrop-filter: blur(16px) saturate(170%);
+  backdrop-filter: blur(16px) saturate(170%);
+  border: 0.5px solid var(--glass-border-regular);
+  box-shadow: var(--glass-inset-regular), var(--glass-shadow-key);
+  will-change: transform;
+}
+
+/* Typography on glass — min weight 500, softened contrast */
+.glass-text {
+  color: var(--glass-text-light);
+  font-weight: 500;
+}
+
+.glass-text .text-muted-foreground,
+.glass-text .text-muted,
+.glass-text .text-hint {
+  font-weight: 500;
+  opacity: 0.72;
+}
+
+/* Browsers without backdrop-filter */
+@supports not (backdrop-filter: blur(1px)) {
+  .glass-regular,
+  .glass-accent {
+    background: rgba(255, 255, 255, 0.92);
+  }
+
+  .glass-thick {
+    background: rgba(255, 255, 255, 0.96);
+  }
+
+  .glass-thin,
+  .glass-fab {
+    background: rgba(255, 255, 255, 0.88);
+  }
+
+  .glass-ultra-thin {
+    background: rgba(255, 255, 255, 0.85);
+  }
+
+  .dark .glass-regular,
+  .dark .glass-accent,
+  .dark .glass-thick,
+  .dark .glass-thin,
+  .dark .glass-ultra-thin,
+  .dark .glass-fab {
+    background: rgba(28, 28, 30, 0.94);
+  }
+}
+
+/* Reduce blur on mobile to limit scroll jank */
+@media (max-width: 768px) {
+  .glass-regular,
+  .glass-accent,
+  .glass-thick,
+  .glass-thin,
+  .glass-ultra-thin,
+  .glass-fab {
+    -webkit-backdrop-filter: blur(12px) saturate(160%);
+    backdrop-filter: blur(12px) saturate(160%);
+  }
+
+  .glass-chip {
+    -webkit-backdrop-filter: blur(10px) saturate(160%);
+    backdrop-filter: blur(10px) saturate(160%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .glass-regular,
+  .glass-accent,
+  .glass-thick,
+  .glass-thin,
+  .glass-ultra-thin,
+  .glass-fab {
+    will-change: auto;
+  }
+}
+
+/* Floating bars — glass on mobile only, transparent on desktop */
+.glass-mobile-bar {
+  border-radius: var(--glass-radius-sheet) var(--glass-radius-sheet) 0 0;
+  background: var(--glass-bg-thin);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  border: 0.5px solid var(--glass-border-regular);
+  border-bottom: none;
+  box-shadow: var(--glass-inset-regular), var(--glass-shadow-ambient), var(--glass-shadow-key);
+  will-change: transform;
+}
+
+@media (min-width: 1024px) {
+  .glass-mobile-bar {
+    background: transparent;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    border: none;
+    box-shadow: none;
+    border-radius: 0;
+    will-change: auto;
+  }
+
+  .glass-mobile-bar.glass-text {
+    color: inherit;
+    font-weight: inherit;
+  }
+}
+
+@media (max-width: 768px) {
+  .glass-mobile-bar {
+    -webkit-backdrop-filter: blur(12px) saturate(160%);
+    backdrop-filter: blur(12px) saturate(160%);
+  }
+}
+
+@supports not (backdrop-filter: blur(1px)) {
+  .glass-chip {
+    background: rgba(255, 255, 255, 0.85);
+  }
+
+  .dark .glass-chip {
+    background: rgba(28, 28, 30, 0.94);
+  }
+
+  .glass-mobile-bar {
+    background: rgba(255, 255, 255, 0.88);
+  }
+
+  .dark .glass-mobile-bar {
+    background: rgba(28, 28, 30, 0.94);
+  }
+}

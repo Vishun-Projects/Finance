@@ -30,7 +30,8 @@ class PersistenceShim:
                 "store": t.store,
                 "personName": t.personName,
                 "commodity": t.commodity,
-                "upiId": t.upiId
+                "upiId": t.upiId,
+                "transactionId": t.transactionId,
             })
             
         # Extract some raw rows for debugging/display

@@ -1,26 +1,17 @@
 /* stylelint-disable at-rule-no-unknown */
 @import '../design/tokens.css';
+@import '../design/glass.css';
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-.safe-top {
-  padding-top: env(safe-area-inset-top);
-}
-
-.safe-bottom {
-  padding-bottom: env(safe-area-inset-bottom);
-}
-
-.safe-padding {
-  padding-top: env(safe-area-inset-top);
-  padding-bottom: env(safe-area-inset-bottom);
-  padding-left: env(safe-area-inset-left);
-  padding-right: env(safe-area-inset-right);
-}
-
 @layer base {
+  :root {
+    /* Clearance for fixed bottom nav pill + FAB (mobile) */
+    --app-bottom-inset: calc(5rem + env(safe-area-inset-bottom));
+  }
+
   * {
     @apply border-border outline-none;
   }
@@ -75,6 +66,31 @@
   }
 }
 
+@layer utilities {
+  .safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .safe-padding {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+
+  .pb-bottom-bar {
+    padding-bottom: var(--app-bottom-inset);
+  }
+
+  .scroll-pb-bottom-bar {
+    scroll-padding-bottom: var(--app-bottom-inset);
+  }
+}
+
 .custom-scrollbar::-webkit-scrollbar {
   width: 4px;
 }
@@ -86,10 +102,6 @@
 .custom-scrollbar::-webkit-scrollbar-thumb {
   background: var(--hint);
   border-radius: var(--radius-pill);
-}
-
-.pb-bottom-bar {
-  padding-bottom: calc(80px + env(safe-area-inset-bottom));
 }
 
 /* Arbitrary grid templates used in src/features (plain CSS — Tailwind layer parser skips these). */

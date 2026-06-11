@@ -27,8 +27,8 @@ const toneClasses: Record<KpiTone, string> = {
 export function MobileKpiStrip({ items, className }: MobileKpiStripProps) {
   return (
     <>
-      <div className={cn('hidden md:contents', className)} aria-hidden />
-      <div className={cn(patterns.mobileKpiStrip, 'md:hidden', className)}>
+      <div className={cn('hidden lg:contents', className)} aria-hidden />
+      <div className={cn(patterns.mobileKpiStrip, 'lg:hidden', className)}>
         {items.map((item) => (
           <div key={item.label} className={cn(patterns.mobileKpiPill, 'card-base shrink-0')}>
             <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-hint">{item.label}</p>
@@ -53,7 +53,7 @@ interface MobileHeroMetricProps {
 
 export function MobileHeroMetric({ label, value, tone = 'neutral', subtitle, footer, className }: MobileHeroMetricProps) {
   return (
-    <div className={cn('card-base p-3 md:hidden', className)}>
+    <div className={cn('card-base p-3 lg:hidden', className)}>
       <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-hint">{label}</p>
       <p className={cn('mt-1 text-2xl font-semibold tabular-nums leading-none', toneClasses[tone])}>{value}</p>
       {subtitle && <div className="mt-2 text-xs text-muted">{subtitle}</div>}

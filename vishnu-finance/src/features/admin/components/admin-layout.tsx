@@ -129,7 +129,7 @@ export function AdminClientLayout({ children }: { children: ReactNode }) {
 
                 <main className={cn(patterns.mainArea, 'min-h-[calc(100vh-4rem)]')}>
                     <div className={cn(patterns.pageShell, 'animate-in fade-in slide-in-from-bottom-4 duration-500')}>
-                        <div className={patterns.pageContentWide}>{children}</div>
+                        <div className={patterns.pageFluid}>{children}</div>
                     </div>
                 </main>
             </div>

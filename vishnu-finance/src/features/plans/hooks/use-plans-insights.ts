@@ -7,6 +7,12 @@ import {
   ClipboardCheck,
   HeartHandshake,
 } from "lucide-react";
+import {
+  groupDeadlinesForCurrentMonth,
+  startOfDay,
+  startOfToday,
+} from "@/lib/utils/deadline-utils";
+import { toNumber } from "@/lib/utils";
 
 export type TabKey = "goals" | "deadlines" | "wishlist";
 
@@ -63,8 +69,12 @@ export function usePlansInsights({
 }: UsePlansInsightsInput) {
   const goalStats = useMemo<GoalStatsSummary>(() => {
     const total = goals.length;
-    const completed = goals.filter((goal) => goal.status === "COMPLETED").length;
-    const active = goals.filter((goal) => goal.status !== "COMPLETED").length;
+    const completed = goals.filter(
+      (goal) =>
+        goal.status === "COMPLETED" ||
+        (goal.targetAmount > 0 && goal.currentAmount >= goal.targetAmount),
+    ).length;
+    const active = total - completed;
     const invested = goals.reduce(
       (sum, goal) => sum + (goal.currentAmount ?? 0),
       0,
@@ -84,15 +94,9 @@ export function usePlansInsights({
   const deadlineStats = useMemo<DeadlineStatsSummary>(() => {
     const total = deadlineEntries.length;
     const paid = deadlineEntries.filter((deadline) => deadline.isCompleted).length;
-    const today = new Date();
-    const upcoming = deadlineEntries.filter(
-      (deadline) =>
-        !deadline.isCompleted && new Date(deadline.dueDate) >= today,
-    ).length;
-    const overdue = deadlineEntries.filter(
-      (deadline) =>
-        !deadline.isCompleted && new Date(deadline.dueDate) < today,
-    ).length;
+    const groups = groupDeadlinesForCurrentMonth(deadlineEntries);
+    const overdue = groups.overdue.length;
+    const upcoming = groups.thisMonthUpcoming.length;
     return { total, paid, upcoming, overdue };
   }, [deadlineEntries]);
 
@@ -103,14 +107,18 @@ export function usePlansInsights({
     const completed = wishlistItems.filter((item) => item.isCompleted).length;
     const pending = total - completed;
     const totalCost = wishlistItems.reduce(
-      (sum, item) => sum + (item.estimatedCost ?? 0),
+      (sum, item) => sum + toNumber(item.estimatedCost),
       0,
     );
     return { total, completed, pending, totalCost };
   }, [wishlistItems]);
 
   const highlightedGoal = useMemo<Goal | null>(() => {
-    const activeGoals = goals.filter((goal) => goal.status !== "COMPLETED");
+    const activeGoals = goals.filter(
+      (goal) =>
+        goal.status !== "COMPLETED" &&
+        (goal.targetAmount <= 0 || goal.currentAmount < goal.targetAmount),
+    );
     if (activeGoals.length === 0) return null;
     return [...activeGoals].sort((a, b) => {
       const priorityDifference = priorityRank(b.priority) - priorityRank(a.priority);
@@ -165,10 +173,10 @@ export function usePlansInsights({
   const tabSummaries = useMemo<Record<TabKey, string>>(
     () => ({
       goals: `${goalStats.active} active`,
-      deadlines: `${deadlineStats.upcoming} upcoming`,
+      deadlines: `${deadlineStats.overdue + deadlineStats.upcoming} this month`,
       wishlist: `${wishlistStats.pending} pending`,
     }),
-    [deadlineStats.upcoming, goalStats.active, wishlistStats.pending],
+    [deadlineStats.overdue, deadlineStats.upcoming, goalStats.active, wishlistStats.pending],
   );
 
   const planFilterOptions = useMemo<PlanFilterOption[]>(
@@ -183,7 +191,7 @@ export function usePlansInsights({
       {
         value: "deadlines",
         label: "Deadlines",
-        description: `${deadlineStats.upcoming} upcoming`,
+        description: `${deadlineStats.overdue + deadlineStats.upcoming} this month`,
         helper: `${deadlineStats.overdue} overdue • ${deadlineStats.paid} paid`,
         icon: CalendarDays,
       },
@@ -251,8 +259,8 @@ export function usePlansInsights({
         ctaLabel: "View deadlines",
         metrics: [
           {
-            label: "Upcoming",
-            value: deadlineStats.upcoming.toString(),
+            label: "This month",
+            value: (deadlineStats.overdue + deadlineStats.upcoming).toString(),
             helper: `${deadlineStats.overdue} overdue`,
           },
           {
@@ -406,10 +414,6 @@ function isDatePast(value?: string | Date | null) {
   if (!parsed) {
     return false;
   }
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const compare = new Date(parsed);
-  compare.setHours(0, 0, 0, 0);
-  return compare.getTime() < today.getTime();
+  return startOfDay(parsed) < startOfToday();
 }
 

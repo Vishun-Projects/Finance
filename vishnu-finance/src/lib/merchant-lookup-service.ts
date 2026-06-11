@@ -3,9 +3,8 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { retryWithBackoff } from './gemini';
 
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
-// Use provided credentials or fallback to environment variables
-const GOOGLE_CUSTOM_SEARCH_API_KEY = process.env.GOOGLE_CUSTOM_SEARCH_API_KEY || 'AIzaSyBXldcBbMnOvvLISw84bdbGDuo6OJn6STs';
-const GOOGLE_CUSTOM_SEARCH_ENGINE_ID = process.env.GOOGLE_CUSTOM_SEARCH_ENGINE_ID || '3711b19706be74dea';
+const GOOGLE_CUSTOM_SEARCH_API_KEY = process.env.GOOGLE_CUSTOM_SEARCH_API_KEY;
+const GOOGLE_CUSTOM_SEARCH_ENGINE_ID = process.env.GOOGLE_CUSTOM_SEARCH_ENGINE_ID;
 
 const genAI = GOOGLE_API_KEY ? new GoogleGenerativeAI(GOOGLE_API_KEY) : null;
 
@@ -346,7 +345,6 @@ export async function lookupMerchantCategory(
     // Check if Gemini quota is exceeded (skip to avoid wasted API calls)
     const { isGeminiQuotaExceeded } = await import('./gemini');
     if (isGeminiQuotaExceeded()) {
-      console.log(`⏭️ Skipping Gemini merchant lookup for "${storeName}" - quota exceeded`);
       return null;
     }
 
@@ -361,7 +359,6 @@ export async function lookupMerchantCategory(
       // Check if quota was exceeded during the call
       const { isGeminiQuotaExceeded: checkQuota } = await import('./gemini');
       if (checkQuota()) {
-        console.log(`⏭️ Gemini quota exceeded during lookup for "${storeName}"`);
       } else {
         console.error('Gemini lookup failed:', error);
       }

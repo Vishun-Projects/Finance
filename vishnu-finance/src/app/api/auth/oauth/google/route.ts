@@ -4,7 +4,6 @@ import { cookies } from 'next/headers';
 
 export async function GET(request: NextRequest) {
   try {
-    console.log('🔐 OAUTH INITIATE - Starting Google OAuth flow');
 
     // Generate PKCE parameters
     const { codeVerifier, codeChallenge, state } = generatePKCE();
@@ -33,7 +32,6 @@ export async function GET(request: NextRequest) {
     // Generate OAuth URL
     const authUrl = generateGoogleOAuthURL(codeChallenge, finalState);
 
-    console.log('✅ OAUTH INITIATE - Redirecting to Google OAuth');
     return NextResponse.redirect(authUrl);
   } catch (error) {
     console.error('❌ OAUTH INITIATE - Error:', error);

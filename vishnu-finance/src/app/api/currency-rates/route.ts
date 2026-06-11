@@ -101,7 +101,6 @@ async function fetchExchangeRates(): Promise<{ [key: string]: number }> {
 
     for (const source of sources) {
       try {
-        console.log(`Trying ${source.name}...`);
         
         const response = await fetch(source.url, {
           headers: {
@@ -114,13 +113,11 @@ async function fetchExchangeRates(): Promise<{ [key: string]: number }> {
 
         if (response.ok) {
           const data = await response.json();
-          console.log(`${source.name} response:`, data);
           
           const parsedRates = source.parser(data);
           
           if (parsedRates && Object.keys(parsedRates).length > 0) {
             Object.assign(rates, parsedRates);
-            console.log(`Successfully fetched rates from ${source.name}:`, Object.keys(rates).length, 'currencies');
             break;
           }
         } else {
@@ -134,7 +131,6 @@ async function fetchExchangeRates(): Promise<{ [key: string]: number }> {
 
     // If no external source worked, use a fallback with some common rates
     if (Object.keys(rates).length === 0) {
-      console.log('Using fallback exchange rates');
       return getFallbackRates();
     }
 

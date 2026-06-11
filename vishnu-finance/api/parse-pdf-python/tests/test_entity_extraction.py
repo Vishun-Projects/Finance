@@ -64,6 +64,21 @@ def test_extract_entities():
             None,
             "Mr Radhe Shyam Panc",
         ),
+        (
+            "TRANSFER FROM 97161000121 NEFT/BOTM/BOTMN52026 053000562990/WESTERN RE//",
+            "Western",
+            None,
+        ),
+        (
+            "ICIC0DC0099/Spotify India /MandateRequest /BRANCH : ATM SERVICE BRANCH",
+            "Spotify",
+            None,
+        ),
+        (
+            "UPI-AIRTEL-AIRTEL-PREPAID.PAYTM@pty",
+            "Airtel",
+            None,
+        ),
     ]
 
     for text, expected_store, expected_person in cases:
@@ -72,7 +87,7 @@ def test_extract_entities():
             assert person == expected_person, f"person mismatch for {text[:40]}... got {person!r}"
             assert store is None, f"expected no store for {text[:40]}... got {store!r}"
         if expected_store:
-            assert store == expected_store, f"store mismatch for {text[:40]}... got {store!r}"
+            assert store == expected_store, f"store mismatch for {text[:40]}... got {store!r}, person={person!r}"
 
 
 if __name__ == "__main__":

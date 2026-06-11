@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import { prisma } from '@/lib/db';
 import { callPythonParser } from '@/lib/python-parser-client';
 import { enrichParsedTransactionsFromHistory } from '@/lib/parse-enrichment';
+import { getAuthenticatedUser, unauthorizedResponse } from '@/lib/api-auth';
 
 /**
  * Call Python serverless/microservice function for PDF parsing
@@ -44,7 +45,10 @@ async function tryPythonParser(
 }
 
 export async function POST(request: NextRequest) {
-  console.log('🔍 PDF API: Starting request processing');
+  const user = await getAuthenticatedUser(request);
+  if (!user) {
+    return unauthorizedResponse();
+  }
   try {
     const formData = await request.formData() as unknown as globalThis.FormData;
     const file = formData.get('file') as File;
@@ -86,18 +90,15 @@ export async function POST(request: NextRequest) {
 
         if (!uploadError && uploadData) {
           remoteFilePath = uploadData.path;
-          console.log('✅ PDF API: Uploaded to Supabase:', remoteFilePath);
         }
       }
     } catch (supaError) {
       console.warn('⚠️ PDF API: Supabase upload error:', supaError);
     }
 
-    console.log('🐍 PDF API: Attempting Python microservice function...');
     const pythonResult = await tryPythonParser(buffer, bankHint, bankParserConfigs, password);
 
     if (pythonResult.success && pythonResult.data) {
-      console.log('✅ PDF API: Python parser succeeded');
       const result = pythonResult.data;
       
       if (result.status === 'needs_password') {
@@ -105,11 +106,10 @@ export async function POST(request: NextRequest) {
       }
 
       let transactions = result.transactions || [];
-      const userId = (formData.get('userId') as string) || '';
+      const userId = user.id;
 
       // Historical Intelligence: batch lookup (max 3 queries, not N per transaction)
       if (userId && transactions.length > 0) {
-        console.log(`🤖 PDF API: Enriching ${transactions.length} transactions for userId: ${userId}`);
         try {
           transactions = await enrichParsedTransactionsFromHistory(userId, transactions);
         } catch (enrichErr) {
@@ -126,7 +126,6 @@ export async function POST(request: NextRequest) {
         remoteFile: remoteFilePath,
       });
     } else {
-      console.log('⚠️ PDF API: Python parser failed:', pythonResult.error);
       return NextResponse.json({
         success: false,
         error: pythonResult.error || 'Python serverless function failed.'

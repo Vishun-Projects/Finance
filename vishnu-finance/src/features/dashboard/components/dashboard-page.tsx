@@ -1,14 +1,18 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { format, differenceInCalendarDays, startOfDay } from 'date-fns';
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   AlarmClock,
   ArrowRight,
   AlertCircle,
   CheckCircle2,
+  Moon,
   ReceiptText,
+  Settings,
+  Sun,
   Target,
   TrendingDown,
   TrendingUp,
@@ -26,11 +30,19 @@ import { cn, formatRupees } from '@/lib/utils';
 import { getTransactionDisplayName } from '@/lib/transaction-utils';
 import { MobileHeroMetric } from '@/components/ui/mobile-kpi-strip';
 import { CompactListRow } from '@/components/ui/compact-list-row';
-import { NavPill, NavPillGroup } from '@/components/ui/nav-pill';
 import { InsightBanner } from '@/components/ui/insight-banner';
 import { SegmentSplitBar } from '@/components/ui/segment-split-bar';
 import { CategoryLegend } from '@/components/ui/category-legend';
-import { BudgetProgressRow } from '@/components/ui/budget-progress-row';
+import {
+  DashboardSegmentedNav,
+  type DashboardMobileView,
+} from '@/features/dashboard/components/dashboard-segmented-nav';
+import { DashboardSearchBar } from '@/features/dashboard/components/dashboard-search-bar';
+import { DashboardRecentActivity } from '@/features/dashboard/components/dashboard-recent-activity';
+import { DashboardQuickActionGrid } from '@/features/dashboard/components/dashboard-quick-action-grid';
+import { DashboardExploreGrid } from '@/features/dashboard/components/dashboard-explore-grid';
+import { PageMandate } from '@/components/layout/page-mandate';
+import { useTheme } from '@/contexts/ThemeContext';
 import {
   buildContextBanner,
   computeNeedsWantsSavingsSplit,
@@ -38,7 +50,15 @@ import {
   getOverBudgetBuckets,
   getTopCategoriesWithPct,
 } from '@/lib/dashboard-insights';
+import {
+  formatDisciplineCurrency,
+  computeSafeToSpend,
+  type DisciplineSummary,
+} from '@/lib/plans-discipline';
+import { AccountBalanceChip } from '@/components/finance/account-balance-chip';
+import { MonthAtGlanceKpis } from '@/components/finance/month-at-glance-kpis';
 import { useBreakpoint } from '@/hooks/use-breakpoint';
+import { useMobileRefreshRegister } from '@/contexts/MobileRefreshContext';
 
 interface DashboardPageProps {
   data: DashboardBootstrap;
@@ -64,12 +84,16 @@ function deadlineDueLabel(dueDate: string) {
 }
 
 export default function DashboardPage({ data }: DashboardPageProps) {
-  const { stats, adherence } = data;
+  const router = useRouter();
+  const { stats, adherence, disciplineSummary: initialDisciplineSummary, planIncomeContext, accountBalance } = data;
   const { currentMonthStats, incomeBreakdown } = stats;
   const income = currentMonthStats.income;
   const expenses = currentMonthStats.expenses;
   const netFlow = currentMonthStats.netFlow;
-  const monthlyIncome = incomeBreakdown?.total ?? currentMonthStats.income;
+  const adjustedNetFlow = currentMonthStats.adjustedNetFlow;
+  const hasSettlementAdjustment = adjustedNetFlow !== netFlow;
+  const displayNetFlow = hasSettlementAdjustment ? adjustedNetFlow : netFlow;
+  const salaryReceived = planIncomeContext.receivedSalaryAnchor;
   const planBaseIncome = adherence.planBaseIncome;
 
   const combinedPlanScore =
@@ -113,7 +137,6 @@ export default function DashboardPage({ data }: DashboardPageProps) {
     () => buildContextBanner(currentMonthStats, incomeBreakdown, stats.salaryInfo, netFlow),
     [currentMonthStats, incomeBreakdown, stats.salaryInfo, netFlow],
   );
-  const summaryGoals = adherence.goals.slice(0, 2);
 
   const alerts: string[] = [
     ...overBudgetBuckets.map((bucket) => `${bucket.label} is over plan by ${formatRupees(bucket.actual - bucket.planned)}`),
@@ -124,13 +147,37 @@ export default function DashboardPage({ data }: DashboardPageProps) {
       .map((goal) => `Goal behind pace: ${goal.name}`),
   ];
 
-  const isMdUp = useBreakpoint('md');
+  const isMdUp = useBreakpoint('lg');
   const mobileAlerts = alerts.slice(0, isMdUp ? 4 : 2);
-  const mobileGoals = adherence.goals.slice(0, isMdUp ? 5 : 3);
+  const mobileGoals = adherence.goals.slice(0, isMdUp ? 5 : 2);
+  const overviewRecentTransactions = stats.recentTransactions.slice(0, 3);
   const recentTransactions = stats.recentTransactions.slice(0, isMdUp ? 8 : 4);
   const recentActivityRef = useRef<HTMLElement>(null);
   const [recentActivityHeight, setRecentActivityHeight] = useState<number>();
-  const [mobileView, setMobileView] = useState<'summary' | 'plan' | 'activity'>('summary');
+  const [mobileView, setMobileView] = useState<DashboardMobileView>('overview');
+  const { setTheme, isLoading: themeLoading, isDark } = useTheme();
+  const isDarkMode = !themeLoading && isDark;
+  const [disciplineSummary, setDisciplineSummary] = useState<DisciplineSummary | null>(
+    initialDisciplineSummary ?? null,
+  );
+
+  useEffect(() => {
+    setDisciplineSummary(initialDisciplineSummary ?? null);
+  }, [initialDisciplineSummary]);
+
+  useMobileRefreshRegister(
+    useCallback(async () => {
+      router.refresh();
+    }, [router])
+  );
+
+  const safeToSpend = useMemo(() => {
+    if (!disciplineSummary) return null;
+    const upcoming = disciplineSummary.deadlines
+      .filter((d) => d.isDueThisMonth || d.isOverdue)
+      .reduce((sum, d) => sum + d.requiredThisMonth, 0);
+    return computeSafeToSpend(disciplineSummary, upcoming);
+  }, [disciplineSummary]);
 
   useEffect(() => {
     const element = recentActivityRef.current;
@@ -147,344 +194,126 @@ export default function DashboardPage({ data }: DashboardPageProps) {
   }, [adherence.goals.length, recentTransactions.length]);
 
   return (
-    <div className={cn(patterns.pageFluid, 'flex flex-col gap-5 max-md:gap-3 pb-8')}>
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="max-md:hidden text-[11px] font-medium uppercase tracking-[0.08em] text-hint">Dashboard</p>
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl font-semibold text-foreground max-md:text-lg">{adherence.monthLabel}</h1>
-            <span className="rounded-full bg-surface px-2 py-0.5 text-[10px] text-muted md:hidden">
-              {spendingContext.daysLeftInMonth} days left
-            </span>
-          </div>
-          <p className="max-md:hidden text-xs text-muted">Live transactions vs your phase plan and goals</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2 max-md:hidden">
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/phase-plan">Phase plan</Link>
-          </Button>
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/transactions">
-              <ReceiptText className="mr-1.5 size-3.5" />
-              Transactions
-            </Link>
-          </Button>
+    <div
+      className={cn(
+        patterns.pageFluid,
+        'flex flex-col gap-5 pb-8',
+        'max-lg:min-h-0 max-lg:flex-1 max-lg:gap-0 max-lg:overflow-hidden max-lg:pb-0',
+      )}
+    >
+      {/* Mobile dashboard header — replaces global top bar on this route */}
+      <div className="safe-top shrink-0 -mx-4 flex items-start justify-between gap-2 px-4 pt-2 lg:hidden">
+        <PageMandate
+          className="min-w-0 flex-1"
+          title={adherence.monthLabel}
+          mandate="This month at a glance — pulse, search, and shortcuts."
+          metrics={[
+            {
+              label: 'Net flow',
+              value: `${displayNetFlow >= 0 ? '+' : ''}${formatRupees(displayNetFlow)}`,
+              tone: displayNetFlow >= 0 ? 'success' : 'danger',
+            },
+            {
+              label: 'Spent / plan',
+              value: `${Math.round(spendingContext.spentOfPlanPercent)}%`,
+              tone: spendingContext.spentOfPlanPercent > 100 ? 'danger' : 'default',
+            },
+            ...(safeToSpend
+              ? [{
+                  label: 'Safe to spend',
+                  value: formatDisciplineCurrency(safeToSpend.safeToSpend),
+                }]
+              : upcomingSoonDeadlines.length > 0
+                ? [{
+                    label: 'Due soon',
+                    value: String(upcomingSoonDeadlines.length),
+                    href: '/plans?tab=deadlines',
+                  }]
+                : mobileAlerts.length > 0
+                  ? [{
+                      label: 'Alert',
+                      value: mobileAlerts[0]!.length > 24 ? `${mobileAlerts[0]!.slice(0, 24)}…` : mobileAlerts[0]!,
+                      tone: 'warning' as const,
+                    }]
+                  : []),
+          ]}
+        />
+        <div className="flex shrink-0 flex-col items-center gap-1 pt-0.5">
+          <button
+            type="button"
+            onClick={() => setTheme(isDarkMode ? 'light' : 'dark')}
+            className="btn-touch flex size-9 items-center justify-center rounded-full border border-border/60 text-muted hover:bg-surface hover:text-foreground"
+            aria-label="Toggle theme"
+            suppressHydrationWarning
+          >
+            {isDarkMode ? <Moon className="size-4" /> : <Sun className="size-4" />}
+          </button>
+          <Link
+            href="/settings"
+            className="btn-touch flex size-9 items-center justify-center rounded-full border border-border/60 text-muted hover:bg-surface hover:text-foreground"
+            aria-label="Settings"
+          >
+            <Settings className="size-4" />
+          </Link>
         </div>
       </div>
 
-      <MobileHeroMetric
-        label="Net flow"
-        value={`${netFlow >= 0 ? '+' : ''}${formatRupees(netFlow)}`}
-        tone={netFlow >= 0 ? 'success' : 'danger'}
-        subtitle={
-          <span>
-            Income {formatRupees(income)} · Spent {formatRupees(expenses)}
-          </span>
-        }
-        footer={
-          <div>
-            <div className="mb-1 flex items-center justify-between text-[10px] text-muted">
-              <span>Plan adherence {combinedPlanScore}%</span>
-              <span>
-                {adherence.activeGoals > 0
-                  ? `${adherence.goalsOnTrack}/${adherence.activeGoals} goals on track`
-                  : 'No goals set'}
-              </span>
-            </div>
-            <Progress value={combinedPlanScore} className="h-1.5" />
-          </div>
-        }
+      <PageMandate
+        className="max-lg:hidden"
+        title={adherence.monthLabel}
+        mandate="This month at a glance — live transactions vs your phase plan and goals."
+        metrics={[
+          {
+            label: 'Net flow',
+            value: `${displayNetFlow >= 0 ? '+' : ''}${formatRupees(displayNetFlow)}`,
+            tone: displayNetFlow >= 0 ? 'success' : 'danger',
+          },
+          {
+            label: 'Plan adherence',
+            value: `${combinedPlanScore}%`,
+          },
+          ...(safeToSpend
+            ? [{ label: 'Safe to spend', value: formatDisciplineCurrency(safeToSpend.safeToSpend) }]
+            : []),
+        ]}
       />
 
-      <div className="hidden grid-cols-2 gap-3 sm:grid-cols-2 md:grid lg:grid-cols-4">
-        <div className="card-base card-compact p-4 sm:p-4">
-          <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-hint">Income</p>
-          <p className="mt-2 flex items-center gap-1.5 text-lg font-semibold tabular-nums text-[var(--success)] sm:text-xl">
-            <TrendingUp className="size-4" />
-            {formatRupees(income)}
-          </p>
-          {incomeBreakdown && incomeBreakdown.total > 0 && (
-            <p className="mt-1 hidden text-[10px] text-muted md:block">
-              Salary {formatRupees(incomeBreakdown.salary)}
-              {incomeBreakdown.family > 0 ? ` · Family ${formatRupees(incomeBreakdown.family)}` : ''}
-              {incomeBreakdown.other > 0 ? ` · Other ${formatRupees(incomeBreakdown.other)}` : ''}
-            </p>
-          )}
-        </div>
-        <div className="card-base p-4">
-          <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-hint">Spent</p>
-          <p className="mt-2 flex items-center gap-1.5 text-lg font-semibold tabular-nums text-[var(--danger)] sm:text-xl">
-            <TrendingDown className="size-4" />
-            {formatRupees(expenses)}
-          </p>
-        </div>
-        <div className="card-base p-4">
-          <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-hint">Net flow</p>
-          <p
-            className={cn(
-              'mt-2 flex items-center gap-1.5 text-lg font-semibold tabular-nums sm:text-xl',
-              netFlow >= 0 ? 'text-[var(--success)]' : 'text-[var(--danger)]',
-            )}
-          >
-            <Wallet className="size-4" />
-            {netFlow >= 0 ? '+' : ''}
-            {formatRupees(netFlow)}
-          </p>
-        </div>
-        <div className="card-base p-4">
-          <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-hint">Plan adherence</p>
-          <p className="mt-2 text-lg font-semibold tabular-nums text-foreground sm:text-xl">{combinedPlanScore}%</p>
-          <Progress value={combinedPlanScore} className="mt-2 h-1.5" />
-          <p className="mt-1 hidden text-[10px] text-muted md:block">
-            Budget {adherence.overallScore}% · Goals{' '}
-            {adherence.activeGoals > 0
-              ? `${adherence.goalsOnTrack}/${adherence.activeGoals} on track`
-              : 'none set'}
-          </p>
-        </div>
-      </div>
+      <DashboardSegmentedNav
+        active={mobileView}
+        onChange={setMobileView}
+        className="shrink-0 -mx-4 px-4 lg:hidden"
+      />
 
-      {mobileAlerts.length > 0 && (
-        <div className="card-base hidden border-[var(--warning)]/30 bg-[var(--warning)]/5 p-4 max-md:p-3 md:block">
-          <div className="mb-2 flex items-center gap-2 text-sm font-medium text-foreground">
-            <AlertCircle className="size-4 text-[var(--warning)]" />
-            Needs attention
-          </div>
-          <ul className="space-y-1 text-xs text-muted">
-            {mobileAlerts.map((alert) => (
-              <li key={alert}>{alert}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      <NavPillGroup className="w-full justify-start md:hidden">
-        {(
-          [
-            ['summary', 'Summary'],
-            ['plan', 'Plan'],
-            ['activity', 'Activity'],
-          ] as const
-        ).map(([view, label]) => (
-          <NavPill key={view} label={label} active={mobileView === view} onClick={() => setMobileView(view)} />
-        ))}
-      </NavPillGroup>
-
-      <div className="space-y-3 md:hidden">
-        {mobileView === 'summary' && (
-          <>
-            {mobileAlerts.length > 0 && (
-              <div className="card-base border-[var(--warning)]/30 bg-[var(--warning)]/5 p-3">
-                <div className="mb-2 flex items-center gap-2 text-sm font-medium text-foreground">
-                  <AlertCircle className="size-4 text-[var(--warning)]" />
-                  Needs attention
-                </div>
-                <ul className="space-y-1 text-xs text-muted">
-                  {mobileAlerts.map((alert) => (
-                    <li key={alert}>{alert}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {contextBanner && <InsightBanner message={contextBanner.message} tone={contextBanner.tone} />}
-
-            {stats.dynamicInsights.length > 0 && (
-              <section className="card-base space-y-2 p-3">
-                <h2 className="text-[10px] font-medium uppercase tracking-[0.08em] text-hint">Insights</h2>
-                <ul className="space-y-1.5">
-                  {stats.dynamicInsights.slice(0, 2).map((insight) => (
-                    <li
-                      key={insight.message}
-                      className={cn(
-                        'text-xs leading-relaxed',
-                        insight.type === 'warning' && 'text-[var(--warning)]',
-                        insight.type === 'positive' && 'text-[var(--success)]',
-                        insight.type === 'pattern' && 'text-muted',
-                      )}
-                    >
-                      {insight.message}
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            )}
-
-            {stats.salaryInfo && (
-              <div className="card-base flex flex-col gap-3 p-3">
-                <div className="flex min-w-0 items-start gap-2 text-sm text-foreground">
-                  <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-[var(--success)]" />
-                  <span>
-                    Salary: {stats.salaryInfo.jobTitle} · {stats.salaryInfo.company} · take-home{' '}
-                    {formatRupees(stats.salaryInfo.takeHome)}/mo
-                  </span>
-                </div>
-                <Button variant="ghost" size="sm" className="h-7 w-full text-xs" asChild>
-                  <Link href="/salary">Manage salary</Link>
-                </Button>
-              </div>
-            )}
-
-            <div className="grid grid-cols-3 gap-2">
-              <div className="card-base p-2.5">
-                <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-hint">Spent</p>
-                <p className="mt-1 text-sm font-semibold tabular-nums text-[var(--danger)]">{formatRupees(expenses)}</p>
-                <p className="mt-0.5 text-[10px] text-muted">of {formatRupees(adherence.plannedTotal)} plan</p>
-              </div>
-              <div className="card-base p-2.5">
-                <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-hint">Avg/day</p>
-                <p className="mt-1 text-sm font-semibold tabular-nums">{formatRupees(spendingContext.avgDailySpend)}</p>
-                <p className="mt-0.5 text-[10px] text-muted">plan {formatRupees(spendingContext.planDailyBurn)}</p>
-              </div>
-              <div className="card-base p-2.5">
-                <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-hint">Adherence</p>
-                <p className="mt-1 text-sm font-semibold tabular-nums">{combinedPlanScore}%</p>
-                <p className="mt-0.5 text-[10px] text-muted">{Math.round(spendingContext.spentOfPlanPercent)}% of plan</p>
-              </div>
-            </div>
-
-            {(segmentSplit.needs + segmentSplit.wants + segmentSplit.savings) > 0 && (
-              <section className="card-base p-3">
-                <h2 className="mb-2 text-[10px] font-medium uppercase tracking-[0.08em] text-hint">
-                  Needs · Wants · Savings
-                </h2>
-                <SegmentSplitBar split={segmentSplit} />
-              </section>
-            )}
-
-            {topCategories.length > 0 && (
-              <section className="card-base p-3">
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <h2 className="text-[10px] font-medium uppercase tracking-[0.08em] text-hint">Where money went</h2>
-                  <Button variant="ghost" size="sm" className="h-7 text-xs" asChild>
-                    <Link href="/transactions">View txns</Link>
-                  </Button>
-                </div>
-                <CategoryLegend items={topCategories} />
-              </section>
-            )}
-
-            {summaryBudgetBuckets.length > 0 && (
-              <section className="card-base p-3">
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <h2 className="text-[10px] font-medium uppercase tracking-[0.08em] text-hint">Budget vs actual</h2>
-                  <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setMobileView('plan')}>
-                    Full breakdown
-                  </Button>
-                </div>
-                <div className="space-y-2">
-                  {summaryBudgetBuckets.map((bucket) => (
-                    <BudgetProgressRow
-                      key={bucket.key}
-                      bucket={bucket}
-                      href={`/transactions?lineItem=${encodeURIComponent(bucket.label)}`}
-                    />
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {summaryGoals.length > 0 && (
-              <section className="card-base p-3">
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <h2 className="text-[10px] font-medium uppercase tracking-[0.08em] text-hint">Goals</h2>
-                  <Button variant="ghost" size="sm" className="h-7 text-xs" asChild>
-                    <Link href="/plans?tab=goals">View all</Link>
-                  </Button>
-                </div>
-                <div className="space-y-2">
-                  {summaryGoals.map((goal) => (
-                    <Link
-                      key={goal.id}
-                      href="/plans?tab=goals"
-                      className="flex items-center gap-3 rounded-md border border-border bg-surface/40 p-2.5 transition-colors active:bg-muted/40"
-                    >
-                      <div className="relative flex size-9 shrink-0 items-center justify-center">
-                        <svg viewBox="0 0 36 36" className="size-9 -rotate-90">
-                          <circle cx="18" cy="18" r="14" fill="none" stroke="var(--border)" strokeWidth="3" />
-                          <circle
-                            cx="18"
-                            cy="18"
-                            r="14"
-                            fill="none"
-                            stroke="var(--warning)"
-                            strokeWidth="3"
-                            strokeDasharray={`${(goal.progressPercent / 100) * 88} 88`}
-                            strokeLinecap="round"
-                          />
-                        </svg>
-                        <span className="absolute text-[9px] font-medium tabular-nums">{goal.progressPercent}%</span>
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-xs font-medium text-foreground">{goal.name}</p>
-                        <p className="text-[10px] text-muted">
-                          {formatRupees(goal.currentAmount)} / {formatRupees(goal.targetAmount)}
-                        </p>
-                      </div>
-                      <Chip variant={goalStatusVariant(goal.status)} className="shrink-0 text-[10px]">
-                        {goalStatusLabel(goal.status)}
-                      </Chip>
-                    </Link>
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {upcomingSoonDeadlines.length > 0 && (
-              <section className="card-base overflow-hidden p-3">
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <AlarmClock className="size-4 text-info" />
-                    <h2 className="text-sm font-medium text-foreground">Due in 3 days</h2>
-                  </div>
-                  <Button variant="ghost" size="sm" className="h-7 text-xs" asChild>
-                    <Link href="/plans?tab=deadlines">
-                      View all
-                      <ArrowRight className="ml-1 size-3" />
-                    </Link>
-                  </Button>
-                </div>
-                <div className="-mx-1 divide-y divide-border">
-                  {upcomingSoonDeadlines.map((deadline) => (
-                    <Link key={`${deadline.title}-${deadline.dueDate}`} href="/plans?tab=deadlines">
-                      <CompactListRow
-                        icon={<AlarmClock className="size-4 text-muted" />}
-                        title={deadline.title}
-                        subtitle={format(new Date(deadline.dueDate), 'd MMM yyyy')}
-                        trailing={
-                          <div className="text-right">
-                            {deadline.amount ? (
-                              <p className="text-xs font-medium tabular-nums text-foreground">
-                                {formatRupees(deadline.amount)}
-                              </p>
-                            ) : null}
-                            <span className="text-[10px] font-medium text-info">{deadlineDueLabel(deadline.dueDate)}</span>
-                          </div>
-                        }
-                      />
-                    </Link>
-                  ))}
-                </div>
-              </section>
-            )}
-          </>
-        )}
-
-        {mobileView === 'plan' && (
+      {/* Mobile tab panels — fill remaining viewport above bottom nav */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden pb-bottom-bar lg:hidden">
+        {mobileView === 'plans' ? (
           <PlanVsActualSection
+            className="flex min-h-0 flex-1 flex-col"
+            fillHeight
             buckets={adherence.buckets}
             lineItems={adherence.lineItems}
             plannedTotal={adherence.plannedTotal}
             actualTotal={adherence.actualTotal}
-            monthlyIncome={monthlyIncome}
+            salaryReceived={salaryReceived}
             planBaseIncome={planBaseIncome}
             planIncomeSource={adherence.planIncomeSource}
+            planIncomeContext={planIncomeContext}
             incomeBreakdown={incomeBreakdown}
+            budgetPlanName={adherence.budgetPlanName}
           />
+        ) : (
+          <div className="custom-scrollbar scroll-pb-bottom-bar flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain">
+        {mobileView === 'overview' && (
+          <div className="space-y-3">
+            <DashboardSearchBar />
+            <DashboardRecentActivity transactions={overviewRecentTransactions} />
+            <DashboardQuickActionGrid />
+            <DashboardExploreGrid />
+          </div>
         )}
 
         {mobileView === 'activity' && (
-          <>
+          <div className="space-y-3">
             <section className="card-base shrink-0 p-3">
               <div className="mb-3 flex items-center justify-between gap-2">
                 <div>
@@ -502,7 +331,9 @@ export default function DashboardPage({ data }: DashboardPageProps) {
                 <p className="text-xs text-muted">No active goals yet. Add goals on the Plans page.</p>
               ) : (
                 <div className="space-y-3">
-                  {mobileGoals.map((goal) => (
+                  {mobileGoals.map((goal) => {
+                    const goalDiscipline = disciplineSummary?.goals.find((g) => g.goalId === goal.id);
+                    return (
                     <div key={goal.id} className="rounded-md border border-border bg-surface/40 p-3">
                       <div className="mb-1.5 flex items-start justify-between gap-2">
                         <div className="min-w-0">
@@ -510,6 +341,14 @@ export default function DashboardPage({ data }: DashboardPageProps) {
                           <p className="text-[10px] text-muted">
                             {formatRupees(goal.currentAmount)} of {formatRupees(goal.targetAmount)}
                           </p>
+                          {goalDiscipline?.monthlyRequired != null && (
+                            <p className="mt-0.5 text-[10px] text-muted">
+                              Need {formatDisciplineCurrency(goalDiscipline.monthlyRequired)}/mo
+                              {disciplineSummary && (
+                                <> · {formatDisciplineCurrency(disciplineSummary.capacity.available)} capacity</>
+                              )}
+                            </p>
+                          )}
                         </div>
                         <Chip variant={goalStatusVariant(goal.status)} className="shrink-0 text-[10px]">
                           {goalStatusLabel(goal.status)}
@@ -517,62 +356,157 @@ export default function DashboardPage({ data }: DashboardPageProps) {
                       </div>
                       <Progress value={goal.progressPercent} className="h-1.5" />
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </section>
 
-            <section className="card-base p-3">
-              <div className="mb-3 flex items-center justify-between gap-2">
-                <div>
-                  <h2 className="text-sm font-medium text-foreground">Recent activity</h2>
-                  <p className="text-[10px] text-muted">Latest transactions this month</p>
+            {topCategories.length > 0 && (
+              <section className="card-base p-3">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <h2 className="text-[10px] font-medium uppercase tracking-[0.08em] text-hint">Where money went</h2>
+                  <Button variant="ghost" size="sm" className="h-7 text-xs" asChild>
+                    <Link href="/transactions">View txns</Link>
+                  </Button>
                 </div>
-                <Target className="size-4 text-hint" />
-              </div>
-              {recentTransactions.length === 0 ? (
-                <p className="text-xs text-muted">No transactions this month.</p>
-              ) : (
-                <ul className="divide-y divide-border">
-                  {recentTransactions.map((tx) => {
-                    const isIncome = tx.amount > 0;
-                    const displayName =
-                      getTransactionDisplayName({
-                        description: tx.description ?? undefined,
-                        store: tx.store,
-                        personName: tx.personName,
-                      }) || tx.title;
-                    return (
-                      <li key={tx.id} className="flex items-center justify-between gap-3 py-2.5">
-                        <div className="min-w-0">
-                          <p className="truncate text-xs font-medium text-foreground">{displayName}</p>
-                          <div className="mt-0.5 flex items-center gap-2 text-[10px] text-muted">
-                            <span>{format(new Date(tx.date), 'd MMM')}</span>
-                            <Chip variant="neutral" className="px-1 py-0 text-[10px]">
-                              {tx.category}
-                            </Chip>
-                          </div>
-                        </div>
-                        <span
-                          className={cn(
-                            'shrink-0 text-xs font-medium tabular-nums',
-                            isIncome ? 'text-[var(--success)]' : 'text-[var(--danger)]',
-                          )}
-                        >
-                          {isIncome ? '+' : ''}
-                          {formatRupees(Math.abs(tx.amount))}
-                        </span>
-                      </li>
-                    );
-                  })}
+                <CategoryLegend items={topCategories} />
+              </section>
+            )}
+
+            {(segmentSplit.needs + segmentSplit.wants + segmentSplit.savings) > 0 && (
+              <section className="card-base p-3">
+                <h2 className="mb-2 text-[10px] font-medium uppercase tracking-[0.08em] text-hint">
+                  Needs · Wants · Savings
+                </h2>
+                <SegmentSplitBar split={segmentSplit} />
+              </section>
+            )}
+
+            {(stats.monthlyTrends?.length ?? 0) > 0 && (
+              <section className="card-base p-3">
+                <h2 className="mb-2 text-sm font-medium text-foreground">6-month spend trend</h2>
+                <ul className="space-y-1.5 text-xs">
+                  {(stats.monthlyTrends ?? []).slice(-6).map((t) => (
+                    <li key={t.month} className="flex justify-between tabular-nums text-muted">
+                      <span>{t.month}</span>
+                      <span>
+                        {formatRupees(t.expenses)} spent · {formatRupees(t.income)} in
+                      </span>
+                    </li>
+                  ))}
                 </ul>
-              )}
-              <Button variant="outline" size="sm" className="mt-3 w-full" asChild>
-                <Link href="/transactions">View all transactions</Link>
-              </Button>
-            </section>
-          </>
+              </section>
+            )}
+
+            {(stats.topPayees?.length ?? 0) > 0 && (
+              <section className="card-base p-3">
+                <h2 className="mb-2 text-sm font-medium text-foreground">Top payees</h2>
+                <ul className="space-y-1.5 text-xs">
+                  {(stats.topPayees ?? []).slice(0, 5).map((payee) => (
+                    <li key={payee.name} className="flex justify-between gap-2">
+                      <Link
+                        href={`/transactions?search=${encodeURIComponent(payee.name)}`}
+                        className="truncate text-foreground hover:underline"
+                      >
+                        {payee.name}
+                      </Link>
+                      <span className="shrink-0 tabular-nums text-muted">
+                        {formatRupees(payee.amount)} · {payee.count}x
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+
+          </div>
         )}
+          </div>
+        )}
+      </div>
+
+      {/* Desktop summary */}
+      <div className="hidden space-y-3 lg:block">
+      <MobileHeroMetric
+        label={hasSettlementAdjustment ? 'Net flow (after settlements)' : 'Net flow'}
+        value={`${displayNetFlow >= 0 ? '+' : ''}${formatRupees(displayNetFlow)}`}
+        tone={displayNetFlow >= 0 ? 'success' : 'danger'}
+        subtitle={
+          <span>
+            Income {formatRupees(income)} · Spent {formatRupees(expenses)}
+            {hasSettlementAdjustment && (
+              <> · Before settlements {netFlow >= 0 ? '+' : ''}{formatRupees(netFlow)}</>
+            )}
+            {safeToSpend && (
+              <> · Fundable {formatDisciplineCurrency(safeToSpend.safeToSpend)}</>
+            )}
+          </span>
+        }
+        footer={
+          <div>
+            <div className="mb-1 flex items-center justify-between text-[10px] text-muted">
+              <span>Plan adherence {combinedPlanScore}%</span>
+              <span>
+                {adherence.activeGoals > 0
+                  ? `${adherence.goalsOnTrack}/${adherence.activeGoals} goals on track`
+                  : 'No goals set'}
+              </span>
+            </div>
+            <Progress value={combinedPlanScore} className="h-1.5" />
+          </div>
+        }
+      />
+
+      <div className="hidden grid-cols-2 gap-3 sm:grid-cols-2 md:grid lg:grid-cols-5">
+        <AccountBalanceChip balance={accountBalance} variant="kpi" className="col-span-2 sm:col-span-1" />
+        <div className="col-span-2 lg:col-span-3">
+          <MonthAtGlanceKpis
+            income={income}
+            expenses={expenses}
+            netFlow={netFlow}
+            displayNetFlow={displayNetFlow}
+            hasSettlementAdjustment={hasSettlementAdjustment}
+          />
+          {incomeBreakdown && incomeBreakdown.total > 0 && (
+            <p className="mt-1 hidden text-[10px] text-muted md:block">
+              Salary {formatRupees(incomeBreakdown.salary)}
+              {incomeBreakdown.family > 0 ? ` · Family ${formatRupees(incomeBreakdown.family)}` : ''}
+              {incomeBreakdown.other > 0 ? ` · Other ${formatRupees(incomeBreakdown.other)}` : ''}
+            </p>
+          )}
+          {hasSettlementAdjustment && (
+            <p className="mt-1 text-[10px] text-muted">
+              Before settlements {netFlow >= 0 ? '+' : ''}{formatRupees(netFlow)}
+            </p>
+          )}
+        </div>
+        <div className="card-base p-4">
+          <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-hint">Plan adherence</p>
+          <p className="mt-2 text-lg font-semibold tabular-nums text-foreground sm:text-xl">{combinedPlanScore}%</p>
+          <Progress value={combinedPlanScore} className="mt-2 h-1.5" />
+          <p className="mt-1 hidden text-[10px] text-muted md:block">
+            Budget {adherence.overallScore}% · Goals{' '}
+            {adherence.activeGoals > 0
+              ? `${adherence.goalsOnTrack}/${adherence.activeGoals} on track`
+              : 'none set'}
+          </p>
+        </div>
+      </div>
+
+      {mobileAlerts.length > 0 && (
+        <div className="card-base border-[var(--warning)]/30 bg-[var(--warning)]/5 p-4">
+          <div className="mb-2 flex items-center gap-2 text-sm font-medium text-foreground">
+            <AlertCircle className="size-4 text-[var(--warning)]" />
+            Needs attention
+          </div>
+          <ul className="space-y-1 text-xs text-muted">
+            {mobileAlerts.map((alert) => (
+              <li key={alert}>{alert}</li>
+            ))}
+          </ul>
+        </div>
+      )}
       </div>
 
       <div className="hidden min-h-0 grid-cols-1 gap-4 md:grid md:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)] md:items-start">
@@ -583,15 +517,17 @@ export default function DashboardPage({ data }: DashboardPageProps) {
           plannedTotal={adherence.plannedTotal}
           actualTotal={adherence.actualTotal}
           maxHeight={isMdUp ? recentActivityHeight : undefined}
-          monthlyIncome={monthlyIncome}
+          salaryReceived={salaryReceived}
           planBaseIncome={planBaseIncome}
           planIncomeSource={adherence.planIncomeSource}
+          planIncomeContext={planIncomeContext}
           incomeBreakdown={incomeBreakdown}
+          budgetPlanName={adherence.budgetPlanName}
         />
         </div>
 
         <div className="flex flex-col gap-4">
-          <section className="card-base shrink-0 p-4 max-md:p-3">
+          <section className="card-base shrink-0 p-4 max-lg:p-3">
             <div className="mb-3 flex items-center justify-between gap-2">
               <div>
                 <h2 className="text-sm font-medium text-foreground">Goals tracker</h2>
@@ -633,7 +569,7 @@ export default function DashboardPage({ data }: DashboardPageProps) {
 
           <section
             ref={recentActivityRef}
-            className="card-base p-4 max-md:p-3"
+            className="card-base p-4 max-lg:p-3"
           >
             <div className="mb-3 flex items-center justify-between gap-2">
               <div>
@@ -700,6 +636,7 @@ export default function DashboardPage({ data }: DashboardPageProps) {
           </Button>
         </div>
       )}
+
     </div>
   );
 }

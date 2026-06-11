@@ -41,7 +41,7 @@ export function ResponsiveSheet({
   contentClassName,
   showGrabber = true,
 }: ResponsiveSheetProps) {
-  const isMobile = useIsMobile('md');
+  const isMobile = useIsMobile('lg');
   const side: SheetSide = isMobile ? 'bottom' : desktopSide;
 
   return (

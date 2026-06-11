@@ -1,7 +1,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { readFile } from 'fs/promises';
 
-const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY || 'AIzaSyBXldcBbMnOvvLISw84bdbGDuo6OJn6STs';
+const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
 
 if (!GOOGLE_API_KEY) {
   throw new Error('GOOGLE_API_KEY is not set in environment variables');
@@ -84,7 +84,6 @@ export async function searchDocuments(
     try {
       model = genAI.getGenerativeModel({ model: 'gemma-3-27b-it' });
     } catch {
-      console.log('Falling back to gemini-1.5-flash for document search');
       model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
     }
 
@@ -152,7 +151,6 @@ Only include documents with relevance score > 0.3.`;
 
     // If it's a 503 or overloaded error after retries, fallback to keyword search
     if (errorMessage.includes('503') || errorMessage.includes('overloaded')) {
-      console.log('Falling back to keyword-based search due to API overload');
     }
 
     // Fallback to simple keyword search
@@ -265,7 +263,6 @@ export async function retryWithBackoff<T>(
       const jitter = Math.random() * 0.3 * baseDelay; // Add up to 30% jitter
       const delay = Math.floor(baseDelay + jitter);
 
-      console.log(`Retry attempt ${attempt + 1}/${maxRetries} after ${delay}ms delay (error: ${errorMessage.substring(0, 100)})`);
       await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
@@ -282,6 +279,8 @@ export async function generateResponse(
     financialSummary?: string;
     relevantDocuments?: Array<{ id: string; title: string; content: string }>;
     conversationHistory?: Array<{ role: 'user' | 'assistant'; content: string }>;
+    systemPreamble?: string;
+    intent?: string;
     filterContext?: {
       searchTerm?: string;
       dateRange?: { startDate?: Date; endDate?: Date };
@@ -312,7 +311,14 @@ export async function generateResponse(
           },
         });
 
-        const systemPrompt = `You are a knowledgeable financial advisor specializing in Indian personal finance, tax planning, investments, and financial management. 
+        const guardrails = context.systemPreamble ?? '';
+        const intentHint = context.intent
+          ? `\nUser intent classification: ${context.intent}. Stay within budgeting/planning scope.`
+          : '';
+
+        const systemPrompt = `${guardrails}${intentHint}
+
+You are a knowledgeable financial advisor specializing in Indian personal finance, tax planning, and financial management. 
 
 Your role is to:
 1. Provide accurate, practical financial advice tailored to Indian financial systems
@@ -500,7 +506,6 @@ Always prioritize information from provided documents and the user's actual tran
       });
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
-      console.log(`Model ${modelName} failed:`, lastError.message);
 
       // AI OPTIMIZATION: FAIL FAST if it's a quota error
       if (isGeminiQuotaExceeded(error)) {
@@ -597,7 +602,6 @@ Focus on official sources like:
 
     // If API is overloaded, return fallback sources instead of empty array
     if (errorMessage.includes('503') || errorMessage.includes('overloaded')) {
-      console.log('API overloaded, returning fallback internet sources');
       return [
         {
           title: 'Income Tax Department - India',
@@ -699,7 +703,6 @@ export async function generateImage(prompt: string): Promise<string | null> {
 
     // Check if quota is exceeded before trying
     if (globalGeminiQuotaExceeded) {
-      console.log('Skipping image generation due to quota limits');
       return null;
     }
 

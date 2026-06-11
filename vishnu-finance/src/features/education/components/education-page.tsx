@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   BookOpen,
   Search,
@@ -26,6 +26,7 @@ import { patterns } from '@/design/patterns';
 import { getSentimentChipVariant } from '@/design/tokens';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
+import { useMobileRefreshRegister } from '@/contexts/MobileRefreshContext';
 
 interface Post {
   id: string;
@@ -58,15 +59,7 @@ export default function EducationPage() {
   const [news, setNews] = useState<DailyNews | null>(null);
   const [newsLoading, setNewsLoading] = useState(true);
 
-  useEffect(() => {
-    fetchPosts();
-  }, [activeCategory]);
-
-  useEffect(() => {
-    fetchDailyNews();
-  }, []);
-
-  const fetchDailyNews = async (force: boolean = false) => {
+  const fetchDailyNews = useCallback(async (force: boolean = false) => {
     try {
       setNewsLoading(true);
       const url = new URL('/api/education/daily-news', window.location.origin);
@@ -82,9 +75,9 @@ export default function EducationPage() {
     } finally {
       setNewsLoading(false);
     }
-  };
+  }, []);
 
-  const fetchPosts = async () => {
+  const fetchPosts = useCallback(async () => {
     setLoading(true);
     try {
       const url = new URL('/api/education/posts', window.location.origin);
@@ -99,7 +92,21 @@ export default function EducationPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeCategory, search]);
+
+  useEffect(() => {
+    void fetchPosts();
+  }, [fetchPosts]);
+
+  useEffect(() => {
+    void fetchDailyNews();
+  }, [fetchDailyNews]);
+
+  useMobileRefreshRegister(
+    useCallback(async () => {
+      await Promise.all([fetchDailyNews(), fetchPosts()]);
+    }, [fetchDailyNews, fetchPosts])
+  );
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -110,7 +117,7 @@ export default function EducationPage() {
 
   return (
     <div className="flex h-full flex-col text-muted">
-      <main className="space-y-6 overflow-y-auto pb-24 custom-scrollbar">
+      <main className="space-y-6 overflow-y-auto custom-scrollbar scroll-pb-bottom-bar">
         <Card className="card-base relative overflow-hidden p-5 md:p-6">
           <div className="pointer-events-none absolute right-0 top-0 hidden p-8 opacity-[0.06] md:block">
             <Globe className="size-48 rotate-12" />
@@ -186,18 +193,21 @@ export default function EducationPage() {
           tag="Financial Education"
           title="Master your financial future"
           subtitle="Guides and insights to help you build lasting wealth."
+          className="hidden lg:block"
         />
 
-        <NavPillGroup>
-          {CATEGORIES.map((cat) => (
-            <NavPill
-              key={cat}
-              label={cat}
-              active={activeCategory === cat}
-              onClick={() => setActiveCategory(cat)}
-            />
-          ))}
-        </NavPillGroup>
+        <div className="sticky top-[calc(3rem+env(safe-area-inset-top))] z-20 -mx-1 py-2 lg:static lg:py-0">
+          <NavPillGroup className="overflow-x-auto">
+            {CATEGORIES.map((cat) => (
+              <NavPill
+                key={cat}
+                label={cat}
+                active={activeCategory === cat}
+                onClick={() => setActiveCategory(cat)}
+              />
+            ))}
+          </NavPillGroup>
+        </div>
 
         {loading ? (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">

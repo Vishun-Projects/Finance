@@ -265,7 +265,6 @@ export async function clearAllCache(): Promise<void> {
     for (const file of files) {
       await fs.unlink(path.join(CACHE_DIR, file)).catch(() => { });
     }
-    console.log('✅ All API cache cleared');
   } catch (e) {
     console.error('Error clearing all cache', e);
   }

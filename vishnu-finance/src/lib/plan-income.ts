@@ -1,12 +1,34 @@
 import { DATA } from '@/features/money-plan/data/money-plan';
 import type { BreakdownCategory, BreakdownItem, MoneyPlanData } from '@/features/money-plan/data/money-plan';
+import {
+  getCurrentMonthRange,
+  getPreviousMonthRange,
+  parseLocalDateEnd,
+  parseLocalDateStart,
+} from '@/lib/date-range';
+import { computeSalaryCredits } from '@/lib/income-breakdown';
 import { prisma } from '@/lib/db';
 
-export type PlanIncomeSource = 'salary_structure' | 'transaction_salary' | 'default';
+export type PlanIncomeSource =
+  | 'salary_structure'
+  | 'last_month_salary'
+  | 'transaction_salary'
+  | 'default';
 
 export interface ResolvedPlanIncome {
   baseIncome: number;
   source: PlanIncomeSource;
+}
+
+export interface PlanIncomeContext {
+  /** Scales phase-plan breakdown (active salary → last month received → this month → default). */
+  planScale: ResolvedPlanIncome;
+  activeSalaryTakeHome: number | null;
+  currentMonthSalaryReceived: number;
+  lastMonthSalaryReceived: number;
+  /** Salary credits used for fundable capacity (this month, else last month). */
+  receivedSalaryAnchor: number;
+  receivedSalarySource: 'current_month' | 'last_month' | 'none';
 }
 
 export const REFERENCE_SALARY = DATA.salary;
@@ -18,11 +40,17 @@ export function scalePlanAmount(referenceAmount: number, baseIncome: number): nu
 
 export function resolvePlanBaseIncome(options: {
   salaryTakeHome?: number | null;
+  lastMonthSalary?: number | null;
   transactionSalary?: number | null;
 }): ResolvedPlanIncome {
   const takeHome = Number(options.salaryTakeHome) || 0;
   if (takeHome > 0) {
     return { baseIncome: takeHome, source: 'salary_structure' };
+  }
+
+  const lastMonthSalary = Number(options.lastMonthSalary) || 0;
+  if (lastMonthSalary > 0) {
+    return { baseIncome: lastMonthSalary, source: 'last_month_salary' };
   }
 
   const transactionSalary = Number(options.transactionSalary) || 0;
@@ -31,6 +59,19 @@ export function resolvePlanBaseIncome(options: {
   }
 
   return { baseIncome: REFERENCE_SALARY, source: 'default' };
+}
+
+export function planIncomeSourceLabel(source: PlanIncomeSource): string {
+  if (source === 'salary_structure') return 'active salary structure';
+  if (source === 'last_month_salary') return 'salary received last month';
+  if (source === 'transaction_salary') return 'salary credits this month';
+  return 'default plan baseline';
+}
+
+export function receivedSalarySourceLabel(source: PlanIncomeContext['receivedSalarySource']): string {
+  if (source === 'current_month') return 'credited this month';
+  if (source === 'last_month') return 'credited last month';
+  return 'none yet';
 }
 
 export function buildScaledPlanAmounts(baseIncome: number): {
@@ -52,17 +93,14 @@ export function buildScaledPlanAmounts(baseIncome: number): {
   return { lineItemPlanned, bucketPlanned, plannedTotal };
 }
 
-export function planIncomeSourceLabel(source: PlanIncomeSource): string {
-  if (source === 'salary_structure') return 'salary structure';
-  if (source === 'transaction_salary') return 'salary credits this month';
-  return 'default plan baseline';
-}
-
 export interface ScaledMoneyPlanView {
   baseIncome: number;
   source: PlanIncomeSource;
   referenceSalary: number;
   salary: number;
+  activeSalaryTakeHome: number | null;
+  currentMonthSalaryReceived: number;
+  lastMonthSalaryReceived: number;
   age: number;
   parents: MoneyPlanData['parents'];
   budget: MoneyPlanData['budget'];
@@ -91,6 +129,10 @@ export interface ScaledMoneyPlanView {
 export function buildScaledMoneyPlanView(
   baseIncome: number,
   source: PlanIncomeSource = 'default',
+  received?: Pick<
+    PlanIncomeContext,
+    'activeSalaryTakeHome' | 'currentMonthSalaryReceived' | 'lastMonthSalaryReceived'
+  >,
 ): ScaledMoneyPlanView {
   const scale = (amount: number) => scalePlanAmount(amount, baseIncome);
   const scaled = buildScaledPlanAmounts(baseIncome);
@@ -119,6 +161,9 @@ export function buildScaledMoneyPlanView(
     source,
     referenceSalary: REFERENCE_SALARY,
     salary: baseIncome,
+    activeSalaryTakeHome: received?.activeSalaryTakeHome ?? null,
+    currentMonthSalaryReceived: received?.currentMonthSalaryReceived ?? 0,
+    lastMonthSalaryReceived: received?.lastMonthSalaryReceived ?? 0,
     age: DATA.age,
     parents: DATA.parents,
     budget,
@@ -179,8 +224,93 @@ export async function fetchActiveSalaryTakeHome(userId: string): Promise<number 
   }
 }
 
+export async function fetchSalaryCreditsInRange(
+  userId: string,
+  startDate: string,
+  endDate: string,
+  activeMonthlyTakeHome?: number | null,
+): Promise<number> {
+  try {
+    const start = parseLocalDateStart(startDate);
+    const end = parseLocalDateEnd(endDate);
+
+    const transactions = await prisma.transaction.findMany({
+      where: {
+        userId,
+        isDeleted: false,
+        transactionDate: { gte: start, lte: end },
+        creditAmount: { gt: 0 },
+      },
+      select: {
+        creditAmount: true,
+        description: true,
+        store: true,
+        personName: true,
+        category: { select: { name: true } },
+      },
+    });
+
+    return computeSalaryCredits(
+      transactions.map((tx) => ({
+        creditAmount: Number(tx.creditAmount) || 0,
+        categoryName: tx.category?.name ?? null,
+        description: tx.description,
+        personName: tx.personName,
+        store: tx.store,
+      })),
+      { activeMonthlyTakeHome: activeMonthlyTakeHome ?? null },
+    );
+  } catch {
+    return 0;
+  }
+}
+
+export async function loadPlanIncomeContext(userId: string): Promise<PlanIncomeContext> {
+  const currentRange = getCurrentMonthRange();
+  const lastRange = getPreviousMonthRange();
+
+  const activeSalaryTakeHome = await fetchActiveSalaryTakeHome(userId);
+
+  const [currentMonthSalaryReceived, lastMonthSalaryReceived] = await Promise.all([
+    fetchSalaryCreditsInRange(
+      userId,
+      currentRange.startDate,
+      currentRange.endDate,
+      activeSalaryTakeHome,
+    ),
+    fetchSalaryCreditsInRange(userId, lastRange.startDate, lastRange.endDate, activeSalaryTakeHome),
+  ]);
+
+  const planScale = resolvePlanBaseIncome({
+    salaryTakeHome: activeSalaryTakeHome,
+    lastMonthSalary: lastMonthSalaryReceived,
+    transactionSalary: currentMonthSalaryReceived,
+  });
+
+  const receivedSalaryAnchor =
+    currentMonthSalaryReceived > 0 ? currentMonthSalaryReceived : lastMonthSalaryReceived;
+  const receivedSalarySource: PlanIncomeContext['receivedSalarySource'] =
+    currentMonthSalaryReceived > 0
+      ? 'current_month'
+      : lastMonthSalaryReceived > 0
+        ? 'last_month'
+        : 'none';
+
+  return {
+    planScale,
+    activeSalaryTakeHome,
+    currentMonthSalaryReceived,
+    lastMonthSalaryReceived,
+    receivedSalaryAnchor,
+    receivedSalarySource,
+  };
+}
+
 export async function loadScaledMoneyPlanForUser(userId: string): Promise<ScaledMoneyPlanView> {
-  const takeHome = await fetchActiveSalaryTakeHome(userId);
-  const resolved = resolvePlanBaseIncome({ salaryTakeHome: takeHome });
-  return buildScaledMoneyPlanView(resolved.baseIncome, resolved.source);
+  const ctx = await loadPlanIncomeContext(userId);
+  return buildScaledMoneyPlanView(ctx.planScale.baseIncome, ctx.planScale.source, {
+    activeSalaryTakeHome: ctx.activeSalaryTakeHome,
+    currentMonthSalaryReceived: ctx.currentMonthSalaryReceived,
+    lastMonthSalaryReceived: ctx.lastMonthSalaryReceived,
+  });
 }

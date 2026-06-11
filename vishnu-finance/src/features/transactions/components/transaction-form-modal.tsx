@@ -181,11 +181,11 @@ export default function TransactionFormModal({
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm sm:items-center sm:p-4 md:p-6" onClick={onClose}>
       <div
-        className="flex max-h-[95dvh] w-full max-w-2xl flex-col overflow-hidden rounded-t-2xl bg-background shadow-2xl animate-in slide-in-from-bottom duration-200 sm:max-h-[90vh] sm:rounded-2xl sm:animate-in sm:zoom-in-95"
+        className="flex max-h-[95dvh] w-full max-w-2xl flex-col overflow-hidden glass-thick glass-text glass-sheet-bottom animate-in slide-in-from-bottom duration-200 sm:max-h-[90vh] sm:rounded-[20px] sm:animate-in sm:zoom-in-95"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header - Fixed */}
-        <div className="px-5 py-4 border-b border-border flex justify-between items-center bg-background/50 backdrop-blur-xl shrink-0">
+        <div className="flex shrink-0 items-center justify-between border-b border-border/50 px-5 py-4">
           <h3 className="text-lg font-bold font-display tracking-tight">
             {transaction ? 'Edit Transaction' : 'Add Transaction'}
           </h3>
@@ -370,7 +370,7 @@ export default function TransactionFormModal({
         </div>
 
         {/* Footer - Fixed */}
-        <div className="p-4 border-t border-border bg-background/50 backdrop-blur-xl shrink-0 flex items-center gap-3">
+        <div className="flex shrink-0 items-center gap-3 border-t border-border/50 p-4">
           <Button
             type="button"
             variant="outline"

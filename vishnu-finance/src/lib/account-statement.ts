@@ -49,6 +49,87 @@ export interface BalanceValidationResult {
   error: string | null;
 }
 
+export interface ImportRecordForMetadata {
+  date?: string;
+  date_iso?: string;
+  debit?: number | string;
+  credit?: number | string;
+  balance?: number | string;
+  accountNumber?: string;
+  bankCode?: string;
+}
+
+function parseRecordDate(record: ImportRecordForMetadata): Date | null {
+  const raw = record.date_iso || record.date;
+  if (!raw) return null;
+  const d = new Date(raw);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/**
+ * Fill missing statement metadata from parsed transaction rows.
+ */
+export function enrichStatementMetadataFromRecords(
+  metadata: StatementMetadata | undefined,
+  records: ImportRecordForMetadata[],
+): StatementMetadata | null {
+  if (!records.length) return metadata ?? null;
+
+  const validDates = records.map(parseRecordDate).filter((d): d is Date => d != null);
+  if (!validDates.length) return metadata ?? null;
+
+  const sortedByDate = [...records].sort((a, b) => {
+    const da = parseRecordDate(a)?.getTime() ?? 0;
+    const db = parseRecordDate(b)?.getTime() ?? 0;
+    return da - db;
+  });
+
+  const minDate = new Date(Math.min(...validDates.map((d) => d.getTime())));
+  const maxDate = new Date(Math.max(...validDates.map((d) => d.getTime())));
+
+  const totalDebits = records.reduce((sum, r) => sum + (Number(r.debit) || 0), 0);
+  const totalCredits = records.reduce((sum, r) => sum + (Number(r.credit) || 0), 0);
+
+  let closingBalance = metadata?.closingBalance ?? null;
+  let openingBalance = metadata?.openingBalance ?? null;
+
+  const withBalance = sortedByDate.filter((r) => r.balance != null && Number(r.balance) !== 0);
+  if (withBalance.length > 0) {
+    const last = withBalance[withBalance.length - 1];
+    closingBalance = Number(last.balance);
+    const first = withBalance[0];
+    const firstBal = Number(first.balance);
+    const firstCredit = Number(first.credit) || 0;
+    const firstDebit = Number(first.debit) || 0;
+    if (openingBalance == null) {
+      openingBalance = firstBal - firstCredit + firstDebit;
+    }
+  }
+
+  if (closingBalance == null && openingBalance != null) {
+    closingBalance = openingBalance + totalCredits - totalDebits;
+  }
+
+  const accountNumber =
+    metadata?.accountNumber || records.find((r) => r.accountNumber)?.accountNumber || null;
+  const bankCode = metadata?.bankCode || records.find((r) => r.bankCode)?.bankCode || undefined;
+
+  return {
+    openingBalance,
+    closingBalance,
+    statementStartDate: metadata?.statementStartDate ?? minDate.toISOString(),
+    statementEndDate: metadata?.statementEndDate ?? maxDate.toISOString(),
+    accountNumber,
+    ifsc: metadata?.ifsc ?? null,
+    branch: metadata?.branch ?? null,
+    accountHolderName: metadata?.accountHolderName ?? null,
+    totalDebits,
+    totalCredits,
+    transactionCount: records.length,
+    bankCode,
+  };
+}
+
 /**
  * Get or create account statement record
  */
@@ -58,50 +139,92 @@ export async function getOrCreateAccountStatement(
   bankCode: string,
   metadata: StatementMetadata
 ): Promise<AccountStatementRecord | null> {
-  if (!metadata.openingBalance || !metadata.statementStartDate || !metadata.statementEndDate) {
-    console.warn('Missing required metadata for account statement');
+  const enriched = {
+    ...metadata,
+    openingBalance: metadata.openingBalance ?? 0,
+    statementStartDate: metadata.statementStartDate,
+    statementEndDate: metadata.statementEndDate,
+  };
+
+  if (!enriched.statementStartDate || !enriched.statementEndDate) {
+    console.warn('Missing required dates for account statement');
+    return null;
+  }
+
+  if (enriched.openingBalance == null && enriched.closingBalance == null) {
+    console.warn('Missing balance metadata for account statement');
     return null;
   }
 
   try {
-    // Check if statement already exists
+    const startDate = new Date(enriched.statementStartDate);
+    const endDate = new Date(enriched.statementEndDate);
+
     const existing = await (prisma as any).accountStatement.findFirst({
       where: {
         userId,
         accountNumber,
         bankCode,
-        statementStartDate: new Date(metadata.statementStartDate),
+        statementStartDate: startDate,
       },
     });
 
     if (existing) {
-      return existing;
+      const statement = await (prisma as any).accountStatement.update({
+        where: { id: existing.id },
+        data: {
+          statementEndDate: endDate,
+          openingBalance: enriched.openingBalance ?? existing.openingBalance,
+          closingBalance: enriched.closingBalance ?? enriched.openingBalance ?? existing.closingBalance,
+          totalDebits: enriched.totalDebits || 0,
+          totalCredits: enriched.totalCredits || 0,
+          transactionCount: enriched.transactionCount || 0,
+          importedAt: new Date(),
+          importedBy: userId,
+          isActive: true,
+          metadata: JSON.stringify({
+            ifsc: enriched.ifsc,
+            branch: enriched.branch,
+            accountHolderName: enriched.accountHolderName,
+          }),
+        },
+      });
+
+      await (prisma as any).accountStatement.updateMany({
+        where: {
+          userId,
+          accountNumber,
+          bankCode,
+          id: { not: statement.id },
+        },
+        data: { isActive: false },
+      });
+
+      return statement;
     }
 
-    // Create new statement record
     const statement = await (prisma as any).accountStatement.create({
       data: {
         userId,
         accountNumber,
         bankCode,
-        statementStartDate: new Date(metadata.statementStartDate),
-        statementEndDate: new Date(metadata.statementEndDate),
-        openingBalance: metadata.openingBalance,
-        closingBalance: metadata.closingBalance || metadata.openingBalance,
-        totalDebits: metadata.totalDebits || 0,
-        totalCredits: metadata.totalCredits || 0,
-        transactionCount: metadata.transactionCount || 0,
+        statementStartDate: startDate,
+        statementEndDate: endDate,
+        openingBalance: enriched.openingBalance ?? 0,
+        closingBalance: enriched.closingBalance ?? enriched.openingBalance ?? 0,
+        totalDebits: enriched.totalDebits || 0,
+        totalCredits: enriched.totalCredits || 0,
+        transactionCount: enriched.transactionCount || 0,
         importedBy: userId,
         metadata: JSON.stringify({
-          ifsc: metadata.ifsc,
-          branch: metadata.branch,
-          accountHolderName: metadata.accountHolderName,
+          ifsc: enriched.ifsc,
+          branch: enriched.branch,
+          accountHolderName: enriched.accountHolderName,
         }),
         isActive: true,
       },
     });
 
-    // Mark other statements for this account as inactive
     await (prisma as any).accountStatement.updateMany({
       where: {
         userId,

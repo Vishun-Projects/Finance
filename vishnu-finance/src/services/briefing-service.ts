@@ -56,7 +56,6 @@ export class BriefingService {
 
     private static async generateBriefing(date: Date, location: string) {
         try {
-            console.log(`[BriefingService] Generating for ${date.toDateString()} in ${location}`);
 
             // Format date for search query
             const dateString = date.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
@@ -115,7 +114,6 @@ Format: JSON only.`;
             // 3. Generate Hero Image immediately (Resilient)
             let heroImageUrl = null;
             if (newsData.imagePrompt) {
-                console.log(`[BriefingService] Generating news image: ${newsData.imagePrompt}`);
                 try {
                     const { generateAndSaveImagenImage } = await import('@/lib/imagen');
                     heroImageUrl = await generateAndSaveImagenImage(newsData.imagePrompt, 'uploads/daily-briefing');

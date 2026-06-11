@@ -2,11 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { join } from 'path';
 import { readFile } from 'fs/promises';
 import { existsSync } from 'fs';
+import { getAuthenticatedUser, unauthorizedResponse } from '@/lib/api-auth';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ path: string[] }> }
 ) {
+  const user = await getAuthenticatedUser(request);
+  if (!user) {
+    return unauthorizedResponse();
+  }
   try {
     const { path: pathArray } = await params;
     const filePath = join(process.cwd(), ...pathArray);

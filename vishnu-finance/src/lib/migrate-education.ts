@@ -9,7 +9,6 @@ function slugify(text: string) {
 }
 
 async function migrateTips() {
-    console.log('Starting migration of tips...');
 
     // Find a superuser to be the author
     const author = await prisma.user.findFirst({
@@ -40,13 +39,11 @@ async function migrateTips() {
                     authorId: author.id,
                 }
             });
-            console.log(`Migrated: ${tip.title}`);
         } catch (error) {
             console.error(`Failed to migrate: ${tip.title}`, error);
         }
     }
 
-    console.log('Migration complete.');
 }
 
 migrateTips()

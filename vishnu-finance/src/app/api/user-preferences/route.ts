@@ -16,7 +16,6 @@ export async function GET(request: NextRequest) {
     const cacheKey = `user_prefs:${userId}`;
     const cachedPrefs = globalCache.get(cacheKey);
     if (cachedPrefs) {
-      // console.log(`⚡ PREFS CACHE HIT (Global): ${userId}`);
       return NextResponse.json(cachedPrefs);
     }
 

@@ -185,7 +185,7 @@ export function QuickActionsMenu({
             animate={reducedMotion ? { opacity: 1 } : { opacity: 1, scale: 1, y: 0 }}
             exit={reducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.9, y: 12 }}
             transition={{ duration: reducedMotion ? 0 : 0.18 }}
-            className="mb-3 flex w-[220px] flex-col gap-2 md:w-[240px]"
+            className="mb-3 flex w-[220px] flex-col gap-2 rounded-[13px] p-2 glass-regular glass-text md:w-[240px]"
           >
             {actions.map((action, index) => (
               <motion.div
@@ -207,9 +207,9 @@ export function QuickActionsMenu({
       <motion.button
         onClick={handleToggle}
         className={cn(
-          "flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg",
+          "flex h-12 w-12 items-center justify-center glass-fab glass-text",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
-          "hover:bg-primary/90 transition-colors",
+          "hover:opacity-95 transition-colors",
         )}
         whileTap={reducedMotion ? {} : { scale: 0.95 }}
         aria-label={isOpen ? "Close quick actions" : "Open quick actions"}

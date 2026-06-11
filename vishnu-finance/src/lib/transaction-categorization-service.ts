@@ -303,7 +303,6 @@ export async function categorizeTransactionsWithAI(
     }
 
     const availableCategories = categoriesForType.map((c) => c.name).join(', ');
-    console.log(`📋 Available ${transactions[0].financialCategory} categories (${categoriesForType.length}): ${availableCategories.substring(0, 150)}...`);
 
     const prompt = `You are a financial transaction categorization assistant. Analyze the following transactions and suggest the most appropriate category for each.
 
@@ -2933,7 +2932,6 @@ export async function categorizeTransactions(
   // Pre-fetch all merchant categories to avoid sequential DB/API calls in the loop
   const storeNames = transactions.map(t => t.store).filter((s): s is string => !!s);
   const merchantLookupMap = await batchLookupMerchantCategories(storeNames, userId);
-  console.log(`📦 Batch merchant lookup completed for ${storeNames.length} stores (${Object.keys(merchantLookupMap).length} unique)`);
 
   // Check cache first
   const cacheKey = userId;
@@ -3293,7 +3291,6 @@ export async function categorizeTransactions(
     checkAIQuota(userId);
 
   if (quotaExceeded) {
-    console.log('⏭️ Skipping AI categorization - Gemini quota exceeded. Using pattern matching and rules only.');
   }
 
   if (!shouldUseAI) {
@@ -3338,7 +3335,6 @@ export async function categorizeTransactions(
   const patternsStr = JSON.stringify(patterns, null, 2);
 
   // Process chunks in parallel with a concurrency limit (Worker Pool Pattern)
-  console.log(`🚀 Processing ${chunks.length} AI chunks in parallel (max 3 at a time) for user ${userId}...`);
   
   const aiResults: CategorizationResult[] = [];
   const chunkResults: CategorizationResult[][] = new Array(chunks.length);

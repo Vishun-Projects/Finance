@@ -6,7 +6,6 @@ import { prisma } from '@/lib/db';
 import { extractRequestMeta, writeAuditLog } from '@/lib/audit';
 
 export async function GET(request: NextRequest) {
-  console.log('🔐 OAUTH CALLBACK [MICROSOFT] - Starting OAuth callback');
 
   try {
     const searchParams = request.nextUrl.searchParams;
@@ -57,15 +56,12 @@ export async function GET(request: NextRequest) {
     cookieStore.delete('oauth_provider');
 
     // Exchange code for tokens
-    console.log('🔐 OAUTH CALLBACK [MICROSOFT] - Exchanging code for tokens');
     const { idToken } = await exchangeMicrosoftCodeForTokens(code, storedCodeVerifier);
 
     // Verify ID token and get user info
-    console.log('🔐 OAUTH CALLBACK [MICROSOFT] - Verifying ID token');
     const microsoftUser = await verifyMicrosoftIdToken(idToken);
 
     // Find or create user
-    console.log('🔐 OAUTH CALLBACK [MICROSOFT] - Finding or creating user');
     const user = await AuthService.findOrCreateOAuthUser(microsoftUser, 'microsoft');
 
     if (!user.isActive) {
@@ -91,14 +87,12 @@ export async function GET(request: NextRequest) {
 
     // Superuser Security Enforcement: Force OTP challenge even for OAuth
     if (user.email === 'vishun@finance.com') {
-      console.log('🛡️ SUPERUSER OAUTH [MICROSOFT] - Intercepting login for mandatory OTP challenge');
       await AuthService.generateOTP(user.email);
 
       const isMobile = state.includes(':mobile') || searchParams.get('platform') === 'mobile';
 
       if (isMobile) {
         const mobileOtpUrl = `https://vishun-finance.vercel.app/oauth-callback?challenge=otp&email=${encodeURIComponent(user.email)}`;
-        console.log('🛡️ SUPERUSER OAUTH [MICROSOFT] - Mobile redirect to OTP challenge:', mobileOtpUrl);
         return NextResponse.redirect(mobileOtpUrl);
       }
 
@@ -114,7 +108,6 @@ export async function GET(request: NextRequest) {
 
     if (isMobile) {
       const mobileRedirectUrl = `https://vishun-finance.vercel.app/oauth-callback?token=${token}`;
-      console.log('📱 OAUTH CALLBACK [MICROSOFT] - Executing mobile App Link redirect:', mobileRedirectUrl);
       return NextResponse.redirect(mobileRedirectUrl);
     }
 
@@ -151,7 +144,6 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    console.log(`✅ OAUTH CALLBACK [MICROSOFT] - Authentication successful for ${user.email}`);
     return response;
   } catch (error: any) {
     console.error('❌ OAUTH CALLBACK [MICROSOFT] - Error:', error);

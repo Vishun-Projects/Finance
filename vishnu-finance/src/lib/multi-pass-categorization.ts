@@ -70,7 +70,6 @@ export async function multiPassCategorization(
   userId: string,
   transactionIds: string[]
 ): Promise<{ categorized: number; updated: number; consistencyFixes: number; integrityFixes: number }> {
-  console.log(`🔄 Starting multi-pass categorization for ${transactionIds.length} transactions`);
 
   // Load all transactions from database
   const transactions = await prisma.transaction.findMany({
@@ -146,7 +145,6 @@ export async function multiPassCategorization(
   });
 
   // PASS 1: Initial categorization
-  console.log(`📊 Pass 1: Initial categorization of ${transactionsToCategorize.length} transactions...`);
   const results: CategorizationResult[] = await categorizeTransactions(userId, transactionsToCategorize);
   
   // Create transaction-result pairs
@@ -160,17 +158,12 @@ export async function multiPassCategorization(
   }));
 
   // PASS 2: Consistency check - ensure same store/UPI/person = same category
-  console.log(`🔍 Pass 2: Consistency check and enforcement...`);
   const consistencyFixes = enforceConsistency(transactionResults);
-  console.log(`✅ Pass 2: Fixed ${consistencyFixes} inconsistencies`);
 
   // PASS 2.5: Category integrity verification
-  console.log(`🔍 Pass 2.5: Category integrity verification...`);
   const integrityFixes = await verifyCategoryIntegrity(userId, transactionResults);
-  console.log(`✅ Pass 2.5: Fixed ${integrityFixes} integrity issues`);
 
   // PASS 3: Re-analyze with consistency context
-  console.log(`🔄 Pass 3: Re-analyzing with consistency context...`);
   const reanalyzedResults = await reanalyzeWithContext(userId, transactionResults);
   
   // Update results with re-analyzed data
@@ -180,11 +173,9 @@ export async function multiPassCategorization(
   }));
 
   // PASS 4: Final consistency check and confidence boost
-  console.log(`✨ Pass 4: Final consistency check and confidence boost...`);
   const finalConsistencyFixes = enforceConsistency(transactionResults);
   const finalIntegrityFixes = await verifyCategoryIntegrity(userId, transactionResults);
   boostConfidenceForConsistent(transactionResults);
-  console.log(`✅ Pass 4: Fixed ${finalConsistencyFixes} more inconsistencies and ${finalIntegrityFixes} integrity issues`);
 
   // Look up category IDs for results that only have category names
   const allCategories = await Promise.all([
@@ -227,7 +218,6 @@ export async function multiPassCategorization(
 
   // Batch update all at once
   if (updates.length > 0) {
-    console.log(`💾 Updating ${updates.length} transactions in database...`);
     
     // Update in batches to avoid overwhelming the database
     const BATCH_SIZE = 100;
@@ -249,10 +239,8 @@ export async function multiPassCategorization(
       );
       
       updatedCount += batch.length;
-      console.log(`  Updated ${updatedCount}/${updates.length} transactions...`);
     }
 
-    console.log(`✅ Successfully updated ${updatedCount} transactions`);
   }
 
   const categorized = transactionResults.filter((tr) => tr.result.categoryId).length;

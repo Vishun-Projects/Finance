@@ -15,7 +15,7 @@ export const revalidate = 300; // Revalidate every 5 minutes
 export async function GET(request: NextRequest) {
   // Rate limiting
   const routeType = getRouteType(request.nextUrl.pathname);
-  const rateLimitResponse = rateLimitMiddleware(routeType, request);
+  const rateLimitResponse = await rateLimitMiddleware(routeType, request);
   if (rateLimitResponse) {
     return rateLimitResponse;
   }
@@ -88,7 +88,7 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   const routeType = getRouteType(request.nextUrl.pathname);
-  const rateLimitResponse = rateLimitMiddleware(routeType, request);
+  const rateLimitResponse = await rateLimitMiddleware(routeType, request);
   if (rateLimitResponse) {
     return rateLimitResponse;
   }

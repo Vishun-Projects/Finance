@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { useToast } from '@/contexts/ToastContext';
-import { cn } from '@/lib/utils';
+import { cn, formatCompactRupees, toNumber } from '@/lib/utils';
 import { patterns } from '@/design/patterns';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,6 +29,11 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { CompactListRow } from '@/components/ui/compact-list-row';
 import { ResponsiveSheet } from '@/components/ui/responsive-sheet';
+import {
+  computeWishlistMonthlyRequired,
+  formatDisciplineCurrency,
+} from '@/lib/plans-discipline';
+import { formatDateLabel } from '@/features/plans/hooks/use-plans-insights';
 
 import { WishlistPriority, WishlistItem, WishlistResponse } from '@/features/plans/types';
 
@@ -36,11 +41,17 @@ interface WishlistPageClientProps {
   initialWishlist: WishlistResponse;
   userId: string;
   layoutVariant?: 'standalone' | 'embedded';
+  onWishlistChange?: (items: WishlistItem[]) => void;
 }
 
 const PRIORITY_OPTIONS: WishlistPriority[] = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
 
-export default function WishlistPageClient({ initialWishlist, userId, layoutVariant = 'standalone' }: WishlistPageClientProps) {
+export default function WishlistPageClient({
+  initialWishlist,
+  userId,
+  layoutVariant = 'standalone',
+  onWishlistChange,
+}: WishlistPageClientProps) {
   const searchParams = useSearchParams();
   const [items, setItems] = useState<WishlistItem[]>(initialWishlist.data || []);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -70,13 +81,19 @@ export default function WishlistPageClient({ initialWishlist, userId, layoutVari
     isCompleted: false,
   });
 
+  useEffect(() => {
+    setItems(initialWishlist.data || []);
+  }, [initialWishlist.data]);
+
   const refreshWishlist = useCallback(async () => {
     setIsRefreshing(true);
     try {
       const response = await fetch('/api/wishlist');
       if (response.ok) {
         const data = await response.json();
-        setItems(data.data || []);
+        const next = data.data || [];
+        setItems(next);
+        onWishlistChange?.(next);
       }
     } catch (error) {
       console.error('Error refreshing wishlist:', error);
@@ -84,7 +101,7 @@ export default function WishlistPageClient({ initialWishlist, userId, layoutVari
     } finally {
       setIsRefreshing(false);
     }
-  }, [showToast]);
+  }, [onWishlistChange, showErrorToast]);
 
   const resetForm = () => {
     setFormState({
@@ -150,6 +167,7 @@ export default function WishlistPageClient({ initialWishlist, userId, layoutVari
       const payload = {
         ...formState,
         estimatedCost: formState.estimatedCost ? parseFloat(formState.estimatedCost) : null,
+        targetDate: formState.targetDate ? new Date(formState.targetDate).toISOString() : null,
         tags: tagsArray,
       };
 
@@ -229,12 +247,21 @@ export default function WishlistPageClient({ initialWishlist, userId, layoutVari
     });
   }, [items, statusFilter, priorityFilter, searchTerm]);
 
-  const wishlistStats = useMemo(() => ({
-    pending: items.filter((item) => !item.isCompleted).length,
-    completed: items.filter((item) => item.isCompleted).length,
-    totalCost: items.reduce((sum, item) => sum + (item.estimatedCost || 0), 0),
-    highPriority: items.filter((item) => item.priority === 'HIGH' || item.priority === 'CRITICAL').length,
-  }), [items]);
+  const wishlistStats = useMemo(() => {
+    const pendingItems = items.filter((item) => !item.isCompleted);
+    const monthlyRequired = pendingItems.reduce((sum, item) => {
+      const discipline = computeWishlistMonthlyRequired(item);
+      return sum + toNumber(discipline?.monthlyRequired);
+    }, 0);
+
+    return {
+      pending: pendingItems.length,
+      completed: items.filter((item) => item.isCompleted).length,
+      totalCost: items.reduce((sum, item) => sum + toNumber(item.estimatedCost), 0),
+      highPriority: items.filter((item) => item.priority === 'HIGH' || item.priority === 'CRITICAL').length,
+      monthlyRequired,
+    };
+  }, [items]);
 
   const isEmbedded = layoutVariant === 'embedded';
 
@@ -275,7 +302,7 @@ export default function WishlistPageClient({ initialWishlist, userId, layoutVari
             </div>
           </div>
         ) : (
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="hidden flex-col gap-2 sm:flex sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-lg font-semibold text-foreground">Wishlist</h2>
               <p className="text-xs text-muted-foreground">Dream purchases and future buys.</p>
@@ -290,9 +317,9 @@ export default function WishlistPageClient({ initialWishlist, userId, layoutVari
                 <RefreshCw className={cn('h-3 w-3', isRefreshing && 'animate-spin')} />
                 Refresh
               </Button>
-              <Button size="sm" className="hidden gap-2 sm:flex" onClick={openCreateDialog}>
+              <Button size="sm" className="gap-2" onClick={openCreateDialog}>
                 <Plus className="h-3 w-3" />
-                Add
+                <span className="hidden sm:inline">Add</span>
               </Button>
             </div>
           </div>
@@ -313,11 +340,44 @@ export default function WishlistPageClient({ initialWishlist, userId, layoutVari
               <p className="mt-2 text-2xl font-medium tabular-nums numeric">{formatRupees(wishlistStats.totalCost)}</p>
             </div>
             <div className="card-base p-4">
-              <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-hint">High priority</p>
-              <p className="mt-2 text-2xl font-medium tabular-nums numeric">{wishlistStats.highPriority}</p>
+              <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-hint">Set-aside/mo</p>
+              <p className="mt-2 text-2xl font-medium tabular-nums numeric">
+                {formatDisciplineCurrency(wishlistStats.monthlyRequired)}
+              </p>
             </div>
           </section>
-        ) : null}
+        ) : (
+          <section className={cn(patterns.cardGrid, 'grid-cols-2 lg:grid-cols-4')}>
+            <div className="card-base min-w-0 p-3">
+              <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-hint">Pending</p>
+              <p className="mt-1 text-base font-semibold tabular-nums numeric sm:text-xl">{wishlistStats.pending}</p>
+            </div>
+            <div className="card-base min-w-0 p-3">
+              <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-hint">Total cost</p>
+              <p
+                className="mt-1 text-base font-semibold tabular-nums numeric sm:text-xl"
+                title={formatRupees(wishlistStats.totalCost)}
+              >
+                {formatCompactRupees(wishlistStats.totalCost)}
+              </p>
+            </div>
+            <div className="card-base min-w-0 p-3">
+              <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-hint">Set-aside/mo</p>
+              <p
+                className="mt-1 text-base font-semibold tabular-nums numeric sm:text-xl"
+                title={formatDisciplineCurrency(wishlistStats.monthlyRequired)}
+              >
+                {wishlistStats.monthlyRequired >= 1000
+                  ? formatCompactRupees(wishlistStats.monthlyRequired)
+                  : formatDisciplineCurrency(wishlistStats.monthlyRequired)}
+              </p>
+            </div>
+            <div className="card-base min-w-0 p-3">
+              <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-hint">High priority</p>
+              <p className="mt-1 text-base font-semibold tabular-nums numeric sm:text-xl">{wishlistStats.highPriority}</p>
+            </div>
+          </section>
+        )}
 
         <section className="card-base overflow-hidden">
           <div className="border-b border-border px-4 py-3">
@@ -342,7 +402,7 @@ export default function WishlistPageClient({ initialWishlist, userId, layoutVari
                 className="h-9 w-full max-w-xs"
               />
             </div>
-            <div className="md:hidden">
+            <div className="lg:hidden">
               <div className="flex items-center gap-2">
                 <Button
                   type="button"
@@ -387,16 +447,24 @@ export default function WishlistPageClient({ initialWishlist, userId, layoutVari
                   <th className="px-4 py-3">Item</th>
                   <th className="px-4 py-3">Priority</th>
                   <th className="px-4 py-3">Tags</th>
+                  <th className="px-4 py-3">₹/month</th>
                   <th className="px-4 py-3 text-right">Est. cost</th>
                   <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {filteredItems.map((item, idx) => (
+                {filteredItems.map((item, idx) => {
+                  const discipline = computeWishlistMonthlyRequired(item);
+                  return (
                   <tr key={item.id} className={cn('hover:bg-surface/80', item.isCompleted && 'opacity-60')}>
                     <td className="px-4 py-3 text-xs tabular-nums text-muted">{idx + 1}</td>
                     <td className="px-4 py-3">
                       <p className={cn('font-medium text-foreground', item.isCompleted && 'line-through')}>{item.title}</p>
+                      {item.targetDate ? (
+                        <p className="text-[11px] text-muted">Target {formatDateLabel(item.targetDate)}</p>
+                      ) : (
+                        <p className="text-[11px] text-muted">No target date</p>
+                      )}
                       {item.category ? (
                         <p className="text-xs capitalize text-muted">{item.category}</p>
                       ) : null}
@@ -412,6 +480,11 @@ export default function WishlistPageClient({ initialWishlist, userId, layoutVari
                           </Badge>
                         ))}
                       </div>
+                    </td>
+                    <td className="px-4 py-3 tabular-nums text-xs text-muted">
+                      {discipline?.monthlyRequired != null
+                        ? formatDisciplineCurrency(discipline.monthlyRequired)
+                        : '—'}
                     </td>
                     <td className="px-4 py-3 text-right tabular-nums numeric">{formatRupees(item.estimatedCost || 0)}</td>
                     <td className="px-4 py-3">
@@ -438,10 +511,11 @@ export default function WishlistPageClient({ initialWishlist, userId, layoutVari
                       </div>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
                 {filteredItems.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-4 py-12 text-center text-sm text-muted">
+                    <td colSpan={7} className="px-4 py-12 text-center text-sm text-muted">
                       No wishlist items found.
                     </td>
                   </tr>
@@ -450,17 +524,30 @@ export default function WishlistPageClient({ initialWishlist, userId, layoutVari
             </table>
           </div>
 
-          <div className="divide-y divide-border md:hidden">
-            {filteredItems.map((item) => (
+          <div className="divide-y divide-border lg:hidden">
+            {filteredItems.map((item) => {
+              const discipline = computeWishlistMonthlyRequired(item);
+              return (
               <CompactListRow
                 key={item.id}
                 icon={<ShoppingCart className="size-4 text-muted" />}
                 title={item.title}
-                subtitle={item.category ?? undefined}
+                subtitle={
+                  discipline?.monthlyRequired != null
+                    ? `${formatDisciplineCurrency(discipline.monthlyRequired)}/mo set-aside`
+                    : item.targetDate
+                      ? `Target ${formatDateLabel(item.targetDate)}`
+                      : 'Set target date for monthly plan'
+                }
                 trailing={
-                  <div className="text-right">
-                    <p className={cn('text-xs font-medium tabular-nums', item.isCompleted && 'line-through opacity-60')}>
-                      {formatRupees(item.estimatedCost || 0)}
+                  <div className="max-w-[5.5rem] shrink-0 text-right">
+                    <p
+                      className={cn('truncate text-xs font-medium tabular-nums', item.isCompleted && 'line-through opacity-60')}
+                      title={formatRupees(item.estimatedCost || 0)}
+                    >
+                      {(item.estimatedCost || 0) >= 1000
+                        ? formatCompactRupees(item.estimatedCost || 0)
+                        : formatRupees(item.estimatedCost || 0)}
                     </p>
                     <span
                       className={cn(
@@ -477,7 +564,8 @@ export default function WishlistPageClient({ initialWishlist, userId, layoutVari
                 onClick={() => setActionItem(item)}
                 className={item.isCompleted ? 'opacity-60' : undefined}
               />
-            ))}
+              );
+            })}
             {filteredItems.length === 0 && (
               <p className="px-4 py-12 text-center text-sm text-muted">No wishlist items found.</p>
             )}
@@ -525,6 +613,17 @@ export default function WishlistPageClient({ initialWishlist, userId, layoutVari
         {actionItem && (
           <div className="space-y-2 text-sm">
             <p className="tabular-nums">{formatRupees(actionItem.estimatedCost || 0)}</p>
+            {(() => {
+              const discipline = computeWishlistMonthlyRequired(actionItem);
+              return discipline?.monthlyRequired != null ? (
+                <p className="text-xs text-foreground">
+                  Save {formatDisciplineCurrency(discipline.monthlyRequired)}/mo
+                  {actionItem.targetDate ? ` until ${formatDateLabel(actionItem.targetDate)}` : ''}
+                </p>
+              ) : (
+                <p className="text-xs text-muted">Add a target date to see monthly set-aside</p>
+              );
+            })()}
             <Badge variant="outline" className="capitalize">{actionItem.priority.toLowerCase()}</Badge>
           </div>
         )}
@@ -586,6 +685,15 @@ export default function WishlistPageClient({ initialWishlist, userId, layoutVari
                       ))}
                     </SelectContent>
                   </Select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">Target date</label>
+                  <Input
+                    type="date"
+                    value={formState.targetDate}
+                    onChange={(e) => handleFormChange('targetDate', e.target.value)}
+                    className="h-11"
+                  />
                 </div>
               </div>
               <div className="space-y-2">

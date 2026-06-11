@@ -5,6 +5,7 @@ const outputMode = process.env.NEXT_OUTPUT_MODE === 'export' ? 'export' : undefi
 const nextConfig: NextConfig = {
   ...(outputMode ? { output: outputMode } : {}),
   ...(outputMode ? { output: outputMode } : {}),
+  serverExternalPackages: ['pdf-parse', 'pdfjs-dist'],
   typescript: {
     ignoreBuildErrors: false,
   },

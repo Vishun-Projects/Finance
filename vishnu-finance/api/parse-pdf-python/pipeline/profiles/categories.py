@@ -87,4 +87,4 @@ def get_commodity(text: str) -> Optional[str]:
     for kw, label in COMMODITY_MAP.items():
         if kw in upper_text:
             return label
-    return "UPI Transfer" if "UPI" in upper_text else "General"
+    return "UPI Transfer" if "UPI" in upper_text else None

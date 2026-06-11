@@ -4,46 +4,70 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
 }
 
-// Optimized Prisma client with connection pooling and performance settings
-// Forced connection limits for high concurrent advisor tasks
+function appendQueryParam(url: string, key: string, value: string): string {
+  if (url.includes(`${key}=`)) return url
+  return url.includes('?') ? `${url}&${key}=${value}` : `${url}?${key}=${value}`
+}
+
+/** Prisma datasource URL with pool settings for dev vs serverless production */
 const getDatabaseUrl = () => {
-  const url = process.env.DATABASE_URL || '';
-  if (url.includes('?')) {
-    if (!url.includes('connection_limit')) {
-      return `${url}&connection_limit=20&pool_timeout=30`;
-    }
-    return url;
+  const isProduction = process.env.NODE_ENV === 'production'
+
+  // Local dev: optional session pooler (5432) is faster than transaction pooler (6543)
+  const base =
+    !isProduction && process.env.DATABASE_URL_SESSION
+      ? process.env.DATABASE_URL_SESSION
+      : process.env.DATABASE_URL || ''
+
+  if (!base) return base
+
+  let url = base
+
+  // Supabase transaction pooler (6543) requires pgbouncer=true for Prisma
+  if (url.includes(':6543')) {
+    url = appendQueryParam(url, 'pgbouncer', 'true')
   }
-  return `${url}?connection_limit=20&pool_timeout=30`;
-};
 
-export const prisma = globalForPrisma.prisma ?? new PrismaClient({
-  log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
-  datasources: {
-    db: {
-      url: getDatabaseUrl(),
+  // Serverless: 1 conn per warm instance — pooler multiplexes to Postgres
+  const connectionLimit = isProduction ? '1' : '5'
+  url = appendQueryParam(url, 'connection_limit', connectionLimit)
+  url = appendQueryParam(url, 'pool_timeout', '30')
+
+  if (isProduction && url.includes('db.') && url.includes('.supabase.co:5432')) {
+    console.error(
+      '[db] DATABASE_URL uses direct Supabase host (5432). Use the transaction pooler on port 6543 in production or you will hit max connections.',
+    )
+  }
+
+  return url
+}
+
+const createPrismaClient = () =>
+  new PrismaClient({
+    log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
+    datasources: {
+      db: {
+        url: getDatabaseUrl(),
+      },
     },
-  },
-})
+  })
 
-// CRITICAL FIX: Ensure singleton pattern works in BOTH development AND production
-// This prevents connection pool exhaustion by reusing the same PrismaClient instance
+// Dev hot-reload can keep a PrismaClient from before `prisma generate` (missing new models).
+const cached = globalForPrisma.prisma
+if (cached && typeof cached.incomeBudgetPlan === 'undefined') {
+  void cached.$disconnect().catch(() => {})
+  globalForPrisma.prisma = undefined
+}
+
+export const prisma = globalForPrisma.prisma ?? createPrismaClient()
+
 if (!globalForPrisma.prisma) {
   globalForPrisma.prisma = prisma
 }
 
-// Graceful shutdown
-process.on('beforeExit', async () => {
-  await prisma.$disconnect()
-})
-
-process.on('SIGINT', async () => {
-  await prisma.$disconnect()
-  process.exit(0)
-})
-
-process.on('SIGTERM', async () => {
-  await prisma.$disconnect()
-  process.exit(0)
-})
+if (process.env.NODE_ENV !== 'production') {
+  process.on('beforeExit', async () => {
+    await prisma.$disconnect()
+  })
+}
 

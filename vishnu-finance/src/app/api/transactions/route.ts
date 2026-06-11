@@ -17,7 +17,7 @@ export const revalidate = 60; // Revalidate every minute
 export async function GET(request: NextRequest) {
   // Rate limiting
   const routeType = getRouteType(request.nextUrl.pathname);
-  const rateLimitResponse = rateLimitMiddleware(routeType, request);
+  const rateLimitResponse = await rateLimitMiddleware(routeType, request);
   if (rateLimitResponse) {
     return rateLimitResponse;
   }
@@ -27,7 +27,6 @@ export async function GET(request: NextRequest) {
   const cacheKey = `transactions_query:${fullUrl}`;
   const cachedResponse = globalCache.get(cacheKey);
   if (cachedResponse) {
-    // console.log(`⚡ TRANSACTIONS CACHE HIT: ${fullUrl}`);
     return NextResponse.json(cachedResponse);
   }
 
@@ -399,7 +398,7 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   const routeType = getRouteType(request.nextUrl.pathname);
-  const rateLimitResponse = rateLimitMiddleware(routeType, request);
+  const rateLimitResponse = await rateLimitMiddleware(routeType, request);
   if (rateLimitResponse) {
     return rateLimitResponse;
   }

@@ -85,7 +85,6 @@ export async function analyzeUserFinances(
 
     const cachedFullSummary = await getCachedData(fullSummaryCacheKey);
     if (cachedFullSummary) {
-      console.log(`⚡ FULL SUMMARY CACHE HIT for ${userId} (Search: ${searchTerm || 'None'})`);
       // Hydrate dates
       return {
         ...cachedFullSummary,

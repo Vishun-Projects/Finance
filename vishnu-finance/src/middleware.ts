@@ -4,13 +4,30 @@ import type { NextRequest } from 'next/server';
 // Routes that don't require authentication
 import { jwtVerify } from 'jose';
 
-// Routes that don't require authentication
-const publicRoutes = ['/auth', '/api/auth/oauth/google', '/api/auth/oauth/google/callback'];
+const publicRoutePrefixes = [
+  '/auth',
+  '/terms',
+  '/privacy',
+  '/shipping',
+  '/contact',
+  '/refunds',
+  '/about',
+  '/api/auth/oauth/google',
+  '/api/auth/oauth/google/callback',
+];
 const adminPrefix = '/admin';
 
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || 'your-secret-key-here-change-in-production'
-);
+function isPublicRoute(pathname: string): boolean {
+  return publicRoutePrefixes.some(
+    (route) => pathname === route || pathname.startsWith(`${route}/`)
+  );
+}
+
+const jwtSecretRaw = process.env.JWT_SECRET;
+if (!jwtSecretRaw) {
+  throw new Error('JWT_SECRET is not defined in environment variables');
+}
+const JWT_SECRET = new TextEncoder().encode(jwtSecretRaw);
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -23,8 +40,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Check if the route is public
-  if (publicRoutes.includes(pathname)) {
+  if (isPublicRoute(pathname)) {
     return NextResponse.next();
   }
 
@@ -42,7 +58,7 @@ export async function middleware(request: NextRequest) {
     } catch (error) {
       console.warn('Invalid JWT token in middleware:', error);
       // Clear token and redirect if not on a public route
-      if (!publicRoutes.includes(pathname) && pathname !== '/') {
+      if (!isPublicRoute(pathname) && pathname !== '/') {
         const response = NextResponse.redirect(new URL('/auth', request.url));
         response.cookies.delete('auth-token');
         return response;
@@ -51,7 +67,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // If no auth token and trying to access protected route, redirect to auth
-  if (!isValidToken && !publicRoutes.includes(pathname) && pathname !== '/') {
+  if (!isValidToken && !isPublicRoute(pathname) && pathname !== '/') {
     const response = NextResponse.redirect(new URL('/auth', request.url));
     // Also delete any potentially stale token cookie
     if (authToken) {
@@ -61,7 +77,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // If has auth token and trying to access login/register, redirect to dashboard
-  if (isValidToken && publicRoutes.includes(pathname)) {
+  if (isValidToken && (pathname === '/auth' || pathname.startsWith('/auth/'))) {
     if (role === 'SUPERUSER') {
       return NextResponse.redirect(new URL(adminPrefix, request.url));
     }

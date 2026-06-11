@@ -167,17 +167,17 @@ export function ResearchTab() {
               <div className="text-[11px] font-medium" style={{ color: row.col }}>
                 Age {row.age}
               </div>
-              <div className="text-[11px] font-medium md:hidden" style={{ color: row.col }}>
+              <div className="text-[11px] font-medium lg:hidden" style={{ color: row.col }}>
                 {row.note}
               </div>
             </div>
             <div className="space-y-1 md:space-y-0">
               <div className="flex justify-between gap-2 text-[11px] md:block md:text-muted-foreground">
-                <span className="text-hint md:hidden">Mummy</span>
+                <span className="text-hint lg:hidden">Mummy</span>
                 <span>{row.mummy}</span>
               </div>
               <div className="flex justify-between gap-2 text-[11px] md:block md:text-muted-foreground">
-                <span className="text-hint md:hidden">Papa</span>
+                <span className="text-hint lg:hidden">Papa</span>
                 <span>{row.papa}</span>
               </div>
             </div>

@@ -51,6 +51,9 @@ class NormalizationShim:
         for txn in transactions:
             raw = txn.description
             
+            # 0. Extract stable bank reference before cleaning strips detail
+            txn.transactionId = style.extract_transaction_id(raw)
+            
             # 1. Extract Entities (Store/Person, Confidence, Commodity, upiId)
             store, person, conf, comm, upi_id = style.extract_entities(raw)
             

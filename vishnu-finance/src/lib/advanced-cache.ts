@@ -441,7 +441,6 @@ export class CacheInvalidation {
     // Invalidate caches matching pattern
     for (const name of cacheManager['caches'].keys()) {
       // This would need to be implemented based on cache structure
-      console.log(`Invalidating cache ${name} with pattern ${pattern}`);
     }
   }
 

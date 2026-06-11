@@ -4,7 +4,6 @@ import { cookies } from 'next/headers';
 
 export async function GET(request: NextRequest) {
   try {
-    console.log('🔐 OAUTH INITIATE [MICROSOFT] - Starting Microsoft OAuth flow');
 
     // Generate PKCE parameters
     const { codeVerifier, codeChallenge, state } = generatePKCE();
@@ -39,7 +38,6 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    console.log('✅ OAUTH INITIATE [MICROSOFT] - Redirecting to Microsoft OAuth');
     return NextResponse.redirect(authUrl);
   } catch (error) {
     console.error('❌ OAUTH INITIATE [MICROSOFT] - Error:', error);

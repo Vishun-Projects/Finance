@@ -61,7 +61,6 @@ export async function POST(request: NextRequest) {
                 httpsAgent,
                 timeout: 10000 // 10s timeout
             });
-            console.log('Direct Teams Webhook sent via Axios');
         } catch (err: any) {
             console.error('Failed to send direct Teams Webhook via Axios:', err.message);
             if (err.response) {

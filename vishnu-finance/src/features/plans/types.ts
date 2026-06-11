@@ -1,6 +1,15 @@
 export type GoalPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 export type GoalStatus = 'ACTIVE' | 'COMPLETED' | 'PAUSED';
 
+export interface GoalContribution {
+  id: string;
+  goalId: string;
+  amount: number;
+  date: string;
+  source: string;
+  note?: string | null;
+}
+
 export interface Goal {
   id: string;
   title: string;
@@ -14,6 +23,7 @@ export interface Goal {
   imageUrl?: string | null;
   userId: string;
   isActive?: boolean;
+  contributions?: GoalContribution[];
   createdAt: string;
   updatedAt: string;
 }

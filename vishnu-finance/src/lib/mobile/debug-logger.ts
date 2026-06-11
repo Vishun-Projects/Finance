@@ -39,7 +39,6 @@ class DebugLogger {
         };
 
         this.isInitialized = true;
-        console.log('🚀 DebugLogger initialized');
     }
 
     private addEntry(type: LogType, args: any[]) {

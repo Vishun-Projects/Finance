@@ -44,6 +44,11 @@ export function getCurrentMonthRange(reference: Date = new Date()): ISODateRange
   };
 }
 
+export function getPreviousMonthRange(reference: Date = new Date()): ISODateRange {
+  const prev = new Date(reference.getFullYear(), reference.getMonth() - 1, 1);
+  return getCurrentMonthRange(prev);
+}
+
 export function formatMonthLabel(reference: Date = new Date(), locale: string | string[] = 'en-US'): string {
   return reference.toLocaleDateString(locale, { month: 'long', year: 'numeric' });
 }

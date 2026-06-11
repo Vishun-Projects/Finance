@@ -9,12 +9,11 @@ export const revalidate = 180; // Revalidate every 3 minutes
 export async function GET(request: NextRequest) {
   // Rate limiting
   const routeType = getRouteType(request.nextUrl.pathname);
-  const rateLimitResponse = rateLimitMiddleware(routeType, request);
+  const rateLimitResponse = await rateLimitMiddleware(routeType, request);
   if (rateLimitResponse) {
     return rateLimitResponse;
   }
 
-  console.log('🔍 WISHLIST GET - Starting request');
   try {
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
@@ -24,14 +23,11 @@ export async function GET(request: NextRequest) {
     const pageSize = Math.min(parseInt(searchParams.get('pageSize') || '100'), 200); // Max 200 per page
     const skip = (page - 1) * pageSize;
 
-    console.log('🔍 WISHLIST GET - User ID:', userId, 'Page:', page, 'PageSize:', pageSize);
 
     if (!userId) {
-      console.log('❌ WISHLIST GET - No user ID provided');
       return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
     }
 
-    console.log('🔍 WISHLIST GET - Fetching from database for user:', userId);
 
     // PERFORMANCE: Get total count for pagination (only if needed)
     const getTotalCount = page === 1 || searchParams.get('includeTotal') === 'true';
@@ -71,7 +67,6 @@ export async function GET(request: NextRequest) {
       tags: item.tags ? JSON.parse(item.tags) : []
     }));
 
-    console.log('✅ WISHLIST GET - Found wishlist items:', processedItems.length, 'records');
 
     // Return paginated response with metadata
     const response: any = {
@@ -95,10 +90,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  console.log('➕ WISHLIST POST - Starting request');
   try {
     const body = await request.json();
-    console.log('➕ WISHLIST POST - Request body:', JSON.stringify(body, null, 2));
 
     const {
       title,
@@ -112,25 +105,11 @@ export async function POST(request: NextRequest) {
       userId
     } = body;
 
-    console.log('➕ WISHLIST POST - Extracted data:', {
-      title,
-      description,
-      estimatedCost,
-      priority,
-      category,
-      targetDate,
-      notes,
-      tags,
-      userId
-    });
-
     // Validate required fields
     if (!title || !estimatedCost || !userId) {
-      console.log('❌ WISHLIST POST - Missing required fields');
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    console.log('➕ WISHLIST POST - Creating wishlist item in database...');
     // Create new wishlist item in database
     const newWishlistItem = await (prisma as any).wishlistItem.create({
       data: {
@@ -147,7 +126,6 @@ export async function POST(request: NextRequest) {
       }
     });
 
-    console.log('✅ WISHLIST POST - Successfully created wishlist item:', JSON.stringify(newWishlistItem, null, 2));
 
     // Trigger Image Generation
     const { addImageGenerationJob, triggerImmediateProcessing } = await import('../../../lib/services/image-queue');
@@ -164,18 +142,14 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
-  console.log('✏️ WISHLIST PUT - Starting request');
   try {
     const body = await request.json();
     const { id, ...updateData } = body;
-    console.log('✏️ WISHLIST PUT - Update data:', JSON.stringify({ id, ...updateData }, null, 2));
 
     if (!id) {
-      console.log('❌ WISHLIST PUT - No ID provided');
       return NextResponse.json({ error: 'ID is required' }, { status: 400 });
     }
 
-    console.log('✏️ WISHLIST PUT - Updating wishlist item in database...');
     // Update wishlist item in database
     const updatedWishlistItem = await (prisma as any).wishlistItem.update({
       where: { id },
@@ -188,7 +162,6 @@ export async function PUT(request: NextRequest) {
       }
     });
 
-    console.log('✅ WISHLIST PUT - Successfully updated wishlist item:', JSON.stringify(updatedWishlistItem, null, 2));
 
     // Trigger Image Regeneration if title changed or image is missing
     const { addImageGenerationJob, triggerImmediateProcessing } = await import('../../../lib/services/image-queue');
@@ -205,24 +178,19 @@ export async function PUT(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  console.log('🗑️ WISHLIST DELETE - Starting request');
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
-    console.log('🗑️ WISHLIST DELETE - ID to delete:', id);
 
     if (!id) {
-      console.log('❌ WISHLIST DELETE - No ID provided');
       return NextResponse.json({ error: 'ID is required' }, { status: 400 });
     }
 
-    console.log('🗑️ WISHLIST DELETE - Deleting from database...');
     // Delete from database
     await (prisma as any).wishlistItem.delete({
       where: { id }
     });
 
-    console.log('✅ WISHLIST DELETE - Successfully deleted wishlist item');
     return NextResponse.json({ message: 'Wishlist item deleted successfully' });
   } catch (error) {
     console.error('❌ WISHLIST DELETE - Error:', error);

@@ -11,5 +11,5 @@ export default async function Home() {
     redirect(destination);
   }
 
-  redirect('/auth?tab=login');
+  redirect('/about');
 }

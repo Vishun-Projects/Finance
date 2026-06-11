@@ -1,6 +1,11 @@
 import { prisma } from './db';
 import { generateResponse } from './gemini';
 import { analyzeUserFinances, formatFinancialSummary, DateRange } from './financial-analysis';
+import {
+  classifyAdvisorIntent,
+  validateAdvisorResponse,
+  buildAdvisorSystemPreamble,
+} from './advisor-guardrails';
 
 export interface AdvisorContext {
   userId: string;
@@ -16,6 +21,8 @@ export interface AdvisorResponse {
     title?: string;
     url?: string;
   }>;
+  blocked?: boolean;
+  intent?: string;
 }
 
 /**
@@ -337,6 +344,9 @@ export async function processAdvisorQuery(context: AdvisorContext): Promise<Advi
     const limit = keyword ? 3000 : 500;
 
     const financialSummaryPromise = analyzeUserFinances(userId, filters.dateRange, keyword, limit);
+    const dashboardPromise = import('@/features/dashboard/loaders').then(({ loadDashboard }) =>
+      loadDashboard(userId),
+    );
 
     const historyPromise = conversationId ? (prisma as any).advisorMessage.findMany({
       where: { conversationId },
@@ -345,9 +355,10 @@ export async function processAdvisorQuery(context: AdvisorContext): Promise<Advi
     }) : Promise.resolve([]);
 
     // Wait for essential context
-    const [financialSummaryResult, messages] = await Promise.all([
+    const [financialSummaryResult, messages, dashboard] = await Promise.all([
       financialSummaryPromise,
-      historyPromise
+      historyPromise,
+      dashboardPromise,
     ]);
     let financialSummary = financialSummaryResult;
 
@@ -381,16 +392,22 @@ export async function processAdvisorQuery(context: AdvisorContext): Promise<Advi
       };
     }
 
-    const financialSummaryText = formatFinancialSummary(financialSummary);
+    const { formatAdvisorPlanContext } = await import('@/lib/advisor-plan-context');
+    const financialSummaryText =
+      formatFinancialSummary(financialSummary) + '\n\n' + formatAdvisorPlanContext(dashboard);
     const conversationHistory = messages.map((msg: { role: string; content: string }) => ({
       role: msg.role === 'USER' ? 'user' : 'assistant',
       content: msg.content,
     }));
 
+    const intent = classifyAdvisorIntent(userMessage);
+
     // Step 4: Generate AI response directly (Zero Document/Internet Overhead)
     const aiResponse = await generateResponse(userMessage, {
       financialSummary: financialSummaryText,
       conversationHistory: conversationHistory.length > 0 ? conversationHistory : undefined,
+      systemPreamble: buildAdvisorSystemPreamble(),
+      intent,
       // Pass filtering metadata to help AI understand its "window" into the data
       filterContext: {
         searchTerm: keyword,
@@ -399,9 +416,13 @@ export async function processAdvisorQuery(context: AdvisorContext): Promise<Advi
       } as any
     });
 
+    const validated = validateAdvisorResponse(aiResponse.response);
+
     return {
-      response: aiResponse.response,
+      response: validated.response,
       sources: aiResponse.sources as any,
+      blocked: validated.blocked,
+      intent,
     };
   } catch (error) {
     console.error('Error processing advisor query:', error);

@@ -56,7 +56,6 @@ export async function fetchLocationByPincode(pincode: string): Promise<PincodeRe
     }
 
     const data = await response.json();
-    console.log('[Pincode Lookup] Direct API response:', data);
     const result = Array.isArray(data) ? data[0] : data;
 
     if (result?.Status === 'Success' && result.PostOffice && result.PostOffice.length > 0) {
@@ -105,7 +104,6 @@ async function fetchLocationByPincodeAlternative(pincode: string): Promise<Pinco
     }
 
     const data = await response.json();
-    console.log('[Pincode Lookup] Proxy response:', data);
     return data;
   } catch (error) {
     console.error('Error calling pincode proxy:', error);

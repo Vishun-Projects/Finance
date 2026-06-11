@@ -25,11 +25,25 @@ import {
 } from 'lucide-react';
 import { CompactListRow } from '@/components/ui/compact-list-row';
 import { ResponsiveSheet } from '@/components/ui/responsive-sheet';
+import { NavPill, NavPillGroup } from '@/components/ui/nav-pill';
+import { computeDeadlineDiscipline, formatDisciplineCurrency, type DisciplineSummary } from '@/lib/plans-discipline';
+import { DetectedBillsSection } from '@/components/finance/detected-bills-section';
+import type { DetectedRecurringBill } from '@/lib/recurring-detection';
+import {
+  filterDeadlinesForScope,
+  getCurrentMonthLabel,
+  groupDeadlinesForCurrentMonth,
+  isDeadlineOverdue,
+  startOfDay,
+  startOfToday,
+} from '@/lib/utils/deadline-utils';
 
 interface DeadlinesPageClientProps {
   initialDeadlines: DeadlinesResponse;
   userId: string;
   layoutVariant?: 'standalone' | 'embedded';
+  onDeadlinesChange?: (deadlines: Deadline[]) => void;
+  disciplineSummary?: DisciplineSummary | null;
 }
 
 interface DeadlineFormState {
@@ -71,19 +85,24 @@ function computeStatus(deadline: Deadline): { label: string; tone: 'default' | '
     return { label: 'Paid', tone: 'secondary', status: 'PAID' };
   }
 
-  const due = new Date(deadline.dueDate);
-  const now = new Date();
-  if (due < now) {
+  if (isDeadlineOverdue(deadline)) {
     return { label: 'Overdue', tone: 'destructive', status: 'OVERDUE' };
   }
 
   return { label: 'Pending', tone: 'default', status: 'PENDING' };
 }
 
-export default function DeadlinesPageClient({ initialDeadlines, userId, layoutVariant = 'standalone' }: DeadlinesPageClientProps) {
+export default function DeadlinesPageClient({
+  initialDeadlines,
+  userId,
+  layoutVariant = 'standalone',
+  onDeadlinesChange,
+  disciplineSummary,
+}: DeadlinesPageClientProps) {
   const searchParams = useSearchParams();
   const [deadlines, setDeadlines] = useState<Deadline[]>(initialDeadlines.data);
   const [statusFilter, setStatusFilter] = useState<'all' | 'PENDING' | 'OVERDUE' | 'PAID' | 'SKIPPED'>('all');
+  const [scopeFilter, setScopeFilter] = useState<'this-month' | 'all'>('this-month');
   const [searchTerm, setSearchTerm] = useState('');
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [actionDeadline, setActionDeadline] = useState<Deadline | null>(null);
@@ -105,6 +124,27 @@ export default function DeadlinesPageClient({ initialDeadlines, userId, layoutVa
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [isRefreshing, startRefreshTransition] = useTransition();
+
+  const handleAddFromDetected = useCallback((bill: DetectedRecurringBill) => {
+    setEditingDeadline(null);
+    setFormState({
+      title: bill.merchant,
+      description: '',
+      amount: String(bill.amount),
+      dueDate: '',
+      category: 'Bills',
+      isRecurring: true,
+      frequency: bill.frequency === 'weekly' ? 'WEEKLY' : 'MONTHLY',
+      paymentMethod: '',
+      accountDetails: '',
+      notes: 'Detected from transaction history',
+    });
+    setDialogOpen(true);
+  }, []);
+
+  useEffect(() => {
+    setDeadlines(initialDeadlines.data);
+  }, [initialDeadlines.data]);
 
   const resetForm = useCallback(() => {
     setEditingDeadline(null);
@@ -130,12 +170,14 @@ export default function DeadlinesPageClient({ initialDeadlines, userId, layoutVa
           throw new Error('Failed to refresh deadlines');
         }
         const data = (await response.json()) as DeadlinesResponse;
-        setDeadlines(Array.isArray(data?.data) ? data.data : []);
+        const next = Array.isArray(data?.data) ? data.data : [];
+        setDeadlines(next);
+        onDeadlinesChange?.(next);
       } catch (error) {
         console.error('[deadlines] refresh failed', error);
       }
     });
-  }, [userId]);
+  }, [userId, onDeadlinesChange]);
 
   const categories = useMemo(() => {
     const unique = new Set<string>();
@@ -145,8 +187,18 @@ export default function DeadlinesPageClient({ initialDeadlines, userId, layoutVa
     return Array.from(unique);
   }, [deadlines]);
 
+  const scopedDeadlines = useMemo(
+    () => filterDeadlinesForScope(deadlines, scopeFilter),
+    [deadlines, scopeFilter],
+  );
+
+  const deadlineGroups = useMemo(
+    () => groupDeadlinesForCurrentMonth(deadlines),
+    [deadlines],
+  );
+
   const filteredDeadlines = useMemo(() => {
-    return deadlines.filter((deadline) => {
+    return scopedDeadlines.filter((deadline) => {
       const { status } = computeStatus(deadline);
       const matchesStatus = statusFilter === 'all' ? true : status === statusFilter;
       const matchesCategory = categoryFilter === 'all' ? true : deadline.category === categoryFilter;
@@ -156,22 +208,32 @@ export default function DeadlinesPageClient({ initialDeadlines, userId, layoutVa
         : true;
       return matchesStatus && matchesCategory && matchesSearch;
     });
-  }, [deadlines, statusFilter, categoryFilter, searchTerm]);
+  }, [scopedDeadlines, statusFilter, categoryFilter, searchTerm]);
+
+  const displayDeadlines = useMemo(() => {
+    if (scopeFilter !== 'this-month') return filteredDeadlines;
+
+    const overdueIds = new Set(deadlineGroups.overdue.map((d) => d.id));
+    const upcomingIds = new Set(deadlineGroups.thisMonthUpcoming.map((d) => d.id));
+    const overdue = filteredDeadlines.filter((d) => overdueIds.has(d.id));
+    const upcoming = filteredDeadlines.filter((d) => upcomingIds.has(d.id));
+
+    return [...overdue, ...upcoming];
+  }, [filteredDeadlines, scopeFilter, deadlineGroups]);
 
   const stats = useMemo(() => {
-    const upcoming = filteredDeadlines.filter((deadline) => !deadline.isCompleted && new Date(deadline.dueDate) >= new Date());
-    const overdue = filteredDeadlines.filter((deadline) => !deadline.isCompleted && new Date(deadline.dueDate) < new Date());
-    const totalAmount = filteredDeadlines.reduce((sum, deadline) => sum + (deadline.amount ?? 0), 0);
-    const monthLabel = new Date().toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+    const monthLabel = getCurrentMonthLabel();
+    const thisMonthActive = deadlineGroups.thisMonthAll;
+    const thisMonthAmount = thisMonthActive.reduce((sum, deadline) => sum + (deadline.amount ?? 0), 0);
 
     return {
-      total: filteredDeadlines.length,
-      upcoming: upcoming.length,
-      overdue: overdue.length,
-      totalAmount,
+      total: displayDeadlines.length,
+      upcoming: deadlineGroups.thisMonthUpcoming.length,
+      overdue: deadlineGroups.overdue.length,
+      totalAmount: thisMonthAmount,
       monthLabel,
     };
-  }, [filteredDeadlines]);
+  }, [displayDeadlines.length, deadlineGroups]);
 
   const openCreateDialog = () => {
     resetForm();
@@ -332,10 +394,12 @@ export default function DeadlinesPageClient({ initialDeadlines, userId, layoutVa
             </div>
           </div>
         ) : (
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="hidden flex-col gap-2 sm:flex sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-lg font-semibold text-foreground">Deadlines</h2>
-              <p className="text-xs text-muted-foreground">Review due dates and payments in one place.</p>
+              <h2 className="text-lg font-semibold text-foreground">Bills & dues</h2>
+              <p className="text-xs text-muted-foreground">
+                {stats.monthLabel} — detected bills and your upcoming dues
+              </p>
             </div>
             <div className="flex items-center gap-2">
               <Button
@@ -347,38 +411,27 @@ export default function DeadlinesPageClient({ initialDeadlines, userId, layoutVa
                 <RefreshCw className={cn('h-3 w-3', isRefreshing && 'animate-spin')} />
                 Refresh
               </Button>
-              <Button size="sm" className="gap-2 hidden sm:flex" onClick={openCreateDialog}>
+              <Button size="sm" className="gap-2" onClick={openCreateDialog}>
                 <Plus className="h-3 w-3" />
-                Add
+                <span className="hidden sm:inline">Add</span>
               </Button>
             </div>
           </div>
         )}
 
-        {!isEmbedded ? (
-          <section className={cn(patterns.cardGrid, 'lg:grid-cols-4')}>
-            <div className="card-base p-4">
-              <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-hint">Pending</p>
-              <p className="mt-2 text-2xl font-medium tabular-nums numeric">{stats.upcoming}</p>
-              <p className="mt-1 text-xs text-muted">{stats.monthLabel}</p>
-            </div>
-            <div className="card-base p-4">
-              <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-hint">Overdue</p>
-              <p className={cn('mt-2 text-2xl font-medium tabular-nums numeric', stats.overdue > 0 && 'text-[var(--danger)]')}>
-                {stats.overdue}
-              </p>
-              <p className="mt-1 text-xs text-muted">Needs attention</p>
-            </div>
-            <div className="card-base p-4">
-              <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-hint">Total</p>
-              <p className="mt-2 text-2xl font-medium tabular-nums numeric">{stats.total}</p>
-            </div>
-            <div className="card-base p-4">
-              <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-hint">Amount due</p>
-              <p className="mt-2 text-2xl font-medium tabular-nums numeric">{formatCurrency(stats.totalAmount)}</p>
-            </div>
-          </section>
-        ) : null}
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <NavPillGroup className="w-full sm:w-auto">
+            <NavPill
+              label="This month"
+              active={scopeFilter === 'this-month'}
+              onClick={() => setScopeFilter('this-month')}
+            />
+            <NavPill label="All deadlines" active={scopeFilter === 'all'} onClick={() => setScopeFilter('all')} />
+          </NavPillGroup>
+          {scopeFilter === 'this-month' && (
+            <p className="text-[10px] text-muted">Paid items and past months are hidden</p>
+          )}
+        </div>
 
         <section className="card-base overflow-hidden">
           <div className="border-b border-border px-4 py-3">
@@ -403,7 +456,7 @@ export default function DeadlinesPageClient({ initialDeadlines, userId, layoutVa
                 className="h-9 w-full max-w-xs"
               />
             </div>
-            <div className="md:hidden">
+            <div className="lg:hidden">
               <div className="flex items-center gap-2">
                 <Button
                   type="button"
@@ -454,10 +507,13 @@ export default function DeadlinesPageClient({ initialDeadlines, userId, layoutVa
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {filteredDeadlines.map((deadline, idx) => {
+                {displayDeadlines.map((deadline, idx) => {
                   const statusMeta = computeStatus(deadline);
+                  const discipline = computeDeadlineDiscipline(deadline);
                   const dueDate = new Date(deadline.dueDate);
-                  const daysLeft = Math.ceil((dueDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+                  const daysLeft = Math.ceil(
+                    (startOfDay(dueDate).getTime() - startOfToday().getTime()) / (1000 * 60 * 60 * 24),
+                  );
                   const isOverdue = statusMeta.status === 'OVERDUE';
 
                   return (
@@ -465,6 +521,18 @@ export default function DeadlinesPageClient({ initialDeadlines, userId, layoutVa
                       <td className="px-4 py-3 text-xs tabular-nums text-muted">{idx + 1}</td>
                       <td className="px-4 py-3">
                         <p className="font-medium text-foreground">{deadline.title}</p>
+                        {discipline && (
+                          <p className="text-[11px] text-muted">{discipline.label}</p>
+                        )}
+                        {disciplineSummary && Number(deadline.amount) > 0 && (
+                          <p className="text-[10px] text-muted">
+                            If paid now:{' '}
+                            {formatDisciplineCurrency(
+                              Math.max(0, disciplineSummary.capacity.available - Number(deadline.amount)),
+                            )}{' '}
+                            capacity left
+                          </p>
+                        )}
                         {deadline.category ? (
                           <p className="text-xs capitalize text-muted">{deadline.category}</p>
                         ) : null}
@@ -514,10 +582,12 @@ export default function DeadlinesPageClient({ initialDeadlines, userId, layoutVa
                     </tr>
                   );
                 })}
-                {filteredDeadlines.length === 0 && (
+                {displayDeadlines.length === 0 && (
                   <tr>
                     <td colSpan={7} className="px-4 py-12 text-center text-sm text-muted">
-                      No deadlines found.
+                      {scopeFilter === 'this-month'
+                        ? 'No deadlines due this month.'
+                        : 'No deadlines found.'}
                     </td>
                   </tr>
                 )}
@@ -525,39 +595,112 @@ export default function DeadlinesPageClient({ initialDeadlines, userId, layoutVa
             </table>
           </div>
 
-          <div className="divide-y divide-border md:hidden">
-            {filteredDeadlines.map((deadline) => {
-              const statusMeta = computeStatus(deadline);
-              const dueDate = new Date(deadline.dueDate);
-              const daysLeft = Math.ceil((dueDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-              const isOverdue = statusMeta.status === 'OVERDUE';
+          <div className="lg:hidden">
+            {scopeFilter === 'this-month' && deadlineGroups.overdue.length > 0 && (
+              <div>
+                <p className="border-b border-border bg-surface px-4 py-2 text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--danger)]">
+                  Overdue
+                </p>
+                <div className="divide-y divide-border">
+                  {displayDeadlines
+                    .filter((d) => isDeadlineOverdue(d))
+                    .map((deadline) => {
+                      const statusMeta = computeStatus(deadline);
+                      return (
+                        <CompactListRow
+                          key={deadline.id}
+                          icon={<AlarmClock className="size-4 text-[var(--danger)]" />}
+                          title={deadline.title}
+                          subtitle={computeDeadlineDiscipline(deadline)?.label ?? `Due ${toLocalDate(deadline.dueDate)} · ${statusMeta.label}`}
+                          trailing={
+                            <p className="text-xs font-medium tabular-nums text-foreground">
+                              {formatCurrency(deadline.amount)}
+                            </p>
+                          }
+                          onClick={() => setActionDeadline(deadline)}
+                        />
+                      );
+                    })}
+                </div>
+              </div>
+            )}
 
-              return (
-                <CompactListRow
-                  key={deadline.id}
-                  icon={<AlarmClock className="size-4 text-muted" />}
-                  title={deadline.title}
-                  subtitle={`Due ${toLocalDate(deadline.dueDate)}`}
-                  trailing={
-                    <div className="text-right">
-                      <p className="text-xs font-medium tabular-nums text-foreground">{formatCurrency(deadline.amount)}</p>
-                      <span
-                        className={cn(
-                          'inline-block size-2 rounded-full',
-                          isOverdue ? 'bg-[var(--danger)]' : 'bg-[var(--success)]'
+            {scopeFilter === 'this-month' && deadlineGroups.thisMonthUpcoming.length > 0 && (
+              <div>
+                <p className="border-b border-border bg-surface px-4 py-2 text-[10px] font-medium uppercase tracking-[0.08em] text-hint">
+                  Due this month
+                </p>
+                <div className="divide-y divide-border">
+                  {displayDeadlines
+                    .filter((d) => !isDeadlineOverdue(d))
+                    .map((deadline) => {
+                      const dueDate = new Date(deadline.dueDate);
+                      const daysLeft = Math.ceil(
+                        (startOfDay(dueDate).getTime() - startOfToday().getTime()) / (1000 * 60 * 60 * 24),
+                      );
+
+                      return (
+                        <CompactListRow
+                          key={deadline.id}
+                          icon={<AlarmClock className="size-4 text-muted" />}
+                          title={deadline.title}
+                          subtitle={computeDeadlineDiscipline(deadline)?.label ?? `Due ${toLocalDate(deadline.dueDate)} · ${daysLeft === 0 ? 'Today' : `${daysLeft} days left`}`}
+                          trailing={
+                            <p className="text-xs font-medium tabular-nums text-foreground">
+                              {formatCurrency(deadline.amount)}
+                            </p>
+                          }
+                          onClick={() => setActionDeadline(deadline)}
+                        />
+                      );
+                    })}
+                </div>
+              </div>
+            )}
+
+            {scopeFilter === 'all' &&
+              displayDeadlines.map((deadline) => {
+                const statusMeta = computeStatus(deadline);
+                const dueDate = new Date(deadline.dueDate);
+                const daysLeft = Math.ceil(
+                  (startOfDay(dueDate).getTime() - startOfToday().getTime()) / (1000 * 60 * 60 * 24),
+                );
+                const isOverdue = statusMeta.status === 'OVERDUE';
+
+                return (
+                  <CompactListRow
+                    key={deadline.id}
+                    icon={<AlarmClock className={cn('size-4', isOverdue ? 'text-[var(--danger)]' : 'text-muted')} />}
+                    title={deadline.title}
+                    subtitle={computeDeadlineDiscipline(deadline)?.label ?? `Due ${toLocalDate(deadline.dueDate)} · ${statusMeta.label}`}
+                    trailing={
+                      <div className="text-right">
+                        <p className="text-xs font-medium tabular-nums text-foreground">{formatCurrency(deadline.amount)}</p>
+                        {!deadline.isCompleted && (
+                          <span className="text-[10px] text-muted">
+                            {isOverdue
+                              ? `${Math.abs(daysLeft)}d overdue`
+                              : daysLeft === 0
+                                ? 'Today'
+                                : `${daysLeft}d left`}
+                          </span>
                         )}
-                      />
-                    </div>
-                  }
-                  onClick={() => setActionDeadline(deadline)}
-                />
-              );
-            })}
-            {filteredDeadlines.length === 0 && (
-              <p className="px-4 py-12 text-center text-sm text-muted">No deadlines found.</p>
+                      </div>
+                    }
+                    onClick={() => setActionDeadline(deadline)}
+                  />
+                );
+              })}
+
+            {displayDeadlines.length === 0 && (
+              <p className="px-4 py-12 text-center text-sm text-muted">
+                {scopeFilter === 'this-month' ? 'No deadlines due this month.' : 'No deadlines found.'}
+              </p>
             )}
           </div>
         </section>
+
+        <DetectedBillsSection onAddDeadline={handleAddFromDetected} className="mt-4" />
       </div>
 
       <ResponsiveSheet

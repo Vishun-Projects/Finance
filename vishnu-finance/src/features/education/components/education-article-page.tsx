@@ -136,7 +136,7 @@ export default function PostDetail() {
                     </div>
                 </div>
 
-                <div className="max-w-4xl mx-auto px-6 pb-24">
+                <div className="max-w-4xl mx-auto px-6">
                     {/* Header Image */}
                     {/* Header Image Banner */}
                     <div className="relative mt-6 mb-8 rounded-xl overflow-hidden w-full aspect-[3/1] shadow-lg bg-muted group">

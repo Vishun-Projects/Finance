@@ -56,7 +56,6 @@ export async function processImageGenerationQueue(batchSize = 2) {
         return { processed: 0, errors: 0 };
     }
 
-    console.log(`[Image Queue] Processing ${jobs.length} jobs...`);
     let processedCount = 0;
     let errorCount = 0;
 
@@ -80,7 +79,6 @@ export async function processImageGenerationQueue(batchSize = 2) {
             if (job.entityType === ImageJobType.GOAL) folder = "uploads/goals";
             if (job.entityType === ImageJobType.WISHLIST_ITEM) folder = "uploads/wishlist";
 
-            console.log(`[Image Queue] Generating image for job ${job.id} (Prompt: ${job.prompt.substring(0, 30)}...)`);
 
             const imageUrl = await generateAndSaveImagenImage(job.prompt, folder);
 
@@ -102,7 +100,6 @@ export async function processImageGenerationQueue(batchSize = 2) {
             await updateEntityWithImage(job.entityId, job.entityType, imageUrl);
 
             processedCount++;
-            console.log(`[Image Queue] Job ${job.id} completed. Image: ${imageUrl}`);
 
         } catch (error) {
             console.error(`[Image Queue] Job ${job.id} failed:`, error);

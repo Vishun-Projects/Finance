@@ -60,7 +60,6 @@ export function validateBalanceReconciliation(
   );
   
   // Log for debugging balance discrepancies
-  console.log(`📊 Balance validation: ${transactions.length} transactions, Credits: ₹${totalCredits.toFixed(2)}, Debits: ₹${totalDebits.toFixed(2)}`);
 
   // Calculate expected closing balance
   const calculatedClosing =

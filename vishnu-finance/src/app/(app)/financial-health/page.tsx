@@ -3,17 +3,17 @@ import FinancialHealthPageClient from './page-client';
 import { RouteLoadingState } from '@/components/feedback/route-fallbacks';
 import { requireUser } from '@/lib/auth/server-auth';
 import { analyzeUserFinances } from '@/lib/financial-analysis';
+import { loadDashboard } from '@/features/dashboard/loaders';
 
 export const dynamic = 'force-dynamic';
 
 export default async function FinancialHealthPage() {
   const user = await requireUser({ redirectTo: '/auth?tab=login' });
 
-  // Analyze all time or 6 months? Design shows "6 Month Trend", so maybe last 6 months + current.
-  // But summary logic usually takes full history or specific range.
-  // We'll fetch all data to ensure trends are accurate, or default to last 6 months.
-  // Let's fetch all for now to let the service handle trends.
-  const summary = await analyzeUserFinances(user.id);
+  const [summary, dashboard] = await Promise.all([
+    analyzeUserFinances(user.id),
+    loadDashboard(user.id),
+  ]);
 
   return (
     <Suspense
@@ -25,7 +25,7 @@ export default async function FinancialHealthPage() {
         />
       }
     >
-      <FinancialHealthPageClient initialData={summary} />
+      <FinancialHealthPageClient initialData={summary} monthContext={dashboard} />
     </Suspense>
   );
 }

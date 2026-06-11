@@ -1,19 +1,18 @@
 import { prisma } from '@/lib/db';
-import { DATA } from '@/features/money-plan/data/money-plan';
 import type { BreakdownCategory } from '@/features/money-plan/data/money-plan';
-import { allocateTransactionsToLineItems, isBufferLineItem, transactionMatchesLineItem } from '@/features/dashboard/config/breakdown-line-map';
+import { transactionMatchesLineItem } from '@/features/dashboard/config/breakdown-line-map';
+import { mapCategoryToBucket } from '@/features/dashboard/config/category-bucket-map';
 import {
-  BUDGET_KEY_TO_BREAKDOWN,
-  PLAN_BUCKET_KEYS,
-  type PlanBucketKey,
-} from '@/features/dashboard/config/category-bucket-map';
-import { assignLineItemForUnmapped, isNonPlanExpenseCategory, resolveTransactionLineItem } from '@/features/dashboard/config/plan-expense-categories';
+  ensureDefaultIncomeBudgetPlan,
+  rollupActualToUserBuckets,
+  scaleIncomeBudgetBuckets,
+} from '@/lib/income-budget-service';
+import { isNonPlanExpenseCategory } from '@/features/dashboard/config/plan-expense-categories';
 import {
   getEffectiveExpenseAmounts,
   loadSettlementLookup,
 } from '@/lib/transaction-settlement-service';
 import {
-  buildScaledPlanAmounts,
   type PlanIncomeSource,
   type ResolvedPlanIncome,
   resolvePlanBaseIncome,
@@ -23,8 +22,10 @@ export type BucketStatus = 'on_track' | 'warning' | 'over';
 export type GoalStatus = 'on_track' | 'behind' | 'completed';
 
 export interface BucketAdherence {
-  key: PlanBucketKey;
+  key: string;
   label: string;
+  variant?: BreakdownCategory;
+  percentage?: number;
   planned: number;
   actual: number;
   remaining: number;
@@ -67,6 +68,8 @@ export interface PlanAdherenceResult {
   monthLabel: string;
   planBaseIncome: number;
   planIncomeSource: PlanIncomeSource;
+  budgetPlanName?: string;
+  budgetTemplateId?: string;
 }
 
 export interface LineItemTransaction {
@@ -123,7 +126,8 @@ export async function getPlanAdherence(
   const { start, end, now } = getCurrentMonthRange();
   const monthLabel = now.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
   const resolvedPlanIncome = planIncome ?? resolvePlanBaseIncome({});
-  const scaledPlan = buildScaledPlanAmounts(resolvedPlanIncome.baseIncome);
+  const userBudgetPlan = await ensureDefaultIncomeBudgetPlan(userId);
+  const scaledUserBuckets = scaleIncomeBudgetBuckets(userBudgetPlan, resolvedPlanIncome.baseIncome);
 
   const [expenseTransactions, goals, settlementLookup] = await Promise.all([
     prisma.transaction
@@ -184,30 +188,41 @@ export async function getPlanAdherence(
     }))
     .filter((tx) => tx.amount > 0);
 
-  const actualByBreakdown = new Map<string, number>();
+  const actualByBreakdown = new Map<BreakdownCategory, number>();
+  const actualByCategory = new Map<string, { amount: number; cat: BreakdownCategory }>();
+
   for (const tx of txInputs) {
     if (isNonPlanExpenseCategory(tx.categoryName ?? '')) continue;
 
-    const lineItem =
-      resolveTransactionLineItem(tx) ??
-      assignLineItemForUnmapped(tx.categoryName ?? 'Uncategorized');
-    if (!lineItem) continue;
-    const bucket = DATA.breakdown.find((item) => item.label === lineItem)?.cat;
-    if (!bucket) continue;
-    actualByBreakdown.set(bucket, (actualByBreakdown.get(bucket) || 0) + tx.amount);
+    const categoryName = tx.categoryName ?? 'Uncategorized';
+    const breakdownCat = mapCategoryToBucket(categoryName);
+
+    actualByBreakdown.set(
+      breakdownCat,
+      (actualByBreakdown.get(breakdownCat) || 0) + tx.amount,
+    );
+
+    const existing = actualByCategory.get(categoryName);
+    if (existing) {
+      existing.amount += tx.amount;
+    } else {
+      actualByCategory.set(categoryName, { amount: tx.amount, cat: breakdownCat });
+    }
   }
 
-  const buckets: BucketAdherence[] = PLAN_BUCKET_KEYS.map((key) => {
-    const budgetEntry = DATA.budget[key];
-    const breakdownKey = BUDGET_KEY_TO_BREAKDOWN[key];
-    const planned = scaledPlan.bucketPlanned.get(breakdownKey) || 0;
-    const actual = actualByBreakdown.get(breakdownKey) || 0;
+  const actualByUserBucket = rollupActualToUserBuckets(actualByBreakdown, userBudgetPlan.buckets);
+
+  const buckets: BucketAdherence[] = scaledUserBuckets.map((bucket) => {
+    const planned = bucket.planned;
+    const actual = actualByUserBucket.get(bucket.key) || 0;
     const remaining = Math.max(0, planned - actual);
     const percentUsed = planned > 0 ? (actual / planned) * 100 : actual > 0 ? 100 : 0;
 
     return {
-      key,
-      label: budgetEntry.label,
+      key: bucket.key,
+      label: bucket.label,
+      variant: bucket.variant,
+      percentage: bucket.percentage,
       planned,
       actual,
       remaining,
@@ -221,27 +236,21 @@ export async function getPlanAdherence(
     ? Math.round(buckets.reduce((sum, bucket) => sum + bucket.score, 0) / buckets.length)
     : 100;
 
-  const actualByLineItem = allocateTransactionsToLineItems(txInputs);
-  const lineItems: LineItemAdherence[] = DATA.breakdown.map((item) => {
-    const planned = item.amount;
-    const actual = Math.round(actualByLineItem.get(item.label) || 0);
-    const remaining = Math.max(0, planned - actual);
-    const percentUsed = planned > 0 ? (actual / planned) * 100 : actual > 0 ? 100 : 0;
+  const lineItems: LineItemAdherence[] = [...actualByCategory.entries()]
+    .sort((a, b) => b[1].amount - a[1].amount)
+    .map(([label, { amount, cat }]) => ({
+      label,
+      cat,
+      planned: 0,
+      actual: Math.round(amount),
+      remaining: 0,
+      percentUsed: amount > 0 ? 100 : 0,
+      status: 'on_track' as BucketStatus,
+      isBuffer: false,
+    }));
 
-    return {
-      label: item.label,
-      cat: item.cat,
-      planned,
-      actual,
-      remaining,
-      percentUsed,
-      status: getBucketStatus(percentUsed),
-      isBuffer: isBufferLineItem(item.label),
-    };
-  });
-
-  const plannedTotal = scaledPlan.plannedTotal;
-  const actualTotal = lineItems.reduce((sum, item) => sum + item.actual, 0);
+  const plannedTotal = scaledUserBuckets.reduce((sum, bucket) => sum + bucket.planned, 0);
+  const actualTotal = buckets.reduce((sum, bucket) => sum + bucket.actual, 0);
 
   const goalAdherence: GoalAdherence[] = (goals as any[]).map((goal) => {
     const targetAmount = Number(goal.targetAmount) || 0;
@@ -288,6 +297,8 @@ export async function getPlanAdherence(
     monthLabel,
     planBaseIncome: resolvedPlanIncome.baseIncome,
     planIncomeSource: resolvedPlanIncome.source,
+    budgetPlanName: userBudgetPlan.name,
+    budgetTemplateId: userBudgetPlan.templateId,
   };
 }
 
@@ -329,18 +340,20 @@ export async function getLineItemTransactions(
   );
 
   return transactions
-    .filter((tx) =>
-      transactionMatchesLineItem(
+    .filter((tx) => {
+      const categoryName = tx.category?.name ?? 'Uncategorized';
+      if (categoryName === lineItemLabel) return true;
+      return transactionMatchesLineItem(
         {
-          categoryName: tx.category?.name ?? 'Uncategorized',
+          categoryName,
           description: tx.description,
           store: tx.store,
           personName: tx.personName,
           amount: Number(tx.debitAmount) || 0,
         },
         lineItemLabel,
-      ),
-    )
+      );
+    })
     .map((tx) => {
       const grossAmount = Number(tx.debitAmount) || 0;
       const settlement = settlementLookup.byTransactionId.get(tx.id);

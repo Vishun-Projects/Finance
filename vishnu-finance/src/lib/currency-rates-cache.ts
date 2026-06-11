@@ -9,7 +9,6 @@ const CACHE_DURATION = 60000; // 1 minute
 export function clearCurrencyRatesCache(): void {
   cachedRates = {};
   lastFetchTime = 0;
-  console.log('✅ Currency rates cache cleared');
 }
 
 // Export function to get currency cache stats

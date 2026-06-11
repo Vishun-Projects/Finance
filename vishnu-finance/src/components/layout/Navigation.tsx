@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '../../contexts/AuthContext';
@@ -8,7 +8,6 @@ import { usePageHeader } from '@/contexts/PageHeaderContext';
 import {
   LogOut,
   User as UserIcon,
-  Menu,
   Sun,
   Moon,
 } from 'lucide-react';
@@ -20,40 +19,28 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from '@/components/ui/sheet';
 import { Avatar } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { useTheme } from '../../contexts/ThemeContext';
 import { cn } from '@/lib/utils';
-import { navLinkVariants } from '@/design/variants';
 import { patterns } from '@/design/patterns';
+import { navLinkVariants } from '@/design/variants';
 import {
   getPageTitle,
-  mobileDrawerItems,
+  mobileBottomNavItems,
   primaryNavItemsConfig,
 } from '@/lib/nav-config';
 import { hapticLight } from '@/lib/haptics';
-
-const mobilePrimaryNavItems = [
-  ...primaryNavItemsConfig.slice(0, 4),
-  { href: '#menu', label: 'More', icon: Menu },
-];
+import { MobileBottomNav } from '@/components/layout/mobile-bottom-nav';
 
 export default function Navigation() {
   const { user, logout } = useAuth();
   const { setTheme, isLoading, isDark } = useTheme();
   const { actions: pageActions } = usePageHeader();
   const pathname = usePathname();
-  const [isSheetOpen, setIsSheetOpen] = useState(false);
   const isDarkMode = !isLoading && isDark;
   const pageTitle = getPageTitle(pathname);
-  const hideMobileTopBar = pathname === '/dashboard';
+  const hideMobileTopBar = pathname === '/dashboard' || pathname === '/advisor' || pathname === '/plans';
 
   const activeByHref = useMemo(() => {
     return new Set(
@@ -139,126 +126,11 @@ export default function Navigation() {
         </div>
       </aside>
 
-      <nav className="safe-area-bottom fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-card lg:hidden">
-        <div className="mx-auto flex h-16 w-full max-w-screen-sm items-center justify-around gap-1 px-2 pb-[env(safe-area-inset-bottom)] sm:px-4">
-          {mobilePrimaryNavItems.map((item) => {
-            const Icon = item.icon;
-            const isMenu = item.label === 'More';
-            const isActive = activeByHref.has(item.href) && !isMenu;
-
-            if (isMenu) {
-              return (
-                <Sheet key={item.label} open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-                  <SheetTrigger asChild>
-                    <button
-                      className="btn-touch flex h-full flex-1 flex-col items-center justify-center gap-1 rounded-lg text-muted transition-all duration-200 active:scale-95 hover:text-foreground"
-                      onClick={handleNavTap}
-                    >
-                      <Icon className="size-5" />
-                      <span className="text-[10px] font-medium">{item.label}</span>
-                    </button>
-                  </SheetTrigger>
-                  <SheetContent side="bottom" className={cn(patterns.bottomSheet, 'h-[80vh] p-0')}>
-                    <SheetHeader className="border-b border-border p-6 text-left">
-                      <SheetTitle className="flex items-center gap-3 text-lg font-medium">
-                        <Avatar userId={user?.id || 'guest'} src={user?.avatarUrl} size="md" />
-                        <div className="flex flex-col">
-                          <span className="max-w-[180px] truncate text-base">{user?.name || 'Guest User'}</span>
-                          <span className="text-xs font-normal text-hint">{user?.email}</span>
-                        </div>
-                      </SheetTitle>
-                    </SheetHeader>
-
-                    <div className="custom-scrollbar flex h-full flex-col overflow-y-auto px-4 py-6 pb-20">
-                      <div className="space-y-1">
-                        <p className="mb-3 px-2 text-xs font-medium uppercase tracking-wider text-hint">More</p>
-                        {mobileDrawerItems.map((drawerItem) => {
-                          const DrawerIcon = drawerItem.icon;
-                          const isDrawerActive = activeByHref.has(drawerItem.href);
-                          return (
-                            <Link
-                              key={drawerItem.href}
-                              href={drawerItem.href}
-                              onClick={() => {
-                                setIsSheetOpen(false);
-                                handleNavTap();
-                              }}
-                              className={navLinkVariants({ active: isDrawerActive })}
-                            >
-                              <DrawerIcon className="size-5" />
-                              <span>{drawerItem.label}</span>
-                            </Link>
-                          );
-                        })}
-                      </div>
-
-                      <div className="mt-8 space-y-1">
-                        <p className="mb-3 px-2 text-xs font-medium uppercase tracking-wider text-hint">Preferences</p>
-                        <div
-                          className="flex items-center justify-between rounded-md px-3 py-3 text-muted hover:bg-surface"
-                          suppressHydrationWarning
-                        >
-                          <div className="flex items-center gap-3">
-                            {isDarkMode ? <Moon className="size-5" /> : <Sun className="size-5" />}
-                            <span className="text-sm font-medium">Dark Mode</span>
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setTheme(isDarkMode ? 'light' : 'dark')}
-                            className="h-6 w-10 p-0"
-                          >
-                            <div
-                              className={cn(
-                                'relative h-4 w-8 rounded-full transition-colors',
-                                isDarkMode ? 'bg-accent' : 'bg-surface'
-                              )}
-                            >
-                              <div
-                                className={cn(
-                                  'absolute top-0.5 size-3 rounded-full bg-background transition-all',
-                                  isDarkMode ? 'left-4' : 'left-0.5'
-                                )}
-                              />
-                            </div>
-                          </Button>
-                        </div>
-
-                        <button
-                          onClick={() => logout()}
-                          className="btn-touch flex w-full items-center gap-3 rounded-md px-3 py-3 text-destructive transition-colors hover:bg-[var(--danger-bg)]"
-                        >
-                          <LogOut className="size-5" />
-                          <span className="text-sm font-medium">Log out</span>
-                        </button>
-                      </div>
-                    </div>
-                  </SheetContent>
-                </Sheet>
-              );
-            }
-
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={handleNavTap}
-                className={cn(
-                  'btn-touch flex h-full flex-1 flex-col items-center justify-center gap-1 rounded-lg transition-all duration-200 active:scale-95',
-                  isActive ? 'text-foreground' : 'text-muted hover:text-foreground'
-                )}
-              >
-                <Icon className={cn('size-5', isActive && 'scale-110')} />
-                <span className={cn('text-[10px] font-medium', isActive && 'font-semibold')}>{item.label}</span>
-              </Link>
-            );
-          })}
-        </div>
-      </nav>
+      <MobileBottomNav items={mobileBottomNavItems} activeByHref={activeByHref} />
 
       <div
         className={cn(
-          'safe-top fixed top-0 left-0 right-0 z-40 flex h-12 items-center justify-between border-b border-border bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/80 lg:hidden',
+          'safe-top fixed top-0 left-0 right-0 z-40 flex h-12 items-center justify-between px-4 glass-ultra-thin glass-text lg:hidden',
           hideMobileTopBar ? 'pointer-events-none invisible h-0 opacity-0' : 'visible h-12 opacity-100'
         )}
       >

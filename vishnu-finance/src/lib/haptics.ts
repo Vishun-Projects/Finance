@@ -83,7 +83,6 @@ export const triggerHaptic = async (type: HapticType = 'medium'): Promise<void> 
       }
     } catch (error) {
       // Silently fail and fall back to vibration API
-      console.debug('Haptics plugin error:', error);
     }
   }
   
@@ -94,7 +93,6 @@ export const triggerHaptic = async (type: HapticType = 'medium'): Promise<void> 
       navigator.vibrate(pattern);
     } catch (error) {
       // Silently fail if vibration is not supported or blocked
-      console.debug('Vibration API error:', error);
     }
   }
 };

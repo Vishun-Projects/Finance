@@ -2,6 +2,7 @@ import { Suspense } from 'react';
 import { requireUser } from '@/lib/auth/server-auth';
 import { RouteLoadingState } from '@/components/feedback/route-fallbacks';
 import { loadGoals, loadDeadlines, loadWishlist } from '@/features/plans/loaders';
+import { loadDashboard } from '@/features/dashboard/loaders';
 import type { PlansBootstrap } from '@/features/plans/components/plans-page';
 import PlansPageClient from './page-client';
 
@@ -22,16 +23,20 @@ export default async function PlansPage({ searchParams }: PlansPageProps) {
   const user = await requireUser({ redirectTo: '/auth?tab=login' });
   const resolvedSearchParams = await searchParams;
 
-  const [goals, deadlines, wishlist] = await Promise.all([
+  const [goals, deadlines, wishlist, dashboard] = await Promise.all([
     loadGoals(user.id),
     loadDeadlines(user.id),
     loadWishlist(user.id),
+    loadDashboard(user.id),
   ]);
 
   const bootstrap: PlansBootstrap = {
     goals,
     deadlines,
     wishlist,
+    disciplineSummary: dashboard.disciplineSummary,
+    planIncomeContext: dashboard.planIncomeContext,
+    accountBalance: dashboard.accountBalance,
   };
 
   const defaultTab = isValidPlansTab(resolvedSearchParams?.tab) ? resolvedSearchParams.tab : 'overview';

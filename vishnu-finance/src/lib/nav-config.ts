@@ -7,6 +7,9 @@ import {
   Settings,
   Wallet,
   BookOpen,
+  LineChart,
+  Landmark,
+  FileBarChart,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -21,8 +24,9 @@ export const primaryNavItemsConfig: NavItem[] = [
   { href: '/advisor', label: 'Advisor', icon: Brain },
   { href: '/transactions', label: 'Transactions', icon: ReceiptText },
   { href: '/plans', label: 'Plans', icon: Layers },
-  { href: '/education', label: 'Insights', icon: BookOpen },
+  { href: '/education', label: 'Learn', icon: BookOpen },
   { href: '/financial-health', label: 'Health Score', icon: Heart },
+  { href: '/investments', label: 'Investments', icon: LineChart },
   { href: '/salary', label: 'Salary', icon: Wallet },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
@@ -31,6 +35,8 @@ export const primaryNavItemsConfig: NavItem[] = [
 export const secondaryRouteTitles: Record<string, string> = {
   '/profile': 'Profile',
   '/phase-plan': 'Phase Plan',
+  '/net-worth': 'Assets & debt',
+  '/reports': 'Reports',
   '/education/daily-news/history': 'News History',
 };
 
@@ -42,7 +48,7 @@ export function getPageTitle(pathname: string): string {
     return 'Daily News';
   }
   if (pathname.startsWith('/education/')) {
-    return 'Insights';
+    return 'Learn';
   }
 
   const match = primaryNavItemsConfig.find(
@@ -51,9 +57,14 @@ export function getPageTitle(pathname: string): string {
   return match?.label ?? 'Vishnu Finance';
 }
 
-export const mobilePrimaryNavItems = [
-  ...primaryNavItemsConfig.slice(0, 4),
-  { href: '#menu', label: 'More', icon: BookOpen }, // icon replaced in Navigation
+/** Secondary routes surfaced in Dashboard Overview Explore grid (ex bottom-nav More drawer) */
+export const mobileExploreItems: NavItem[] = [
+  ...primaryNavItemsConfig.slice(4),
+  { href: '/net-worth', label: 'Net worth', icon: Landmark },
+  { href: '/reports', label: 'Reports', icon: FileBarChart },
 ];
 
-export const mobileDrawerItems = primaryNavItemsConfig.slice(4);
+/** @deprecated use primaryNavItemsConfig.slice(0, 4) directly */
+export const mobileDrawerItems = mobileExploreItems;
+
+export const mobileBottomNavItems = primaryNavItemsConfig.slice(0, 4);

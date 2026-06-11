@@ -35,7 +35,6 @@ export class MailerService {
                 html
             });
 
-            console.log(`[MailerService] Message sent: %s`, info.messageId);
             return info;
         } catch (error) {
             console.error('[MailerService] Failed to send email:', error);

@@ -34,7 +34,6 @@ export async function generateAndSaveImagenImage(prompt: string, relativeUploadD
                 size: "1024x576"
             };
 
-            console.log(`[ImageGen] Attempting with model: ${model}...`);
 
             const response = await fetch(url, {
                 method: 'POST',
@@ -100,7 +99,6 @@ async function downloadAndSave(data: any, relativeUploadDir: string): Promise<st
 
         if (!imageUrl) return null;
 
-        console.log(`[ImageGen] Downloading image: ${imageUrl}`);
         const imageResponse = await fetch(imageUrl);
         if (!imageResponse.ok) return null;
 

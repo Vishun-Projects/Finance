@@ -83,5 +83,6 @@ class FinalTransaction:
     personName: Optional[str] = None
     commodity: Optional[str] = None
     upiId: Optional[str] = None
+    transactionId: Optional[str] = None
     date_iso: Optional[str] = None
     reasons: List[str] = field(default_factory=list)

@@ -9,12 +9,11 @@ export const revalidate = 60; // Revalidate every minute
 export async function GET(request: NextRequest) {
   // Rate limiting
   const routeType = getRouteType(request.nextUrl.pathname);
-  const rateLimitResponse = rateLimitMiddleware(routeType, request);
+  const rateLimitResponse = await rateLimitMiddleware(routeType, request);
   if (rateLimitResponse) {
     return rateLimitResponse;
   }
 
-  console.log('🔍 DEADLINES GET - Starting request');
   try {
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
@@ -24,14 +23,11 @@ export async function GET(request: NextRequest) {
     const pageSize = Math.min(parseInt(searchParams.get('pageSize') || '100'), 200); // Max 200 per page
     const skip = (page - 1) * pageSize;
     
-    console.log('🔍 DEADLINES GET - User ID:', userId, 'Page:', page, 'PageSize:', pageSize);
 
     if (!userId) {
-      console.log('❌ DEADLINES GET - No user ID provided');
       return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
     }
 
-    console.log('🔍 DEADLINES GET - Fetching from database for user:', userId);
     
     // PERFORMANCE: Get total count for pagination (only if needed)
     const getTotalCount = page === 1 || searchParams.get('includeTotal') === 'true';
@@ -67,7 +63,6 @@ export async function GET(request: NextRequest) {
       })
     ]);
 
-    console.log('✅ DEADLINES GET - Found deadlines:', deadlines.length, 'records');
     
     // Return paginated response with metadata
     const response: any = {
@@ -91,10 +86,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  console.log('➕ DEADLINES POST - Starting request');
   try {
     const body = await request.json();
-    console.log('➕ DEADLINES POST - Request body:', JSON.stringify(body, null, 2));
     
     const {
       title,
@@ -110,27 +103,11 @@ export async function POST(request: NextRequest) {
       userId
     } = body;
 
-    console.log('➕ DEADLINES POST - Extracted data:', {
-      title,
-      description,
-      amount,
-      dueDate,
-      isRecurring,
-      frequency,
-      category,
-      paymentMethod,
-      accountDetails,
-      notes,
-      userId
-    });
-
     // Validate required fields
     if (!title || !dueDate || !userId) {
-      console.log('❌ DEADLINES POST - Missing required fields');
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    console.log('➕ DEADLINES POST - Creating deadline in database...');
     // Create new deadline in database
     const newDeadline = await (prisma as any).deadline.create({
       data: {
@@ -150,7 +127,6 @@ export async function POST(request: NextRequest) {
       }
     });
 
-    console.log('✅ DEADLINES POST - Successfully created deadline:', JSON.stringify(newDeadline, null, 2));
     return NextResponse.json(newDeadline);
   } catch (error) {
     console.error('❌ DEADLINES POST - Error:', error);
@@ -160,18 +136,14 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
-  console.log('✏️ DEADLINES PATCH - Starting request');
   try {
     const body = await request.json();
     const { id, ...updateData } = body;
-    console.log('✏️ DEADLINES PATCH - Update data:', JSON.stringify({ id, ...updateData }, null, 2));
 
     if (!id) {
-      console.log('❌ DEADLINES PATCH - No ID provided');
       return NextResponse.json({ error: 'ID is required' }, { status: 400 });
     }
 
-    console.log('✏️ DEADLINES PATCH - Updating deadline in database...');
     // Update deadline in database
     const updatedDeadline = await (prisma as any).deadline.update({
       where: { id },
@@ -184,7 +156,6 @@ export async function PATCH(request: NextRequest) {
       }
     });
 
-    console.log('✅ DEADLINES PATCH - Successfully updated deadline:', JSON.stringify(updatedDeadline, null, 2));
     return NextResponse.json(updatedDeadline);
   } catch (error) {
     console.error('❌ DEADLINES PATCH - Error:', error);
@@ -194,24 +165,19 @@ export async function PATCH(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  console.log('🗑️ DEADLINES DELETE - Starting request');
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
-    console.log('🗑️ DEADLINES DELETE - ID to delete:', id);
 
     if (!id) {
-      console.log('❌ DEADLINES DELETE - No ID provided');
       return NextResponse.json({ error: 'ID is required' }, { status: 400 });
     }
 
-    console.log('🗑️ DEADLINES DELETE - Deleting from database...');
     // Delete from database
     await (prisma as any).deadline.delete({
       where: { id }
     });
 
-    console.log('✅ DEADLINES DELETE - Successfully deleted deadline');
     return NextResponse.json({ message: 'Deadline deleted successfully' });
   } catch (error) {
     console.error('❌ DEADLINES DELETE - Error:', error);

@@ -29,12 +29,21 @@ import {
 import { normalizeGoals } from '@/lib/utils/goal-normalize';
 import { CompactListRow } from '@/components/ui/compact-list-row';
 import { ResponsiveSheet } from '@/components/ui/responsive-sheet';
+import { Chip } from '@/components/ui/chip';
+import {
+  computeGoalMonthlyRequired,
+  formatDisciplineCurrency,
+  goalPaceLabel,
+  type DisciplineSummary,
+} from '@/lib/plans-discipline';
+import { formatDateLabel } from '@/features/plans/hooks/use-plans-insights';
 
 interface GoalsPageClientProps {
   initialGoals: Goal[];
   userId: string;
   layoutVariant?: 'standalone' | 'embedded';
   onGoalsChange?: (goals: Goal[]) => void;
+  disciplineSummary?: DisciplineSummary | null;
 }
 
 interface GoalFormState {
@@ -49,6 +58,13 @@ interface GoalFormState {
 
 const PRIORITY_OPTIONS: GoalPriority[] = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
 const STATUS_FILTERS: Array<'all' | GoalStatus> = ['all', 'ACTIVE', 'COMPLETED', 'PAUSED'];
+const CONTRIBUTION_SOURCES = ['Salary', 'Savings', 'Bonus', 'Investment', 'Other'] as const;
+
+interface ContributionFormState {
+  amount: string;
+  source: (typeof CONTRIBUTION_SOURCES)[number];
+  note: string;
+}
 
 function formatCurrency(amount: number): string {
   if (!Number.isFinite(amount)) {
@@ -75,6 +91,7 @@ export default function GoalsPageClient({
   userId,
   layoutVariant = 'standalone',
   onGoalsChange,
+  disciplineSummary,
 }: GoalsPageClientProps) {
   const [goals, setGoals] = useState<Goal[]>(() => normalizeGoals(initialGoals));
   const [statusFilter, setStatusFilter] = useState<'all' | GoalStatus>('all');
@@ -82,6 +99,14 @@ export default function GoalsPageClient({
   const [searchTerm, setSearchTerm] = useState('');
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [actionGoal, setActionGoal] = useState<Goal | null>(null);
+  const [contributionGoal, setContributionGoal] = useState<Goal | null>(null);
+  const [contributionOpen, setContributionOpen] = useState(false);
+  const [contributionForm, setContributionForm] = useState<ContributionFormState>({
+    amount: '',
+    source: 'Savings',
+    note: '',
+  });
+  const [isContributing, setIsContributing] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
   const [formState, setFormState] = useState<GoalFormState>({
@@ -118,6 +143,17 @@ export default function GoalsPageClient({
   const openCreateDialog = () => {
     resetForm();
     setDialogOpen(true);
+  };
+
+  const openContributionDialog = (goal: Goal) => {
+    setContributionGoal(goal);
+    setContributionForm({ amount: '', source: 'Savings', note: '' });
+    setContributionOpen(true);
+  };
+
+  const resetContributionForm = () => {
+    setContributionGoal(null);
+    setContributionForm({ amount: '', source: 'Savings', note: '' });
   };
 
   useEffect(() => {
@@ -298,6 +334,46 @@ export default function GoalsPageClient({
     }
   };
 
+  const handleContribute = async () => {
+    if (!contributionGoal) return;
+
+    const amount = parseFloat(contributionForm.amount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return;
+    }
+
+    setIsContributing(true);
+    try {
+      const newTotal = contributionGoal.currentAmount + amount;
+      const response = await fetch('/api/goals', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: contributionGoal.id,
+          contributionAmount: amount,
+          contributionSource: contributionForm.source,
+          contributionNote: contributionForm.note.trim() || null,
+          currentAmount: newTotal,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to add contribution');
+      }
+
+      setContributionOpen(false);
+      resetContributionForm();
+      const updated = await refreshGoals();
+      if (!updated && onGoalsChange) {
+        onGoalsChange(goals);
+      }
+    } catch (error) {
+      console.error('[goals] contribution failed', error);
+    } finally {
+      setIsContributing(false);
+    }
+  };
+
   const isEmbedded = layoutVariant === 'embedded';
 
   return (
@@ -315,6 +391,28 @@ export default function GoalsPageClient({
             : 'container-fluid space-y-4 pb-12 pt-4 md:pt-6 lg:pt-8',
         )}
       >
+        {disciplineSummary && disciplineSummary.capacity.available > 0 && goals.length > 0 && (
+          <section className="card-base border-[var(--success)]/30 bg-[var(--success)]/5 p-3">
+            <p className="text-sm font-medium text-foreground">Fund goals from plan headroom</p>
+            <p className="mt-1 text-xs text-muted">
+              You have {formatDisciplineCurrency(disciplineSummary.capacity.available)} available this month from
+              headroom + underspend. Mark a contribution from SIP or savings toward a goal below.
+            </p>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="mt-2 h-8"
+              onClick={() => {
+                const behind = goals.find((g) => g.status === 'ACTIVE');
+                if (behind) openContributionDialog(behind);
+              }}
+            >
+              Record goal contribution
+            </Button>
+          </section>
+        )}
+
         {!isEmbedded ? (
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -337,7 +435,7 @@ export default function GoalsPageClient({
             </div>
           </div>
         ) : (
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="hidden flex-col gap-2 sm:flex sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-lg font-semibold text-foreground">Goals</h2>
               <p className="text-xs text-muted-foreground">Stay on top of your savings targets.</p>
@@ -352,9 +450,9 @@ export default function GoalsPageClient({
                 <RefreshCw className={cn('h-3 w-3', isRefreshing && 'animate-spin')} />
                 Refresh
               </Button>
-              <Button size="sm" className="gap-2 hidden sm:flex" onClick={openCreateDialog}>
+              <Button size="sm" className="gap-2" onClick={openCreateDialog}>
                 <Plus className="h-3 w-3" />
-                Add
+                <span className="hidden sm:inline">Add</span>
               </Button>
             </div>
           </div>
@@ -406,7 +504,7 @@ export default function GoalsPageClient({
                 className="h-9 w-full max-w-xs"
               />
             </div>
-            <div className="md:hidden">
+            <div className="lg:hidden">
               <div className="flex items-center gap-2">
                 <Button
                   type="button"
@@ -451,6 +549,8 @@ export default function GoalsPageClient({
                   <th className="px-4 py-3">Goal</th>
                   <th className="px-4 py-3">Priority</th>
                   <th className="px-4 py-3">Progress</th>
+                  <th className="px-4 py-3">Pace</th>
+                  <th className="px-4 py-3">₹/month</th>
                   <th className="px-4 py-3 text-right">Saved</th>
                   <th className="px-4 py-3 text-right">Target</th>
                   <th className="px-4 py-3 text-right">Actions</th>
@@ -459,11 +559,17 @@ export default function GoalsPageClient({
               <tbody className="divide-y divide-border">
                 {filteredGoals.map((goal, idx) => {
                   const progress = calculateGoalProgress(goal);
+                  const discipline = computeGoalMonthlyRequired(goal);
                   return (
                     <tr key={goal.id} className="hover:bg-surface/80">
                       <td className="px-4 py-3 text-xs text-muted tabular-nums">{idx + 1}</td>
                       <td className="px-4 py-3">
                         <p className="font-medium text-foreground">{goal.title}</p>
+                        {goal.targetDate ? (
+                          <p className="text-[11px] text-muted">Target {formatDateLabel(goal.targetDate)}</p>
+                        ) : (
+                          <p className="text-[11px] text-muted">No target date</p>
+                        )}
                         {goal.category ? (
                           <p className="text-xs text-muted capitalize">{goal.category}</p>
                         ) : null}
@@ -477,10 +583,47 @@ export default function GoalsPageClient({
                           <span className="text-xs tabular-nums text-muted w-8 text-right">{progress}%</span>
                         </div>
                       </td>
+                      <td className="px-4 py-3">
+                        <Chip
+                          variant={
+                            discipline.paceStatus === 'on_track'
+                              ? 'success'
+                              : discipline.paceStatus === 'behind'
+                                ? 'warning'
+                                : 'neutral'
+                          }
+                          className="text-[10px]"
+                        >
+                          {goalPaceLabel(discipline.paceStatus)}
+                        </Chip>
+                      </td>
+                      <td className="px-4 py-3 tabular-nums text-xs text-muted">
+                        {discipline.monthlyRequired != null
+                          ? formatDisciplineCurrency(discipline.monthlyRequired)
+                          : '—'}
+                      </td>
                       <td className="px-4 py-3 text-right tabular-nums numeric">{formatCurrency(goal.currentAmount)}</td>
                       <td className="px-4 py-3 text-right tabular-nums numeric">{formatCurrency(goal.targetAmount)}</td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-8 text-[var(--success)]"
+                            title="Add contribution"
+                            onClick={() => openContributionDialog(goal)}
+                          >
+                            <ArrowUpRight className="size-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-8"
+                            title="Mark complete"
+                            onClick={() => handleMarkCompleted(goal)}
+                          >
+                            <CheckCircle className="size-3.5" />
+                          </Button>
                           <Button variant="ghost" size="icon" className="size-8" onClick={() => openEditDialog(goal)}>
                             <Target className="size-3.5" />
                           </Button>
@@ -494,7 +637,7 @@ export default function GoalsPageClient({
                 })}
                 {filteredGoals.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="px-4 py-12 text-center text-sm text-muted">
+                    <td colSpan={9} className="px-4 py-12 text-center text-sm text-muted">
                       No goals found.
                     </td>
                   </tr>
@@ -503,18 +646,25 @@ export default function GoalsPageClient({
             </table>
           </div>
 
-          <div className="divide-y divide-border md:hidden">
+          <div className="divide-y divide-border lg:hidden">
             {filteredGoals.map((goal) => {
               const progress = calculateGoalProgress(goal);
+              const discipline = computeGoalMonthlyRequired(goal);
               return (
                 <CompactListRow
                   key={goal.id}
                   icon={<Target className="size-4 text-muted" />}
                   title={goal.title}
-                  subtitle={goal.category ? goal.category : undefined}
+                  subtitle={
+                    discipline.monthlyRequired != null
+                      ? `${formatDisciplineCurrency(discipline.monthlyRequired)}/mo · ${goalPaceLabel(discipline.paceStatus)}`
+                      : goal.targetDate
+                        ? `Target ${formatDateLabel(goal.targetDate)} · ${goalPaceLabel(discipline.paceStatus)}`
+                        : 'Set target date'
+                  }
                   trailing={
                     <span className="text-xs text-muted">
-                      {progress}% · {formatCurrency(goal.currentAmount)}/{formatCurrency(goal.targetAmount)}
+                      {progress}% · {formatCurrency(goal.currentAmount)}
                     </span>
                   }
                   onClick={() => setActionGoal(goal)}
@@ -533,7 +683,32 @@ export default function GoalsPageClient({
         onOpenChange={(open) => !open && setActionGoal(null)}
         title={actionGoal?.title ?? 'Goal'}
         footer={
-          <div className="flex w-full gap-2">
+          <div className="flex w-full flex-col gap-2">
+            <Button
+              className="w-full"
+              onClick={() => {
+                if (actionGoal) {
+                  openContributionDialog(actionGoal);
+                  setActionGoal(null);
+                }
+              }}
+            >
+              <ArrowUpRight className="mr-2 size-3.5" />
+              Add contribution
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => {
+                if (actionGoal) {
+                  void handleMarkCompleted(actionGoal);
+                  setActionGoal(null);
+                }
+              }}
+            >
+              <CheckCircle className="mr-2 size-3.5" />
+              Mark complete
+            </Button>
             <Button
               variant="outline"
               className="flex-1"
@@ -558,12 +733,144 @@ export default function GoalsPageClient({
         }
       >
         {actionGoal && (
-          <div className="space-y-2 text-sm">
-            <p className="text-muted">
-              {calculateGoalProgress(actionGoal)}% · {formatCurrency(actionGoal.currentAmount)} of{' '}
-              {formatCurrency(actionGoal.targetAmount)}
-            </p>
-            <Badge variant="outline" className="capitalize">{actionGoal.priority.toLowerCase()}</Badge>
+          <div className="space-y-3 text-sm">
+            {(() => {
+              const discipline = computeGoalMonthlyRequired(actionGoal);
+              return (
+                <>
+                  <p className="text-muted">
+                    {calculateGoalProgress(actionGoal)}% · {formatCurrency(actionGoal.currentAmount)} of{' '}
+                    {formatCurrency(actionGoal.targetAmount)}
+                  </p>
+                  {discipline.monthlyRequired != null && (
+                    <p className="text-xs text-foreground">
+                      Save {formatDisciplineCurrency(discipline.monthlyRequired)}/mo
+                      {actionGoal.targetDate ? ` until ${formatDateLabel(actionGoal.targetDate)}` : ''}
+                    </p>
+                  )}
+                  <div className="flex flex-wrap gap-2">
+                    <Badge variant="outline" className="capitalize">{actionGoal.priority.toLowerCase()}</Badge>
+                    <Chip
+                      variant={
+                        discipline.paceStatus === 'on_track'
+                          ? 'success'
+                          : discipline.paceStatus === 'behind'
+                            ? 'warning'
+                            : 'neutral'
+                      }
+                      className="text-[10px]"
+                    >
+                      {goalPaceLabel(discipline.paceStatus)}
+                    </Chip>
+                  </div>
+                </>
+              );
+            })()}
+            {actionGoal.contributions && actionGoal.contributions.length > 0 && (
+              <div className="space-y-1.5 border-t border-border pt-3">
+                <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-hint">Recent contributions</p>
+                {actionGoal.contributions.slice(0, 3).map((contribution) => (
+                  <div key={contribution.id} className="flex items-center justify-between text-xs">
+                    <span className="text-muted">{contribution.source}</span>
+                    <span className="tabular-nums text-foreground">{formatCurrency(contribution.amount)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </ResponsiveSheet>
+
+      <ResponsiveSheet
+        open={contributionOpen}
+        onOpenChange={(open) => {
+          setContributionOpen(open);
+          if (!open) resetContributionForm();
+        }}
+        title="Add contribution"
+        description={contributionGoal ? `Add funds to ${contributionGoal.title}` : undefined}
+        footer={
+          <div className="flex w-full gap-2">
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() => {
+                setContributionOpen(false);
+                resetContributionForm();
+              }}
+              disabled={isContributing}
+            >
+              Cancel
+            </Button>
+            <Button
+              className="flex-1"
+              onClick={handleContribute}
+              disabled={isContributing || !contributionForm.amount}
+            >
+              {isContributing ? <Loader2 className="size-4 animate-spin" /> : 'Save contribution'}
+            </Button>
+          </div>
+        }
+      >
+        {contributionGoal && (
+          <div className="space-y-4">
+            <div className="rounded-md border border-border bg-surface p-3 text-sm">
+              <p className="text-muted">Current saved</p>
+              <p className="mt-1 text-lg font-medium tabular-nums">{formatCurrency(contributionGoal.currentAmount)}</p>
+              <p className="mt-2 text-xs text-hint">
+                Target {formatCurrency(contributionGoal.targetAmount)}
+              </p>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground" htmlFor="contribution-amount">
+                Amount (₹)
+              </label>
+              <Input
+                id="contribution-amount"
+                type="number"
+                min="1"
+                placeholder="5000"
+                value={contributionForm.amount}
+                onChange={(event) => setContributionForm((prev) => ({ ...prev, amount: event.target.value }))}
+                className="h-11"
+                autoFocus
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground">Source</label>
+              <Select
+                value={contributionForm.source}
+                onValueChange={(value) =>
+                  setContributionForm((prev) => ({
+                    ...prev,
+                    source: value as ContributionFormState['source'],
+                  }))
+                }
+              >
+                <SelectTrigger className="h-11">
+                  <SelectValue placeholder="Select source" />
+                </SelectTrigger>
+                <SelectContent>
+                  {CONTRIBUTION_SOURCES.map((source) => (
+                    <SelectItem key={source} value={source}>
+                      {source}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground" htmlFor="contribution-note">
+                Note (optional)
+              </label>
+              <Textarea
+                id="contribution-note"
+                rows={2}
+                placeholder="e.g. May salary savings"
+                value={contributionForm.note}
+                onChange={(event) => setContributionForm((prev) => ({ ...prev, note: event.target.value }))}
+              />
+            </div>
           </div>
         )}
       </ResponsiveSheet>

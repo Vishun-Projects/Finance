@@ -14,8 +14,17 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Callout } from '@/components/ui/callout';
 import { Chip } from '@/components/ui/chip';
-import { cn } from '@/lib/utils';
+import { cn, formatRupees } from '@/lib/utils';
 import { getTransactionDisplayName } from '@/lib/transaction-utils';
+import type { ImportPreviewResult } from '@/lib/import-preview-service';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { format } from 'date-fns';
 
 export interface ParsedBankTransaction {
   debit?: number | string;
@@ -36,8 +45,8 @@ interface ParsedTransactionsReviewModalProps {
   open: boolean;
   onClose: () => void;
   fileName?: string;
-  parsingViewMode: 'transactions' | 'raw' | 'json';
-  onParsingViewModeChange: (mode: 'transactions' | 'raw' | 'json') => void;
+  parsingViewMode: 'transactions' | 'import-check' | 'payees' | 'raw' | 'json';
+  onParsingViewModeChange: (mode: 'transactions' | 'import-check' | 'payees' | 'raw' | 'json') => void;
   parsedTransactions: ParsedBankTransaction[];
   filteredParsed: ParsedBankTransaction[];
   visibleParsed: ParsedBankTransaction[];
@@ -60,6 +69,15 @@ interface ParsedTransactionsReviewModalProps {
   totalPages: number;
   allowImportDespiteValidation: boolean;
   onAllowImportDespiteValidationChange: (value: boolean) => void;
+  forceInsertOnImport: boolean;
+  onForceInsertOnImportChange: (value: boolean) => void;
+  updateExistingOnImport: boolean;
+  onUpdateExistingOnImportChange: (value: boolean) => void;
+  importPreview: ImportPreviewResult | null;
+  importPreviewLoading?: boolean;
+  categories?: Array<{ id: string; name: string }>;
+  categoryOverrides: Record<string, string>;
+  onCategoryOverrideChange: (payeeKey: string, categoryId: string) => void;
   isImporting: boolean;
   importProgress: number;
   onImport: () => void;
@@ -93,6 +111,15 @@ export default function ParsedTransactionsReviewModal({
   totalPages,
   allowImportDespiteValidation,
   onAllowImportDespiteValidationChange,
+  forceInsertOnImport,
+  onForceInsertOnImportChange,
+  updateExistingOnImport,
+  onUpdateExistingOnImportChange,
+  importPreview,
+  importPreviewLoading,
+  categories = [],
+  categoryOverrides,
+  onCategoryOverrideChange,
   isImporting,
   importProgress,
   onImport,
@@ -133,11 +160,13 @@ export default function ParsedTransactionsReviewModal({
           </button>
         </div>
 
-        <div className="flex border-b px-5 bg-muted/20 shrink-0">
+        <div className="flex border-b px-5 bg-muted/20 shrink-0 overflow-x-auto">
           {(
             [
+              ['import-check', 'Import check'],
+              ['payees', 'Payees'],
               ['transactions', `Transactions (${filteredParsed.length})`],
-              ['raw', 'Pipeline debug'],
+              ['raw', 'Debug'],
               ['json', 'JSON'],
             ] as const
           ).map(([mode, label]) => (
@@ -158,6 +187,172 @@ export default function ParsedTransactionsReviewModal({
         </div>
 
         <div className="overflow-y-auto flex-1 min-h-0 p-5">
+          {parsingViewMode === 'import-check' && (
+            <div className="space-y-4">
+              {importPreviewLoading && (
+                <p className="text-sm text-muted-foreground">Analyzing overlaps and duplicates…</p>
+              )}
+              {importPreview && (
+                <>
+                  <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                    <div className="rounded-lg border border-border bg-muted/30 p-3">
+                      <p className="text-xs text-muted-foreground">New rows</p>
+                      <p className="text-lg font-semibold text-success">{importPreview.counts.new}</p>
+                    </div>
+                    <div className="rounded-lg border border-border bg-muted/30 p-3">
+                      <p className="text-xs text-muted-foreground">Duplicates</p>
+                      <p className="text-lg font-semibold text-warning">{importPreview.counts.duplicate}</p>
+                    </div>
+                    <div className="rounded-lg border border-border bg-muted/30 p-3">
+                      <p className="text-xs text-muted-foreground">In-file dupes</p>
+                      <p className="text-lg font-semibold text-muted-foreground">{importPreview.counts.inFileDuplicate}</p>
+                    </div>
+                    <div className="rounded-lg border border-border bg-muted/30 p-3">
+                      <p className="text-xs text-muted-foreground">Parsed closing</p>
+                      <p className="text-lg font-semibold tabular-nums">
+                        {importPreview.balance.parsedClosing != null
+                          ? formatInr(importPreview.balance.parsedClosing)
+                          : '—'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {importPreview.statementPeriod.start && importPreview.statementPeriod.end && (
+                    <Callout variant="info" title="Statement period">
+                      {format(new Date(importPreview.statementPeriod.start), 'd MMM yyyy')} →{' '}
+                      {format(new Date(importPreview.statementPeriod.end), 'd MMM yyyy')}
+                    </Callout>
+                  )}
+
+                  {importPreview.overlap.hasOverlap && importPreview.overlap.message && (
+                    <Callout variant="warning" title="Overlapping dates">
+                      {importPreview.overlap.message}
+                    </Callout>
+                  )}
+
+                  {importPreview.balance.parsedClosing != null &&
+                    importPreview.balance.lastStoredBalance != null &&
+                    Math.abs(importPreview.balance.parsedClosing - importPreview.balance.lastStoredBalance) > 1 && (
+                      <Callout variant="warning" title="Balance comparison">
+                        Parsed closing {formatInr(importPreview.balance.parsedClosing)} vs your current bank balance{' '}
+                        {formatRupees(importPreview.balance.lastStoredBalance)}.
+                      </Callout>
+                    )}
+
+                  {importPreview.duplicates.length > 0 && (
+                    <div className="rounded-lg border border-border overflow-hidden">
+                      <p className="border-b border-border bg-muted/30 px-3 py-2 text-xs font-medium">
+                        Sample duplicates ({importPreview.duplicates.length})
+                      </p>
+                      <ul className="max-h-40 divide-y divide-border overflow-y-auto text-xs">
+                        {importPreview.duplicates.slice(0, 8).map((dup) => (
+                          <li key={`${dup.existingId}-${dup.index}`} className="flex justify-between gap-2 px-3 py-2">
+                            <span className="truncate text-muted-foreground">
+                              {dup.date} · {dup.description.slice(0, 40)}
+                            </span>
+                            <span className="shrink-0 tabular-nums">{formatInr(dup.amount)}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {parseValidation?.valid === false && (
+                <Callout variant="warning" title="Balance mismatch">
+                  Parsed totals may not fully match running balances. Review before importing.
+                </Callout>
+              )}
+
+              <div className="space-y-2 rounded-lg border border-border p-3">
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={allowImportDespiteValidation}
+                    onChange={(e) => onAllowImportDespiteValidationChange(e.target.checked)}
+                  />
+                  Import despite balance mismatch
+                </label>
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={updateExistingOnImport}
+                    onChange={(e) => onUpdateExistingOnImportChange(e.target.checked)}
+                  />
+                  Update existing duplicate rows (otherwise skip duplicates)
+                </label>
+                <label className="flex items-center gap-2 text-sm cursor-pointer text-muted-foreground">
+                  <input
+                    type="checkbox"
+                    checked={forceInsertOnImport}
+                    onChange={(e) => onForceInsertOnImportChange(e.target.checked)}
+                  />
+                  Force re-insert all rows (advanced — skips duplicate detection)
+                </label>
+              </div>
+            </div>
+          )}
+
+          {parsingViewMode === 'payees' && (
+            <div className="space-y-3">
+              {!importPreview?.payees.length ? (
+                <p className="text-sm text-muted-foreground">No payees detected in this import.</p>
+              ) : (
+                importPreview.payees.map((payee) => (
+                  <div key={payee.key} className="rounded-lg border border-border p-3">
+                    <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <p className="text-sm font-medium text-foreground">{payee.displayName}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {payee.occurrences} txn(s) ·{' '}
+                          {payee.bucket === 'new'
+                            ? 'New payee'
+                            : payee.bucket === 'conflict'
+                              ? 'Category conflict'
+                              : 'Known payee'}
+                        </p>
+                      </div>
+                      <Badge variant="outline" className="text-[10px] capitalize">
+                        {payee.bucket}
+                      </Badge>
+                    </div>
+                    {payee.bucket === 'conflict' && payee.categories && (
+                      <p className="mb-2 text-xs text-muted-foreground">
+                        Existing:{' '}
+                        {payee.categories
+                          .map((c) => `${c.categoryName} (${c.count})`)
+                          .join(' · ')}
+                      </p>
+                    )}
+                    {(payee.bucket === 'new' || payee.bucket === 'conflict') && (
+                      <Select
+                        value={categoryOverrides[payee.key] || payee.suggestedCategoryId || ''}
+                        onValueChange={(value) => onCategoryOverrideChange(payee.key, value)}
+                      >
+                        <SelectTrigger className="h-9">
+                          <SelectValue placeholder="Choose category" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {categories.map((cat) => (
+                            <SelectItem key={cat.id} value={cat.id}>
+                              {cat.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                    {payee.bucket === 'known' && payee.suggestedCategoryName && (
+                      <p className="text-xs text-muted-foreground">
+                        Will use {payee.suggestedCategoryName}
+                      </p>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+
           {parsingViewMode === 'transactions' && (
             <div className="space-y-4">
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -190,20 +385,10 @@ export default function ParsedTransactionsReviewModal({
                 </div>
               </div>
 
-              {parseValidation?.valid === false && (
-                <>
-                  <Callout variant="warning" title="Balance mismatch">
-                    Parsed totals may not fully match running balances. Review before importing.
-                  </Callout>
-                  <label className="mt-2 flex items-center gap-2 text-sm cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={allowImportDespiteValidation}
-                      onChange={(e) => onAllowImportDespiteValidationChange(e.target.checked)}
-                    />
-                    Import anyway (skip duplicate checks)
-                  </label>
-                </>
+              {parseValidation?.valid === false && parsingViewMode === 'transactions' && (
+                <Callout variant="warning" title="Balance mismatch">
+                  Parsed totals may not fully match running balances. Review the Import check tab before importing.
+                </Callout>
               )}
 
               {statementMetadata && (
@@ -222,6 +407,18 @@ export default function ParsedTransactionsReviewModal({
                       <div>
                         <p className="text-xs text-muted-foreground">Holder</p>
                         <p>{String(statementMetadata.accountHolderName)}</p>
+                      </div>
+                    )}
+                    {statementMetadata.statementStartDate != null && (
+                      <div>
+                        <p className="text-xs text-muted-foreground">Period start</p>
+                        <p>{String(statementMetadata.statementStartDate).slice(0, 10)}</p>
+                      </div>
+                    )}
+                    {statementMetadata.statementEndDate != null && (
+                      <div>
+                        <p className="text-xs text-muted-foreground">Period end</p>
+                        <p>{String(statementMetadata.statementEndDate).slice(0, 10)}</p>
                       </div>
                     )}
                     {statementMetadata.openingBalance != null && (
@@ -275,7 +472,7 @@ export default function ParsedTransactionsReviewModal({
                 </div>
               </div>
 
-              <div className="hidden md:block border border-border rounded-lg overflow-hidden">
+              <div className="hidden lg:block border border-border rounded-lg overflow-hidden">
                 <table className="min-w-full text-sm">
                   <thead className="bg-muted/60 sticky top-0">
                     <tr>
@@ -325,7 +522,7 @@ export default function ParsedTransactionsReviewModal({
                 </table>
               </div>
 
-              <div className="md:hidden divide-y divide-border border border-border rounded-lg overflow-hidden">
+              <div className="lg:hidden divide-y divide-border border border-border rounded-lg overflow-hidden">
                 {visibleParsed.length === 0 ? (
                   <div className="px-4 py-8 text-center text-sm text-muted-foreground">No transactions in this view</div>
                 ) : (
@@ -484,7 +681,9 @@ export default function ParsedTransactionsReviewModal({
             )}
           </Button>
           <p className="text-xs text-center text-muted-foreground">
-            Credits → Income · Debits → Expenses · Duplicates skipped automatically
+            {importPreview
+              ? `${importPreview.counts.new} new · ${importPreview.counts.duplicate} duplicates skipped unless you update existing`
+              : 'Credits → Income · Debits → Expenses'}
           </p>
         </div>
       </div>

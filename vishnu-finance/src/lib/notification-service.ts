@@ -102,7 +102,6 @@ export class NotificationService {
 
         if (subscribers.length === 0) return [];
 
-        console.log(`[NotificationService] Starting broadcast to ${subscribers.length} users...`);
 
         return Promise.allSettled(
             subscribers.map(sub => this.notifyUser(sub.userId, {

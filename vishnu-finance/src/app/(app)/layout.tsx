@@ -32,7 +32,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <NavigationIsland />
       </Suspense>
 
-      <main className="flex-1 flex flex-col min-w-0 bg-background overflow-y-auto custom-scrollbar overflow-x-hidden pb-24 lg:pb-0">
+      <main className="flex-1 flex flex-col min-w-0 min-h-0 bg-background overflow-y-auto overflow-x-hidden max-lg:pb-[var(--app-bottom-inset)] lg:pb-0 max-lg:has-[data-fill-viewport]:overflow-hidden max-lg:has-[data-fill-viewport]:pb-0">
         <AppPageShell>{children}</AppPageShell>
       </main>
     </div>

@@ -129,14 +129,12 @@ export class AuthService {
   // Register new user
   static async registerUser(email: string, password: string, name?: string) {
     const startTime = Date.now();
-    console.log(`\u23F1\uFE0F REGISTER START: ${email}`);
 
     // Check if user already exists
     const dbStart1 = Date.now();
     const existingUser = await prisma.user.findUnique({
       where: { email }
     });
-    console.log(`\u23F1\uFE0F DB QUERY (findUnique): ${Date.now() - dbStart1}ms`);
 
     if (existingUser) {
       // Check if user is OAuth-only
@@ -160,7 +158,6 @@ export class AuthService {
         isVerified: false // Default to unverified
       }
     });
-    console.log(`\u23F1\uFE0F DB QUERY (create): ${Date.now() - dbStart2}ms`);
 
     // Generate OTP for the new user
     const otp = await this.generateOTP(email);
@@ -179,7 +176,6 @@ export class AuthService {
       await MailerService.sendOTP(email, otp);
     }
 
-    console.log(`\u23F1\uFE0F REGISTER COMPLETE: ${Date.now() - startTime}ms`);
 
     // Return user info but NO token
     return {
@@ -196,9 +192,6 @@ export class AuthService {
   // Login user
   static async loginUser(email: string, password: string) {
     const startTime = Date.now();
-    console.log('\uD83D\uDD12 LOGIN API - Starting login request');
-    console.log('\uD83D\uDD12 LOGIN API - Login attempt for email:', email);
-    console.log(`\u23F1\uFE0F LOGIN START: ${email}`);
 
     // Check if user exists
     const dbStart1 = Date.now();
@@ -208,23 +201,19 @@ export class AuthService {
         preferences: true
       }
     });
-    console.log(`\u23F1\uFE0F DB QUERY (findUnique): ${Date.now() - dbStart1}ms`);
 
     if (!user || !user.password) {
-      console.log('\u26A0\uFE0F LOGIN API - User not found or OAuth only');
       throw new Error('Invalid email or password');
     }
 
     // Compare password
     const isMatch = await this.comparePassword(password, user.password);
     if (!isMatch) {
-      console.log('\u26A0\uFE0F LOGIN API - Password mismatch');
       throw new Error('Invalid email or password');
     }
 
     // Check verification status
     if (!user.isVerified) {
-      console.log('\u26A0\uFE0F LOGIN API - User not verified');
       // Generate new OTP
       const otp = await this.generateOTP(user.email);
       // Resend OTP
@@ -244,12 +233,16 @@ export class AuthService {
 
     // Check if user is active
     if (!user.isActive) {
-      console.log('\u26A0\uFE0F LOGIN API - User account inactive');
       throw new Error('Account is inactive. Please contact support.');
     }
 
     // Generate tokens
-    const token = this.generateAccessToken({ userId: user.id, email: user.email });
+    const token = this.generateAccessToken({
+      userId: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+    });
 
     // Update last login
     const dbStart2 = Date.now();
@@ -257,9 +250,7 @@ export class AuthService {
       where: { id: user.id },
       data: { lastLogin: new Date() }
     });
-    console.log(`\u23F1\uFE0F DB QUERY (update): ${Date.now() - dbStart2}ms`);
 
-    console.log(`\u23F1\uFE0F LOGIN COMPLETE: ${Date.now() - startTime}ms`);
     return {
       user: {
         id: user.id,
@@ -299,7 +290,6 @@ export class AuthService {
     const cacheKey = `auth_user:${payload.userId}`;
     const cached = globalCache.get(cacheKey);
     if (cached) {
-      // console.log(`\u26A1 AUTH CACHE HIT (Global): ${payload.userId}`);
       return cached;
     }
 
@@ -332,14 +322,11 @@ export class AuthService {
         }
       });
 
-      console.log(`\u23F1\uFE0F GET USER FROM TOKEN DB QUERY: ${Date.now() - dbStart}ms`);
 
       if (!user) {
-        console.log('\u26A0\uFE0F GET USER FROM TOKEN - User not found');
         return null;
       }
 
-      console.log(`\u2705 GET USER FROM TOKEN SUCCESS in ${Date.now() - startTime}ms`);
 
       // AI OPTIMIZATION: Update Persistent Global Cache
       globalCache.set(cacheKey, user, this.CACHE_TTL);

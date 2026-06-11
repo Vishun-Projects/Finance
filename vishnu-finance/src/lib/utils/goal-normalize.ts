@@ -17,6 +17,10 @@ export function normalizeGoal(goal: Goal): Goal {
     targetAmount: toNumber(goal.targetAmount),
     currentAmount: toNumber(goal.currentAmount),
     imageUrl: goal.imageUrl,
+    contributions: goal.contributions?.map((contribution) => ({
+      ...contribution,
+      amount: toNumber(contribution.amount),
+    })),
   };
 }
 

@@ -1,7 +1,0 @@
-node_modules
-.expo
-.next
-dist
-build
-web-build
-*.log

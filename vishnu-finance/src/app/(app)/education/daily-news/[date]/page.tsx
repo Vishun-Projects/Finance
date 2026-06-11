@@ -59,7 +59,7 @@ export default async function DailyBriefingPage({ params }: { params: Promise<{ 
                         <span className="text-muted-foreground font-sans text-[10px] uppercase tracking-[0.2em]">Daily Briefing</span>
                     </div>
                     <div className="flex items-center gap-4">
-                        <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-accent/50 rounded-full border border-border">
+                        <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 bg-accent/50 rounded-full border border-border">
                             <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
                             <span className="text-[10px] font-sans font-bold uppercase tracking-wider text-foreground">Live Market</span>
                         </div>
@@ -70,7 +70,7 @@ export default async function DailyBriefingPage({ params }: { params: Promise<{ 
                     </div>
                 </div>
 
-                <div className="max-w-4xl mx-auto px-6 pb-24">
+                <div className="max-w-4xl mx-auto px-6">
                     {/* Header Image Banner */}
                     <div className="relative mt-6 mb-8 rounded-xl overflow-hidden w-full aspect-[3/1] shadow-lg bg-muted group">
                         {briefing.heroImage ? (

@@ -1,18 +1,19 @@
 'use client';
 
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { ArrowRight, ChevronRight } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { LineItemTransactionsSheet } from '@/features/dashboard/components/line-item-transactions-sheet';
+import { BudgetSetupSheet } from '@/features/dashboard/components/budget-setup-sheet';
+import { TakeHomeAnchor } from '@/components/finance/take-home-anchor';
 import { CAT_LABEL } from '@/features/money-plan/data/money-plan';
 import { categoryColorVar } from '@/design/tokens';
 import type { BucketAdherence, LineItemAdherence } from '@/lib/plan-adherence-service';
-import { planIncomeSourceLabel } from '@/lib/plan-income';
+import { planIncomeSourceLabel, receivedSalarySourceLabel, type PlanIncomeContext, type PlanIncomeSource } from '@/lib/plan-income';
 import { cn, formatRupees } from '@/lib/utils';
 
 function bucketStatusLabel(status: BucketAdherence['status']) {
@@ -31,11 +32,16 @@ function progressClass(status: BucketAdherence['status']) {
 
 function BucketRow({ bucket }: { bucket: BucketAdherence }) {
   return (
-    <div className="max-md:space-y-1">
-      <div className="mb-1.5 flex items-center justify-between gap-2 text-xs max-md:mb-1">
+    <div className="max-lg:space-y-1">
+      <div className="mb-1.5 flex items-center justify-between gap-2 text-xs max-lg:mb-1">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="font-medium text-foreground">{bucket.label}</span>
-          <Badge variant="outline" className="max-md:hidden px-1.5 py-0 text-[10px] font-normal md:inline-flex">
+          <span className="font-medium text-foreground">
+            {bucket.label}
+            {bucket.percentage != null ? (
+              <span className="ml-1 font-normal text-muted">({bucket.percentage}%)</span>
+            ) : null}
+          </span>
+          <Badge variant="outline" className="max-lg:hidden px-1.5 py-0 text-[10px] font-normal md:inline-flex">
             {bucketStatusLabel(bucket.status)}
           </Badge>
         </div>
@@ -47,7 +53,7 @@ function BucketRow({ bucket }: { bucket: BucketAdherence }) {
       <p className="mt-1 hidden text-[10px] text-muted md:block">
         {bucket.status === 'over'
           ? `${formatRupees(bucket.actual - bucket.planned)} over plan`
-          : `${formatRupees(bucket.remaining)} remaining`}
+          : `${formatRupees(bucket.remaining)} left in plan`}
       </p>
     </div>
   );
@@ -92,7 +98,9 @@ function LineItemRow({
         <div className="flex shrink-0 items-center gap-1 text-right">
           <div>
             <p className="text-xs tabular-nums text-foreground">
-              {formatRupees(item.actual)} / {formatRupees(item.planned)}
+              {item.planned > 0
+                ? `${formatRupees(item.actual)} / ${formatRupees(item.planned)}`
+                : formatRupees(item.actual)}
             </p>
             {item.status !== 'on_track' && (
               <Badge variant="outline" className="mt-0.5 px-1 py-0 text-[9px] font-normal">
@@ -109,7 +117,7 @@ function LineItemRow({
           ? `${formatRupees(item.planned)} planned · tap to inspect`
           : item.status === 'over'
             ? `${formatRupees(item.actual - item.planned)} over plan · tap to see transactions`
-            : `${formatRupees(item.remaining)} remaining · tap to see transactions`}
+            : `${formatRupees(item.remaining)} left in plan · tap to see transactions`}
       </p>
     </button>
   );
@@ -120,9 +128,10 @@ interface PlanVsActualSectionProps {
   lineItems: LineItemAdherence[];
   plannedTotal: number;
   actualTotal: number;
-  monthlyIncome: number;
+  salaryReceived: number;
   planBaseIncome: number;
-  planIncomeSource: 'salary_structure' | 'transaction_salary' | 'default';
+  planIncomeSource: PlanIncomeSource;
+  planIncomeContext?: PlanIncomeContext;
   incomeBreakdown?: {
     salary: number;
     family: number;
@@ -130,6 +139,10 @@ interface PlanVsActualSectionProps {
     total: number;
   };
   maxHeight?: number;
+  className?: string;
+  /** Expand card to fill parent height on mobile (dashboard Plans tab) */
+  fillHeight?: boolean;
+  budgetPlanName?: string;
 }
 
 export function PlanVsActualSection({
@@ -137,51 +150,77 @@ export function PlanVsActualSection({
   lineItems,
   plannedTotal,
   actualTotal,
-  monthlyIncome,
+  salaryReceived,
   planBaseIncome,
   planIncomeSource,
+  planIncomeContext,
   incomeBreakdown,
   maxHeight,
+  className,
+  fillHeight = false,
+  budgetPlanName,
 }: PlanVsActualSectionProps) {
   const router = useRouter();
   const totalDelta = actualTotal - plannedTotal;
   const [selectedLineItem, setSelectedLineItem] = useState<LineItemAdherence | null>(null);
   const [showAllBreakdown, setShowAllBreakdown] = useState(false);
+  const [budgetSheetOpen, setBudgetSheetOpen] = useState(false);
   const visibleLineItems = showAllBreakdown ? lineItems : lineItems.slice(0, 5);
 
   return (
-    <>
+    <div
+      className={cn(
+        fillHeight && 'flex min-h-0 flex-1 flex-col',
+        className,
+      )}
+    >
+      <TakeHomeAnchor
+        baseIncome={planBaseIncome}
+        source={planIncomeSource}
+        variant="compact"
+        className="mb-3 shrink-0 max-lg:mb-2"
+        activeSalaryTakeHome={planIncomeContext?.activeSalaryTakeHome}
+        currentMonthSalaryReceived={planIncomeContext?.currentMonthSalaryReceived}
+        lastMonthSalaryReceived={planIncomeContext?.lastMonthSalaryReceived}
+        receivedSalarySource={planIncomeContext?.receivedSalarySource}
+      />
       <section
-        className="card-base flex min-h-0 flex-col overflow-hidden p-4 max-md:max-h-[45dvh] max-md:p-3"
+        className={cn(
+          'card-base flex min-h-0 flex-col overflow-hidden p-4 max-lg:p-3',
+          fillHeight && 'min-h-0 flex-1',
+        )}
         style={maxHeight ? { maxHeight: `${maxHeight}px` } : undefined}
       >
-        <div className="mb-4 flex shrink-0 items-center justify-between gap-2 max-md:mb-2">
+        <div className="mb-4 flex shrink-0 items-center justify-between gap-2 max-lg:mb-2">
           <div>
-            <h2 className="text-sm font-medium text-foreground">Monthly plan vs actual</h2>
-            <p className="max-md:hidden text-[10px] text-muted">
-              Budget scaled to {formatRupees(planBaseIncome)} take-home ({planIncomeSourceLabel(planIncomeSource)})
+            <h2 className="text-sm font-medium text-foreground">Monthly budget vs actual</h2>
+            <p className="text-[10px] text-muted">
+              {budgetPlanName ?? 'Your budget'} · scaled to {formatRupees(planBaseIncome)} take-home (
+              {planIncomeSourceLabel(planIncomeSource)})
             </p>
           </div>
-          <Button variant="ghost" size="sm" className="h-7 text-xs" asChild>
-            <Link href="/phase-plan">
-              View plan
-              <ArrowRight className="ml-1 size-3" />
-            </Link>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 shrink-0 text-xs"
+            onClick={() => setBudgetSheetOpen(true)}
+          >
+            Edit budget
           </Button>
         </div>
 
         <Tabs defaultValue="overview" className="flex min-h-0 w-full flex-1 flex-col">
-          <TabsList className="mb-4 h-8 w-full shrink-0 justify-start bg-surface max-md:mb-2 max-md:h-7">
+          <TabsList className="mb-4 h-8 w-full shrink-0 justify-start bg-surface max-lg:mb-2 max-lg:h-7">
             <TabsTrigger value="overview" className="h-7 px-3 text-xs">
               Overview
             </TabsTrigger>
             <TabsTrigger value="breakdown" className="h-7 px-3 text-xs">
-              Full breakdown
+              By category
             </TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="mt-0 flex min-h-0 flex-1 flex-col data-[state=inactive]:hidden">
-            <div className="custom-scrollbar min-h-0 flex-1 space-y-4 overflow-y-auto pr-1 max-md:space-y-2">
+            <div className="custom-scrollbar min-h-0 flex-1 space-y-4 overflow-y-auto pr-1 max-lg:space-y-2">
               {buckets.map((bucket) => (
                 <BucketRow key={bucket.key} bucket={bucket} />
               ))}
@@ -204,7 +243,7 @@ export function PlanVsActualSection({
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="mt-2 h-8 w-full text-xs md:hidden"
+                  className="mt-2 h-8 w-full text-xs lg:hidden"
                   onClick={() => setShowAllBreakdown((v) => !v)}
                 >
                   {showAllBreakdown ? 'Show less' : `Show all ${lineItems.length} items`}
@@ -225,33 +264,51 @@ export function PlanVsActualSection({
                   : ` (${totalDelta > 0 ? 'over' : 'under'} by ${formatRupees(Math.abs(totalDelta))})`}
               </span>
             </div>
-            {monthlyIncome > plannedTotal && (
-              <p className="mt-2 hidden shrink-0 text-[10px] text-muted md:block">
-                Plan allocates {formatRupees(plannedTotal)} of {formatRupees(monthlyIncome)} received this month
-                {incomeBreakdown && incomeBreakdown.family > 0
-                  ? ` (salary ${formatRupees(incomeBreakdown.salary)} + family ${formatRupees(incomeBreakdown.family)}`
-                    + (incomeBreakdown.other > 0 ? ` + other ${formatRupees(incomeBreakdown.other)}` : '')
-                    + ')'
+            {salaryReceived > plannedTotal && (
+              <p className="mt-2 shrink-0 text-[10px] text-muted">
+                Plan allocates {formatRupees(plannedTotal)} of {formatRupees(salaryReceived)} salary credited
+                {planIncomeContext?.receivedSalarySource && planIncomeContext.receivedSalarySource !== 'none'
+                  ? ` (${receivedSalarySourceLabel(planIncomeContext.receivedSalarySource)})`
                   : ''}
                 {' · '}
-                {formatRupees(monthlyIncome - plannedTotal)} unallocated headroom
+                {formatRupees(salaryReceived - plannedTotal)} unallocated headroom
               </p>
             )}
-            {monthlyIncome <= plannedTotal && planBaseIncome > 0 && (
-              <p className="mt-2 hidden shrink-0 text-[10px] text-muted md:block">
+            {salaryReceived <= plannedTotal && planBaseIncome > 0 && (
+              <p className="mt-2 shrink-0 text-[10px] text-muted">
                 Plan targets {formatRupees(plannedTotal)} based on {formatRupees(planBaseIncome)} take-home.
-                {monthlyIncome < plannedTotal
-                  ? ` Received ${formatRupees(monthlyIncome)} so far this month.`
-                  : ''}
+                {salaryReceived < plannedTotal && salaryReceived > 0
+                  ? ` Salary credited ${formatRupees(salaryReceived)}${
+                      planIncomeContext?.receivedSalarySource &&
+                      planIncomeContext.receivedSalarySource !== 'none'
+                        ? ` (${receivedSalarySourceLabel(planIncomeContext.receivedSalarySource)})`
+                        : ''
+                    }.`
+                  : salaryReceived === 0 && planIncomeContext?.lastMonthSalaryReceived
+                    ? ` No salary credited this month yet · last month ${formatRupees(planIncomeContext.lastMonthSalaryReceived)}.`
+                    : salaryReceived === 0
+                      ? ' No salary credited yet this month.'
+                      : ''}
+                {incomeBreakdown && incomeBreakdown.total > salaryReceived && (
+                  <> Total income {formatRupees(incomeBreakdown.total)} incl. non-salary credits.</>
+                )}
               </p>
             )}
-            <p className="mt-2 hidden shrink-0 text-[10px] text-muted md:block">
-              Tap any row to see the transactions behind it. Lend money to a friend and got it back?
-              Link both transactions so only the net counts.
+            <p className="mt-2 shrink-0 text-[10px] text-muted">
+              Investments and insurance lines are part of your phase plan — Goals on Plans are tracked separately.
+            </p>
+            <p className="mt-1 shrink-0 text-[10px] text-muted max-lg:hidden">
+              Category spend this month — tap a row to see transactions.
             </p>
           </TabsContent>
         </Tabs>
       </section>
+
+      <BudgetSetupSheet
+        open={budgetSheetOpen}
+        onOpenChange={setBudgetSheetOpen}
+        onSaved={() => router.refresh()}
+      />
 
       <LineItemTransactionsSheet
         open={selectedLineItem !== null}
@@ -263,6 +320,6 @@ export function PlanVsActualSection({
         actual={selectedLineItem?.actual ?? 0}
         onUpdated={() => router.refresh()}
       />
-    </>
+    </div>
   );
 }

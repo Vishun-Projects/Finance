@@ -20,6 +20,8 @@ import { toast } from 'sonner';
 import { BiometricService } from '@/lib/mobile/biometric';
 import { Capacitor } from '@capacitor/core';
 import { Fingerprint } from 'lucide-react';
+import { legalConfig } from '@/lib/legal-config';
+import { SiteFooter } from '@/components/layout/site-footer';
 
 type AuthTab = 'login' | 'register';
 
@@ -88,15 +90,12 @@ function AuthPageInner({ initialTab }: AuthPageClientProps) {
   useEffect(() => {
     const checkBiometrics = async () => {
       const platform = Capacitor.getPlatform();
-      console.log(`📱 Platform Detected: ${platform}`);
-      console.log('📱 Checking biometric availability...');
 
       if (Capacitor.isNativePlatform()) {
         // Retry logic for bridge initialization
         let available = false;
         for (let i = 0; i < 5; i++) { // Increased retries
           available = await BiometricService.isAvailable();
-          console.log(`📱 Biometric attempt ${i + 1} for ${platform}: ${available}`);
           if (available) break;
           await new Promise(resolve => setTimeout(resolve, 1000));
         }
@@ -105,7 +104,6 @@ function AuthPageInner({ initialTab }: AuthPageClientProps) {
           console.warn('⚠️ Biometrics reported unavailable after 5 attempts.');
         }
       } else {
-        console.log('🖥️ Not a native platform, biometrics disabled.');
       }
     };
     checkBiometrics();
@@ -144,12 +142,9 @@ function AuthPageInner({ initialTab }: AuthPageClientProps) {
   // Database Connection Debugger (For User Verification)
   useEffect(() => {
     const verifyConnection = async () => {
-      console.log('🔍 [Debug] Initiating Database Connection Check...');
       try {
         const result = await checkDatabaseConnection();
-        console.log('🔍 [Debug] Database Connection Result:', result);
         if (result.success) {
-          console.log('[Debug] Database connected successfully');
         } else {
           console.error('[Debug] Database connection failed:', result.message);
         }
@@ -166,7 +161,6 @@ function AuthPageInner({ initialTab }: AuthPageClientProps) {
     const challenge = searchParams.get('challenge');
     const emailParam = searchParams.get('email');
     if (challenge === 'otp' && emailParam) {
-      console.log('🛡️ Intercepted security challenge: Switching to OTP verification');
       setVerificationEmail(emailParam);
       setShowOTP(true);
       toast.info('Security verification required. A code has been sent to your registered device.');
@@ -192,7 +186,6 @@ function AuthPageInner({ initialTab }: AuthPageClientProps) {
         if (Capacitor.isNativePlatform()) {
           const saveSuccess = await BiometricService.setCredentials(loginData.email, loginData.password);
           if (saveSuccess) {
-            console.log('🔐 Credentials saved securely for biometrics');
           }
         }
 
@@ -338,7 +331,7 @@ function AuthPageInner({ initialTab }: AuthPageClientProps) {
   };
 
   return (
-    <div className="flex min-h-screen w-full bg-background text-foreground selection:bg-primary/30 selection:text-primary-foreground">
+    <div className="flex min-h-0 w-full flex-1 bg-background text-foreground selection:bg-primary/30 selection:text-primary-foreground lg:min-h-screen">
       {/* Left Panel - Premium Visuals */}
       <div className="relative hidden w-[60%] lg:flex flex-col justify-between overflow-hidden bg-card/50">
         <div className="absolute inset-0">
@@ -353,12 +346,12 @@ function AuthPageInner({ initialTab }: AuthPageClientProps) {
           <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-transparent to-background/20" />
         </div>
 
-        <div className="relative z-10 p-12 flex items-center gap-3">
-          <div className="relative h-12 w-12 overflow-hidden rounded-xl border border-border shadow-lg bg-background/50 backdrop-blur-md flex items-center justify-center">
+        <a href="/about" className="relative z-10 flex items-center gap-3 p-12 transition-opacity hover:opacity-90">
+          <div className="relative flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl border border-border bg-background/50 shadow-lg backdrop-blur-md">
             <Image src={logoSrc} alt="Logo" width={32} height={32} className="object-contain" />
           </div>
-          <span className="text-xl font-bold tracking-wide text-foreground">Vishnu Finance</span>
-        </div>
+          <span className="text-xl font-bold tracking-wide text-foreground">{legalConfig.brandName}</span>
+        </a>
 
         <div className="relative z-10 p-12 max-w-2xl">
           <motion.div
@@ -392,7 +385,21 @@ function AuthPageInner({ initialTab }: AuthPageClientProps) {
       </div>
 
       {/* Right Panel - Auth Form */}
-      <div className="flex-1 flex flex-col items-center justify-center p-6 md:p-12 relative bg-background">
+      <div className="relative flex flex-1 flex-col overflow-y-auto">
+        {/* Mobile top bar */}
+        <div className="relative z-20 flex items-center justify-between border-b border-border/60 bg-background/90 px-4 py-3 backdrop-blur-xl safe-top lg:hidden">
+          <a href="/about" className="flex items-center gap-2 transition-opacity hover:opacity-90">
+            <div className="flex size-8 items-center justify-center rounded-lg border border-border/80 bg-card">
+              <Image src={logoSrc} alt="" width={20} height={20} className="object-contain" />
+            </div>
+            <span className="text-sm font-semibold">{legalConfig.brandName}</span>
+          </a>
+          <a href="/about" className="text-sm font-medium text-primary hover:underline">
+            About
+          </a>
+        </div>
+
+        <div className="relative flex flex-1 flex-col items-center justify-center p-6 pb-8 md:p-10 lg:p-12 safe-bottom">
         {/* Mobile Background (Absolute) */}
         <div className="absolute inset-0 lg:hidden z-0">
           <Image
@@ -408,17 +415,9 @@ function AuthPageInner({ initialTab }: AuthPageClientProps) {
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.5 }}
-          className="w-full max-w-sm z-10 space-y-8"
+          className="z-10 w-full max-w-[400px] space-y-6"
         >
-          {/* Mobile Logo */}
-          <div className="flex flex-col items-center gap-4 lg:hidden mb-8">
-            <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-primary/20 to-background border border-primary/30 flex items-center justify-center shadow-lg icon-glow">
-              <Image src={logoSrc} alt="Logo" width={40} height={40} className="object-contain" />
-            </div>
-            <h2 className="text-2xl font-bold text-foreground">Vishnu Finance</h2>
-          </div>
-
-          <div>
+          <div className="rounded-2xl border border-border/60 bg-card/40 p-6 shadow-sm backdrop-blur-md sm:p-8">
             <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as AuthTab)} className="w-full">
               <TabsList className="grid w-full grid-cols-2 bg-muted/50 p-1 border border-border rounded-xl backdrop-blur-sm">
                 <TabsTrigger
@@ -655,12 +654,14 @@ function AuthPageInner({ initialTab }: AuthPageClientProps) {
             </Tabs>
 
 
-            <div className="mt-8 text-center text-xs text-muted-foreground">
-              Protected by Vishnu Finance Security. <br />
-              By continuing, you agree to our Terms & Policy.
-            </div>
+            <p className="mt-6 text-center text-[11px] leading-relaxed text-muted-foreground">
+              Protected by {legalConfig.brandName} Security.
+            </p>
           </div>
+
+          <SiteFooter variant="auth" />
         </motion.div>
+        </div>
       </div>
     </div>
   );

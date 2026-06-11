@@ -50,7 +50,6 @@ export function MobileNavigationListener() {
 
         // 2. Lifecycle Listeners (Security & UX)
         const pauseListener = App.addListener('appStateChange', ({ isActive }) => {
-            console.log('📱 App state changed. Active:', isActive);
             setIsAppPaused(!isActive);
 
             if (!isActive) {
@@ -78,7 +77,6 @@ export function MobileNavigationListener() {
 
         // 4. Handle Deep Links (OAuth Callbacks & App Links)
         const appUrlListener = App.addListener('appUrlOpen', async (data) => {
-            console.log('📱 [MobileNav] App opened with URL:', data.url);
 
             try {
                 const url = new URL(data.url);
@@ -86,13 +84,11 @@ export function MobileNavigationListener() {
                 if (url.host === 'oauth-callback' || url.pathname === '/oauth-callback' || url.pathname.includes('oauth-callback')) {
                     const token = url.searchParams.get('token');
                     if (token) {
-                        console.log('🔐 [MobileNav] OAuth token detected in URL');
                         Haptics.notification({ type: 'success' as any });
 
                         if (Capacitor.isNativePlatform()) {
                             const { CapacitorCookies } = await import('@capacitor/core');
 
-                            console.log('🔐 [MobileNav] Syncing token to native vault...');
                             await CapacitorCookies.setCookie({
                                 url: 'https://vishun-finance.vercel.app',
                                 key: 'auth-token',
@@ -103,7 +99,6 @@ export function MobileNavigationListener() {
 
                             // Verify cookie was set (Diagnostic)
                             const cookies = await CapacitorCookies.getCookies({ url: 'https://vishun-finance.vercel.app' });
-                            console.log('🔐 [MobileNav] Native vault sync check:', cookies['auth-token'] ? 'SUCCESS' : 'FAILED');
                         } else {
                             document.cookie = `auth-token=${token}; path=/; max-age=604800; SameSite=None; Secure`;
                         }
@@ -111,9 +106,7 @@ export function MobileNavigationListener() {
                         toast.success('Secure session established');
 
                         // Safety delay to ensure bridge sync before navigation
-                        console.log('📱 [MobileNav] Delaying dashboard entry for sync stability...');
                         setTimeout(() => {
-                            console.log('🚀 [MobileNav] Navigating to dashboard');
                             window.location.href = '/dashboard';
                         }, 500);
                         return;

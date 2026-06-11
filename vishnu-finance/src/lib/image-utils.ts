@@ -90,20 +90,17 @@ export async function generatePollinationsImage(prompt: string, relativeUploadDi
 
     // Strategy 1: Flux Model (High Quality)
     const fluxUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1024&height=576&nologo=true&seed=${seed}&model=flux`;
-    console.log(`[ImageGen] Strategy 1 (Flux): ${fluxUrl}`);
     const fluxPath = await downloadAndSaveImage(fluxUrl, relativeUploadDir);
     if (fluxPath) return fluxPath;
 
     // Strategy 2: Default/Turbo Model (Reliable/Fast)
     const turboUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1024&height=576&nologo=true&seed=${seed}&model=turbo`;
-    console.log(`[ImageGen] Strategy 2 (Turbo): ${turboUrl}`);
     const turboPath = await downloadAndSaveImage(turboUrl, relativeUploadDir);
     if (turboPath) return turboPath;
 
     // Strategy 3: Ultra-Simplified Prompt (Fail-safe)
     const simplePrompt = encodeURIComponent("minimalist abstract finance geometric shapes");
     const simpleUrl = `https://image.pollinations.ai/prompt/${simplePrompt}?width=1024&height=576&nologo=true&seed=${seed}&model=flux`;
-    console.log(`[ImageGen] Strategy 3 (Simple): ${simpleUrl}`);
     const simplePath = await downloadAndSaveImage(simpleUrl, relativeUploadDir);
     if (simplePath) return simplePath;
 

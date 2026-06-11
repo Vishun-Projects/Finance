@@ -15,6 +15,12 @@ import { MobileHeroMetric, MobileKpiStrip } from '@/components/ui/mobile-kpi-str
 import { ResponsiveSheet } from '@/components/ui/responsive-sheet';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { TakeHomeAnchor } from '@/components/finance/take-home-anchor';
+import {
+  SalaryPlanPreviewCard,
+  type PlanPreviewData,
+} from '@/components/finance/salary-plan-preview-card';
+import type { PlanIncomeSource } from '@/lib/plan-income';
 
 function parseRecordField(field: unknown): Record<string, number> {
   if (!field) return {};
@@ -114,7 +120,7 @@ function BreakdownTable({
           ))}
         </tbody>
       </table>
-      <div className="space-y-2 md:hidden">
+      <div className="space-y-2 lg:hidden">
         {rows.map((row) => (
           <div
             key={row.label}
@@ -177,6 +183,33 @@ export default function SalaryStructureManagement() {
   const [deductionAmount, setDeductionAmount] = useState('');
   const [employerContributionName, setEmployerContributionName] = useState('');
   const [employerContributionAmount, setEmployerContributionAmount] = useState('');
+  const [planPreview, setPlanPreview] = useState<PlanPreviewData | null>(null);
+  const [planPreviewLoading, setPlanPreviewLoading] = useState(false);
+
+  const fetchPlanPreview = useCallback(async () => {
+    try {
+      setPlanPreviewLoading(true);
+      const response = await fetch('/api/plan-preview');
+      if (response.ok) {
+        const data = await response.json();
+        setPlanPreview({
+          takeHome: data.takeHome,
+          source: data.source as PlanIncomeSource,
+          plannedTotal: data.plannedTotal,
+          actualTotal: data.actualTotal,
+          headroom: data.headroom,
+          underspend: data.underspend ?? 0,
+          available: data.available,
+          overallScore: data.overallScore,
+          monthLabel: data.monthLabel,
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching plan preview:', error);
+    } finally {
+      setPlanPreviewLoading(false);
+    }
+  }, []);
 
   const fetchSalaryStructures = useCallback(async () => {
     if (!user) return;
@@ -205,8 +238,9 @@ export default function SalaryStructureManagement() {
     if (user && !authLoading) {
       fetchSalaryStructures();
       fetchSalaryHistory();
+      void fetchPlanPreview();
     }
-  }, [user, authLoading, fetchSalaryStructures, fetchSalaryHistory]);
+  }, [user, authLoading, fetchSalaryStructures, fetchSalaryHistory, fetchPlanPreview]);
 
   const activeStructure = useMemo(
     () => salaryStructures.find((s) => s.isActive) || salaryStructures[0] || null,
@@ -383,6 +417,7 @@ export default function SalaryStructureManagement() {
       if (response.ok) {
         fetchSalaryStructures();
         fetchSalaryHistory();
+        void fetchPlanPreview();
         setShowForm(false);
         setEditingStructure(null);
         setEditingHistoryId(null);
@@ -599,7 +634,7 @@ export default function SalaryStructureManagement() {
       <div className="flex flex-col gap-4 lg:max-h-[calc(100vh-7rem)]">
         {/* Header — one line */}
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="min-w-0 max-md:hidden">
+          <div className="min-w-0 max-lg:hidden">
             <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-hint">Salary</p>
             <h1 className="truncate text-xl font-semibold text-foreground">
               {activeStructure.jobTitle}
@@ -610,14 +645,14 @@ export default function SalaryStructureManagement() {
               {activeStructure.location ? ` · ${activeStructure.location}` : ''}
             </p>
           </div>
-          <div className="flex shrink-0 flex-wrap items-center gap-2 max-md:w-full max-md:justify-end">
-            <Button size="sm" variant="outline" onClick={() => handleEdit(activeStructure)} className="max-md:px-2">
+          <div className="flex shrink-0 flex-wrap items-center gap-2 max-lg:w-full max-lg:justify-end">
+            <Button size="sm" variant="outline" onClick={() => handleEdit(activeStructure)} className="max-lg:px-2">
               <Edit className="size-3.5 sm:mr-1.5" />
-              <span className="max-md:hidden">Edit current</span>
+              <span className="max-lg:hidden">Edit current</span>
             </Button>
-            <Button size="sm" onClick={openNewStructure} className="max-md:px-2">
+            <Button size="sm" onClick={openNewStructure} className="max-lg:px-2">
               <Plus className="size-3.5 sm:mr-1.5" />
-              <span className="max-md:hidden">Update structure</span>
+              <span className="max-lg:hidden">Update structure</span>
             </Button>
           </div>
         </div>
@@ -650,6 +685,20 @@ export default function SalaryStructureManagement() {
             { label: 'Ded/mo', value: `-${formatRupees(totalMonthlyDeductions)}`, tone: 'danger' },
           ]}
         />
+
+        <TakeHomeAnchor
+          baseIncome={netMonthly}
+          source="salary_structure"
+          variant="compact"
+          showEditLink={false}
+          className="mb-1"
+          activeSalaryTakeHome={netMonthly}
+          currentMonthSalaryReceived={planPreview?.currentMonthSalaryReceived}
+          lastMonthSalaryReceived={planPreview?.lastMonthSalaryReceived}
+          receivedSalarySource={planPreview?.receivedSalarySource}
+        />
+
+        <SalaryPlanPreviewCard preview={planPreview} loading={planPreviewLoading} />
 
         {/* All KPIs in one row — desktop only */}
         <div className="hidden grid-cols-2 gap-3 md:grid md:grid-cols-4">
@@ -796,7 +845,7 @@ export default function SalaryStructureManagement() {
                   </table>
                 </div>
 
-                <div className="space-y-3 md:hidden">
+                <div className="space-y-3 lg:hidden">
                   {sortedHistory.slice(0, 6).map((item) => {
                     const itemAllowances = parseRecordField(item.allowances);
                     const itemDeductions = parseRecordField(item.deductions);

@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { legalConfig } from '@/lib/legal-config';
 
 declare global {
   interface Window {
@@ -58,8 +59,8 @@ export default function RazorpayTest() {
         order_id: orderId,
         amount,
         currency: currency || 'INR',
-        name: 'Finance App',
-        description: 'Test Payment',
+        name: legalConfig.brandName,
+        description: `Test payment — ${legalConfig.legalName}`,
         prefill: {
           name: 'Test User',
           email: 'test@example.com',

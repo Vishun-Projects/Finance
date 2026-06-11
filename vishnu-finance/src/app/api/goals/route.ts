@@ -9,18 +9,14 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0; // Disable cache for now
 
 export async function GET(request: NextRequest) {
-  console.log('🔍 GOALS GET - Starting request');
   try {
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
-    console.log('🔍 GOALS GET - User ID:', userId);
 
     if (!userId) {
-      console.log('❌ GOALS GET - No user ID provided');
       return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
     }
 
-    console.log('🔍 GOALS GET - Fetching from database for user:', userId);
     // Fetch goals from database
     const goals = await prisma.goal.findMany({
       where: { userId },
@@ -28,8 +24,6 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: 'desc' }
     });
 
-    console.log('✅ GOALS GET - Found goals:', goals.length, 'records');
-    // console.log('📊 GOALS GET - Goals data:', JSON.stringify(goals, null, 2));
     return NextResponse.json(goals);
   } catch (error) {
     console.error('❌ GOALS GET - Error:', error);
@@ -41,10 +35,8 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   // ... (POST remains largely the same, usually we don't add contributions on create but we could if needed)
   // For brevity, keeping POST as is, mainly focused on updates.
-  console.log('➕ GOALS POST - Starting request');
   try {
     const body = await request.json();
-    console.log('➕ GOALS POST - Request body:', JSON.stringify(body, null, 2));
 
     // ... (rest of POST implementation unchanged)
     const {
@@ -80,7 +72,6 @@ export async function POST(request: NextRequest) {
     try {
       const prompt = `A professional, high-end, Cinematic photography of ${title}, representing financial success and luxury, 8k resolution, photorealistic, cinematic lighting, minimalist aesthetic, 16:9 aspect ratio`;
       await addImageGenerationJob(newGoal.id, ImageJobType.GOAL, prompt);
-      console.log(`🎨 Goal Image - Queued generation for: "${title}" (ID: ${newGoal.id})`);
     } catch (imageErr) {
       console.error('⚠️ Goal Image - Failed to queue generation:', imageErr);
     }
@@ -95,11 +86,9 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
-  console.log('✏️ GOALS PUT - Starting request');
   try {
     const body = await request.json();
     const { id, contributionAmount, contributionSource, contributionNote, ...updateData } = body;
-    console.log('✏️ GOALS PUT - Update data:', JSON.stringify({ id, contributionAmount, ...updateData }, null, 2));
 
     if (!id) {
       return NextResponse.json({ error: 'ID is required' }, { status: 400 });
@@ -109,7 +98,6 @@ export async function PUT(request: NextRequest) {
 
     // specific handling for adding funds with source tracking
     if (contributionAmount) {
-      console.log('✏️ GOALS PUT - processing contribution:', contributionAmount);
       const amount = parseFloat(contributionAmount);
 
       // Transaction to ensure both contribution record and balance update happen
@@ -154,7 +142,6 @@ export async function PUT(request: NextRequest) {
           try {
             const prompt = `A professional, high-quality, high-resolution photography of ${updateData.title}, financial goal achievement, wealth, success, photorealistic, 16:9 aspect ratio`;
             await addImageGenerationJob(id, ImageJobType.GOAL, prompt);
-            console.log(`🎨 Goal Image - Re-queued generation for updated title: "${updateData.title}"`);
           } catch (imageErr) {
             console.error('⚠️ Goal Image - Failed to queue generation:', imageErr);
           }
@@ -181,14 +168,12 @@ export async function PUT(request: NextRequest) {
         try {
           const prompt = `A professional, high-quality, high-resolution photography of ${updateData.title}, financial goal achievement, wealth, success, photorealistic, 16:9 aspect ratio`;
           await addImageGenerationJob(id, ImageJobType.GOAL, prompt);
-          console.log(`🎨 Goal Image - Re-queued generation for updated title: "${updateData.title}"`);
         } catch (imageErr) {
           console.error('⚠️ Goal Image - Failed to queue generation:', imageErr);
         }
       }
     }
 
-    console.log('✅ GOALS PUT - Successfully updated goal:', { id: updatedGoal.id, currentAmount: updatedGoal.currentAmount });
     revalidatePath('/');
     revalidatePath('/plans');
     return NextResponse.json(updatedGoal);
@@ -199,24 +184,19 @@ export async function PUT(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  console.log('🗑️ GOALS DELETE - Starting request');
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
-    console.log('🗑️ GOALS DELETE - ID to delete:', id);
 
     if (!id) {
-      console.log('❌ GOALS DELETE - No ID provided');
       return NextResponse.json({ error: 'ID is required' }, { status: 400 });
     }
 
-    console.log('🗑️ GOALS DELETE - Deleting from database...');
     // Delete from database
     await prisma.goal.delete({
       where: { id }
     });
 
-    console.log('✅ GOALS DELETE - Successfully deleted goal');
     revalidatePath('/');
     revalidatePath('/plans');
     return NextResponse.json({ message: 'Goal deleted successfully' });

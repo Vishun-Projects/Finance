@@ -6,6 +6,7 @@ interface PageHeaderState {
   title?: string;
   subtitle?: string;
   actions?: ReactNode;
+  backAction?: ReactNode;
 }
 
 interface PageHeaderContextType extends PageHeaderState {

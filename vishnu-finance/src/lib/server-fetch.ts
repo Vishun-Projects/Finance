@@ -212,15 +212,6 @@ export async function serverFetch<T = unknown>(
 
     const payload = (await parseResponse(response, parseAs)) as T;
 
-    console.info(
-      `[serverFetch] ${description ?? response.url} succeeded (${duration}ms)`,
-      {
-        status: response.status,
-        requestId,
-        revalidate,
-      },
-    );
-
     return payload;
   } catch (error) {
     const duration = Date.now() - startedAt;

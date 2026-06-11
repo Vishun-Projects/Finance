@@ -6,15 +6,16 @@ import {
   getOrCreateAccountStatement,
   validateOpeningBalance,
   checkStatementContinuity,
+  enrichStatementMetadataFromRecords,
   type StatementMetadata,
 } from '@/lib/account-statement';
 import { relative } from 'path';
 import { writeAuditLog, extractRequestMeta } from '@/lib/audit';
 import { validateBalanceReconciliation, formatValidationResult } from '@/lib/balance-validator';
 import { categorizeTransactions, detectAutoPayTransactions } from '@/lib/transaction-categorization-service';
-import * as crypto from 'crypto';
 import { toLocalISODate } from '@/lib/date-range';
 import { globalCache } from '@/lib/cache-singleton';
+import { generateDedupHash, areDescriptionsSimilar, buildInFileDedupKey } from '@/lib/import-dedup';
 
 interface ImportRecord {
   title?: string;
@@ -50,12 +51,11 @@ interface ImportRecord {
 }
 
 export async function POST(request: NextRequest) {
-  console.log('🏦 Import Bank Statement API: Starting request');
 
 
   try {
     const body = await request.json();
-    const { userId, records, metadata, document, useAICategorization = true, validateBalance = true, categorizeInBackground = false, forceInsert = false, updateExisting = true } = body as {
+    const { userId, records, metadata, document, useAICategorization = true, validateBalance = true, categorizeInBackground = false, forceInsert = false, updateExisting = false, categoryOverrides = {} } = body as {
       userId: string;
       records: ImportRecord[];
       metadata?: StatementMetadata;
@@ -68,13 +68,13 @@ export async function POST(request: NextRequest) {
       };
       useAICategorization?: boolean;
       validateBalance?: boolean;
-      categorizeInBackground?: boolean; // If true, skip categorization during import and do it in background
-      forceInsert?: boolean; // Skip duplicate check and force insert
-      updateExisting?: boolean; // Refresh parsed fields when dedupHash already exists
+      categorizeInBackground?: boolean;
+      forceInsert?: boolean;
+      updateExisting?: boolean;
+      categoryOverrides?: Record<string, string>;
     };
 
     // Log categorization settings
-    console.log(`📋 Categorization settings: useAICategorization=${useAICategorization}, categorizeInBackground=${categorizeInBackground}, records=${records.length}`);
 
     if (!userId || !Array.isArray(records)) {
       return NextResponse.json(
@@ -112,15 +112,23 @@ export async function POST(request: NextRequest) {
     const warnings: string[] = [];
     const errors: string[] = [];
 
-    if (metadata && accountNumber && bankCode && metadata.openingBalance !== null) {
+    const enrichedMeta = enrichStatementMetadataFromRecords(metadata, records);
+    const statementMeta = enrichedMeta ?? metadata;
+
+    if (
+      statementMeta &&
+      accountNumber &&
+      bankCode &&
+      (statementMeta.openingBalance != null || statementMeta.closingBalance != null)
+    ) {
       try {
         // Validate opening balance
         balanceValidation = await validateOpeningBalance(
           userId,
           accountNumber,
           bankCode,
-          metadata.openingBalance,
-          metadata.statementStartDate
+          statementMeta.openingBalance ?? 0,
+          statementMeta.statementStartDate
         );
 
         if (balanceValidation.warning) {
@@ -128,12 +136,12 @@ export async function POST(request: NextRequest) {
         }
 
         // Check statement continuity
-        if (metadata.statementStartDate) {
+        if (statementMeta.statementStartDate) {
           const continuity = await checkStatementContinuity(
             userId,
             accountNumber,
             bankCode,
-            new Date(metadata.statementStartDate)
+            new Date(statementMeta.statementStartDate)
           );
 
           if (continuity.hasGap && continuity.gapDays > 0) {
@@ -160,7 +168,7 @@ export async function POST(request: NextRequest) {
 
           // Update metadata with calculated totals
           const enrichedMetadata: StatementMetadata = {
-            ...metadata,
+            ...statementMeta,
             totalDebits,
             totalCredits,
             transactionCount: records.length,
@@ -175,7 +183,6 @@ export async function POST(request: NextRequest) {
           );
 
           if (accountStatement) {
-            console.log(`✅ Account statement stored: ${accountStatement.id}`);
           }
         }
       } catch (error: any) {
@@ -376,7 +383,8 @@ export async function POST(request: NextRequest) {
           debitAmount: debitAmount,
           financialCategory: financialCategory,
           category: (r.category || '').toString().trim() || null,
-          notes: (r.notes || '').toString().trim() || null,
+          notes: (r.notes || r.commodity || '').toString().trim() || null,
+          commodity: (r.commodity || r.notes || '').toString().trim() || null,
           // Bank-specific fields
           bankCode: r.bankCode || null,
           transactionId: r.transactionId || null,
@@ -395,14 +403,14 @@ export async function POST(request: NextRequest) {
           hasZeroAmount: hasZeroAmount,
           parsingMethod: r.parsingMethod || 'standard',
           parsingConfidence: r.parsingConfidence || (isPartialData ? 0.5 : 1.0),
-          dedupHash: generateDedupHash({
-            userId,
+          dedupHash: generateDedupHash(userId, {
             transactionDate: parsedDate!,
             description: description,
             creditAmount: creditAmount,
             debitAmount: debitAmount,
             transactionId: r.transactionId || null,
-          })
+            balance: r.balance ? Number(r.balance) : null,
+          }),
         };
       })
       .filter((r, idx) => {
@@ -417,7 +425,6 @@ export async function POST(request: NextRequest) {
 
         // Log partial data transactions but keep them
         if (r.isPartialData) {
-          console.log(`ℹ️ [${idx}] Partial data transaction kept: hasInvalidDate=${r.hasInvalidDate}, hasZeroAmount=${r.hasZeroAmount}, missingDescription=${!r.description || r.description === 'Uncategorized Transaction'}`);
         }
 
         return true;
@@ -427,7 +434,6 @@ export async function POST(request: NextRequest) {
     const normalizedCount = normalized.length;
     const filteredCount = records.length - normalizedCount;
     if (filteredCount > 0) {
-      console.log(`📊 Normalization: ${records.length} records → ${normalizedCount} valid (${filteredCount} filtered)`);
     }
 
     // Apply entity mappings before saving to database (Optimized Batch)
@@ -453,6 +459,19 @@ export async function POST(request: NextRequest) {
         }
         if (record.store && storeMappings[record.store]) {
           record.store = storeMappings[record.store];
+        }
+      }
+    }
+
+    if (Object.keys(categoryOverrides).length > 0) {
+      for (const record of normalized) {
+        const key = record.store
+          ? `store:${record.store.toLowerCase()}`
+          : record.personName
+            ? `person:${record.personName.toLowerCase()}`
+            : null;
+        if (key && categoryOverrides[key]) {
+          (record as any).categoryId = categoryOverrides[key];
         }
       }
     }
@@ -506,7 +525,6 @@ export async function POST(request: NextRequest) {
     let categorizedCount = 0;
     if (useAICategorization && !shouldUseBackground && userId && normalized.length > 0) {
       try {
-        console.log(`🤖 Starting batch categorization for ${normalized.length} transactions...`);
 
         // Pre-fetch ALL categories once for fast lookup
         const allExpenseCategories = await (prisma as any).category.findMany({
@@ -590,13 +608,11 @@ export async function POST(request: NextRequest) {
           });
 
         // Categorize entire batch at once (ensures consistency)
-        console.log(`🤖 Categorizing ${transactionsToCategorize.length} transactions...`);
         const categorizationResults = await categorizeTransactions(userId, transactionsToCategorize);
 
         // Log categorization results
         const foundWithId = categorizationResults.filter(r => r.categoryId).length;
         const foundWithName = categorizationResults.filter(r => r.categoryName && !r.categoryId).length;
-        console.log(`📊 Categorization results: ${foundWithId} with ID, ${foundWithName} with name only, ${categorizationResults.length - foundWithId - foundWithName} uncategorized`);
 
         // Apply categories to normalized records
         for (let i = 0; i < normalized.length; i++) {
@@ -654,7 +670,6 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        console.log(`✅ Applied categories to ${categorizedCount}/${normalized.length} transactions`);
       } catch (error: any) {
         console.error('Error in batch categorization:', error);
         warnings.push(`AI categorization failed: ${error.message}. Continuing with import...`);
@@ -665,7 +680,6 @@ export async function POST(request: NextRequest) {
     let deadlinesCreated = 0;
     if (userId && normalized.length > 0) {
       try {
-        console.log('🔍 Detecting auto-pay transactions (EMI, subscriptions)...');
 
         // Prepare transactions for auto-pay detection
         // First, get category names for transactions that have categoryId
@@ -698,7 +712,6 @@ export async function POST(request: NextRequest) {
         // Detect auto-pay patterns
         const autoPayPatterns = await detectAutoPayTransactions(userId, transactionsForDetection);
 
-        console.log(`📋 Found ${autoPayPatterns.length} auto-pay patterns with confidence >= 0.8`);
 
         // Helper function to calculate next due date
         const calculateNextDueDate = (lastDate: Date, frequency: 'MONTHLY' | 'WEEKLY' | 'DAILY'): Date => {
@@ -781,9 +794,7 @@ export async function POST(request: NextRequest) {
                 });
 
                 deadlinesCreated++;
-                console.log(`✅ Created deadline: ${pattern.title} - ₹${roundedAmount.toFixed(2)} (${pattern.frequency})`);
               } else {
-                console.log(`⏭️ Deadline already exists: ${pattern.title}`);
               }
             } catch (error: any) {
               console.error(`Error creating deadline for ${pattern.title}:`, error);
@@ -793,7 +804,6 @@ export async function POST(request: NextRequest) {
         }
 
         if (deadlinesCreated > 0) {
-          console.log(`✅ Created ${deadlinesCreated} deadlines from auto-pay patterns`);
         }
       } catch (error: any) {
         console.error('Error detecting auto-pay transactions:', error);
@@ -817,7 +827,14 @@ export async function POST(request: NextRequest) {
         invalidDateCount++;
         return false;
       }
-      const key = `${r.description}|${r.creditAmount}|${r.debitAmount}|${dateStr}`;
+      const key = buildInFileDedupKey({
+        transactionDate: r.transactionDate!,
+        description: r.description,
+        creditAmount: r.creditAmount,
+        debitAmount: r.debitAmount,
+        transactionId: r.transactionId,
+        balance: r.balance,
+      });
       if (seen.has(key)) {
         duplicateKeys.add(key);
         return false;
@@ -829,10 +846,8 @@ export async function POST(request: NextRequest) {
     // Log deduplication statistics
     const internalDuplicateCount = normalized.length - unique.length - invalidDateCount;
     if (internalDuplicateCount > 0 || invalidDateCount > 0) {
-      console.log(`📊 Deduplication: ${normalized.length} normalized → ${unique.length} unique (${internalDuplicateCount} duplicates in file, ${invalidDateCount} invalid dates)`);
       if (invalidDateCount > 0) {
         const sampleInvalid = normalized.filter(r => !r.transactionDate || isNaN(r.transactionDate.getTime())).slice(0, 3);
-        console.log(`🔍 Sample invalid dates in payload:`, sampleInvalid.map(r => (records[normalized.indexOf(r)] as any).date_iso || (records[normalized.indexOf(r)] as any).date));
       }
     }
 
@@ -860,8 +875,10 @@ export async function POST(request: NextRequest) {
     let existing: any[] = [];
     // Define sets at higher scope
     const existingIds = new Set<string>();
+    const existingDedupHashes = new Set<string>();
     const existingCompositeKeys = new Set<string>();
     const existingBuckets = new Map<string, Array<{ description: string, id: string, transactionId: string }>>();
+    const pendingFuzzyUpdates: Array<{ existingId: string; record: (typeof unique)[number] }> = [];
 
     if (!forceInsert) {
       try {
@@ -874,7 +891,6 @@ export async function POST(request: NextRequest) {
         });
 
         if (totalCount === 0) {
-          console.log('✅ Database is empty for this user, skipping duplicate check');
         } else {
           // IMPORTANT: Use a wider date range to catch all potential duplicates
           // Add 30 days buffer on each side to catch transactions that might have slight date variations
@@ -896,6 +912,7 @@ export async function POST(request: NextRequest) {
               debitAmount: true,
               transactionDate: true,
               transactionId: true,
+              dedupHash: true,
               accountNumber: true,
             },
           });
@@ -906,6 +923,9 @@ export async function POST(request: NextRequest) {
           // const existingIds = new Set<string>(); // Already defined at higher scope
 
           existing.forEach((e: any) => {
+            if (e.dedupHash) {
+              existingDedupHashes.add(e.dedupHash);
+            }
             // 1. Transaction ID Set
             if (e.transactionId && e.transactionId.trim().length > 0) {
               existingIds.add(e.transactionId.trim());
@@ -932,62 +952,32 @@ export async function POST(request: NextRequest) {
             } catch { }
           });
 
-          console.log(`🔍 Built deduplication index: ${existingIds.size} IDs, ${existingBuckets.size} date-amount buckets`);
         }
       } catch (error: any) {
         // Transaction table doesn't exist yet, skip deduplication
-        console.log('⚠️ Transaction table not available, skipping deduplication check', error);
         existing = [];
       }
     } else {
-      console.log('⚡ Force insert mode: Skipping duplicate check');
     }
 
-    // Helper for fuzzy string matching (Levenshtein-like or simple token overlap)
-    const areDescriptionsSimilar = (desc1: string, desc2: string): boolean => {
-      if (desc1 === desc2) return true;
-
-      // Normalize: remove special chars, extra spaces
-      const norm1 = desc1.replace(/[^a-z0-9]/g, '');
-      const norm2 = desc2.replace(/[^a-z0-9]/g, '');
-
-      if (norm1 === norm2) return true;
-      if (norm1.includes(norm2) || norm2.includes(norm1)) return true;
-
-      // If one is very short, require exact match
-      if (norm1.length < 5 || norm2.length < 5) return false;
-
-      // Simple variation check: allow 20% difference in length
-      const lenDiff = Math.abs(norm1.length - norm2.length);
-      if (lenDiff > Math.max(norm1.length, norm2.length) * 0.3) return false;
-
-      // Count matching characters (approximate)
-      let matches = 0;
-      const minLen = Math.min(norm1.length, norm2.length);
-      for (let i = 0; i < minLen; i++) {
-        if (norm1[i] === norm2[i]) matches++;
-      }
-
-      // If > 70% match from start
-      if (matches / minLen > 0.7) return true;
-
-      return false;
-    };
-
     // Filter out duplicates before insertion (in-memory check)
-    // Note: This helps but database constraint is the ultimate protection against race conditions
     const toInsert = unique.filter(r => {
       if (!r.transactionDate || isNaN(r.transactionDate.getTime())) return false;
 
-      if (forceInsert || updateExisting) {
+      if (forceInsert) {
         return true;
       }
 
       try {
+        const hash = (r as { dedupHash?: string }).dedupHash;
+
+        if (hash && existingDedupHashes.has(hash)) {
+          return updateExisting;
+        }
+
         // Check 1: Transaction ID (Exact Match)
         if (r.transactionId && r.transactionId.trim().length > 0) {
           if (existingIds.has(r.transactionId.trim())) {
-            console.log(`🔍 Duplicate detected by ID: ${r.transactionId}`);
             return false;
           }
         }
@@ -1004,7 +994,9 @@ export async function POST(request: NextRequest) {
           const currentDesc = (r.description || '').toLowerCase();
           for (const candidate of candidates) {
             if (areDescriptionsSimilar(currentDesc, candidate.description)) {
-              console.log(`🔍 Duplicate detected by content: "${r.description?.substring(0, 20)}..." matches existing "${candidate.description.substring(0, 20)}..."`);
+              if (updateExisting) {
+                pendingFuzzyUpdates.push({ existingId: candidate.id, record: r });
+              }
               return false;
             }
           }
@@ -1019,8 +1011,6 @@ export async function POST(request: NextRequest) {
     const existingDuplicates = unique.length - toInsert.length;
     duplicates += existingDuplicates;
 
-    console.log(`📊 Import summary: ${records.length} total records → ${normalized.length} normalized → ${unique.length} unique → ${toInsert.length} to insert`);
-    console.log(`📊 Breakdown: ${records.length - normalized.length} filtered during normalization, ${normalized.length - unique.length} duplicates/invalid in file, ${existingDuplicates} existing in DB`);
 
     // If significant number of records lost, log warning
     const totalLost = records.length - toInsert.length;
@@ -1034,7 +1024,6 @@ export async function POST(request: NextRequest) {
         await (prisma as any).$queryRaw`SELECT 1 FROM transactions LIMIT 1`;
       } catch (error: any) {
         // Transaction table doesn't exist, fall back to Expense/IncomeSource
-        console.log('⚠️ Transaction table not available, falling back to Expense/IncomeSource', error);
         return NextResponse.json({
           success: false,
           error: 'Transaction table not migrated yet. Please run Prisma migration first.',
@@ -1050,7 +1039,6 @@ export async function POST(request: NextRequest) {
         chunks.push(toInsert.slice(i, i + batchSize));
       }
 
-      console.log(`📦 Processing ${toInsert.length} transactions in ${chunks.length} batches of ${batchSize}`);
 
       // Process batches with controlled parallelism for optimal performance
       const CONCURRENT_BATCHES = 5; // Process 5 batches in parallel (optimized for MySQL)
@@ -1239,7 +1227,6 @@ export async function POST(request: NextRequest) {
             debitInserted += result.debit;
           }
 
-          console.log(`✅ Processed batches ${i + 1}-${Math.min(i + CONCURRENT_BATCHES, chunks.length)}/${chunks.length}`);
         }
 
         return results;
@@ -1254,13 +1241,43 @@ export async function POST(request: NextRequest) {
       // If INSERT IGNORE prevented some inserts, those are additional duplicates we didn't catch
       const dbDuplicates = Math.max(0, toInsert.length - inserted);
       if (dbDuplicates > 0 && dbDuplicates !== existingDuplicates) {
-        console.log(`📊 Additional duplicates caught by INSERT IGNORE: ${dbDuplicates - existingDuplicates}`);
         // Don't add to duplicates counter - existingDuplicates already includes the in-memory check
         // This is just for logging
       }
     }
 
-    console.log(`✅ Import Bank Statement: ${inserted} transactions inserted (${creditInserted} credits, ${debitInserted} debits), ${duplicates} duplicates`);
+    if (updateExisting && pendingFuzzyUpdates.length > 0) {
+      for (const { existingId, record } of pendingFuzzyUpdates) {
+        try {
+          await (prisma as any).transaction.update({
+            where: { id: existingId, userId },
+            data: {
+              description: record.description,
+              personName: record.personName,
+              store: record.store,
+              upiId: record.upiId,
+              branch: record.branch,
+              notes: formatNotes(record) || null,
+              rawData: record.rawData,
+              dedupHash: (record as { dedupHash?: string }).dedupHash,
+              bankCode: record.bankCode,
+              transactionId: record.transactionId,
+              accountNumber: record.accountNumber,
+              transferType: record.transferType,
+              balance: record.balance,
+              parsingMethod: record.parsingMethod,
+              parsingConfidence: record.parsingConfidence,
+              isDeleted: false,
+              deletedAt: null,
+            },
+          });
+          updatedExisting++;
+        } catch (error) {
+          console.warn(`⚠️ Failed to update existing transaction ${existingId}:`, error);
+        }
+      }
+    }
+
 
     globalCache.clear();
 
@@ -1301,12 +1318,10 @@ export async function POST(request: NextRequest) {
       (inserted > 50 && useAICategorization && normalized.length > 50) ||
       earlierShouldUseBackground; // Use the earlier determination as fallback
 
-    console.log(`🔍 Background categorization check: categorizeInBackground=${categorizeInBackground}, inserted=${inserted}, useAICategorization=${useAICategorization}, earlierShouldUseBackground=${earlierShouldUseBackground}, finalShouldUseBackground=${finalShouldUseBackground}`);
 
     // Use the final shouldUseBackground flag, but also check if we actually inserted transactions
     if (finalShouldUseBackground && inserted > 0) {
       try {
-        console.log(`🔍 Fetching transaction IDs for background categorization...`);
 
         // Fetch the IDs of recently inserted transactions
         // Use a wider time window (5 minutes) and account statement ID if available
@@ -1328,7 +1343,6 @@ export async function POST(request: NextRequest) {
 
         // If account statement ID was used but no results, try without it
         if (recentTransactions.length === 0 && accountStatement?.id) {
-          console.log(`⚠️ No transactions found with accountStatementId, trying without it...`);
           recentTransactions = await prisma.transaction.findMany({
             where: {
               userId,
@@ -1345,16 +1359,13 @@ export async function POST(request: NextRequest) {
 
         insertedTransactionIds = recentTransactions.map(t => t.id);
 
-        console.log(`📊 Found ${insertedTransactionIds.length} transaction IDs (expected: ${inserted})`);
 
         if (insertedTransactionIds.length > 0) {
           // Use Next.js after() for robust background processing on Vercel
           after(() => {
-            console.log(`🚀 Starting background categorization for ${insertedTransactionIds.length} transactions via internal service...`);
             import('@/lib/multi-pass-categorization').then(({ multiPassCategorization }) => {
               multiPassCategorization(userId, insertedTransactionIds)
                 .then(result => {
-                  console.log(`✅ Background categorization complete: ${result.categorized} categorized`);
                 })
                 .catch(error => {
                   console.error('❌ Background categorization failed:', error);
@@ -1367,7 +1378,6 @@ export async function POST(request: NextRequest) {
           console.warn(`⚠️ No transaction IDs found for background categorization (inserted: ${inserted}, timeWindow: ${timeWindow.toISOString()})`);
           // Fallback: If we can't find transaction IDs but have inserted transactions, try immediate categorization
           if (inserted > 0 && inserted <= 200 && useAICategorization && !categorizeInBackground) {
-            console.log(`🔄 Transaction IDs not found, attempting immediate categorization as fallback...`);
             // This will be handled by the existing immediate categorization logic below
           }
         }
@@ -1375,17 +1385,14 @@ export async function POST(request: NextRequest) {
         console.error('❌ Error starting background categorization:', error);
         // Fallback: If background categorization fails and we have transactions, try immediate categorization
         if (inserted > 0 && inserted <= 200 && useAICategorization && !categorizeInBackground) {
-          console.log(`🔄 Background categorization error, attempting immediate categorization as fallback...`);
           // This will be handled by the existing immediate categorization logic below
         }
         // Continue - import was successful
       }
     } else {
       if (!finalShouldUseBackground) {
-        console.log(`ℹ️ Background categorization skipped: categorizeInBackground=${categorizeInBackground}, inserted=${inserted}, useAICategorization=${useAICategorization}`);
       }
       if (inserted === 0) {
-        console.log(`ℹ️ No transactions inserted, skipping background categorization`);
       }
     }
 
@@ -1443,52 +1450,12 @@ export async function POST(request: NextRequest) {
 
 // Helper to format notes with multiple fields
 function formatNotes(record: any): string {
-  // Only save commodity in notes field, as it represents the actual item/purpose
   if (record.commodity) {
     return record.commodity;
   }
-
-  // Fallback: if no commodity, save a meaningful part of description
-  if (record.description) {
-    // Extract meaningful note from description if available
-    return record.description;
+  if (record.notes) {
+    return record.notes;
   }
-
   return '';
-}
-
-/**
- * Generate a deterministic hash for a transaction to prevent duplicates.
- * Fingerprint: userId + Date + Credit + Debit + Normalized Description
- */
-function generateDedupHash(tx: {
-  userId: string;
-  transactionDate: Date;
-  description: string;
-  creditAmount: number;
-  debitAmount: number;
-  transactionId?: string | null;
-}): string {
-  // If we have a bank-provided transaction ID, that's the strongest fingerprint
-  if (tx.transactionId && tx.transactionId.trim().length > 5) {
-    return `id_${tx.userId}_${tx.transactionId.trim()}`;
-  }
-
-  const dateStr = toLocalISODate(tx.transactionDate);
-  const credit = Number(tx.creditAmount || 0).toFixed(2);
-  const debit = Number(tx.debitAmount || 0).toFixed(2);
-
-  // Normalize description: lowercase, remove special chars, collapse spaces
-  const normDesc = tx.description
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, '')
-    .trim()
-    .substring(0, 100);
-
-  const rawString = `${tx.userId}|${dateStr}|${credit}|${debit}|${normDesc}`;
-
-  // Simple hashing (djb2-like) or just a long string if DB column allows
-  // For PostgreSQL, a long unique string is fine, but let's use a basic buffer hash
-  return crypto.createHash('md5').update(rawString).digest('hex');
 }
 

@@ -54,7 +54,7 @@ export function ResponsiveDialog({
   contentClassName,
   maxWidth = 'lg',
 }: ResponsiveDialogProps) {
-  const isMobile = useIsMobile('md');
+  const isMobile = useIsMobile('lg');
 
   if (isMobile) {
     return (

@@ -21,6 +21,10 @@ test('resolvePlanBaseIncome prefers salary structure over transaction salary', (
     { baseIncome: 52000, source: 'salary_structure' },
   );
   assert.deepEqual(
+    resolvePlanBaseIncome({ salaryTakeHome: 0, lastMonthSalary: 45000, transactionSalary: 48000 }),
+    { baseIncome: 45000, source: 'last_month_salary' },
+  );
+  assert.deepEqual(
     resolvePlanBaseIncome({ salaryTakeHome: 0, transactionSalary: 48000 }),
     { baseIncome: 48000, source: 'transaction_salary' },
   );

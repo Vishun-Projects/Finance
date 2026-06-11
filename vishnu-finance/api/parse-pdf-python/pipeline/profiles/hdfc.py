@@ -31,18 +31,26 @@ class HDFCStyle(BaseStyle):
         from .categories import get_commodity
         commodity = get_commodity(cleaned)
         
-        # Extract UPI ID if present
         upi_id = None
         upi_match = re.search(r'upi/.*?/[^/]+/([^/]+)/', cleaned.lower())
         if upi_match:
             upi_id = upi_match.group(1).strip()
-            
-        # 1. HDFC UPI Pattern: UPI-SENDER-RECIPIENT-REF
-        match_upi = re.search(r'UPI-(?:.*?)-(.*?)-', cleaned, re.IGNORECASE)
+
+        # HDFC UPI Pattern: UPI-SENDER-RECIPIENT-REF — prefer known merchant brands
+        match_upi = re.search(r'UPI-([^-]+)-([^-]+)-', cleaned, re.IGNORECASE)
         if match_upi:
-            entity = match_upi.group(1).strip()
-            if len(entity) >= 3:
-                is_store = any(k in entity.upper() for k in self.STORE_KEYWORDS)
-                return (entity, None, 0.95, commodity, upi_id) if is_store else (None, entity, 0.95, commodity, upi_id)
+            for segment in (match_upi.group(1), match_upi.group(2)):
+                brand = self._merchant_from_fragment(segment)
+                if brand:
+                    return brand, None, 0.95, get_commodity(brand) or commodity, upi_id
+
+                normalized = self._normalize_entity_name(segment)
+                if normalized and not self._is_invalid_entity(normalized):
+                    is_store = (
+                        any(k in normalized.upper() for k in self.STORE_KEYWORDS)
+                        or self._looks_like_company(normalized)
+                    )
+                    if is_store:
+                        return normalized, None, 0.95, commodity, upi_id
 
         return super().extract_entities(text)

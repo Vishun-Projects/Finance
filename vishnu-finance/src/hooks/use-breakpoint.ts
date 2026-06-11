@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useSyncExternalStore } from 'react';
 
 export const BREAKPOINTS = {
   sm: 640,
@@ -16,23 +16,27 @@ function getBreakpointQuery(breakpoint: Breakpoint) {
   return `(min-width: ${BREAKPOINTS[breakpoint]}px)`;
 }
 
-export function useBreakpoint(breakpoint: Breakpoint = 'md') {
-  const [matches, setMatches] = useState(false);
-
-  useEffect(() => {
-    const query = window.matchMedia(getBreakpointQuery(breakpoint));
-
-    const update = () => setMatches(query.matches);
-    update();
-
-    query.addEventListener('change', update);
-    return () => query.removeEventListener('change', update);
-  }, [breakpoint]);
-
-  return matches;
+function subscribeMediaQuery(query: string, callback: () => void) {
+  const mql = window.matchMedia(query);
+  mql.addEventListener('change', callback);
+  return () => mql.removeEventListener('change', callback);
 }
 
-export function useIsMobile(breakpoint: Breakpoint = 'md') {
+function getMediaQuerySnapshot(query: string) {
+  return window.matchMedia(query).matches;
+}
+
+export function useBreakpoint(breakpoint: Breakpoint = 'lg') {
+  const query = getBreakpointQuery(breakpoint);
+
+  return useSyncExternalStore(
+    (callback) => subscribeMediaQuery(query, callback),
+    () => getMediaQuerySnapshot(query),
+    () => false
+  );
+}
+
+export function useIsMobile(breakpoint: Breakpoint = 'lg') {
   const isAtLeast = useBreakpoint(breakpoint);
   return !isAtLeast;
 }

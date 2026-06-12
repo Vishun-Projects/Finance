@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useMemo } from 'react';
-import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePageHeader } from '@/contexts/PageHeaderContext';
@@ -19,20 +18,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Avatar } from '@/components/ui/avatar';
-import { Button } from '@/components/ui/button';
 import { useTheme } from '../../contexts/ThemeContext';
 import { cn } from '@/lib/utils';
 import { patterns } from '@/design/patterns';
 import { navLinkVariants } from '@/design/variants';
-import {
-  getPageTitle,
-  mobileBottomNavItems,
-  primaryNavItemsConfig,
-} from '@/lib/nav-config';
+import { getPageTitle, mobileBottomNavItems, desktopNavItems } from '@/lib/nav-config';
 import { hideGlobalTopBar } from '@/lib/layout-config';
 import { hapticLight } from '@/lib/haptics';
 import { MobileBottomNav } from '@/components/layout/mobile-bottom-nav';
+import { NavLink } from '@/components/layout/nav-link';
 
 export default function Navigation() {
   const { user, logout } = useAuth();
@@ -45,9 +39,9 @@ export default function Navigation() {
 
   const activeByHref = useMemo(() => {
     return new Set(
-      primaryNavItemsConfig
+      desktopNavItems
         .filter((item) => pathname === item.href || pathname.startsWith(item.href + '/'))
-        .map((item) => item.href)
+        .map((item) => item.href),
     );
   }, [pathname]);
 
@@ -57,7 +51,7 @@ export default function Navigation() {
 
   return (
     <>
-      <aside className={cn(patterns.sidebar, 'hidden lg:flex h-full z-50')}>
+      <aside className={cn(patterns.sidebar, 'hidden h-full z-50 lg:flex')}>
         <div className="mb-10 flex items-center gap-3">
           <div className="flex size-8 shrink-0 items-center justify-center">
             <img src="/icon-removebg-preview.png" alt="Logo" className="size-full object-contain" />
@@ -65,20 +59,20 @@ export default function Navigation() {
           <span className="text-base font-medium tracking-tight text-foreground">Vishnu Finance</span>
         </div>
 
-        <nav className="flex flex-1 flex-col gap-0.5">
-          {primaryNavItemsConfig.map((item) => {
+        <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto">
+          {desktopNavItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeByHref.has(item.href);
             return (
-              <Link
+              <NavLink
                 key={item.href}
                 href={item.href}
-                className={navLinkVariants({ active: isActive })}
+                className={cn(navLinkVariants({ active: isActive }), 'btn-touch gap-3')}
                 onClick={handleNavTap}
               >
-                <Icon className={cn('size-4', isActive ? 'text-foreground' : 'text-hint')} />
+                <Icon className={cn('size-4 shrink-0', isActive ? 'text-foreground' : 'text-hint')} />
                 <span>{item.label}</span>
-              </Link>
+              </NavLink>
             );
           })}
         </nav>
@@ -87,7 +81,7 @@ export default function Navigation() {
           <button
             type="button"
             onClick={() => setTheme(isDarkMode ? 'light' : 'dark')}
-            className={cn(navLinkVariants({ active: false }), 'w-full btn-touch')}
+            className={cn(navLinkVariants({ active: false }), 'btn-touch w-full')}
             suppressHydrationWarning
           >
             {isDarkMode ? <Moon className="size-4" /> : <Sun className="size-4" />}
@@ -96,7 +90,7 @@ export default function Navigation() {
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="flex w-full items-center gap-3 rounded-md border border-border bg-surface p-3 text-left outline-none">
+              <button className="flex w-full min-w-0 items-center gap-3 rounded-md border border-border bg-surface p-3 text-left outline-none">
                 <div className="flex size-9 shrink-0 items-center justify-center overflow-hidden border border-border bg-background">
                   {user?.avatarUrl ? (
                     <img alt="Profile" className="size-full object-cover" src={user.avatarUrl} />
@@ -106,9 +100,9 @@ export default function Navigation() {
                     </div>
                   )}
                 </div>
-                <div className="flex min-w-0 flex-col">
-                  <span className="truncate text-sm font-medium text-foreground">{user?.name || 'User'}</span>
-                  <span className="text-xs text-hint">{user?.email}</span>
+                <div className="min-w-0 flex-1 overflow-hidden">
+                  <span className="block truncate text-sm font-medium text-foreground">{user?.name || 'User'}</span>
+                  <span className="block truncate text-xs text-hint">{user?.email}</span>
                 </div>
               </button>
             </DropdownMenuTrigger>
@@ -132,11 +126,11 @@ export default function Navigation() {
       <div
         className={cn(
           'safe-top fixed top-0 left-0 right-0 z-40 flex h-12 items-center justify-between px-4 glass-ultra-thin glass-text lg:hidden',
-          hideMobileTopBar ? 'pointer-events-none invisible h-0 opacity-0' : 'visible h-12 opacity-100'
+          hideMobileTopBar ? 'pointer-events-none invisible h-0 opacity-0' : 'visible h-12 opacity-100',
         )}
       >
         <div className="min-w-0 flex-1">
-          <h1 className="truncate text-sm font-semibold text-foreground">{pageTitle}</h1>
+          <h1 className="truncate text-base font-medium tracking-tight text-foreground">{pageTitle}</h1>
         </div>
         <div className="flex shrink-0 items-center gap-1">
           {pageActions}

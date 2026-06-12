@@ -103,3 +103,63 @@ When refactoring a page, remove unused imports, duplicate headers, and obsolete 
 | `/advisor` | yes | no | page |
 | `/transactions` | yes | yes | table |
 | Others | no | no | page |
+
+---
+
+## Performance & security (audit baseline)
+
+### Loading layers
+- **Route `loading.tsx`** — full skeleton during RSC navigation (primary UX).
+- **`RoutePendingOverlay`** — thin top progress bar only (no duplicate full skeleton).
+- **Page `Suspense`** — async server child fallback matches route variant.
+
+### Server data
+- **`loadDashboardCached` / `loadPlansPageBootstrapCached`** — plans fetch goals/deadlines/wishlist once, then pass into `loadDashboard`.
+- **`loadTransactionsBootstrapCached`** — default month view cached with tag invalidation via `revalidateUserAppPages`.
+- **Settings loaders** — direct Prisma (no HTTP loopback).
+- **Salary page** — server bootstrap via `loadSalaryBootstrap`.
+
+### Security highlights
+- OTP stored as bcrypt hash with lockout; short-lived access JWT + rotating refresh tokens in DB.
+- CSRF double-submit + Origin validation on `/api/app` mutations; fetch interceptor attaches `X-CSRF-Token`.
+- OAuth account linking requires password confirmation when email already has credentials.
+- Legacy API routes use `withAuth` + session `user.id` (not client `userId`).
+- Mobile OAuth uses one-time exchange code (`/api/auth/mobile-session`), not JWT in URL.
+- CSP without `unsafe-eval` in production; secrets in env (`SUPERUSER_EMAIL`, `FIXER_API_KEY`, etc.).
+- Auth endpoints rate-limited; failed login/OTP audited; `clear_cache` SUPERUSER-only.
+
+### UX response-time tiers
+
+| Tier | Threshold | UI pattern | Components |
+|------|-----------|------------|------------|
+| **Instant** | ~100ms | Pressed state, local disabled/spinner | `Button` (`pending`, `active:scale-[0.97]`), `NavLink` (`opacity-70`, `aria-busy`), `usePendingAction` |
+| **Visible wait** | ~1s | Skeleton / route loader / inline pending | `AppRouteLoader` + route `loading.tsx`, `RoutePendingOverlay`, `Button.pending` |
+| **Long work** | 1s+ | Percent progress or step count | Import/categorize progress bars in transaction import flow |
+| **Reversible mutation** | any | Optimistic update + rollback on error | `useOptimistic` on transactions & plans toggles; refetch reconciles server truth |
+
+Supporting heuristics: **Fitts** (`btn-touch` 44px targets), **Hick** (desktop tx toolbar Actions menu; settings Advanced collapsed by default), **Jakob** (mobile 4-tab + desktop nav groups), **Doherty** (nav pending within one frame).
+
+### Visual hierarchy (attention tiers)
+
+| Tier | What | Contrast / type | Components |
+|------|------|-----------------|------------|
+| **1 — Content focal** | Page title, primary metric | `--text`, `textRoles.pageTitle`, `textRoles.metricValue` | `PageMandate`, hero KPIs |
+| **2 — Primary action** | Add, Save, FAB | Primary button; one saturated CTA per viewport when possible | `Button` default variant |
+| **3 — Secondary UI** | Filters, pills, list rows | `--muted` / `--hint`; never brighter than body | `NavPill` (in-content), filter chips |
+| **4 — Chrome (recede)** | Bottom nav, top bar, sticky bars | `--chrome-*` tokens; **must not be brightest surface on dark** | `glass-chrome`, `MobileBottomNav`, mobile top bar |
+
+**Dark-mode chrome rule:** nav bars use `--chrome-active` (~8% white fill), not inverted `--accent`. Active nav label steps from `--chrome-fg` (hint) to `--chrome-fg-active` (muted) — never full `#f7f7f5` pills.
+
+**Typography checklist for new pages:**
+- Title → `textRoles.pageTitle` via `PageMandate` or `textRole('pageTitle')`
+- Mandate → `textRoles.mandate`
+- Metric label/value → `metricLabel` / `metricValue`
+- Section headers → `textRoles.sectionLabel`
+- Nav labels → `textRoles.navLabel` (11px micro — not for body copy)
+
+**Spacing:** use `--space-page-x/y`, `--space-section`, `--space-stack-*` via Tailwind `px-page-x`, `mb-section`, `gap-stack-md`.
+
+### Measurement
+- `ANALYZE=true npm run build` — bundle analyzer.
+- `npm run performance` — local route timing script.
+- `@vercel/speed-insights` in root layout (preview/production).

@@ -2,10 +2,12 @@
 
 import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
+import { Loader2 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 
-const BASE_BUTTON_CLASSES = "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0"
+const BASE_BUTTON_CLASSES =
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors active:scale-[0.97] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0"
 
 const VARIANT_CLASSES = {
   default: "bg-primary text-primary-foreground hover:bg-primary/90",
@@ -31,6 +33,7 @@ export interface ButtonProps
   variant?: ButtonVariant
   size?: ButtonSize
   asChild?: boolean
+  pending?: boolean
 }
 
 interface ButtonVariantsInput {
@@ -44,9 +47,34 @@ export function buttonVariants({ variant = "default", size = "default", classNam
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant = "default", size = "default", asChild = false, ...props }, ref) => {
-    const Comp = asChild ? Slot : "button"
-    return <Comp className={buttonVariants({ variant, size, className })} ref={ref} {...props} />
+  ({ className, variant = "default", size = "default", asChild = false, pending = false, disabled, children, ...props }, ref) => {
+    const isDisabled = disabled || pending
+
+    if (asChild) {
+      return (
+        <Slot
+          className={buttonVariants({ variant, size, className })}
+          ref={ref}
+          aria-busy={pending || undefined}
+          {...props}
+        >
+          {children}
+        </Slot>
+      )
+    }
+
+    return (
+      <button
+        className={buttonVariants({ variant, size, className })}
+        ref={ref}
+        disabled={isDisabled}
+        aria-busy={pending || undefined}
+        {...props}
+      >
+        {pending ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
+        {children}
+      </button>
+    )
   },
 )
 Button.displayName = "Button"

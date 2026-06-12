@@ -1,6 +1,5 @@
 import { prisma } from '@/lib/db';
 import type { DeadlinesResponse, Goal, WishlistResponse } from '@/features/plans/types';
-
 const EMPTY_DEADLINES: DeadlinesResponse = {
   data: [],
   pagination: {
@@ -43,8 +42,8 @@ export async function loadGoals(userId: string): Promise<Goal[]> {
     });
     return toJson(goals) as Goal[];
   } catch (error) {
-    console.error('[goals] bootstrap fetch failed', error);
-    return [];
+    console.error('[goals] bootstrap fetch failed', { userId, error });
+    throw error;
   }
 }
 
@@ -78,8 +77,8 @@ export async function loadDeadlines(userId: string): Promise<DeadlinesResponse> 
       },
     };
   } catch (error) {
-    console.error('[deadlines] bootstrap fetch failed', error);
-    return EMPTY_DEADLINES;
+    console.error('[deadlines] bootstrap fetch failed', { userId, error });
+    throw error;
   }
 }
 
@@ -101,7 +100,7 @@ export async function loadWishlist(userId: string): Promise<WishlistResponse> {
       }),
     ]);
 
-    const data = wishlistItems.map((item) => ({
+    const data = wishlistItems.map((item: (typeof wishlistItems)[number]) => ({
       ...item,
       tags: item.tags ? (JSON.parse(item.tags) as string[]) : [],
     }));
@@ -118,7 +117,7 @@ export async function loadWishlist(userId: string): Promise<WishlistResponse> {
       },
     };
   } catch (error) {
-    console.error('[wishlist] bootstrap fetch failed', error);
-    return EMPTY_WISHLIST;
+    console.error('[wishlist] bootstrap fetch failed', { userId, error });
+    throw error;
   }
 }

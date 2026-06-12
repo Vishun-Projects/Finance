@@ -196,10 +196,15 @@ export async function POST(request: NextRequest) {
     let documentRecord: any = null;
     if (document?.storageKey) {
       try {
-        const absolutePath = document.storageKey;
+        const { sanitizeImportStorageKey } = await import('@/lib/storage-path');
+        const sanitizedKey = sanitizeImportStorageKey(document.storageKey, userId);
+        if (!sanitizedKey) {
+          warnings.push('Invalid document storage path rejected');
+        } else {
+        const absolutePath = sanitizedKey;
         const relativePath = absolutePath.startsWith(process.cwd())
           ? relative(process.cwd(), absolutePath).replace(/\\/g, '/')
-          : document.storageKey;
+          : sanitizedKey;
 
         documentRecord = await (prisma as any).document.create({
           data: {
@@ -217,6 +222,7 @@ export async function POST(request: NextRequest) {
             metadata: metadata ? JSON.stringify(metadata) : null,
           },
         });
+        }
       } catch (error) {
         console.warn('⚠️ Failed to persist document record for bank import:', error);
       }

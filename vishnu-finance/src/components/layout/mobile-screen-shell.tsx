@@ -6,7 +6,7 @@ import MobilePageHeader from '@/components/layout/mobile-page-header';
 import FabButton from '@/components/ui/fab-button';
 import { useScrollOwner } from '@/contexts/scroll-owner-context';
 import { useIsMobile } from '@/hooks/use-breakpoint';
-import { getPageEnterVariants, prefersReducedMotion } from '@/lib/motion-utils';
+import { getPageEnterVariants } from '@/lib/motion-utils';
 import { cn } from '@/lib/utils';
 
 export interface MobileScreenShellProps {
@@ -95,7 +95,6 @@ export function MobileScreenShell({
     return <>{children}</>;
   }
 
-  const reducedMotion = prefersReducedMotion();
   const pageVariants = useMemo(() => getPageEnterVariants(), []);
   const ptrIndicatorTop = noTopOffset || tableScrollShell ? 'top-2' : 'top-14';
 
@@ -111,10 +110,9 @@ export function MobileScreenShell({
         'lg:pt-0',
         className,
       )}
-      initial={reducedMotion ? false : 'hidden'}
+      initial={false}
       animate="visible"
       variants={pageVariants}
-      transition={reducedMotion ? { duration: 0 } : undefined}
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}

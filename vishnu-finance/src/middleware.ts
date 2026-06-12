@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { clearSessionCookies } from '@/lib/clear-session-cookies';
 
 // Routes that don't require authentication
 import { jwtVerify } from 'jose';
@@ -29,6 +30,22 @@ if (!jwtSecretRaw) {
 }
 const JWT_SECRET = new TextEncoder().encode(jwtSecretRaw);
 
+function issueLegacyCsrfCookie(request: NextRequest, response: NextResponse): NextResponse {
+  if (request.cookies.get('auth-token') && !request.cookies.get('csrf-token')) {
+    const csrfToken =
+      crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '');
+    const isProd = process.env.NODE_ENV === 'production';
+    response.cookies.set('csrf-token', csrfToken, {
+      httpOnly: false,
+      secure: isProd,
+      sameSite: isProd ? 'none' : 'lax',
+      path: '/',
+      maxAge: 7 * 24 * 60 * 60,
+    });
+  }
+  return response;
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -40,11 +57,16 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  const signedOut = request.nextUrl.searchParams.get('signedOut') === '1';
+  if ((pathname === '/auth' || pathname.startsWith('/auth/')) && signedOut) {
+    const response = NextResponse.next();
+    clearSessionCookies(response);
+    return response;
+  }
+
   if (isPublicRoute(pathname)) {
     return NextResponse.next();
   }
-
-  // Check for auth token in cookies
   const authToken = request.cookies.get('auth-token');
 
   let role: 'USER' | 'SUPERUSER' | undefined;
@@ -94,7 +116,7 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  return NextResponse.next();
+  return issueLegacyCsrfCookie(request, NextResponse.next());
 }
 
 export const config = {

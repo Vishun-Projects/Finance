@@ -82,30 +82,25 @@ export function MobileNavigationListener() {
                 const url = new URL(data.url);
 
                 if (url.host === 'oauth-callback' || url.pathname === '/oauth-callback' || url.pathname.includes('oauth-callback')) {
-                    const token = url.searchParams.get('token');
-                    if (token) {
+                    const code = url.searchParams.get('code');
+                    if (code) {
                         Haptics.notification({ type: 'success' as any });
 
-                        if (Capacitor.isNativePlatform()) {
-                            const { CapacitorCookies } = await import('@capacitor/core');
+                        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://vishun-finance.vercel.app';
+                        const exchangeRes = await fetch(`${apiUrl.replace(/\/$/, '')}/api/auth/mobile-session`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            credentials: 'include',
+                            body: JSON.stringify({ code }),
+                        });
 
-                            await CapacitorCookies.setCookie({
-                                url: 'https://vishun-finance.vercel.app',
-                                key: 'auth-token',
-                                value: token,
-                                expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toUTCString(),
-                                path: '/',
-                            });
-
-                            // Verify cookie was set (Diagnostic)
-                            const cookies = await CapacitorCookies.getCookies({ url: 'https://vishun-finance.vercel.app' });
-                        } else {
-                            document.cookie = `auth-token=${token}; path=/; max-age=604800; SameSite=None; Secure`;
+                        if (!exchangeRes.ok) {
+                            toast.error('Failed to establish secure session');
+                            return;
                         }
 
                         toast.success('Secure session established');
 
-                        // Safety delay to ensure bridge sync before navigation
                         setTimeout(() => {
                             window.location.href = '/dashboard';
                         }, 500);

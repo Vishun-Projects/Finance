@@ -12,8 +12,6 @@ export const metadata: Metadata = {
   description: "Personal Finance Management Dashboard",
 };
 
-export const dynamic = "force-dynamic";
-
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   await requireUser({ redirectTo: "/auth?tab=login" });
 

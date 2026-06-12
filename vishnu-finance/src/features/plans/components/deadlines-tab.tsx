@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useMemo, useCallback, useTransition, useEffect } from 'react';
+import { useState, useMemo, useCallback, useTransition, useEffect, useOptimistic } from 'react';
 import { useSearchParams } from 'next/navigation';
 import type { Deadline, DeadlinesResponse, DeadlineStatus } from '@/features/plans/types';
 import { Button } from '@/components/ui/button';
@@ -101,6 +101,20 @@ export default function DeadlinesPageClient({
 }: DeadlinesPageClientProps) {
   const searchParams = useSearchParams();
   const [deadlines, setDeadlines] = useState<Deadline[]>(initialDeadlines.data);
+  const [optimisticDeadlines, toggleDeadlineOptimistic] = useOptimistic(
+    deadlines,
+    (state, deadline: Deadline) =>
+      state.map((d) =>
+        d.id === deadline.id
+          ? {
+              ...d,
+              isCompleted: !deadline.isCompleted,
+              status: !deadline.isCompleted ? ('PAID' as DeadlineStatus) : ('PENDING' as DeadlineStatus),
+              completedDate: !deadline.isCompleted ? new Date().toISOString() : null,
+            }
+          : d,
+      ),
+  );
   const [statusFilter, setStatusFilter] = useState<'all' | 'PENDING' | 'OVERDUE' | 'PAID' | 'SKIPPED'>('all');
   const [scopeFilter, setScopeFilter] = useState<'this-month' | 'all'>('this-month');
   const [searchTerm, setSearchTerm] = useState('');
@@ -181,20 +195,20 @@ export default function DeadlinesPageClient({
 
   const categories = useMemo(() => {
     const unique = new Set<string>();
-    deadlines.forEach((deadline) => {
+    optimisticDeadlines.forEach((deadline) => {
       if (deadline.category) unique.add(deadline.category);
     });
     return Array.from(unique);
-  }, [deadlines]);
+  }, [optimisticDeadlines]);
 
   const scopedDeadlines = useMemo(
-    () => filterDeadlinesForScope(deadlines, scopeFilter),
-    [deadlines, scopeFilter],
+    () => filterDeadlinesForScope(optimisticDeadlines, scopeFilter),
+    [optimisticDeadlines, scopeFilter],
   );
 
   const deadlineGroups = useMemo(
-    () => groupDeadlinesForCurrentMonth(deadlines),
-    [deadlines],
+    () => groupDeadlinesForCurrentMonth(optimisticDeadlines),
+    [optimisticDeadlines],
   );
 
   const filteredDeadlines = useMemo(() => {
@@ -335,6 +349,7 @@ export default function DeadlinesPageClient({
   };
 
   const handleToggleCompleted = async (deadline: Deadline) => {
+    toggleDeadlineOptimistic(deadline);
     try {
       const response = await fetch('/api/deadlines', {
         method: 'PATCH',
@@ -352,6 +367,7 @@ export default function DeadlinesPageClient({
       await refreshDeadlines();
     } catch (error) {
       console.error('[deadlines] toggle complete failed', error);
+      await refreshDeadlines();
     }
   };
 

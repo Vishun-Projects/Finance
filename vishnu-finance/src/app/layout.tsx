@@ -155,6 +155,7 @@ export const viewport: Viewport = {
 
 
 import FetchInterceptor from "@/components/fetch-interceptor";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 
 
@@ -201,6 +202,8 @@ export default async function RootLayout({
                     <Toaster />
 
                     <MobileNavigationListener />
+
+                    <SpeedInsights />
 
                   </LayoutProvider>
 

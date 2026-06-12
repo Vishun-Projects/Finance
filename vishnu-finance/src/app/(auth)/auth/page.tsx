@@ -11,12 +11,16 @@ type AuthPageProps = {
 export const dynamic = 'force-dynamic';
 
 export default async function AuthPage({ searchParams }: AuthPageProps) {
-  const user = await getCurrentUser();
   const resolvedSearchParams = await searchParams;
+  const signedOutParam = resolvedSearchParams?.signedOut;
+  const signedOut = signedOutParam === '1' || (Array.isArray(signedOutParam) && signedOutParam[0] === '1');
 
-  if (user) {
-    const destination = user.role === 'SUPERUSER' ? '/admin' : '/dashboard';
-    redirect(destination);
+  if (!signedOut) {
+    const user = await getCurrentUser();
+    if (user) {
+      const destination = user.role === 'SUPERUSER' ? '/admin' : '/dashboard';
+      redirect(destination);
+    }
   }
 
   const initialTabParam = Array.isArray(resolvedSearchParams?.tab)

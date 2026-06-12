@@ -1,5 +1,5 @@
-
-import { serverFetch } from '@/lib/server-fetch';
+import { prisma } from '@/lib/db';
+import { requireUser } from '@/lib/auth/server-auth';
 
 export interface UserProfilePayload {
   id: string;
@@ -25,16 +25,42 @@ export interface UserProfilePayload {
   status?: 'ACTIVE' | 'FROZEN' | 'SUSPENDED' | null;
 }
 
-interface UserProfileResponse {
-  user: UserProfilePayload;
-}
-
 export async function loadUserProfile(): Promise<UserProfilePayload | null> {
-  const data = await serverFetch<UserProfileResponse>('/api/user/profile', {
-    cache: 'no-store',
-    description: 'user-profile',
-    revalidate: 30,
+  const user = await requireUser();
+  const userProfile = await prisma.user.findUnique({
+    where: { id: user.id },
+    select: {
+      id: true,
+      email: true,
+      name: true,
+      avatarUrl: true,
+      gender: true,
+      phone: true,
+      dateOfBirth: true,
+      addressLine1: true,
+      addressLine2: true,
+      city: true,
+      state: true,
+      country: true,
+      pincode: true,
+      occupation: true,
+      bio: true,
+      isActive: true,
+      lastLogin: true,
+      createdAt: true,
+      updatedAt: true,
+      role: true,
+      status: true,
+    },
   });
 
-  return data?.user ?? null;
+  if (!userProfile) return null;
+
+  return {
+    ...userProfile,
+    dateOfBirth: userProfile.dateOfBirth?.toISOString() ?? null,
+    lastLogin: userProfile.lastLogin?.toISOString() ?? null,
+    createdAt: userProfile.createdAt.toISOString(),
+    updatedAt: userProfile.updatedAt.toISOString(),
+  };
 }

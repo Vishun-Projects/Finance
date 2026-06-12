@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useMemo, useCallback, useTransition, useEffect } from 'react';
+import { useState, useMemo, useCallback, useTransition, useEffect, useOptimistic } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Goal, GoalPriority, GoalStatus } from '@/features/plans/types';
 import { Button } from '@/components/ui/button';
@@ -94,6 +94,16 @@ export default function GoalsPageClient({
   disciplineSummary,
 }: GoalsPageClientProps) {
   const [goals, setGoals] = useState<Goal[]>(() => normalizeGoals(initialGoals));
+  const [optimisticGoals, markGoalCompleteOptimistic] = useOptimistic(
+    goals,
+    (state, goalId: string) =>
+      state.map((g) =>
+        g.id === goalId
+          ? { ...g, status: 'COMPLETED' as GoalStatus, currentAmount: g.targetAmount }
+          : g,
+      ),
+  );
+  const displayGoals = optimisticGoals;
   const [statusFilter, setStatusFilter] = useState<'all' | GoalStatus>('all');
   const [priorityFilter, setPriorityFilter] = useState<'all' | GoalPriority>('all');
   const [searchTerm, setSearchTerm] = useState('');
@@ -124,7 +134,9 @@ export default function GoalsPageClient({
   const searchParams = useSearchParams();
 
   useEffect(() => {
-    setGoals(normalizeGoals(initialGoals));
+    if (initialGoals.length > 0) {
+      setGoals(normalizeGoals(initialGoals));
+    }
   }, [initialGoals]);
 
   const resetForm = useCallback(() => {
@@ -196,8 +208,14 @@ export default function GoalsPageClient({
     }
   }, [userId, onGoalsChange]);
 
+  useEffect(() => {
+    if (initialGoals.length === 0 && userId) {
+      void refreshGoals();
+    }
+  }, [initialGoals.length, userId, refreshGoals]);
+
   const filteredGoals = useMemo(() => {
-    return goals.filter((goal) => {
+    return displayGoals.filter((goal) => {
       const matchesSearch = searchTerm
         ? goal.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (goal.description ?? '').toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -214,23 +232,23 @@ export default function GoalsPageClient({
 
       return matchesSearch && matchesStatus && matchesPriority;
     });
-  }, [goals, searchTerm, statusFilter, priorityFilter]);
+  }, [displayGoals, searchTerm, statusFilter, priorityFilter]);
 
   const goalStats = useMemo(() => {
-    const totalTarget = goals.reduce((sum, goal) => sum + (goal.targetAmount ?? 0), 0);
-    const totalCurrent = goals.reduce((sum, goal) => sum + (goal.currentAmount ?? 0), 0);
-    const completed = goals.filter((goal) => calculateGoalProgress(goal) >= 100 || goal.status === 'COMPLETED').length;
-    const active = goals.length - completed;
+    const totalTarget = displayGoals.reduce((sum, goal) => sum + (goal.targetAmount ?? 0), 0);
+    const totalCurrent = displayGoals.reduce((sum, goal) => sum + (goal.currentAmount ?? 0), 0);
+    const completed = displayGoals.filter((goal) => calculateGoalProgress(goal) >= 100 || goal.status === 'COMPLETED').length;
+    const active = displayGoals.length - completed;
 
     return {
-      total: goals.length,
+      total: displayGoals.length,
       completed,
       active,
       progressPercent: totalTarget ? Math.round((totalCurrent / totalTarget) * 100) : 0,
       totalTarget,
       totalCurrent,
     };
-  }, [goals]);
+  }, [displayGoals]);
 
   const handleFormChange = (field: keyof GoalFormState, value: string | GoalPriority) => {
     setFormState((prev) => ({
@@ -310,6 +328,7 @@ export default function GoalsPageClient({
   };
 
   const handleMarkCompleted = async (goal: Goal) => {
+    markGoalCompleteOptimistic(goal.id);
     try {
       const response = await fetch('/api/goals', {
         method: 'PUT',
@@ -331,6 +350,7 @@ export default function GoalsPageClient({
       }
     } catch (error) {
       console.error('[goals] mark complete failed', error);
+      await refreshGoals();
     }
   };
 

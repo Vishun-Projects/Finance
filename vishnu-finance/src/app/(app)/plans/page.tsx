@@ -8,6 +8,35 @@ import PlansPageClient from './page-client';
 const ALLOWED_TABS = ['overview', 'goals', 'deadlines', 'wishlist'] as const;
 type PlansTab = (typeof ALLOWED_TABS)[number];
 
+const EMPTY_PLANS_BOOTSTRAP: PlansBootstrap = {
+  goals: [],
+  deadlines: {
+    data: [],
+    pagination: {
+      page: 1,
+      pageSize: 100,
+      total: 0,
+      totalPages: 0,
+      hasNextPage: false,
+      hasPreviousPage: false,
+    },
+  },
+  wishlist: {
+    data: [],
+    pagination: {
+      page: 1,
+      pageSize: 100,
+      total: 0,
+      totalPages: 0,
+      hasNextPage: false,
+      hasPreviousPage: false,
+    },
+  },
+  disciplineSummary: null,
+  planIncomeContext: null,
+  accountBalance: null,
+};
+
 function isValidPlansTab(tab?: string): tab is PlansTab {
   return Boolean(tab && ALLOWED_TABS.includes(tab as PlansTab));
 }
@@ -28,16 +57,21 @@ async function PlansLoader({ searchParams }: PlansPageProps) {
   const user = await requireUser({ redirectTo: '/auth?tab=login' });
   const resolvedSearchParams = await searchParams;
 
-  const { goals, deadlines, wishlist, dashboard } = await loadPlansPageBootstrapCached(user.id);
+  let bootstrap: PlansBootstrap = EMPTY_PLANS_BOOTSTRAP;
 
-  const bootstrap: PlansBootstrap = {
-    goals,
-    deadlines,
-    wishlist,
-    disciplineSummary: dashboard.disciplineSummary,
-    planIncomeContext: dashboard.planIncomeContext,
-    accountBalance: dashboard.accountBalance,
-  };
+  try {
+    const { goals, deadlines, wishlist, dashboard } = await loadPlansPageBootstrapCached(user.id);
+    bootstrap = {
+      goals,
+      deadlines,
+      wishlist,
+      disciplineSummary: dashboard.disciplineSummary,
+      planIncomeContext: dashboard.planIncomeContext,
+      accountBalance: dashboard.accountBalance,
+    };
+  } catch (error) {
+    console.error('[plans-page] bootstrap failed', { userId: user.id, error });
+  }
 
   const defaultTab = isValidPlansTab(resolvedSearchParams?.tab) ? resolvedSearchParams.tab : 'overview';
 

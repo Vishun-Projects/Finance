@@ -3,6 +3,8 @@ import { prisma } from './db';
 
 export type AuditEvent =
   | 'USER_LOGIN'
+  | 'AUTH_LOGIN_FAILED'
+  | 'AUTH_OTP_FAILED'
   | 'USER_LOGOUT'
   | 'USER_OAUTH_LOGIN'
   | 'USER_OAUTH_REGISTER'
@@ -22,7 +24,8 @@ export type AuditEvent =
   | 'TRANSACTION_IMPORT'
   | 'TRANSACTION_DELETE'
   | 'TRANSACTION_RESTORE'
-  | 'ADMIN_ACTION';
+  | 'ADMIN_ACTION'
+  | 'N8N_WEBHOOK';
 
 export type AuditSeverity = 'INFO' | 'WARN' | 'ALERT';
 

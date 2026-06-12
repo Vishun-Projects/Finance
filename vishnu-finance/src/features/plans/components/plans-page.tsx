@@ -20,7 +20,9 @@ import { NavPill, NavPillGroup } from "@/components/ui/nav-pill";
 import { CompactListRow } from "@/components/ui/compact-list-row";
 import { useIsMobile } from "@/hooks/use-breakpoint";
 import { useMobileRefreshRegister } from '@/contexts/MobileRefreshContext';
-import { useRouteBootstrap, clearRouteBootstrap } from '@/hooks/use-route-bootstrap';
+import { useRouteBootstrap, clearAllAppRouteBootstraps } from '@/hooks/use-route-bootstrap';
+import { isPlansBootstrapEmpty } from '@/lib/bootstrap-utils';
+import { usePendingAction } from '@/hooks/use-pending-action';
 import { normalizeGoals } from "@/lib/utils/goal-normalize";
 import {
   formatCurrency,
@@ -40,6 +42,7 @@ import type { PlanIncomeContext } from "@/lib/plan-income";
 import type { CurrentAccountBalance } from "@/lib/account-balance-service";
 import { PlanCapacityBanner } from "@/features/plans/components/plan-capacity-banner";
 import { PageMandate } from '@/components/layout/page-mandate';
+import { DataRecoveryBanner } from '@/components/feedback/data-recovery-banner';
 import { TabPanelTransition } from '@/components/motion/tab-panel';
 import { useTheme } from '@/contexts/ThemeContext';
 import GoalsTab from "@/features/plans/components/goals-tab";
@@ -95,7 +98,7 @@ function addLabelForTab(tab: TabLabel): string {
 
 export default function PlansPage({ bootstrap, userId, defaultTab = "overview" }: PlansPageClientProps) {
   const isMobile = useIsMobile();
-  const cachedBootstrap = useRouteBootstrap('/plans', bootstrap);
+  const cachedBootstrap = useRouteBootstrap('/plans', bootstrap, { isEmpty: isPlansBootstrapEmpty });
   const { setTheme, isLoading: themeLoading, isDark } = useTheme();
   const isDarkMode = !themeLoading && isDark;
   const searchParams = useSearchParams();
@@ -109,7 +112,8 @@ export default function PlansPage({ bootstrap, userId, defaultTab = "overview" }
   const [disciplineSummary, setDisciplineSummary] = useState<DisciplineSummary | null>(
     cachedBootstrap.disciplineSummary ?? null,
   );
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [entitiesLoadError, setEntitiesLoadError] = useState<string | null>(null);
+  const { run: runRefresh, isPending: isRefreshing } = usePendingAction();
 
   const deadlinesResponse = useMemo<DeadlinesResponse>(
     () => ({ ...cachedBootstrap.deadlines, data: deadlines }),
@@ -121,15 +125,18 @@ export default function PlansPage({ bootstrap, userId, defaultTab = "overview" }
   );
 
   useEffect(() => {
-    setGoals(normalizeGoals(cachedBootstrap.goals));
+    const next = normalizeGoals(cachedBootstrap.goals);
+    setGoals((prev) => (next.length > 0 ? next : prev));
   }, [cachedBootstrap.goals]);
 
   useEffect(() => {
-    setDeadlines(cachedBootstrap.deadlines.data ?? []);
+    const next = cachedBootstrap.deadlines.data ?? [];
+    setDeadlines((prev) => (next.length > 0 ? next : prev));
   }, [cachedBootstrap.deadlines.data]);
 
   useEffect(() => {
-    setWishlistItems(cachedBootstrap.wishlist.data ?? []);
+    const next = cachedBootstrap.wishlist.data ?? [];
+    setWishlistItems((prev) => (next.length > 0 ? next : prev));
   }, [cachedBootstrap.wishlist.data]);
 
   useEffect(() => {
@@ -138,10 +145,6 @@ export default function PlansPage({ bootstrap, userId, defaultTab = "overview" }
       setActiveTab(TAB_FROM_PARAM[tabParam.toLowerCase()]);
     }
   }, [searchParams]);
-
-  useEffect(() => {
-    setDisciplineSummary(cachedBootstrap.disciplineSummary ?? null);
-  }, [cachedBootstrap.disciplineSummary]);
 
   const loadDiscipline = useCallback(async () => {
     try {
@@ -153,6 +156,61 @@ export default function PlansPage({ bootstrap, userId, defaultTab = "overview" }
       console.error('[plans] discipline fetch failed', error);
     }
   }, []);
+
+  const refetchPlansEntities = useCallback(async () => {
+    try {
+      setEntitiesLoadError(null);
+      const [goalsRes, deadlinesRes, wishlistRes] = await Promise.all([
+        fetch(`/api/goals?userId=${encodeURIComponent(userId)}`),
+        fetch(`/api/deadlines?userId=${encodeURIComponent(userId)}&page=1&pageSize=100`),
+        fetch('/api/wishlist'),
+      ]);
+
+      let loadedAny = false;
+
+      if (goalsRes.ok) {
+        const data = (await goalsRes.json()) as Goal[];
+        if (Array.isArray(data)) {
+          const normalized = normalizeGoals(data);
+          if (normalized.length > 0) {
+            setGoals(normalized);
+            loadedAny = true;
+          }
+        }
+      }
+
+      if (deadlinesRes.ok) {
+        const payload = (await deadlinesRes.json()) as DeadlinesResponse | Deadline[];
+        const rows = Array.isArray(payload) ? payload : payload.data ?? [];
+        if (rows.length > 0) {
+          setDeadlines(rows);
+          loadedAny = true;
+        }
+      }
+
+      if (wishlistRes.ok) {
+        const payload = (await wishlistRes.json()) as WishlistResponse | WishlistItem[];
+        const rows = Array.isArray(payload) ? payload : payload.data ?? [];
+        if (rows.length > 0) {
+          setWishlistItems(rows);
+          loadedAny = true;
+        }
+      }
+
+      if (!loadedAny && isPlansBootstrapEmpty(cachedBootstrap)) {
+        setEntitiesLoadError('Could not load plans data. Check your connection and retry.');
+      }
+    } catch (error) {
+      console.error('[plans] entity refetch failed', error);
+      setEntitiesLoadError('Could not load plans data. Check your connection and retry.');
+    }
+  }, [userId, cachedBootstrap]);
+
+  useEffect(() => {
+    if (isPlansBootstrapEmpty(cachedBootstrap)) {
+      void refetchPlansEntities();
+    }
+  }, [cachedBootstrap, refetchPlansEntities]);
 
   useEffect(() => {
     void loadDiscipline();
@@ -189,15 +247,12 @@ export default function PlansPage({ bootstrap, userId, defaultTab = "overview" }
   );
 
   const refreshModule = useCallback(async () => {
-    setIsRefreshing(true);
-    try {
-      clearRouteBootstrap('/plans');
+    await runRefresh(async () => {
+      clearAllAppRouteBootstraps();
       router.refresh();
-      await loadDiscipline();
-    } finally {
-      setTimeout(() => setIsRefreshing(false), 600);
-    }
-  }, [router, loadDiscipline]);
+      await Promise.all([refetchPlansEntities(), loadDiscipline()]);
+    });
+  }, [router, loadDiscipline, refetchPlansEntities, runRefresh]);
 
   useMobileRefreshRegister(refreshModule, '/plans');
 
@@ -262,23 +317,50 @@ export default function PlansPage({ bootstrap, userId, defaultTab = "overview" }
         </button>
       </div>
 
+      {entitiesLoadError ? (
+        <DataRecoveryBanner
+          message={entitiesLoadError}
+          onRetry={() => void refetchPlansEntities()}
+          loading={isRefreshing}
+          className="mb-3"
+        />
+      ) : null}
+
       <div className="mb-3 flex shrink-0 flex-col gap-2 max-lg:mb-2 lg:mb-5 lg:flex-row lg:flex-wrap lg:items-center lg:gap-3">
-        <NavPillGroup className="w-full shrink-0 lg:w-auto">
+        {isMobile ? (
+          <NavPillGroup variant="segmented" className="w-full shrink-0 -mx-4 px-4">
             {TABS.map((tab) => {
               const meta = TAB_META[tab];
               const Icon = meta.icon;
               return (
-              <NavPill
-                key={tab}
-                label={isMobile ? meta.mobileLabel : tab}
-                icon={isMobile ? <Icon className="size-3.5" /> : undefined}
-                active={activeTab === tab}
-                onClick={() => handleTabChange(tab)}
-                className="max-lg:min-w-[4.25rem] max-lg:flex-col max-lg:gap-0.5 max-lg:px-2 max-lg:py-1.5 max-lg:text-[10px]"
-              />
-            );
-          })}
-        </NavPillGroup>
+                <NavPill
+                  key={tab}
+                  variant="segmented"
+                  label={meta.mobileLabel}
+                  icon={<Icon className="size-3.5 shrink-0" />}
+                  active={activeTab === tab}
+                  onClick={() => handleTabChange(tab)}
+                />
+              );
+            })}
+          </NavPillGroup>
+        ) : (
+          <NavPillGroup className="w-full shrink-0 lg:w-auto">
+            {TABS.map((tab) => {
+              const meta = TAB_META[tab];
+              const Icon = meta.icon;
+              return (
+                <NavPill
+                  key={tab}
+                  label={tab}
+                  icon={<Icon className="size-3.5" />}
+                  active={activeTab === tab}
+                  onClick={() => handleTabChange(tab)}
+                />
+              );
+            })}
+          </NavPillGroup>
+        )}
 
         <div className="flex items-center gap-2 lg:ml-auto">
           <Button variant="outline" size="sm" onClick={refreshModule} disabled={isRefreshing} className="gap-1.5">

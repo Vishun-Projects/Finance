@@ -61,6 +61,13 @@ module.exports = {
 					credits: 'var(--chart-credits)',
 					debits: 'var(--chart-debits)',
 				},
+				chrome: {
+					DEFAULT: 'var(--chrome-bg)',
+					border: 'var(--chrome-border)',
+					fg: 'var(--chrome-fg)',
+					'fg-active': 'var(--chrome-fg-active)',
+					active: 'var(--chrome-active)',
+				},
 			},
 			fontFamily: {
 				sans: ['var(--font-sans)'],

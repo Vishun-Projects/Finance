@@ -19,17 +19,49 @@ export interface NavItem {
   icon: LucideIcon;
 }
 
-export const primaryNavItemsConfig: NavItem[] = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutGrid },
-  { href: '/advisor', label: 'Advisor', icon: Brain },
-  { href: '/transactions', label: 'Transactions', icon: ReceiptText },
-  { href: '/plans', label: 'Plans', icon: Layers },
-  { href: '/education', label: 'Learn', icon: BookOpen },
-  { href: '/financial-health', label: 'Health Score', icon: Heart },
-  { href: '/investments', label: 'Investments', icon: LineChart },
-  { href: '/salary', label: 'Salary', icon: Wallet },
-  { href: '/settings', label: 'Settings', icon: Settings },
+export interface NavSection {
+  id: string;
+  label: string;
+  items: NavItem[];
+}
+
+export const desktopNavSections: NavSection[] = [
+  {
+    id: 'core',
+    label: 'Core',
+    items: [
+      { href: '/dashboard', label: 'Dashboard', icon: LayoutGrid },
+      { href: '/advisor', label: 'Advisor', icon: Brain },
+      { href: '/transactions', label: 'Transactions', icon: ReceiptText },
+      { href: '/plans', label: 'Plans', icon: Layers },
+    ],
+  },
+  {
+    id: 'finance',
+    label: 'Finance',
+    items: [
+      { href: '/salary', label: 'Salary', icon: Wallet },
+      { href: '/investments', label: 'Investments', icon: LineChart },
+      { href: '/net-worth', label: 'Net Worth', icon: Landmark },
+      { href: '/financial-health', label: 'Health', icon: Heart },
+      { href: '/reports', label: 'Reports', icon: FileBarChart },
+    ],
+  },
+  {
+    id: 'account',
+    label: 'Account',
+    items: [
+      { href: '/settings', label: 'Settings', icon: Settings },
+      { href: '/education', label: 'Education', icon: BookOpen },
+    ],
+  },
 ];
+
+/** Flat desktop sidebar — no section headers */
+export const desktopNavItems: NavItem[] = desktopNavSections.flatMap((s) => s.items);
+
+/** Flat list for mobile bottom nav, page titles, and legacy consumers */
+export const primaryNavItemsConfig: NavItem[] = desktopNavSections.flatMap((s) => s.items);
 
 /** Extra routes not in bottom nav primary tabs */
 export const secondaryRouteTitles: Record<string, string> = {
@@ -52,19 +84,15 @@ export function getPageTitle(pathname: string): string {
   }
 
   const match = primaryNavItemsConfig.find(
-    (item) => pathname === item.href || pathname.startsWith(item.href + '/')
+    (item) => pathname === item.href || pathname.startsWith(item.href + '/'),
   );
   return match?.label ?? 'Vishnu Finance';
 }
 
-/** Secondary routes surfaced in Dashboard Overview Explore grid (ex bottom-nav More drawer) */
+/** Secondary routes surfaced in Dashboard Overview Explore grid */
 export const mobileExploreItems: NavItem[] = [
-  ...primaryNavItemsConfig.slice(4),
-  { href: '/net-worth', label: 'Net worth', icon: Landmark },
-  { href: '/reports', label: 'Reports', icon: FileBarChart },
+  ...desktopNavSections.find((s) => s.id === 'finance')!.items,
+  ...desktopNavSections.find((s) => s.id === 'account')!.items.filter((i) => i.href !== '/settings'),
 ];
 
-/** @deprecated use primaryNavItemsConfig.slice(0, 4) directly */
-export const mobileDrawerItems = mobileExploreItems;
-
-export const mobileBottomNavItems = primaryNavItemsConfig.slice(0, 4);
+export const mobileBottomNavItems = desktopNavSections.find((s) => s.id === 'core')!.items;

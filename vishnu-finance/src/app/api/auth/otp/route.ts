@@ -1,38 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { AuthService, SUPERUSER_EMAIL, SUPERUSER_PHONE } from '@/lib/auth';
-import { MailerService } from '@/lib/mailer-service';
-import { prisma } from '@/lib/db';
+import { AuthService, deliverOtpToUser, findUserByEmail, normalizeEmail } from '@/lib/auth';
+import { rateLimitMiddleware } from '@/lib/rate-limit';
+import { corsPreflightHeaders } from '@/lib/cors';
 
-export async function OPTIONS() {
+export async function OPTIONS(request: NextRequest) {
     return new NextResponse(null, {
         status: 204,
-        headers: {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
-            'Access-Control-Max-Age': '86400',
-        },
+        headers: corsPreflightHeaders(request),
     });
 }
 
 export async function POST(request: NextRequest) {
-    try {
-        const { email } = await request.json();
+    const rateLimitResponse = await rateLimitMiddleware('auth', request);
+    if (rateLimitResponse) return rateLimitResponse;
 
-        if (!email) {
+    try {
+        const { email: rawEmail } = await request.json();
+
+        if (!rawEmail) {
             return NextResponse.json(
                 { error: 'Email is required' },
                 { status: 400 }
             );
         }
 
-        // Check if user exists
-        const user = await prisma.user.findUnique({
-            where: { email }
-        });
+        const email = normalizeEmail(rawEmail);
+
+        const user = await findUserByEmail(email);
 
         if (!user) {
-            // Security: Don't reveal if user exists
             return NextResponse.json(
                 { message: 'If this email is registered, a verification code has been sent.' },
                 { status: 200 }
@@ -46,23 +42,18 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Generate OTP
-        const otp = await AuthService.generateOTP(email);
+        const otp = await AuthService.generateOTP(user.email);
 
-        // Superuser Redirection Logic: Bypass email and send via SMS (N8n)
-        if (email === SUPERUSER_EMAIL) {
-            const { N8nService } = await import('@/lib/n8n-service');
-
-            // Still trigger a specific event for clean SMS routing in n8n
-            await N8nService.triggerWorkflow('otp_phone_delivery', {
-                email,
-                otp,
-                phone: SUPERUSER_PHONE,
-                provider: 'twilio_sms'
-            });
-        } else {
-            // Normal flow for other users
-            await MailerService.sendOTP(email, otp);
+        try {
+            await deliverOtpToUser(user.email, otp);
+        } catch (deliveryError) {
+            console.error('OTP delivery failed:', deliveryError);
+            return NextResponse.json(
+                {
+                    error: 'Could not send verification code. Try Google sign-in or check SMTP settings.',
+                },
+                { status: 503 }
+            );
         }
 
         return NextResponse.json(
@@ -70,7 +61,7 @@ export async function POST(request: NextRequest) {
             { status: 200 }
         );
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Request OTP Error:', error);
         return NextResponse.json(
             { error: 'Internal server error' },

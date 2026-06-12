@@ -44,7 +44,7 @@ export const navPillVariants = cva(
   {
     variants: {
       active: {
-        true: 'text-[var(--primary-foreground)]',
+        true: 'text-foreground',
         false: 'bg-transparent text-muted hover:text-foreground',
       },
     },
@@ -52,9 +52,9 @@ export const navPillVariants = cva(
   }
 );
 
-/** Uber-style underline segmented control — dashboard mobile */
+/** Uber-style underline segmented control — full-width equal tabs */
 export const segmentedNavPillVariants = cva(
-  'relative inline-flex shrink-0 items-center gap-1.5 px-4 py-3 text-sm font-medium transition-colors duration-150',
+  'relative inline-flex min-w-0 flex-1 items-center justify-center gap-1.5 px-2 py-3 text-sm font-medium transition-colors duration-150',
   {
     variants: {
       active: {

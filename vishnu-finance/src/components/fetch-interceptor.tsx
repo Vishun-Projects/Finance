@@ -1,108 +1,110 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useLayoutEffect, useRef } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { debugLogger } from '@/lib/mobile/debug-logger';
+import { installFetchCsrfInterceptor } from '@/lib/install-fetch-csrf';
+
+if (typeof window !== 'undefined') {
+  installFetchCsrfInterceptor();
+}
 
 export default function FetchInterceptor() {
-    const originalFetchRef = useRef<typeof fetch | null>(null);
-    const isInterceptedRef = useRef(false);
+  const originalFetchRef = useRef<typeof fetch | null>(null);
+  const isInterceptedRef = useRef(false);
 
-    useEffect(() => {
-        // Initialize logger
-        debugLogger.init();
+  useLayoutEffect(() => {
+    debugLogger.init();
 
-        // Only intercept on mobile/native platforms for base URL redirection,
-        // but we can log network for all platforms if desired.
-        // For now, keep redirection limited to native.
-        const isNative = Capacitor.isNativePlatform();
+    const isNative = Capacitor.isNativePlatform();
 
-        if (isInterceptedRef.current) return;
+    if (isInterceptedRef.current) return;
 
-        // Store original fetch
-        if (!originalFetchRef.current) {
-            originalFetchRef.current = window.fetch.bind(window);
+    if (!originalFetchRef.current) {
+      originalFetchRef.current = window.fetch.bind(window);
+    }
+
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://vishun-finance.vercel.app';
+
+    window.fetch = async (...args) => {
+      let resource = args[0];
+      let config = args[1] ? { ...args[1] } : {};
+      const method = config.method || 'GET';
+
+      let url = 'Unknown URL';
+      if (typeof resource === 'string') {
+        url = resource;
+      } else if (resource instanceof URL) {
+        url = resource.toString();
+      } else if (resource instanceof Request) {
+        url = resource.url;
+      }
+
+      debugLogger.logNetwork(method, url);
+
+      if (isNative) {
+        const currentOrigin = typeof window !== 'undefined' ? window.location.origin : '';
+        const isLocalOrigin =
+          currentOrigin.includes('localhost') ||
+          currentOrigin.startsWith('file://') ||
+          currentOrigin.startsWith('capacitor://');
+
+        if (isLocalOrigin) {
+          const cleanApiUrl = apiUrl.endsWith('/') ? apiUrl.slice(0, -1) : apiUrl;
+
+          if (typeof resource === 'string' && resource.startsWith('/')) {
+            resource = `${cleanApiUrl}${resource}`;
+          } else if (resource instanceof URL && resource.origin === window.location.origin) {
+            resource = new URL(resource.pathname + resource.search, cleanApiUrl);
+          } else if (
+            resource instanceof Request &&
+            (resource.url.startsWith('/') ||
+              resource.url.startsWith('file://') ||
+              resource.url.startsWith('capacitor://'))
+          ) {
+            const urlObj = new URL(resource.url, window.location.origin);
+            if (urlObj.origin === window.location.origin) {
+              const newUrl = `${cleanApiUrl}${urlObj.pathname}${urlObj.search}`;
+              resource = new Request(newUrl, resource);
+            }
+          }
+        }
+      }
+
+      try {
+        const response = await originalFetchRef.current!(resource, config);
+
+        try {
+          const clonedRes = response.clone();
+          const contentType = clonedRes.headers.get('content-type');
+          const logBodies = process.env.NODE_ENV !== 'production';
+
+          if (logBodies && contentType && contentType.includes('application/json')) {
+            const body = await clonedRes.json().catch(() => 'JSON parse failed');
+            debugLogger.logNetwork(method, url, response.status, undefined, body);
+          } else {
+            debugLogger.logNetwork(method, url, response.status);
+          }
+        } catch {
+          debugLogger.logNetwork(method, url, response.status, 'Body read failed');
         }
 
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://vishun-finance.vercel.app';
+        return response;
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : 'Network error';
+        debugLogger.logNetwork(method, url, undefined, message);
+        throw error;
+      }
+    };
 
-        window.fetch = async (...args) => {
-            let resource = args[0];
-            const config = args[1];
-            const method = config?.method || 'GET';
+    isInterceptedRef.current = true;
+    return () => {
+      if (originalFetchRef.current) {
+        window.fetch = originalFetchRef.current;
+        isInterceptedRef.current = false;
+      }
+    };
+  }, []);
 
-            // Robust URL extraction for logging
-            let url = 'Unknown URL';
-            if (typeof resource === 'string') {
-                url = resource;
-            } else if (resource instanceof URL) {
-                url = resource.toString();
-            } else if (resource instanceof Request) {
-                url = resource.url;
-            }
-
-            // Log start of request
-            debugLogger.logNetwork(method, url);
-
-            // Base URL detection & redirection for native
-            if (isNative) {
-                const currentOrigin = typeof window !== 'undefined' ? window.location.origin : '';
-                const isLocalOrigin = currentOrigin.includes('localhost') || currentOrigin.startsWith('file://') || currentOrigin.startsWith('capacitor://');
-
-                if (isLocalOrigin) {
-                    const cleanApiUrl = apiUrl.endsWith('/') ? apiUrl.slice(0, -1) : apiUrl;
-
-                    if (typeof resource === 'string' && resource.startsWith('/')) {
-                        // Redirect relative strings
-                        resource = `${cleanApiUrl}${resource}`;
-                    } else if (resource instanceof URL && resource.origin === window.location.origin) {
-                        // Redirect relative URL objects
-                        resource = new URL(resource.pathname + resource.search, cleanApiUrl);
-                    } else if (resource instanceof Request && (resource.url.startsWith('/') || resource.url.startsWith('file://') || resource.url.startsWith('capacitor://'))) {
-                        // Handle relative Request objects (common for Server Actions)
-                        // In Capacitor, a relative request might sometimes show up with origin, but still needs redirection
-                        const urlObj = new URL(resource.url, window.location.origin);
-                        if (urlObj.origin === window.location.origin) {
-                            const newUrl = `${cleanApiUrl}${urlObj.pathname}${urlObj.search}`;
-                            resource = new Request(newUrl, resource);
-                        }
-                    }
-                }
-            }
-
-            try {
-                const response = await originalFetchRef.current!(resource, config);
-
-                // Clone response to read body for debugging without consuming it
-                try {
-                    const clonedRes = response.clone();
-                    const contentType = clonedRes.headers.get('content-type');
-
-                    if (contentType && contentType.includes('application/json')) {
-                        const body = await clonedRes.json().catch(() => 'JSON parse failed');
-                        debugLogger.logNetwork(method, url, response.status, undefined, body);
-                    } else {
-                        debugLogger.logNetwork(method, url, response.status, undefined, 'Non-JSON response');
-                    }
-                } catch (e) {
-                    debugLogger.logNetwork(method, url, response.status, 'Body read failed');
-                }
-
-                return response;
-            } catch (error: any) {
-                debugLogger.logNetwork(method, url, undefined, error.message);
-                throw error;
-            }
-        };
-
-        isInterceptedRef.current = true;
-        return () => {
-            if (originalFetchRef.current) {
-                window.fetch = originalFetchRef.current;
-                isInterceptedRef.current = false;
-            }
-        };
-    }, []);
-
-    return null;
+  return null;
 }

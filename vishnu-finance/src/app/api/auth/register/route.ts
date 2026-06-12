@@ -1,19 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { AuthService } from '@/lib/auth';
+import { rateLimitMiddleware } from '@/lib/rate-limit';
+import { corsPreflightHeaders } from '@/lib/cors';
 
-export async function OPTIONS() {
+export async function OPTIONS(request: NextRequest) {
   return new NextResponse(null, {
     status: 204,
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
-      'Access-Control-Max-Age': '86400',
-    },
+    headers: corsPreflightHeaders(request),
   });
 }
 
 export async function POST(request: NextRequest) {
+  const rateLimitResponse = await rateLimitMiddleware('auth', request);
+  if (rateLimitResponse) return rateLimitResponse;
+
   try {
     const { email, password, name } = await request.json();
 
@@ -25,9 +25,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (password.length < 6) {
+    if (password.length < 8) {
       return NextResponse.json(
-        { error: 'Password must be at least 6 characters long' },
+        { error: 'Password must be at least 8 characters long' },
         { status: 400 }
       );
     }

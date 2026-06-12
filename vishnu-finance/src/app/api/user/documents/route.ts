@@ -103,6 +103,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'File is required' }, { status: 400 });
     }
 
+    const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+    const ALLOWED_MIME = new Set([
+      'application/pdf',
+      'image/jpeg',
+      'image/png',
+      'image/webp',
+    ]);
+    if (file.size > MAX_UPLOAD_BYTES) {
+      return NextResponse.json({ error: 'File must be 10 MB or smaller' }, { status: 413 });
+    }
+    if (file.type && !ALLOWED_MIME.has(file.type)) {
+      return NextResponse.json({ error: 'Unsupported file type' }, { status: 415 });
+    }
+
     const visibility = (formData.get('visibility') as DocumentVisibility | null) || 'PRIVATE';
     if (!ALLOWED_VISIBILITIES.includes(visibility)) {
       return NextResponse.json({ error: 'Invalid visibility option' }, { status: 400 });

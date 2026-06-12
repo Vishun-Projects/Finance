@@ -230,7 +230,7 @@ export async function exchangeMicrosoftCodeForTokens(
 }
 
 /**
- * Verify and decode Microsoft ID token
+ * Verify and decode Microsoft ID token (JWKS signature verified)
  */
 export async function verifyMicrosoftIdToken(idToken: string): Promise<{
   email: string;
@@ -238,39 +238,28 @@ export async function verifyMicrosoftIdToken(idToken: string): Promise<{
   picture?: string;
   sub: string;
 }> {
-  // Decode JWT token (Microsoft tokens are standard JWT)
-  const parts = idToken.split('.');
-  if (parts.length !== 3) {
-    throw new Error('Invalid Microsoft ID token format');
+  if (!MICROSOFT_OAUTH_CLIENT_ID) {
+    throw new Error('Microsoft OAuth is not configured');
   }
 
-  // Decode payload (base64url)
-  const payload = JSON.parse(
-    Buffer.from(parts[1], 'base64url').toString('utf-8')
-  );
-
-  // Verify audience
-  if (payload.aud !== MICROSOFT_OAUTH_CLIENT_ID) {
-    throw new Error('Invalid Microsoft ID token audience');
-  }
-
-  // Verify issuer (Microsoft)
-  if (!payload.iss?.includes('microsoftonline.com')) {
-    throw new Error('Invalid Microsoft ID token issuer');
-  }
+  const { verifyMicrosoftIdTokenSignature } = await import('@/lib/oauth-jwks');
+  const payload = await verifyMicrosoftIdTokenSignature(idToken, MICROSOFT_OAUTH_CLIENT_ID);
 
   if (!payload.email && !payload.preferred_username) {
     throw new Error('Email not found in Microsoft ID token');
   }
 
-  const email = payload.email || payload.preferred_username;
-  const name = payload.name || payload.given_name + ' ' + (payload.family_name || '') || email.split('@')[0];
+  const email = String(payload.email || payload.preferred_username);
+  const given = payload.given_name ? String(payload.given_name) : '';
+  const family = payload.family_name ? String(payload.family_name) : '';
+  const name =
+    (payload.name ? String(payload.name) : `${given} ${family}`.trim()) || email.split('@')[0];
 
   return {
     email,
     name: name.trim(),
-    picture: payload.picture,
-    sub: payload.sub || payload.oid,
+    picture: payload.picture ? String(payload.picture) : undefined,
+    sub: String(payload.sub || payload.oid || ''),
   };
 }
 
@@ -373,7 +362,7 @@ export async function exchangeAppleCodeForTokens(
 }
 
 /**
- * Verify and decode Apple ID token
+ * Verify and decode Apple ID token (JWKS signature verified)
  */
 export async function verifyAppleIdToken(idToken: string): Promise<{
   email: string;
@@ -381,43 +370,32 @@ export async function verifyAppleIdToken(idToken: string): Promise<{
   picture?: string;
   sub: string;
 }> {
-  // Decode JWT token (Apple tokens are standard JWT)
-  const parts = idToken.split('.');
-  if (parts.length !== 3) {
-    throw new Error('Invalid Apple ID token format');
+  if (!APPLE_OAUTH_CLIENT_ID) {
+    throw new Error('Apple OAuth is not configured');
   }
 
-  // Decode payload (base64url)
-  const payload = JSON.parse(
-    Buffer.from(parts[1], 'base64url').toString('utf-8')
-  );
-
-  // Verify audience
-  if (payload.aud !== APPLE_OAUTH_CLIENT_ID) {
-    throw new Error('Invalid Apple ID token audience');
-  }
-
-  // Verify issuer (Apple)
-  if (payload.iss !== 'https://appleid.apple.com') {
-    throw new Error('Invalid Apple ID token issuer');
-  }
+  const { verifyAppleIdTokenSignature } = await import('@/lib/oauth-jwks');
+  const payload = await verifyAppleIdTokenSignature(idToken, APPLE_OAUTH_CLIENT_ID);
 
   if (!payload.email && !payload.sub) {
     throw new Error('Email or subject not found in Apple ID token');
   }
 
-  // Apple may not always provide email in subsequent logins
-  // Use sub (subject) as fallback identifier
-  const email = payload.email || `${payload.sub}@privaterelay.appleid.com`;
-  const name = payload.name 
-    ? `${payload.name.givenName || ''} ${payload.name.familyName || ''}`.trim()
-    : email.split('@')[0];
+  const email = payload.email
+    ? String(payload.email)
+    : `${String(payload.sub)}@privaterelay.appleid.com`;
+
+  let name = email.split('@')[0];
+  if (payload.name && typeof payload.name === 'object' && payload.name !== null) {
+    const n = payload.name as { givenName?: string; familyName?: string };
+    name = `${n.givenName || ''} ${n.familyName || ''}`.trim() || name;
+  }
 
   return {
     email,
     name: name || email.split('@')[0],
-    picture: undefined, // Apple doesn't provide profile pictures
-    sub: payload.sub,
+    picture: undefined,
+    sub: String(payload.sub),
   };
 }
 

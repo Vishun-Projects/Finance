@@ -22,6 +22,11 @@ const nextConfig: NextConfig = {
 
   // Security Headers
   async headers() {
+    const isProd = process.env.NODE_ENV === 'production';
+    const scriptSrc = isProd
+      ? "script-src 'self' 'unsafe-inline' https://vercel.live"
+      : "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://vercel.live";
+
     return [
       {
         source: '/(.*)',
@@ -53,6 +58,20 @@ const nextConfig: NextConfig = {
           {
             key: 'Permissions-Policy',
             value: 'camera=(), microphone=(), geolocation=(), payment=()'
+          },
+          {
+            key: 'Content-Security-Policy',
+            value: [
+              "default-src 'self'",
+              scriptSrc,
+              "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+              "img-src 'self' data: blob: https:",
+              "font-src 'self' data: https://fonts.gstatic.com",
+              "connect-src 'self' https: wss:",
+              "frame-ancestors 'self'",
+              "base-uri 'self'",
+              "form-action 'self'",
+            ].join('; '),
           }
         ]
       }
@@ -228,4 +247,9 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
 };
 
-export default nextConfig;
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const withBundleAnalyzer = require('@next/bundle-analyzer')({
+  enabled: process.env.ANALYZE === 'true',
+});
+
+export default withBundleAnalyzer(nextConfig);

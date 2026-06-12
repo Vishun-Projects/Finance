@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { usePendingAction } from '@/hooks/use-pending-action';
 import { ArrowLeft } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -43,7 +44,7 @@ export default function SettingsPageClient({
   const [activeLegalDoc, setActiveLegalDoc] = useState<LegalDocHref | null>(null);
   const [mobileInSection, setMobileInSection] = useState(false);
   const isMobile = useIsMobile('lg');
-  const [loading, setLoading] = useState(false);
+  const { run: runSave, isPending: loading } = usePendingAction();
   const [savedSections, setSavedSections] = useState<Record<string, boolean>>({});
   const { theme, setTheme } = useTheme();
   const { user } = useAuth();
@@ -95,42 +96,45 @@ export default function SettingsPageClient({
       return;
     }
 
-    setLoading(true);
-    try {
-      const response = await fetch('/api/user-preferences', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user.id,
-          navigationLayout: 'top',
-          currency: selectedCurrency,
-          language: preferences.language,
-          timezone: preferences.timezone,
-          dateFormat: preferences.dateFormat,
-          telegramUserId: preferences.telegramUserId,
-          telegramEnabled: preferences.telegramEnabled,
-          emailEnabled: preferences.emailEnabled,
-          notificationEmail: preferences.notificationEmail,
-          dailyQuoteEnabled: preferences.dailyQuoteEnabled,
-        }),
-      });
+    await runSave(async () => {
+      try {
+        const response = await fetch('/api/user-preferences', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: user.id,
+            navigationLayout: 'top',
+            currency: selectedCurrency,
+            language: preferences.language,
+            timezone: preferences.timezone,
+            dateFormat: preferences.dateFormat,
+            telegramUserId: preferences.telegramUserId,
+            telegramEnabled: preferences.telegramEnabled,
+            emailEnabled: preferences.emailEnabled,
+            notificationEmail: preferences.notificationEmail,
+            dailyQuoteEnabled: preferences.dailyQuoteEnabled,
+          }),
+        });
 
-      const responseData = await response.json();
+        const responseData = await response.json();
 
-      if (response.ok) {
-        success('Settings saved', `${section} settings have been saved successfully.`);
-        setSavedSections((prev) => ({ ...prev, [section]: true }));
-        setTimeout(() => {
-          setSavedSections((prev) => ({ ...prev, [section]: false }));
-        }, 3000);
-      } else {
-        showError('Save failed', responseData.error || 'Unknown error');
+        if (response.ok) {
+          success('Settings saved', `${section} settings have been saved successfully.`);
+          setSavedSections((prev) => ({ ...prev, [section]: true }));
+          setTimeout(() => {
+            setSavedSections((prev) => ({ ...prev, [section]: false }));
+          }, 3000);
+        } else {
+          showError('Save failed', responseData.error || 'Unknown error');
+          throw new Error(responseData.error || 'Save failed');
+        }
+      } catch (error) {
+        if (error instanceof Error && error.message !== 'Save failed') {
+          showError('Network error', 'Could not save preferences. Please try again.');
+        }
+        throw error;
       }
-    } catch {
-      showError('Network error', 'Could not save preferences. Please try again.');
-    } finally {
-      setLoading(false);
-    }
+    });
   };
 
   const handlePushToggle = async (checked: boolean) => {

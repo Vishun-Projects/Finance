@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef, useOptimistic } from 'react';
 import Link from 'next/link';
 import { Plus, Search, Filter, X, RefreshCw, CheckSquare, Square, Trash2, RotateCw, Tag, Layers, ChevronLeft, ChevronRight, Sparkles, Check, Calendar as CalendarIcon, FileText, Upload, AlertCircle, TrendingUp, ChevronDown, Edit, Download, ArrowUp, ShoppingCart, Utensils, Zap, ShoppingBag, BrainCircuit, Sun, Moon, Link2, MoreHorizontal } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -45,11 +45,13 @@ import { DocumentImportSheet } from './document-import-sheet';
 import { ResponsiveDialog } from '@/components/ui/responsive-dialog';
 import SpendingCalendar, { type DailySpendEntry } from './spending-calendar';
 import { TRANSACTION_PAGE_SIZE } from '@/features/transactions/constants';
+import { useTransactionApi } from '@/features/transactions/hooks/use-transaction-api';
 import { toLocalISODate } from '@/lib/date-range';
 import { AccountBalanceChip } from '@/components/finance/account-balance-chip';
 import { MonthAtGlanceKpis } from '@/components/finance/month-at-glance-kpis';
 import { PageMandate } from '@/components/layout/page-mandate';
-import { clearRouteBootstrap, useRouteBootstrap } from '@/hooks/use-route-bootstrap';
+import { clearAllAppRouteBootstraps, useRouteBootstrap } from '@/hooks/use-route-bootstrap';
+import { usePendingAction } from '@/hooks/use-pending-action';
 import type { CurrentAccountBalance } from '@/lib/account-balance-service';
 import type { ImportPreviewResult } from '@/lib/import-preview-service';
 import {
@@ -106,8 +108,35 @@ interface TransactionUnifiedManagementProps {
   bootstrap?: TransactionsBootstrap;
 }
 
+type TransactionOptimisticAction =
+  | { type: 'delete'; ids: string[] }
+  | { type: 'restore'; ids: string[] }
+  | { type: 'bulkCategory'; ids: string[]; categoryId: string };
+
+function applyTransactionOptimistic(
+  state: Transaction[],
+  action: TransactionOptimisticAction,
+): Transaction[] {
+  switch (action.type) {
+    case 'delete':
+      return state.filter((t) => !action.ids.includes(t.id));
+    case 'restore':
+      return state.map((t) =>
+        action.ids.includes(t.id) ? { ...t, isDeleted: false } : t,
+      );
+    case 'bulkCategory':
+      return state.map((t) =>
+        action.ids.includes(t.id) ? { ...t, categoryId: action.categoryId } : t,
+      );
+    default:
+      return state;
+  }
+}
+
 export default function TransactionUnifiedManagement({ bootstrap }: TransactionUnifiedManagementProps = {}) {
   const { user } = useAuth();
+  const transactionApi = useTransactionApi();
+  const { run: runPendingMutation, isPending: isMutationPending } = usePendingAction();
   const { formatCurrency: formatCurrencyFunc } = useCurrency();
   const { success, error: showError } = useToast();
   const router = useRouter();
@@ -124,7 +153,12 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
   const bootstrapRange = activeBootstrap?.range;
 
   // State
-  const [transactions, setTransactions] = useState<Transaction[]>(activeBootstrap?.transactions ?? []);
+  const [baseTransactions, setTransactions] = useState<Transaction[]>(activeBootstrap?.transactions ?? []);
+  const [optimisticTransactions, addOptimisticTransaction] = useOptimistic(
+    baseTransactions,
+    applyTransactionOptimistic,
+  );
+  const transactions = optimisticTransactions;
   const [categories, setCategories] = useState<{ id: string; name: string; type: 'INCOME' | 'EXPENSE'; color?: string }[]>(
     activeBootstrap?.categories ?? [],
   );
@@ -141,7 +175,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
   const [showLinkModal, setShowLinkModal] = useState(false);
   const [deletingTransaction, setDeletingTransaction] = useState<Transaction | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
+  const isDeleting = isMutationPending;
 
   // Selection state (always available, no separate mode)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -590,18 +624,11 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
     if (!resolvedUserId) return;
     setIsDailySpendLoading(true);
     try {
-      const response = await fetch('/api/app', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'transactions_daily_spend',
-          startDate: startDate || undefined,
-          endDate: endDate || undefined,
-          range: quickRange,
-        }),
+      const data = await transactionApi.dailySpend({
+        startDate: startDate || undefined,
+        endDate: endDate || undefined,
+        range: quickRange,
       });
-      if (!response.ok) throw new Error('Failed to fetch daily spend');
-      const data = await response.json();
       setDailySpend(Array.isArray(data.daily) ? data.daily : []);
     } catch (error) {
       console.error('Error fetching daily spend:', error);
@@ -609,24 +636,17 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
     } finally {
       setIsDailySpendLoading(false);
     }
-  }, [resolvedUserId, startDate, endDate, quickRange]);
+  }, [resolvedUserId, startDate, endDate, quickRange, transactionApi]);
 
   const fetchCategoryBreakdown = useCallback(async () => {
     if (!resolvedUserId) return;
     setIsCategoryBreakdownLoading(true);
     try {
-      const response = await fetch('/api/app', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'transactions_category_breakdown',
-          startDate: startDate || undefined,
-          endDate: endDate || undefined,
-          range: quickRange,
-        }),
+      const data = await transactionApi.categoryBreakdown({
+        startDate: startDate || undefined,
+        endDate: endDate || undefined,
+        range: quickRange,
       });
-      if (!response.ok) throw new Error('Failed to fetch category breakdown');
-      const data = await response.json();
       setCategoryBreakdown(Array.isArray(data.categories) ? data.categories : []);
     } catch (error) {
       console.error('Error fetching category breakdown:', error);
@@ -634,7 +654,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
     } finally {
       setIsCategoryBreakdownLoading(false);
     }
-  }, [resolvedUserId, startDate, endDate, quickRange]);
+  }, [resolvedUserId, startDate, endDate, quickRange, transactionApi]);
 
   const fetchTransactions = useCallback(async ({
     showSpinner = true,
@@ -647,15 +667,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
       setIsLoading(true);
     }
     try {
-      const response = await fetch('/api/app', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(buildTransactionsRequest(page)),
-      });
-
-      if (!response.ok) throw new Error('Failed to fetch transactions');
-
-      const data = await response.json();
+      const data = await transactionApi.list(buildTransactionsRequest(page));
       const nextTransactions: Transaction[] = data.transactions || [];
       const nextPagination = data.pagination;
       const nextTotals = data.totals ?? null;
@@ -700,7 +712,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
         setIsLoading(false);
       }
     }
-  }, [resolvedUserId, buildTransactionsRequest, showError, fetchDailySpend, fetchCategoryBreakdown]);
+  }, [resolvedUserId, buildTransactionsRequest, showError, fetchDailySpend, fetchCategoryBreakdown, transactionApi]);
 
   const loadMoreTransactions = useCallback(async () => {
     if (isLoadingMore || isLoading) return;
@@ -764,6 +776,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
 
   useMobileRefreshRegister(
     useCallback(async () => {
+      clearAllAppRouteBootstraps();
       await fetchTransactions({ showSpinner: false });
     }, [fetchTransactions]),
     '/transactions',
@@ -950,61 +963,52 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
 
   // Handle save
   const handleSave = useCallback(async (data: TransactionFormData) => {
-    try {
-      const transactionId = editingTransaction?.id;
-      const action = transactionId ? 'transactions_update' : 'transactions_create';
+    await runPendingMutation(async () => {
+      try {
+        const transactionId = editingTransaction?.id;
 
-      const response = await fetch('/api/app', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action,
-          ...(transactionId ? { id: transactionId } : {}),
-          ...data,
-        }),
-      });
+        if (transactionId) {
+          await transactionApi.update({ id: transactionId, ...data });
+        } else {
+          await transactionApi.create({ ...data });
+        }
 
-      if (!response.ok) throw new Error('Failed to save transaction');
-
-      success('Success', transactionId ? 'Transaction updated' : 'Transaction added');
-      setShowForm(false);
-      setEditingTransaction(null);
-      fetchTransactions();
-    } catch (error) {
-      console.error('Error saving transaction:', error);
-      showError('Error', 'Failed to save transaction');
-    }
-  }, [editingTransaction, fetchTransactions, success, showError]);
+        success('Success', transactionId ? 'Transaction updated' : 'Transaction added');
+        setShowForm(false);
+        setEditingTransaction(null);
+        await fetchTransactions();
+      } catch (error) {
+        console.error('Error saving transaction:', error);
+        showError('Error', 'Failed to save transaction');
+        throw error;
+      }
+    });
+  }, [editingTransaction, fetchTransactions, success, showError, transactionApi, runPendingMutation]);
 
   // Handle delete
   const handleDelete = useCallback(async () => {
     if (!deletingTransaction) return;
 
-    setIsDeleting(true);
-    try {
-      const response = await fetch('/api/app', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'transactions_delete_single',
-          id: deletingTransaction.id,
-        }),
-      });
+    const deletedId = deletingTransaction.id;
+    addOptimisticTransaction({ type: 'delete', ids: [deletedId] });
 
-      if (!response.ok) throw new Error('Failed to delete transaction');
+    await runPendingMutation(async () => {
+      try {
+        await transactionApi.delete({ id: deletedId });
 
-      success('Success', 'Transaction deleted');
-      setShowDeleteDialog(false);
-      setDeletingTransaction(null);
-      setSelectedIds(new Set());
-      fetchTransactions();
-    } catch (error) {
-      console.error('Error deleting transaction:', error);
-      showError('Error', 'Failed to delete transaction');
-    } finally {
-      setIsDeleting(false);
-    }
-  }, [deletingTransaction, fetchTransactions, success, showError]);
+        success('Success', 'Transaction deleted');
+        setShowDeleteDialog(false);
+        setDeletingTransaction(null);
+        setSelectedIds(new Set());
+        await fetchTransactions();
+      } catch (error) {
+        console.error('Error deleting transaction:', error);
+        showError('Error', 'Failed to delete transaction');
+        await fetchTransactions();
+        throw error;
+      }
+    });
+  }, [deletingTransaction, fetchTransactions, success, showError, transactionApi, runPendingMutation, addOptimisticTransaction]);
 
   // Bulk operations
   const handleSelectAll = useCallback(() => {
@@ -1065,31 +1069,24 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
       return;
     }
 
-    setIsDeleting(true);
-    try {
-      const response = await fetch('/api/app', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'transactions_delete_bulk',
-          transactionIds: Array.from(selectedIds),
-        }),
-      });
+    const ids = Array.from(selectedIds);
+    addOptimisticTransaction({ type: 'delete', ids });
 
-      if (!response.ok) throw new Error('Failed to delete transactions');
-
-      const data = await response.json();
-      success('Success', `Deleted ${data.deletedCount || selectedIds.size} transaction(s)`);
-      setShowBulkDeleteDialog(false);
-      setSelectedIds(new Set());
-      fetchTransactions();
-    } catch (error) {
-      console.error('Error deleting transactions:', error);
-      showError('Error', 'Failed to delete transactions');
-    } finally {
-      setIsDeleting(false);
-    }
-  }, [selectedIds, fetchTransactions, success, showError]);
+    await runPendingMutation(async () => {
+      try {
+        const data = await transactionApi.bulkDelete({ transactionIds: ids });
+        success('Success', `Deleted ${data.deletedCount || ids.length} transaction(s)`);
+        setShowBulkDeleteDialog(false);
+        setSelectedIds(new Set());
+        await fetchTransactions();
+      } catch (error) {
+        console.error('Error deleting transactions:', error);
+        showError('Error', 'Failed to delete transactions');
+        await fetchTransactions();
+        throw error;
+      }
+    });
+  }, [selectedIds, fetchTransactions, success, showError, transactionApi, runPendingMutation, addOptimisticTransaction]);
 
   const handleBulkRestore = useCallback(async () => {
     const deletedSelected = Array.from(selectedIds).filter(id => {
@@ -1102,30 +1099,24 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
       return;
     }
 
-    setIsDeleting(true);
-    try {
-      const response = await fetch('/api/app', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'transactions_restore',
+    addOptimisticTransaction({ type: 'restore', ids: deletedSelected });
+
+    await runPendingMutation(async () => {
+      try {
+        const data = await transactionApi.restore({
           transactionIds: deletedSelected,
-        }),
-      });
-
-      if (!response.ok) throw new Error('Failed to restore transactions');
-
-      const data = await response.json();
-      success('Success', `Restored ${data.restoredCount || deletedSelected.length} transaction(s)`);
-      setSelectedIds(new Set());
-      fetchTransactions();
-    } catch (error) {
-      console.error('Error restoring transactions:', error);
-      showError('Error', 'Failed to restore transactions');
-    } finally {
-      setIsDeleting(false);
-    }
-  }, [selectedIds, transactions, fetchTransactions, success, showError]);
+        });
+        success('Success', `Restored ${data.restoredCount || deletedSelected.length} transaction(s)`);
+        setSelectedIds(new Set());
+        await fetchTransactions();
+      } catch (error) {
+        console.error('Error restoring transactions:', error);
+        showError('Error', 'Failed to restore transactions');
+        await fetchTransactions();
+        throw error;
+      }
+    });
+  }, [selectedIds, transactions, fetchTransactions, success, showError, transactionApi, runPendingMutation, addOptimisticTransaction]);
 
   // Auto-categorize using full categorization service (rules + AI + patterns)
   const handleAutoCategorizeSelected = useCallback(async () => {
@@ -1182,23 +1173,9 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
         };
       });
 
-      // Call categorization API endpoint
-      const response = await fetch('/api/app', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'transactions_categorize',
-          userId: user?.id,
-          transactions: transactionsToCategorize,
-        }),
+      const categorizationResults = await transactionApi.categorize({
+        transactions: transactionsToCategorize,
       });
-
-      if (!response.ok) {
-        const error = await response.json().catch(() => ({ error: 'Failed to categorize transactions' }));
-        throw new Error(error.error || 'Failed to categorize transactions');
-      }
-
-      const categorizationResults = await response.json();
 
       if (!Array.isArray(categorizationResults) || categorizationResults.length !== selectedTransactions.length) {
         throw new Error('Invalid categorization response');
@@ -1212,7 +1189,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
             return {
               id: t.id,
               categoryId: result.categoryId,
-              financialCategory: result.financialCategory || t.financialCategory,
+              financialCategory: t.financialCategory,
             };
           }
           return null;
@@ -1225,23 +1202,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
         return;
       }
 
-      // Use batch update endpoint to avoid 429 rate limit errors
-      const batchResponse = await fetch('/api/app', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'transactions_batch_update',
-          userId: user?.id,
-          updates,
-        }),
-      });
-
-      if (!batchResponse.ok) {
-        const error = await batchResponse.json().catch(() => ({ error: 'Failed to update transactions' }));
-        throw new Error(error.error || 'Failed to update transactions');
-      }
-
-      const batchResult = await batchResponse.json();
+      const batchResult = await transactionApi.batchUpdate({ updates });
       const successCount = batchResult.succeeded || 0;
       const categorizedCount = categorizationResults.filter(r => r.categoryId).length;
 
@@ -1263,7 +1224,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
     } finally {
       setIsBulkUpdating(false);
     }
-  }, [selectedIds, transactions, user, fetchTransactions, success, showError]);
+  }, [selectedIds, transactions, user, fetchTransactions, success, showError, transactionApi]);
 
   const handleGlobalAutoCategorize = useCallback(async () => {
     if (isBulkUpdating) return;
@@ -1277,21 +1238,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
 
     try {
       while (iterations < MAX_ITERATIONS) {
-        const response = await fetch('/api/app', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'transactions_auto_categorize',
-            userId: user?.id,
-          }),
-        });
-
-        if (!response.ok) {
-          const error = await response.json().catch(() => ({ error: 'Auto-categorization failed' }));
-          throw new Error(error.error || 'Auto-categorization failed');
-        }
-
-        const result = await response.json();
+        const result = await transactionApi.autoCategorize();
         
         if (result.updated > 0) {
           totalUpdated += result.updated;
@@ -1333,7 +1280,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
       setIsBulkUpdating(false);
       setCategorizationProgress(null);
     }
-  }, [user, isBulkUpdating, fetchTransactions, success, showError, setCategorizationProgress]);
+  }, [user, isBulkUpdating, fetchTransactions, success, showError, setCategorizationProgress, transactionApi]);
 
   const handleBulkCategorize = useCallback(async () => {
     if (selectedIds.size === 0 || !bulkCategoryId) {
@@ -1380,22 +1327,10 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
         }
       }
 
-      // Use the batch update endpoint
-      const response = await fetch('/api/app', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'transactions_batch_update',
-          userId: user?.id,
-          updates,
-        }),
-      });
+      const updateIds = updates.map((u) => u.id);
+      addOptimisticTransaction({ type: 'bulkCategory', ids: updateIds, categoryId: bulkCategoryId });
 
-      if (!response.ok) {
-        throw new Error('Failed to update transactions');
-      }
-
-      const result = await response.json();
+      const result = await transactionApi.batchUpdate({ updates });
       const successCount = result.succeeded || 0;
       
       success('Success', `Updated ${successCount} transaction(s) ${applyToAllMatching ? '(including matches)' : ''}`);
@@ -1403,14 +1338,15 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
       setShowBulkCategorize(false);
       setBulkCategoryId('');
       setApplyToAllMatching(false);
-      fetchTransactions();
+      await fetchTransactions();
     } catch (error) {
       console.error('Error categorizing transactions:', error);
       showError('Error', 'Failed to categorize transactions');
+      await fetchTransactions();
     } finally {
       setIsBulkUpdating(false);
     }
-  }, [selectedIds, bulkCategoryId, transactions, applyToAllMatching, user, fetchTransactions, success, showError]);
+  }, [selectedIds, bulkCategoryId, transactions, applyToAllMatching, user, fetchTransactions, success, showError, transactionApi, addOptimisticTransaction]);
 
   const typeOptions = [
     { value: 'ALL', label: 'All Types' },
@@ -1852,18 +1788,9 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
     const poll = async () => {
       if (!isMountedRef.current) return;
       try {
-        const response = await fetch('/api/app', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'transactions_categorize_background_status',
-            userId,
-            transactionIds,
-          }),
-        });
+        const status = await transactionApi.categorizeBackgroundStatus({ transactionIds });
 
-        if (response.ok && isMountedRef.current) {
-          const status = await response.json();
+        if (isMountedRef.current) {
           const progress = status.progress || 0;
           const categorized = status.categorized || 0;
           const total = status.total || transactionIds.length;
@@ -2164,9 +2091,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
 
       success('Imported', message);
       setImportProgress(100);
-      clearRouteBootstrap('/dashboard');
-      clearRouteBootstrap('/plans');
-      clearRouteBootstrap('/transactions');
+      clearAllAppRouteBootstraps();
 
       if (shouldExpandDateFilter && importRange) {
         updateURLParams({
@@ -2378,13 +2303,19 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
             <Plus className="size-4" />
           </Button>
         </div>
-        <div className="flex items-center gap-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          <NavPillGroup className="shrink-0">
+        <div className="flex w-full flex-col gap-0 lg:hidden">
+          <NavPillGroup variant="segmented" className="w-full -mx-4 px-4">
             {(['daily', 'weekly', 'monthly'] as const).map((p) => (
-              <NavPill key={p} label={p} active={period === p} onClick={() => handlePeriodChange(p)} />
+              <NavPill
+                key={p}
+                variant="segmented"
+                label={p}
+                active={period === p}
+                onClick={() => handlePeriodChange(p)}
+              />
             ))}
           </NavPillGroup>
-          <NavPillGroup className="shrink-0">
+          <NavPillGroup variant="segmented" className="w-full -mx-4 px-4">
             {(
               [
                 ['list', 'List'],
@@ -2394,6 +2325,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
             ).map(([panel, label]) => (
               <NavPill
                 key={panel}
+                variant="segmented"
                 label={label}
                 active={mobilePanel === panel}
                 onClick={() => setMobilePanel(panel)}

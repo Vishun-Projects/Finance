@@ -59,6 +59,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
     }
 
+    const MAX_PDF_BYTES = 15 * 1024 * 1024;
+    if (file.size > MAX_PDF_BYTES) {
+      return NextResponse.json({ error: 'PDF must be 15 MB or smaller' }, { status: 413 });
+    }
+    if (file.type && file.type !== 'application/pdf') {
+      return NextResponse.json({ error: 'Only PDF files are allowed' }, { status: 415 });
+    }
+
     // Fetch Bank Configurations from DB
     let bankParserConfigs: any[] = [];
     try {

@@ -116,7 +116,7 @@ Format: JSON only.`;
             if (newsData.imagePrompt) {
                 try {
                     const { generateAndSaveImagenImage } = await import('@/lib/imagen');
-                    heroImageUrl = await generateAndSaveImagenImage(newsData.imagePrompt, 'uploads/daily-briefing');
+                    heroImageUrl = await generateAndSaveImagenImage(newsData.imagePrompt, 'daily-briefing');
                 } catch (imgError) {
                     console.error('[BriefingService] Immediate image generation failed:', imgError);
                 }

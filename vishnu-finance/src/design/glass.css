@@ -87,6 +87,28 @@
   will-change: transform;
 }
 
+/* Tier 4 chrome — persistent nav bars (must recede, especially on dark) */
+.glass-chrome {
+  background: var(--chrome-bg);
+  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  backdrop-filter: blur(12px) saturate(160%);
+  border: 0.5px solid var(--chrome-border);
+  box-shadow: var(--chrome-shadow);
+  will-change: transform;
+}
+
+.glass-chrome-text {
+  color: var(--chrome-fg);
+  font-weight: 500;
+}
+
+.glass-chrome-text .text-muted-foreground,
+.glass-chrome-text .text-muted,
+.glass-chrome-text .text-hint {
+  color: var(--chrome-fg);
+  opacity: 0.85;
+}
+
 /* Typography on glass — min weight 500, softened contrast */
 .glass-text {
   color: var(--glass-text-light);
@@ -159,15 +181,15 @@
   }
 }
 
-/* Floating bars — glass on mobile only, transparent on desktop */
+/* Floating bars — chrome glass on mobile only, transparent on desktop */
 .glass-mobile-bar {
   border-radius: var(--glass-radius-sheet) var(--glass-radius-sheet) 0 0;
-  background: var(--glass-bg-thin);
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
-  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
-  border: 0.5px solid var(--glass-border-regular);
+  background: var(--chrome-bg);
+  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  backdrop-filter: blur(12px) saturate(160%);
+  border: 0.5px solid var(--chrome-border);
   border-bottom: none;
-  box-shadow: var(--glass-inset-regular), var(--glass-shadow-ambient), var(--glass-shadow-key);
+  box-shadow: var(--chrome-shadow);
   will-change: transform;
 }
 
@@ -182,7 +204,7 @@
     will-change: auto;
   }
 
-  .glass-mobile-bar.glass-text {
+  .glass-mobile-bar.glass-chrome-text {
     color: inherit;
     font-weight: inherit;
   }
@@ -202,6 +224,14 @@
 
   .dark .glass-chip {
     background: rgba(28, 28, 30, 0.94);
+  }
+
+  .glass-chrome {
+    background: rgba(255, 255, 255, 0.92);
+  }
+
+  .dark .glass-chrome {
+    background: rgba(28, 28, 30, 0.92);
   }
 
   .glass-mobile-bar {

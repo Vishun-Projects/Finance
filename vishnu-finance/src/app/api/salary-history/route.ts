@@ -1,22 +1,18 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '../../../lib/db';
+import { NextResponse } from 'next/server';
+import { withAuth } from '@/lib/api-auth';
+import { prisma } from '@/lib/db';
+import { rejectForeignUserId } from '@/lib/api-user-scope';
 
-export async function GET(request: NextRequest) {
+export const GET = withAuth(async (request, user) => {
   try {
     const { searchParams } = new URL(request.url);
-    const userId = searchParams.get('userId');
+    const forbidden = rejectForeignUserId(user, searchParams.get('userId'));
+    if (forbidden) return forbidden;
 
-    if (!userId) {
-      return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
-    }
-
-    // Fetch salary history from database using type assertion
     const salaryHistory = await (prisma as any).salaryHistory.findMany({
-      where: { userId },
+      where: { userId: user.id },
       orderBy: { effectiveDate: 'desc' },
-      include: {
-        salaryStructure: true
-      }
+      include: { salaryStructure: true },
     });
 
     return NextResponse.json(salaryHistory);
@@ -24,4 +20,4 @@ export async function GET(request: NextRequest) {
     console.error('Error fetching salary history:', error);
     return NextResponse.json({ error: 'Failed to fetch salary history' }, { status: 500 });
   }
-}
+});

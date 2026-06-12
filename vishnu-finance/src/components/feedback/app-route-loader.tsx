@@ -2,12 +2,19 @@ import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { ReactNode } from 'react';
 
-export type AppRouteLoaderVariant =  | 'generic'
+export type AppRouteLoaderVariant =
+  | 'generic'
   | 'dashboard'
   | 'transactions'
   | 'plans'
   | 'advisor'
-  | 'salary';
+  | 'salary'
+  | 'health'
+  | 'settings'
+  | 'investments'
+  | 'net-worth'
+  | 'reports'
+  | 'education';
 
 interface AppRouteLoaderProps {
   variant?: AppRouteLoaderVariant;
@@ -122,6 +129,97 @@ function SalarySkeleton() {
   );
 }
 
+function HealthSkeleton() {
+  return (
+    <>
+      <MandateBand />
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
+        <Skeleton className="h-72 rounded-md lg:col-span-5" />
+        <Skeleton className="h-72 rounded-md lg:col-span-7" />
+      </div>
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        {[1, 2, 3].map((i) => (
+          <Skeleton key={i} className="h-40 rounded-md" />
+        ))}
+      </div>
+    </>
+  );
+}
+
+function SettingsSkeleton() {
+  return (
+    <>
+      <MandateBand />
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[12rem_minmax(0,1fr)]">
+        <Skeleton className="hidden h-64 rounded-md lg:block" />
+        <div className="space-y-4">
+          <Skeleton className="h-10 w-full max-w-xs rounded-md" />
+          <Skeleton className="h-48 rounded-md" />
+          <Skeleton className="h-48 rounded-md" />
+        </div>
+      </div>
+    </>
+  );
+}
+
+function InvestmentsSkeleton() {
+  return (
+    <>
+      <MandateBand />
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        {[1, 2, 3, 4].map((i) => (
+          <Skeleton key={i} className="h-20 rounded-md" />
+        ))}
+      </div>
+      <Skeleton className="h-64 rounded-md" />
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <Skeleton className="h-48 rounded-md" />
+        <Skeleton className="h-48 rounded-md" />
+      </div>
+    </>
+  );
+}
+
+function NetWorthSkeleton() {
+  return (
+    <>
+      <MandateBand />
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        {[1, 2, 3, 4].map((i) => (
+          <Skeleton key={i} className="h-20 rounded-md" />
+        ))}
+      </div>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <Skeleton className="h-72 rounded-md" />
+        <Skeleton className="h-72 rounded-md" />
+      </div>
+    </>
+  );
+}
+
+function ReportsSkeleton() {
+  return (
+    <>
+      <MandateBand />
+      <Skeleton className="h-10 w-full max-w-md rounded-md" />
+      <Skeleton className="h-96 rounded-md" />
+    </>
+  );
+}
+
+function EducationSkeleton() {
+  return (
+    <>
+      <MandateBand />
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {[1, 2, 3, 4, 5, 6].map((i) => (
+          <Skeleton key={i} className="h-40 rounded-md" />
+        ))}
+      </div>
+    </>
+  );
+}
+
 function GenericSkeleton() {
   return (
     <>
@@ -144,6 +242,12 @@ const VARIANTS: Record<AppRouteLoaderVariant, () => ReactNode> = {
   plans: PlansSkeleton,
   advisor: AdvisorSkeleton,
   salary: SalarySkeleton,
+  health: HealthSkeleton,
+  settings: SettingsSkeleton,
+  investments: InvestmentsSkeleton,
+  'net-worth': NetWorthSkeleton,
+  reports: ReportsSkeleton,
+  education: EducationSkeleton,
 };
 
 export function AppRouteLoader({

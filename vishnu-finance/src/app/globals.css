@@ -26,8 +26,8 @@
 
 @layer base {
   :root {
-    /* Clearance for fixed bottom nav pill + FAB (mobile) */
-    --app-bottom-inset: calc(4.5rem + env(safe-area-inset-bottom));
+    /* Clearance for fixed bottom tab bar (mobile) */
+    --app-bottom-inset: calc(3.25rem + env(safe-area-inset-bottom));
     /* Extra gap at scroll end on page-scroll routes (stacked with main padding) */
     --app-scroll-end-gap: 1.25rem;
   }

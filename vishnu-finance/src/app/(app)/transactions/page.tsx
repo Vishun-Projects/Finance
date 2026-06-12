@@ -5,6 +5,7 @@ import { requireUser } from '@/lib/auth/server-auth';
 import { getCurrentMonthRange } from '@/lib/date-range';
 import { TRANSACTION_PAGE_SIZE } from '@/features/transactions/constants';
 import { loadTransactionsBootstrap, loadTransactionCategories } from '@/features/transactions/loaders';
+import { loadTransactionsBootstrapCached } from '@/lib/server-data-cache';
 
 type TransactionsPageProps = {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
@@ -32,16 +33,25 @@ async function TransactionsLoader({ searchParams }: TransactionsPageProps) {
   let transactionsData: Awaited<ReturnType<typeof loadTransactionsBootstrap>> | null = null;
   let categories: Awaited<ReturnType<typeof loadTransactionCategories>> = [];
 
+  const isDefaultView =
+    range === 'month' &&
+    type === 'ALL' &&
+    !search &&
+    startDate === currentRange.startDate &&
+    endDate === currentRange.endDate;
+
   try {
     const [transactionsResult, categoriesResult] = await Promise.all([
-      loadTransactionsBootstrap({
-        userId: user.id,
-        startDate,
-        endDate,
-        type,
-        search,
-        pageSize: TRANSACTION_PAGE_SIZE,
-      }),
+      isDefaultView
+        ? loadTransactionsBootstrapCached(user.id, startDate, endDate)
+        : loadTransactionsBootstrap({
+            userId: user.id,
+            startDate,
+            endDate,
+            type,
+            search,
+            pageSize: TRANSACTION_PAGE_SIZE,
+          }),
       loadTransactionCategories(user.id),
     ]);
 

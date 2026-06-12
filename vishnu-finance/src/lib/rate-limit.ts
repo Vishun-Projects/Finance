@@ -2,6 +2,7 @@
  * Optional Upstash Redis rate limiting when UPSTASH_REDIS_REST_URL is set.
  * Falls back to in-memory store for local dev / free hobby without Redis.
  */
+import { NextResponse } from 'next/server';
 
 interface RateLimitEntry {
   count: number;
@@ -27,13 +28,18 @@ setInterval(() => {
   }
 }, 5 * 60 * 1000);
 
-function getIdentifier(request: Request): string {
+function getIdentifier(request: Request, routeType?: keyof typeof RATE_LIMITS | 'default'): string {
+  if (routeType === 'auth') {
+    const forwarded = request.headers.get('x-forwarded-for');
+    return forwarded?.split(',')[0]?.trim() || request.headers.get('x-real-ip') || 'unknown';
+  }
+
   const url = new URL(request.url);
   const userId = url.searchParams.get('userId');
   if (userId) return userId;
 
   const forwarded = request.headers.get('x-forwarded-for');
-  return forwarded?.split(',')[0] || request.headers.get('x-real-ip') || 'unknown';
+  return forwarded?.split(',')[0]?.trim() || request.headers.get('x-real-ip') || 'unknown';
 }
 
 function checkInMemoryRateLimit(
@@ -41,7 +47,7 @@ function checkInMemoryRateLimit(
   request: Request,
 ): { allowed: boolean; remaining: number; resetTime: number; limit: number } {
   const limit = RATE_LIMITS[routeType] || RATE_LIMITS.default;
-  const identifier = getIdentifier(request);
+  const identifier = getIdentifier(request, routeType);
   const key = `${routeType}:${identifier}`;
   const now = Date.now();
   const entry = rateLimitStore.get(key);
@@ -83,7 +89,7 @@ async function checkUpstashRateLimit(
       limiter: Ratelimit.slidingWindow(limit.requests, `${windowSec} s`),
       prefix: `vf:${routeType}`,
     });
-    const identifier = getIdentifier(request);
+    const identifier = getIdentifier(request, routeType);
     const result = await ratelimit.limit(identifier);
     return {
       allowed: result.success,
@@ -119,20 +125,19 @@ export function getRouteType(pathname: string): keyof typeof RATE_LIMITS | 'defa
 export async function rateLimitMiddleware(
   routeType: keyof typeof RATE_LIMITS | 'default',
   request: Request,
-): Promise<Response | null> {
+): Promise<NextResponse | null> {
   const result = await checkRateLimit(routeType, request);
 
   if (!result.allowed) {
-    return new Response(
-      JSON.stringify({
+    return NextResponse.json(
+      {
         error: 'Too many requests',
         message: `Rate limit exceeded. Please try again after ${new Date(result.resetTime).toISOString()}`,
         retryAfter: Math.ceil((result.resetTime - Date.now()) / 1000),
-      }),
+      },
       {
         status: 429,
         headers: {
-          'Content-Type': 'application/json',
           'X-RateLimit-Limit': result.limit.toString(),
           'X-RateLimit-Remaining': result.remaining.toString(),
           'X-RateLimit-Reset': result.resetTime.toString(),

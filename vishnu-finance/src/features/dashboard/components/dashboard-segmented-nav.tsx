@@ -3,6 +3,7 @@
 import { LayoutGrid, Layers, ReceiptText } from 'lucide-react';
 import { NavPill, NavPillGroup } from '@/components/ui/nav-pill';
 import { hapticLight } from '@/lib/haptics';
+import { cn } from '@/lib/utils';
 
 export type DashboardMobileView = 'overview' | 'plans' | 'activity';
 
@@ -20,7 +21,7 @@ interface DashboardSegmentedNavProps {
 
 export function DashboardSegmentedNav({ active, onChange, className }: DashboardSegmentedNavProps) {
   return (
-    <NavPillGroup variant="segmented" className={className}>
+    <NavPillGroup variant="segmented" className={cn('w-full', className)}>
       {TABS.map(({ id, label, icon: Icon }) => (
         <NavPill
           key={id}

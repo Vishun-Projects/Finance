@@ -20,7 +20,7 @@ export function TabPanelTransition({ panelKey, children, className }: TabPanelTr
         key={panelKey}
         className={cn(className)}
         variants={variants}
-        initial="hidden"
+        initial={false}
         animate="visible"
         exit="exit"
       >

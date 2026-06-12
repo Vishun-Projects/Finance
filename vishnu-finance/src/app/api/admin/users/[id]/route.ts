@@ -112,6 +112,8 @@ export async function PATCH(
 
     const meta = extractRequestMeta(request);
 
+    AuthService.invalidateUserCache(updated.id);
+
     await writeAuditLog({
       actorId: actor.id,
       event: 'USER_STATUS_CHANGE',

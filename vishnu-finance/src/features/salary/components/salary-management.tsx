@@ -2,8 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Plus, Edit, Trash2, DollarSign, Loader2 } from 'lucide-react';
-import { CartesianGrid, Line, LineChart, Tooltip, XAxis, YAxis } from 'recharts';
-import { ChartContainer } from '@/components/ui/chart-container';
+import dynamic from 'next/dynamic';
 import { SalaryStructure, SalaryHistory } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn, formatRupees } from '@/lib/utils';
@@ -21,6 +20,12 @@ import {
   type PlanPreviewData,
 } from '@/components/finance/salary-plan-preview-card';
 import type { PlanIncomeSource } from '@/lib/plan-income';
+import type { SalaryBootstrap } from '@/features/salary/loaders';
+
+const SalaryHistoryChart = dynamic(
+  () => import('./salary-history-chart').then((m) => m.SalaryHistoryChart),
+  { ssr: false, loading: () => <div className="h-[130px] animate-pulse rounded bg-muted/20" /> },
+);
 
 function parseRecordField(field: unknown): Record<string, number> {
   if (!field) return {};
@@ -150,11 +155,19 @@ function BreakdownTable({
   );
 }
 
-export default function SalaryStructureManagement() {
+interface SalaryManagementProps {
+  initialBootstrap?: SalaryBootstrap;
+}
+
+export default function SalaryStructureManagement({ initialBootstrap }: SalaryManagementProps) {
   const { user, loading: authLoading } = useAuth();
-  const [salaryStructures, setSalaryStructures] = useState<SalaryStructure[]>([]);
-  const [salaryHistory, setSalaryHistory] = useState<SalaryHistory[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [salaryStructures, setSalaryStructures] = useState<SalaryStructure[]>(
+    () => initialBootstrap?.structures ?? [],
+  );
+  const [salaryHistory, setSalaryHistory] = useState<SalaryHistory[]>(
+    () => initialBootstrap?.history ?? [],
+  );
+  const [loading, setLoading] = useState(!initialBootstrap);
   const [showForm, setShowForm] = useState(false);
   const [editingStructure, setEditingStructure] = useState<SalaryStructure | null>(null);
   const [editingHistoryId, setEditingHistoryId] = useState<string | null>(null);
@@ -183,7 +196,9 @@ export default function SalaryStructureManagement() {
   const [deductionAmount, setDeductionAmount] = useState('');
   const [employerContributionName, setEmployerContributionName] = useState('');
   const [employerContributionAmount, setEmployerContributionAmount] = useState('');
-  const [planPreview, setPlanPreview] = useState<PlanPreviewData | null>(null);
+  const [planPreview, setPlanPreview] = useState<PlanPreviewData | null>(
+    () => initialBootstrap?.planPreview ?? null,
+  );
   const [planPreviewLoading, setPlanPreviewLoading] = useState(false);
 
   const fetchPlanPreview = useCallback(async () => {
@@ -235,12 +250,13 @@ export default function SalaryStructureManagement() {
   }, [user]);
 
   useEffect(() => {
+    if (initialBootstrap) return;
     if (user && !authLoading) {
       fetchSalaryStructures();
       fetchSalaryHistory();
       void fetchPlanPreview();
     }
-  }, [user, authLoading, fetchSalaryStructures, fetchSalaryHistory, fetchPlanPreview]);
+  }, [user, authLoading, fetchSalaryStructures, fetchSalaryHistory, fetchPlanPreview, initialBootstrap]);
 
   const activeStructure = useMemo(
     () => salaryStructures.find((s) => s.isActive) || salaryStructures[0] || null,
@@ -750,19 +766,7 @@ export default function SalaryStructureManagement() {
               {historyChartData.length < 2 ? (
                 <div className="flex flex-1 items-center justify-center text-xs text-muted">Need 2+ revisions for trend.</div>
               ) : (
-                <ChartContainer height={130} className="flex-1">
-                  <LineChart data={historyChartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" opacity={0.35} />
-                    <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: 'var(--muted)' }} />
-                    <YAxis hide tickFormatter={(v) => `${(v / 100000).toFixed(0)}L`} />
-                    <Tooltip
-                      formatter={(value: number) => formatRupees(value)}
-                      labelFormatter={(_, items) => (items?.[0]?.payload as { fullDate?: string })?.fullDate ?? ''}
-                      contentStyle={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '12px' }}
-                    />
-                    <Line type="monotone" dataKey="salary" stroke="var(--foreground)" strokeWidth={2} dot={false} />
-                  </LineChart>
-                </ChartContainer>
+                <SalaryHistoryChart data={historyChartData} />
               )}
             </div>
           </MobileCollapsibleSection>

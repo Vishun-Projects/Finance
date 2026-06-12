@@ -1,76 +1,47 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '../../../lib/db';
-import { rateLimitMiddleware, getRouteType } from '../../../lib/rate-limit';
+import { NextResponse } from 'next/server';
+import { prisma } from '@/lib/db';
+import { rateLimitMiddleware, getRouteType } from '@/lib/rate-limit';
 import { invalidateUserAppData } from '@/lib/server-data-cache';
+import { withAuth } from '@/lib/api-auth';
+import { rejectForeignUserId } from '@/lib/api-user-scope';
 
-// Configure route caching - user-specific dynamic data
 export const dynamic = 'force-dynamic';
-export const revalidate = 180; // Revalidate every 3 minutes
+export const revalidate = 180;
 
-export async function GET(request: NextRequest) {
-  // Rate limiting
+export const GET = withAuth(async (request, user) => {
   const routeType = getRouteType(request.nextUrl.pathname);
   const rateLimitResponse = await rateLimitMiddleware(routeType, request);
-  if (rateLimitResponse) {
-    return rateLimitResponse;
-  }
+  if (rateLimitResponse) return rateLimitResponse;
 
   try {
     const { searchParams } = new URL(request.url);
-    const userId = searchParams.get('userId');
+    const forbidden = rejectForeignUserId(user, searchParams.get('userId'));
+    if (forbidden) return forbidden;
 
-    // PERFORMANCE: Add pagination support
     const page = parseInt(searchParams.get('page') || '1');
-    const pageSize = Math.min(parseInt(searchParams.get('pageSize') || '100'), 200); // Max 200 per page
+    const pageSize = Math.min(parseInt(searchParams.get('pageSize') || '100'), 200);
     const skip = (page - 1) * pageSize;
+    const userId = user.id;
 
-
-    if (!userId) {
-      return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
-    }
-
-
-    // PERFORMANCE: Get total count for pagination (only if needed)
     const getTotalCount = page === 1 || searchParams.get('includeTotal') === 'true';
     const [totalCount, wishlistItems] = await Promise.all([
-      getTotalCount ? (prisma as any).wishlistItem.count({
-        where: { userId }
-      }) : Promise.resolve(0),
-      // Fetch wishlist items from database with pagination
+      getTotalCount
+        ? (prisma as any).wishlistItem.count({ where: { userId } })
+        : Promise.resolve(0),
       (prisma as any).wishlistItem.findMany({
         where: { userId },
-        select: {
-          id: true,
-          title: true,
-          description: true,
-          estimatedCost: true,
-          priority: true,
-          category: true,
-          targetDate: true,
-          isCompleted: true,
-          completedDate: true,
-          imageUrl: true,
-          notes: true,
-          tags: true,
-          userId: true,
-          createdAt: true,
-          updatedAt: true
-        },
         orderBy: { createdAt: 'desc' },
         skip,
-        take: pageSize // PERFORMANCE: Add limit
-      })
+        take: pageSize,
+      }),
     ]);
 
-    // Parse tags from JSON strings to arrays
-    const processedItems = wishlistItems.map((item: any) => ({
+    const processedItems = wishlistItems.map((item: { tags?: string | null }) => ({
       ...item,
-      tags: item.tags ? JSON.parse(item.tags) : []
+      tags: item.tags ? JSON.parse(item.tags) : [],
     }));
 
-
-    // Return paginated response with metadata
-    const response: any = {
+    return NextResponse.json({
       data: processedItems,
       pagination: {
         page,
@@ -78,40 +49,27 @@ export async function GET(request: NextRequest) {
         total: totalCount,
         totalPages: Math.ceil(totalCount / pageSize),
         hasNextPage: skip + pageSize < totalCount,
-        hasPreviousPage: page > 1
-      }
-    };
-
-    return NextResponse.json(response);
+        hasPreviousPage: page > 1,
+      },
+    });
   } catch (error) {
-    console.error('❌ WISHLIST GET - Error:', error);
-    console.error('❌ WISHLIST GET - Error details:', JSON.stringify(error, null, 2));
+    console.error('WISHLIST GET - Error:', error);
     return NextResponse.json({ error: 'Failed to fetch wishlist items' }, { status: 500 });
   }
-}
+});
 
-export async function POST(request: NextRequest) {
+export const POST = withAuth(async (request, user) => {
   try {
     const body = await request.json();
+    const forbidden = rejectForeignUserId(user, body.userId);
+    if (forbidden) return forbidden;
 
-    const {
-      title,
-      description,
-      estimatedCost,
-      priority,
-      category,
-      targetDate,
-      notes,
-      tags,
-      userId
-    } = body;
+    const { title, description, estimatedCost, priority, category, targetDate, notes, tags } = body;
 
-    // Validate required fields
-    if (!title || !estimatedCost || !userId) {
+    if (!title || !estimatedCost) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    // Create new wishlist item in database
     const newWishlistItem = await (prisma as any).wishlistItem.create({
       data: {
         title,
@@ -122,65 +80,69 @@ export async function POST(request: NextRequest) {
         targetDate: targetDate ? new Date(targetDate) : null,
         notes: notes || null,
         tags: tags ? JSON.stringify(tags) : null,
-        userId: userId,
-        isCompleted: false
-      }
+        userId: user.id,
+        isCompleted: false,
+      },
     });
 
-
-    // Trigger Image Generation
-    const { addImageGenerationJob, triggerImmediateProcessing } = await import('../../../lib/services/image-queue');
+    const { addImageGenerationJob, triggerImmediateProcessing } = await import('@/lib/services/image-queue');
     const { ImageJobType } = await import('@prisma/client');
     await addImageGenerationJob(newWishlistItem.id, ImageJobType.WISHLIST_ITEM, title);
     triggerImmediateProcessing();
 
-    invalidateUserAppData(userId);
+    invalidateUserAppData(user.id);
     return NextResponse.json(newWishlistItem);
   } catch (error) {
-    console.error('❌ WISHLIST POST - Error:', error);
-    console.error('❌ WISHLIST POST - Error details:', JSON.stringify(error, null, 2));
+    console.error('WISHLIST POST - Error:', error);
     return NextResponse.json({ error: 'Failed to create wishlist item' }, { status: 500 });
   }
-}
+});
 
-export async function PUT(request: NextRequest) {
+export const PUT = withAuth(async (request, user) => {
   try {
     const body = await request.json();
-    const { id, ...updateData } = body;
+    const { id, ...rawUpdate } = body;
 
     if (!id) {
       return NextResponse.json({ error: 'ID is required' }, { status: 400 });
     }
 
-    // Update wishlist item in database
+    const owned = await (prisma as any).wishlistItem.findFirst({ where: { id, userId: user.id } });
+    if (!owned) {
+      return NextResponse.json({ error: 'Wishlist item not found' }, { status: 404 });
+    }
+
     const updatedWishlistItem = await (prisma as any).wishlistItem.update({
       where: { id },
       data: {
-        ...updateData,
-        estimatedCost: updateData.estimatedCost ? parseFloat(updateData.estimatedCost) : undefined,
-        targetDate: updateData.targetDate ? new Date(updateData.targetDate) : undefined,
-        tags: updateData.tags ? JSON.stringify(updateData.tags) : undefined,
-        updatedAt: new Date()
-      }
+        title: rawUpdate.title,
+        description: rawUpdate.description,
+        estimatedCost: rawUpdate.estimatedCost ? parseFloat(rawUpdate.estimatedCost) : undefined,
+        priority: rawUpdate.priority,
+        category: rawUpdate.category,
+        targetDate: rawUpdate.targetDate ? new Date(rawUpdate.targetDate) : undefined,
+        notes: rawUpdate.notes,
+        tags: rawUpdate.tags ? JSON.stringify(rawUpdate.tags) : undefined,
+        isCompleted: rawUpdate.isCompleted,
+        completedDate: rawUpdate.completedDate ? new Date(rawUpdate.completedDate) : undefined,
+        updatedAt: new Date(),
+      },
     });
 
-
-    // Trigger Image Regeneration if title changed or image is missing
-    const { addImageGenerationJob, triggerImmediateProcessing } = await import('../../../lib/services/image-queue');
+    const { addImageGenerationJob, triggerImmediateProcessing } = await import('@/lib/services/image-queue');
     const { ImageJobType } = await import('@prisma/client');
     await addImageGenerationJob(updatedWishlistItem.id, ImageJobType.WISHLIST_ITEM, updatedWishlistItem.title);
     triggerImmediateProcessing();
 
-    if (updatedWishlistItem?.userId) invalidateUserAppData(updatedWishlistItem.userId);
+    invalidateUserAppData(user.id);
     return NextResponse.json(updatedWishlistItem);
   } catch (error) {
-    console.error('❌ WISHLIST PUT - Error:', error);
-    console.error('❌ WISHLIST PUT - Error details:', JSON.stringify(error, null, 2));
+    console.error('WISHLIST PUT - Error:', error);
     return NextResponse.json({ error: 'Failed to update wishlist item' }, { status: 500 });
   }
-}
+});
 
-export async function DELETE(request: NextRequest) {
+export const DELETE = withAuth(async (request, user) => {
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
@@ -189,16 +151,18 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'ID is required' }, { status: 400 });
     }
 
-    const existing = await (prisma as any).wishlistItem.findUnique({ where: { id }, select: { userId: true } });
-    await (prisma as any).wishlistItem.delete({
-      where: { id }
+    const deleted = await (prisma as any).wishlistItem.deleteMany({
+      where: { id, userId: user.id },
     });
 
-    if (existing?.userId) invalidateUserAppData(existing.userId);
+    if (deleted.count === 0) {
+      return NextResponse.json({ error: 'Wishlist item not found' }, { status: 404 });
+    }
+
+    invalidateUserAppData(user.id);
     return NextResponse.json({ message: 'Wishlist item deleted successfully' });
   } catch (error) {
-    console.error('❌ WISHLIST DELETE - Error:', error);
-    console.error('❌ WISHLIST DELETE - Error details:', JSON.stringify(error, null, 2));
+    console.error('WISHLIST DELETE - Error:', error);
     return NextResponse.json({ error: 'Failed to delete wishlist item' }, { status: 500 });
   }
-}
+});

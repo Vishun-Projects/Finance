@@ -194,12 +194,13 @@ function AuthPageInner({ initialTab }: AuthPageClientProps) {
       } else {
         setLoginError('Invalid credentials');
       }
-    } catch (error: any) {
-      const errorMsg = error.message || '';
-      if (errorMsg.includes('not verified') || errorMsg.includes('verification code')) {
-        setVerificationEmail(loginData.email);
+    } catch (error: unknown) {
+      const err = error as Error & { requiresVerification?: boolean; email?: string };
+      const errorMsg = err.message || '';
+      if (err.requiresVerification || errorMsg.toLowerCase().includes('verification')) {
+        setVerificationEmail(err.email || loginData.email);
         setShowOTP(true);
-        toast.info(errorMsg); // Use the specific message from backend (mentions SMS/Email)
+        toast.info(errorMsg || 'Verification code sent. Check your email or phone.');
       } else {
         setLoginError(errorMsg || 'Connection failed. Please try again.');
         toast.error(errorMsg || 'Login failed');

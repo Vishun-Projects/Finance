@@ -18,13 +18,14 @@ from index import handler
 
 app = FastAPI()
 
-# Enable CORS for local development
+# Enable CORS for local development — credentials require explicit origins
+allowed_origins = os.environ.get("PYTHON_CORS_ORIGINS", "http://localhost:3000").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[o.strip() for o in allowed_origins if o.strip()],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["POST", "GET", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization"],
 )
 
 @app.get("/")

@@ -1,43 +1,70 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { AuthService } from '@/lib/auth';
+import { prisma } from '@/lib/db';
+import { AuthService, findUserByEmail, normalizeEmail } from '@/lib/auth';
+import { invalidateUserAppData } from '@/lib/server-data-cache';
+import { rateLimitMiddleware } from '@/lib/rate-limit';
+import { setSessionCookies, clearSessionCookies } from '@/lib/session-cookies';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export async function POST(request: NextRequest) {
-    try {
-        const { email, otp } = await request.json();
+  const rateLimitResponse = await rateLimitMiddleware('auth', request);
+  if (rateLimitResponse) return rateLimitResponse;
 
-        if (!email || !otp) {
-            return NextResponse.json(
-                { error: 'Email and OTP are required' },
-                { status: 400 }
-            );
-        }
+  try {
+    const { email: rawEmail, otp } = await request.json();
 
-        // Verify OTP
-        const result = await AuthService.verifyOTP(email, otp);
-
-        const response = NextResponse.json({
-            success: true,
-            message: 'Email verified successfully',
-            user: (result as any).user
-        });
-
-        // Set auth cookie
-        if ((result as any).token) {
-            response.cookies.set('auth-token', (result as any).token, {
-                httpOnly: true,
-                secure: true,
-                sameSite: 'none',
-                maxAge: 7 * 24 * 60 * 60 // 7 days
-            });
-        }
-
-        return response;
-
-    } catch (error: any) {
-        console.error('OTP Verification Error:', error);
-        return NextResponse.json(
-            { error: error.message || 'Failed to verify OTP' },
-            { status: 400 }
-        );
+    if (!rawEmail || !otp) {
+      return NextResponse.json({ error: 'Email and OTP are required' }, { status: 400 });
     }
+
+    const email = normalizeEmail(rawEmail);
+
+    const verified = await AuthService.verifyOTP(email, otp);
+    if (!verified) {
+      const { writeAuditLog, extractRequestMeta } = await import('@/lib/audit');
+      const meta = extractRequestMeta(request);
+      await writeAuditLog({
+        actorId: 'anonymous',
+        event: 'AUTH_OTP_FAILED',
+        severity: 'WARN',
+        ipAddress: meta.ipAddress,
+        userAgent: meta.userAgent,
+        message: `Failed OTP verification for ${email}`,
+        metadata: { email },
+      });
+      return NextResponse.json({ error: 'Invalid or expired OTP' }, { status: 401 });
+    }
+
+    const user = await findUserByEmail(email);
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    const response = NextResponse.json({
+      success: true,
+      message: 'Email verified successfully',
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        isVerified: user.isVerified,
+      },
+    });
+
+    await setSessionCookies(response, {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+    });
+
+    return response;
+  } catch (error: unknown) {
+    console.error('OTP Verification Error:', error);
+    const message = error instanceof Error ? error.message : 'Failed to verify OTP';
+    return NextResponse.json({ error: message }, { status: 400 });
+  }
 }

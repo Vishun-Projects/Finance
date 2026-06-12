@@ -71,14 +71,22 @@ export async function processImageGenerationQueue(batchSize = 2) {
                 },
             });
 
-            // Generate Image
-            // Determine folder based on entity type
-            let folder = "uploads/misc";
-            if (job.entityType === ImageJobType.EDUCATION_POST) folder = "uploads/education";
-            if (job.entityType === ImageJobType.DAILY_BRIEFING) folder = "uploads/daily-briefing";
-            if (job.entityType === ImageJobType.GOAL) folder = "uploads/goals";
-            if (job.entityType === ImageJobType.WISHLIST_ITEM) folder = "uploads/wishlist";
+            // Generate Image — user-scoped for goals/wishlist
+            let folder = 'misc';
+            let userId: string | null = null;
 
+            if (job.entityType === ImageJobType.EDUCATION_POST) folder = 'education';
+            if (job.entityType === ImageJobType.DAILY_BRIEFING) folder = 'daily-briefing';
+            if (job.entityType === ImageJobType.GOAL) {
+                const goal = await db.goal.findUnique({ where: { id: job.entityId }, select: { userId: true } });
+                userId = goal?.userId ?? null;
+                folder = userId ? `user-media/${userId}/goals` : 'misc';
+            }
+            if (job.entityType === ImageJobType.WISHLIST_ITEM) {
+                const item = await (db as any).wishlistItem.findUnique({ where: { id: job.entityId }, select: { userId: true } });
+                userId = item?.userId ?? null;
+                folder = userId ? `user-media/${userId}/wishlist` : 'misc';
+            }
 
             const imageUrl = await generateAndSaveImagenImage(job.prompt, folder);
 

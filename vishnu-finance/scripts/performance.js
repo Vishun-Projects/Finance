@@ -2,42 +2,43 @@
 
 const fs = require('fs');
 const path = require('path');
+const { performance } = require('node:perf_hooks');
 
-console.log('🚀 Performance Optimization Script');
-console.log('================================');
+console.log('Performance baseline');
+console.log('======================');
 
-// Check if .env.local exists, if not create it
 const envPath = path.join(__dirname, '..', '.env.local');
 if (!fs.existsSync(envPath)) {
-  const envContent = `# Performance optimizations
-NEXT_TELEMETRY_DISABLED=1
-NODE_ENV=development
-
-# Development performance
-NEXT_FAST_REFRESH=true
-NEXT_OPTIMIZE_FONTS=true
-
-# Bundle analysis (set to true when needed)
-ANALYZE=false
-
-# Cache optimizations
-NEXT_CACHE_MAX_AGE=31536000
-`;
-  
-  fs.writeFileSync(envPath, envContent);
-  console.log('✅ Created .env.local with performance optimizations');
-} else {
-  console.log('✅ .env.local already exists');
+  fs.writeFileSync(
+    envPath,
+    `# Performance / measurement\nNEXT_TELEMETRY_DISABLED=1\nANALYZE=false\n`,
+  );
+  console.log('Created .env.local with ANALYZE=false');
 }
 
-// Performance tips
-console.log('\n📋 Performance Tips:');
-console.log('1. Use the correct directory: cd vishnu-finance');
-console.log('2. Run: npm run dev:fast (for turbo mode)');
-console.log('3. Pages will load super fast now!');
-console.log('4. No more constant recompiling');
+async function measureRoute(label, url) {
+  const start = performance.now();
+  try {
+    const res = await fetch(url, { redirect: 'manual' });
+    const ms = Math.round(performance.now() - start);
+    console.log(`${label}: ${ms}ms (HTTP ${res.status})`);
+    return ms;
+  } catch (error) {
+    console.log(`${label}: failed (${error.message})`);
+    return null;
+  }
+}
 
-console.log('\n🎯 Next Steps:');
-console.log('1. cd vishnu-finance');
-console.log('2. npm run dev:fast (turbo enabled)');
-console.log('3. Enjoy lightning-fast performance! 🚀');
+async function main() {
+  const base = process.env.PERF_BASE_URL || 'http://localhost:3000';
+  console.log(`\nServer timing against ${base}`);
+  console.log('Start dev server first: npm run dev\n');
+
+  await measureRoute('GET /auth', `${base}/auth`);
+  await measureRoute('GET /dashboard', `${base}/dashboard`);
+
+  console.log('\nBundle analysis: ANALYZE=true npm run build');
+  console.log('Web Vitals: @vercel/speed-insights enabled in root layout (preview/prod)');
+}
+
+main();

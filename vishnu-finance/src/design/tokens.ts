@@ -49,6 +49,20 @@ export const cssVar = {
   muted: '--muted',
   hint: '--hint',
   accent: '--accent',
+  chromeBg: '--chrome-bg',
+  chromeBorder: '--chrome-border',
+  chromeFg: '--chrome-fg',
+  chromeFgActive: '--chrome-fg-active',
+  chromeActive: '--chrome-active',
+  textDisplay: '--text-display',
+  textTitle: '--text-title',
+  textSubtitle: '--text-subtitle',
+  textBody: '--text-body',
+  textLabel: '--text-label',
+  textMicro: '--text-micro',
+  spacePageX: '--space-page-x',
+  spacePageY: '--space-page-y',
+  spaceSection: '--space-section',
 } as const;
 
 export const DEFAULT_CATEGORY_COLOR = 'var(--category-default)';

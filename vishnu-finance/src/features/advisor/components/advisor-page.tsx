@@ -424,7 +424,7 @@ export default function AdvisorPage({ initialInsights }: AdvisorPageProps) {
       </TabPanelTransition>
 
       {mode === 'ai' && (
-        <div className="fixed inset-x-0 bottom-[calc(var(--app-bottom-inset)+0.25rem)] z-30 shrink-0 p-3 glass-mobile-bar glass-text lg:static lg:bottom-auto lg:p-4 lg:pb-6">
+        <div className="fixed inset-x-0 bottom-[calc(var(--app-bottom-inset)+0.25rem)] z-30 shrink-0 p-3 glass-mobile-bar glass-chrome-text lg:static lg:bottom-auto lg:p-4 lg:pb-6">
           <div className="relative mx-auto max-w-4xl">
             <Input
               ref={inputRef}

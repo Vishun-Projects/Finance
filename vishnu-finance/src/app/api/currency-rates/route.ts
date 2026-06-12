@@ -76,27 +76,25 @@ async function fetchExchangeRates(): Promise<{ [key: string]: number }> {
   
   try {
     // Try multiple free exchange rate APIs
+    const fixerKey = process.env.FIXER_API_KEY;
     const sources = [
       {
         url: 'https://api.exchangerate-api.com/v4/latest/USD',
         name: 'ExchangeRate-API',
         parser: (data: any) => data.rates
       },
-      {
-        url: 'https://api.fixer.io/v1/latest?access_key=eb72e039872a2f2007803ba9edb78f4a&base=USD',
-        name: 'Fixer.io',
-        parser: (data: any) => data.rates
-      },
+      ...(fixerKey
+        ? [{
+            url: `https://api.fixer.io/v1/latest?access_key=${fixerKey}&base=USD`,
+            name: 'Fixer.io',
+            parser: (data: any) => data.rates
+          }]
+        : []),
       {
         url: 'https://api.exchangerate.host/latest?base=USD',
         name: 'ExchangeRate-Host',
         parser: (data: any) => data.rates
       },
-      {
-        url: 'https://api.currencyapi.com/v3/latest?apikey=YOUR_API_KEY&base_currency=USD',
-        name: 'CurrencyAPI',
-        parser: (data: any) => data.data ? Object.fromEntries(Object.entries(data.data).map(([key, value]: [string, any]) => [key, value.value])) : {}
-      }
     ];
 
     for (const source of sources) {

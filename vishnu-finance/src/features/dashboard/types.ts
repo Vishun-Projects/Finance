@@ -13,7 +13,7 @@ export interface MonthContext {
   adjustedNetFlow: number;
   disciplineSummary: DisciplineSummary;
   planIncomeContext: PlanIncomeContext;
-  accountBalance: CurrentAccountBalance;
+  accountBalance: CurrentAccountBalance | null;
   adherence: PlanAdherenceResult;
 }
 
@@ -22,6 +22,6 @@ export interface DashboardBootstrap {
   adherence: PlanAdherenceResult;
   disciplineSummary: DisciplineSummary;
   planIncomeContext: PlanIncomeContext;
-  accountBalance: CurrentAccountBalance;
+  accountBalance: CurrentAccountBalance | null;
   monthContext: MonthContext;
 }

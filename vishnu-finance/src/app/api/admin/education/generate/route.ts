@@ -110,7 +110,7 @@ Rules:
         if (postData.imagePrompt) {
             try {
                 const { generateAndSaveImagenImage } = await import('@/lib/imagen');
-                postData.coverImage = await generateAndSaveImagenImage(postData.imagePrompt, 'uploads/education');
+                postData.coverImage = await generateAndSaveImagenImage(postData.imagePrompt, 'education');
             } catch (imgError) {
                 console.error('[AI Post Gen] Image generation failed:', imgError);
                 // Continue without image, user can regenerate later

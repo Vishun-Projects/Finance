@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { clearUserCache } from '@/lib/api-cache';
 import { invalidateUserAppData } from '@/lib/server-data-cache';
+import { corsPreflightHeaders } from '@/lib/cors';
 
 // Helper functions for analytics
 function processMonthlyTrends(income: any[], expenses: any[], months: number) {
@@ -52,15 +53,10 @@ function processCategoryBreakdown(expenses: any[]) {
     .sort((a, b) => b.amount - a.amount);
 }
 
-export async function OPTIONS() {
+export async function OPTIONS(request: NextRequest) {
   return new NextResponse(null, {
     status: 204,
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
-      'Access-Control-Max-Age': '86400',
-    },
+    headers: corsPreflightHeaders(request),
   });
 }
 
@@ -73,6 +69,10 @@ export async function POST(request: NextRequest) {
     if (!action) {
       return NextResponse.json({ error: 'Missing action' }, { status: 400 });
     }
+
+    const { guardMutationRequest } = await import('@/lib/request-guard');
+    const guardResponse = guardMutationRequest(request, { action });
+    if (guardResponse) return guardResponse;
 
     // --- CENTRAL AUTHENTICATION ---
     const publicActions = ['auth_login', 'auth_register'];
@@ -341,1151 +341,143 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: 'Preferences deleted successfully' });
     }
 
-    // Transactions - List (GET equivalent)
-    if (action === 'transactions_list') {
-      const { AuthService } = await import('@/lib/auth');
-      const { prisma } = await import('@/lib/db');
-      const authToken = request.cookies.get('auth-token');
-      if (!authToken) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-      const user = await AuthService.getUserFromToken(authToken.value);
-      if (!user || !user.isActive) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Transactions — delegated to TransactionService (backward-compatible API)
+    const transactionActions = new Set([
+      'transactions_list',
+      'transactions_daily_spend',
+      'transactions_category_breakdown',
+      'transactions_create',
+      'transactions_update',
+      'transactions_delete_single',
+      'transactions_delete_bulk',
+      'transactions_restore',
+      'transactions_batch_update',
+      'transactions_auto_categorize',
+      'transactions_categorize',
+      'transactions_categorize_background_status',
+    ]);
 
+    if (transactionActions.has(action)) {
       const {
-        page = 1,
-        pageSize: pageSizeParam = '50',
-        includeTotals = false,
-        includeCount = true,
-        type: financialCategoryParamRaw,
-        financialCategory: financialCategoryAlias,
-        categoryId,
-        startDate,
-        endDate,
-        search: searchTermRaw,
-        searchTerm: searchTermAlias,
-        includeDeleted = false,
-        sortField = 'transactionDate',
-        sortDirection = 'desc',
-        amountPreset,
-        minAmount,
-        maxAmount,
-        range, // New parameter to detect 'all' range
-      } = body || {};
+        TransactionServiceError,
+        listTransactions,
+        getDailySpend,
+        getCategoryBreakdown,
+        createTransaction,
+        updateTransaction,
+        deleteTransaction,
+        deleteTransactionsBulk,
+        restoreTransactions,
+        batchUpdateTransactions,
+        autoCategorizeTransactions,
+        categorizeTransactionsForUser,
+        getCategorizeBackgroundStatus,
+      } = await import('@/lib/services/transaction-service');
 
-      const searchTerm = searchTermRaw ?? searchTermAlias;
-      const financialCategoryInput = financialCategoryParamRaw ?? financialCategoryAlias;
-
-      // AI OPTIMIZATION: High-speed query caching for Dashboard/Transactions
-      const cacheKey = `transactions_list:${user.id}:${JSON.stringify(body)}`;
-      const { globalCache } = await import('@/lib/cache-singleton');
-      const cachedResponse = globalCache.get(cacheKey);
-      if (cachedResponse) {
-        return NextResponse.json(cachedResponse);
-      }
-
-      const pageSize = pageSizeParam === 'all'
-        ? 100
-        : Math.min(parseInt(String(pageSizeParam || '50'), 10), 100);
-      const skip = (Number(page) - 1) * pageSize;
-      const shouldCount = includeCount !== false && Number(page) === 1;
-      const allowedCategories = ['INCOME', 'EXPENSE', 'TRANSFER', 'INVESTMENT', 'OTHER'] as const;
-      const normalizedCategory = financialCategoryInput?.toUpperCase() ?? null;
-      const financialCategory = normalizedCategory && allowedCategories.includes(normalizedCategory as any)
-        ? normalizedCategory
-        : null;
-
-      const where: any = { userId: user.id };
-      if (!includeDeleted) where.isDeleted = false;
-      if (financialCategory) where.financialCategory = financialCategory;
-      if (categoryId) {
-        if (categoryId === 'uncategorized') {
-          where.categoryId = null;
-        } else {
-          where.categoryId = categoryId;
-        }
-      }
-
-      // AI OPTIMIZATION: If range is 'all', ignore defensive startDate/endDate to ensure consistency with "Overall Time"
-      if (range !== 'all' && (startDate || endDate)) {
-        const { parseLocalDateStart, parseLocalDateEnd } = await import('@/lib/date-range');
-        const start = startDate ? parseLocalDateStart(startDate) : null;
-        const end = endDate ? parseLocalDateEnd(endDate) : null;
-        const isValidStart = start && !isNaN(start.getTime());
-        const isValidEnd = end && !isNaN(end.getTime());
-
-        if (isValidStart || isValidEnd) {
-          where.transactionDate = {};
-          if (isValidStart) where.transactionDate.gte = start;
-          if (isValidEnd) where.transactionDate.lte = end;
-        }
-      }
-
-      const validSortFields: Record<string, string> = {
-        date: 'transactionDate',
-        transactionDate: 'transactionDate',
-        amount: 'creditAmount',
-        description: 'description',
-        category: 'category',
-      };
-      const dbSortField = validSortFields[sortField] || 'transactionDate';
-      const orderBy: Record<string, 'asc' | 'desc'> = { [dbSortField]: sortDirection };
-
-      // Search term filter
-      const hasSearchTerm = searchTerm && searchTerm.trim().length > 0;
-      if (hasSearchTerm) {
-        where.OR = [
-          { description: { contains: searchTerm, mode: 'insensitive' } },
-          { store: { contains: searchTerm, mode: 'insensitive' } },
-          { personName: { contains: searchTerm, mode: 'insensitive' } },
-          { upiId: { contains: searchTerm, mode: 'insensitive' } },
-          { notes: { contains: searchTerm, mode: 'insensitive' } },
-          { category: { name: { contains: searchTerm, mode: 'insensitive' } } },
-        ];
-      }
-
-      // DB-LEVEL AMOUNT FILTERING (AI Performance Optimization)
-      let amountRange: { gte?: number; lt?: number; lte?: number } | null = null;
-      if (amountPreset) {
-        switch (amountPreset) {
-          case 'lt1k': amountRange = { lt: 1000 }; break;
-          case '1to10k': amountRange = { gte: 1000, lt: 10000 }; break;
-          case '10to50k': amountRange = { gte: 10000, lt: 50000 }; break;
-          case '50to100k': amountRange = { gte: 50000, lt: 100000 }; break;
-          case 'gt100k': amountRange = { gte: 100000 }; break;
-        }
-      }
-
-      const combinedMin = minAmount !== null && minAmount !== undefined ? minAmount : (amountRange?.gte ?? null);
-      const combinedMax = maxAmount !== null && maxAmount !== undefined ? maxAmount : (amountRange?.lt ?? amountRange?.lte ?? null);
-
-      if (combinedMin !== null || combinedMax !== null) {
-        const amountFilter: any = {};
-        if (combinedMin !== null) amountFilter.gte = combinedMin;
-        if (combinedMax !== null) {
-          if (amountRange?.lt !== undefined && combinedMax === amountRange.lt) {
-            amountFilter.lt = combinedMax;
-          } else {
-            amountFilter.lte = combinedMax;
-          }
-        }
-
-        // Apply to both credit and debit amounts since we don't know which one holds the value
-        // Use AND to combine with existing filters if necessary
-        const amountCondition = {
-          OR: [
-            { creditAmount: amountFilter },
-            { debitAmount: amountFilter }
-          ]
-        };
-
-        if (where.OR) {
-          // If we already have search (where.OR), we must wrap both in AND to preserve both conditions
-          const searchCondition = { OR: where.OR };
-          delete where.OR;
-          where.AND = [searchCondition, amountCondition];
-        } else {
-          where.AND = [amountCondition];
-        }
-      }
-
-      // Fetch data in parallel — skip count/aggregates on page>1 to reduce pooler load
-      const [transactionsData, totalCountData, totalsData] = await Promise.all([
-        (prisma as any).transaction.findMany({
-          where,
-          include: {
-            category: true,
-            document: {
-              select: {
-                id: true,
-                originalName: true,
-                mimeType: true,
-                fileSize: true,
-                visibility: true,
-                sourceType: true,
-                uploadedById: true,
-                ownerId: true,
-                bankCode: true,
-                isDeleted: true,
-                deletedAt: true,
-              },
-            },
-          },
-          orderBy,
-          skip,
-          take: pageSize,
-        }),
-        shouldCount
-          ? (prisma as any).transaction.count({ where })
-          : Promise.resolve(null),
-        includeTotals && shouldCount ? (async () => {
-          const [incomeRes, expenseRes] = await Promise.all([
-            (prisma as any).transaction.aggregate({
-              where: { ...where, financialCategory: 'INCOME' },
-              _sum: { creditAmount: true },
-            }),
-            (prisma as any).transaction.aggregate({
-              where: { ...where, financialCategory: 'EXPENSE' },
-              _sum: { debitAmount: true },
-            }),
-          ]);
-          return {
-            income: Number(incomeRes?._sum?.creditAmount || 0),
-            expense: Number(expenseRes?._sum?.debitAmount || 0),
-          };
-        })() : Promise.resolve(null)
-      ]);
-
-      let transactions = transactionsData as any[];
-      const totalCount = totalCountData;
-      const totals = totalsData;
-
-
-      // In-memory filters removed (Now handled at DB level for 10x performance)
-      const transformed = transactions.map((t: any) => ({
-        ...t,
-        creditAmount: Number(t.creditAmount),
-        debitAmount: Number(t.debitAmount),
-        balance: t.balance ? Number(t.balance) : null,
-        category: t.category ? {
-          id: t.category.id,
-          name: t.category.name,
-          type: t.category.type,
-          color: t.category.color,
-          icon: t.category.icon,
-        } : null,
-      }));
-
-      const responseData = {
-        transactions: transformed,
-        pagination: {
-          total: totalCount ?? undefined,
-          page: Number(page),
-          pageSize,
-          totalPages: totalCount != null ? Math.ceil(totalCount / pageSize) : undefined,
-        },
-        totals,
-      };
-
-      // Cache for 30 seconds to speed up navigation
-      globalCache.set(cacheKey, responseData, 30000);
-
-      return NextResponse.json(responseData);
-    }
-
-    if (action === 'transactions_daily_spend') {
-      const { AuthService } = await import('@/lib/auth');
-      const { prisma } = await import('@/lib/db');
-      const { Prisma } = await import('@prisma/client');
-      const authToken = request.cookies.get('auth-token');
-      if (!authToken) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-      const user = await AuthService.getUserFromToken(authToken.value);
-      if (!user || !user.isActive) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-      const { startDate, endDate, range } = body || {};
-
-      let dateFilter: typeof Prisma.empty = Prisma.empty;
-      if (range !== 'all' && (startDate || endDate)) {
-        const start = startDate ? new Date(startDate) : null;
-        const end = endDate ? new Date(endDate) : null;
-        const isValidStart = start && !Number.isNaN(start.getTime());
-        const isValidEnd = end && !Number.isNaN(end.getTime());
-
-        if (isValidStart && isValidEnd) {
-          end!.setHours(23, 59, 59, 999);
-          dateFilter = Prisma.sql`AND "transactionDate" >= ${start} AND "transactionDate" <= ${end}`;
-        } else if (isValidStart) {
-          dateFilter = Prisma.sql`AND "transactionDate" >= ${start}`;
-        } else if (isValidEnd) {
-          end!.setHours(23, 59, 59, 999);
-          dateFilter = Prisma.sql`AND "transactionDate" <= ${end}`;
-        }
-      }
-
-      const rows = await prisma.$queryRaw<Array<{ date: string; expense: number; income: number; count: number }>>`
-        SELECT
-          to_char("transactionDate" AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS date,
-          COALESCE(SUM("debitAmount"), 0)::float AS expense,
-          COALESCE(SUM("creditAmount"), 0)::float AS income,
-          COUNT(*)::int AS count
-        FROM "transactions"
-        WHERE "userId" = ${user.id}
-          AND "isDeleted" = false
-          ${dateFilter}
-        GROUP BY 1
-        ORDER BY 1 ASC
-      `;
-
-      return NextResponse.json({
-        daily: rows.map((row) => ({
-          date: row.date,
-          expense: Number(row.expense) || 0,
-          income: Number(row.income) || 0,
-          count: Number(row.count) || 0,
-        })),
-      });
-    }
-
-    if (action === 'transactions_category_breakdown') {
-      const { AuthService } = await import('@/lib/auth');
-      const { prisma } = await import('@/lib/db');
-      const { Prisma } = await import('@prisma/client');
-      const authToken = request.cookies.get('auth-token');
-      if (!authToken) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-      const user = await AuthService.getUserFromToken(authToken.value);
-      if (!user || !user.isActive) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-      const { startDate, endDate, range } = body || {};
-
-      let dateFilter: typeof Prisma.empty = Prisma.empty;
-      if (range !== 'all' && (startDate || endDate)) {
-        const start = startDate ? new Date(startDate) : null;
-        const end = endDate ? new Date(endDate) : null;
-        const isValidStart = start && !Number.isNaN(start.getTime());
-        const isValidEnd = end && !Number.isNaN(end.getTime());
-
-        if (isValidStart && isValidEnd) {
-          end!.setHours(23, 59, 59, 999);
-          dateFilter = Prisma.sql`AND t."transactionDate" >= ${start} AND t."transactionDate" <= ${end}`;
-        } else if (isValidStart) {
-          dateFilter = Prisma.sql`AND t."transactionDate" >= ${start}`;
-        } else if (isValidEnd) {
-          end!.setHours(23, 59, 59, 999);
-          dateFilter = Prisma.sql`AND t."transactionDate" <= ${end}`;
-        }
-      }
-
-      const rows = await prisma.$queryRaw<Array<{ name: string; expense: number; count: number }>>`
-        SELECT
-          COALESCE(c.name, 'Uncategorized') AS name,
-          COALESCE(SUM(t."debitAmount"), 0)::float AS expense,
-          COUNT(*)::int AS count
-        FROM "transactions" t
-        LEFT JOIN "categories" c ON t."categoryId" = c.id
-        WHERE t."userId" = ${user.id}
-          AND t."isDeleted" = false
-          AND t."financialCategory" = 'EXPENSE'
-          AND t."debitAmount" > 0
-          ${dateFilter}
-        GROUP BY COALESCE(c.name, 'Uncategorized')
-        ORDER BY expense DESC
-        LIMIT 25
-      `;
-
-      return NextResponse.json({
-        categories: rows.map((row) => ({
-          name: row.name,
-          expense: Number(row.expense) || 0,
-          count: Number(row.count) || 0,
-        })),
-      });
-    }
-
-    // Transactions - Create
-    if (action === 'transactions_create') {
-      const { AuthService } = await import('@/lib/auth');
-      const { prisma } = await import('@/lib/db');
-      const { getCanonicalName } = await import('@/lib/entity-mapping-service');
-      const authToken = request.cookies.get('auth-token');
-      if (!authToken) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-      const user = await AuthService.getUserFromToken(authToken.value);
-      if (!user || !user.isActive) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-      const {
-        description,
-        transactionDate,
-        creditAmount = 0,
-        debitAmount = 0,
-        financialCategory = 'EXPENSE',
-        categoryId,
-        notes,
-        store,
-        personName,
-        upiId,
-        receiptUrl,
-        bankCode,
-        transactionId,
-        accountNumber,
-        transferType,
-        branch,
-        rawData,
-        balance,
-      } = body || {};
-
-      if (!description || (!creditAmount && !debitAmount)) {
-        return NextResponse.json({ error: 'Description and amount are required' }, { status: 400 });
-      }
-
-      let finalStore = store;
-      let finalPersonName = personName;
       try {
-        if (store) finalStore = await getCanonicalName(user.id, store, 'STORE');
-        if (personName) finalPersonName = await getCanonicalName(user.id, personName, 'PERSON');
-      } catch { }
-
-      const transaction = await (prisma as any).transaction.create({
-        data: {
-          userId: user.id,
-          description,
-          transactionDate: new Date(transactionDate || Date.now()),
-          creditAmount: parseFloat(String(creditAmount)) || 0,
-          debitAmount: parseFloat(String(debitAmount)) || 0,
-          financialCategory: financialCategory.toUpperCase(),
-          categoryId: categoryId || null,
-          notes: notes || null,
-          store: finalStore || null,
-          personName: finalPersonName || null,
-          upiId: upiId || null,
-          receiptUrl: receiptUrl || null,
-          bankCode: bankCode || null,
-          transactionId: transactionId || null,
-          accountNumber: accountNumber || null,
-          transferType: transferType || null,
-          branch: branch || null,
-          rawData: rawData || null,
-          balance: balance ? parseFloat(String(balance)) : null,
-          autoCategorized: body.autoCategorized === true,
-          isDeleted: false,
-        },
-        include: { category: true },
-      });
-
-      // Clear cache to ensure Advisor/Dashboard see new data
-      await clearUserCache(user.id);
-      invalidateUserAppData(user.id);
-
-      return NextResponse.json({
-        ...transaction,
-        creditAmount: Number(transaction.creditAmount),
-        debitAmount: Number(transaction.debitAmount),
-        balance: transaction.balance ? Number(transaction.balance) : null,
-      }, { status: 201 });
-    }
-
-    // Transactions - Update
-    if (action === 'transactions_update') {
-      const { id, ...updateData } = body || {};
-      if (!id) return NextResponse.json({ error: 'Transaction id is required' }, { status: 400 });
-      const { AuthService } = await import('@/lib/auth');
-      const { prisma } = await import('@/lib/db');
-      const { getCanonicalName } = await import('@/lib/entity-mapping-service');
-      const authToken = request.cookies.get('auth-token');
-      if (!authToken) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-      const user = await AuthService.getUserFromToken(authToken.value);
-      if (!user || !user.isActive) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-      const existing = await (prisma as any).transaction.findFirst({
-        where: { id, userId: user.id },
-      });
-      if (!existing) return NextResponse.json({ error: 'Transaction not found' }, { status: 404 });
-
-      let finalStore = updateData.store;
-      let finalPersonName = updateData.personName;
-      if (updateData.store || updateData.personName) {
-        try {
-          if (updateData.store && updateData.store !== existing.store) {
-            finalStore = await getCanonicalName(user.id, updateData.store, 'STORE');
-          }
-          if (updateData.personName && updateData.personName !== existing.personName) {
-            finalPersonName = await getCanonicalName(user.id, updateData.personName, 'PERSON');
-          }
-        } catch { }
-      }
-
-      const data: any = {};
-      if (updateData.description !== undefined) data.description = updateData.description;
-      if (updateData.transactionDate !== undefined) data.transactionDate = new Date(updateData.transactionDate);
-      if (updateData.creditAmount !== undefined) data.creditAmount = parseFloat(String(updateData.creditAmount)) || 0;
-      if (updateData.debitAmount !== undefined) data.debitAmount = parseFloat(String(updateData.debitAmount)) || 0;
-      if (updateData.financialCategory !== undefined) data.financialCategory = updateData.financialCategory.toUpperCase();
-      if (updateData.categoryId !== undefined) data.categoryId = updateData.categoryId || null;
-      if (updateData.notes !== undefined) data.notes = updateData.notes || null;
-      if (updateData.store !== undefined) data.store = finalStore || null;
-      if (updateData.personName !== undefined) data.personName = finalPersonName || null;
-      if (updateData.upiId !== undefined) data.upiId = updateData.upiId || null;
-      if (updateData.receiptUrl !== undefined) data.receiptUrl = updateData.receiptUrl || null;
-      if (updateData.bankCode !== undefined) data.bankCode = updateData.bankCode || null;
-      if (updateData.transactionId !== undefined) data.transactionId = updateData.transactionId || null;
-      if (updateData.accountNumber !== undefined) data.accountNumber = updateData.accountNumber || null;
-      if (updateData.transferType !== undefined) data.transferType = updateData.transferType || null;
-      if (updateData.branch !== undefined) data.branch = updateData.branch || null;
-      if (updateData.rawData !== undefined) data.rawData = updateData.rawData || null;
-      if (updateData.balance !== undefined) data.balance = updateData.balance ? parseFloat(String(updateData.balance)) : null;
-      if (updateData.autoCategorized !== undefined) data.autoCategorized = updateData.autoCategorized === true;
-
-      const updated = await (prisma as any).transaction.update({
-        where: { id },
-        data,
-        include: { category: true },
-      });
-
-      // Clear cache
-      await clearUserCache(user.id);
-      invalidateUserAppData(user.id);
-
-      return NextResponse.json({
-        ...updated,
-        creditAmount: Number(updated.creditAmount),
-        debitAmount: Number(updated.debitAmount),
-        balance: updated.balance ? Number(updated.balance) : null,
-        category: updated.category ? {
-          id: updated.category.id,
-          name: updated.category.name,
-          type: updated.category.type,
-          color: updated.category.color,
-          icon: updated.category.icon,
-        } : null,
-      });
-    }
-
-    // Transactions - Delete Single
-    if (action === 'transactions_delete_single') {
-      const { id } = body || {};
-      if (!id) return NextResponse.json({ error: 'Transaction id is required' }, { status: 400 });
-      const { AuthService } = await import('@/lib/auth');
-      const { prisma } = await import('@/lib/db');
-      const authToken = request.cookies.get('auth-token');
-      if (!authToken) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-      const user = await AuthService.getUserFromToken(authToken.value);
-      if (!user || !user.isActive) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-      const existing = await (prisma as any).transaction.findFirst({
-        where: { id, userId: user.id },
-      });
-      if (!existing) return NextResponse.json({ error: 'Transaction not found' }, { status: 404 });
-
-      const deleted = await (prisma as any).transaction.update({
-        where: { id },
-        data: { isDeleted: true, deletedAt: new Date() },
-      });
-
-      // Clear cache
-      await clearUserCache(user.id);
-      invalidateUserAppData(user.id);
-
-      return NextResponse.json({
-        id: deleted.id,
-        isDeleted: true,
-        deletedAt: deleted.deletedAt,
-      });
-    }
-
-    // Transactions - Delete Bulk
-    if (action === 'transactions_delete_bulk') {
-      const { transactionIds, filters } = body || {};
-      const { AuthService } = await import('@/lib/auth');
-      const { prisma } = await import('@/lib/db');
-      const authToken = request.cookies.get('auth-token');
-      if (!authToken) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-      const user = await AuthService.getUserFromToken(authToken.value);
-      if (!user || !user.isActive) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-      let deletedCount = 0;
-      if (transactionIds && Array.isArray(transactionIds) && transactionIds.length > 0) {
-        const result = await (prisma as any).transaction.updateMany({
-          where: { id: { in: transactionIds }, userId: user.id, isDeleted: false },
-          data: { isDeleted: true, deletedAt: new Date() },
-        });
-        deletedCount += result.count;
-      }
-      if (filters) {
-        const where: any = { userId: user.id, isDeleted: false };
-        if (filters.bankCode) where.bankCode = filters.bankCode;
-        if (filters.transactionType === 'expense' || filters.transactionType === 'debit') {
-          where.financialCategory = 'EXPENSE';
-          where.debitAmount = { gt: 0 };
-        } else if (filters.transactionType === 'income' || filters.transactionType === 'credit') {
-          where.financialCategory = 'INCOME';
-          where.creditAmount = { gt: 0 };
-        }
-        if (filters.startDate || filters.endDate) {
-          where.transactionDate = {};
-          if (filters.startDate) where.transactionDate.gte = new Date(filters.startDate);
-          if (filters.endDate) where.transactionDate.lte = new Date(filters.endDate);
-        }
-        const result = await (prisma as any).transaction.updateMany({
-          where,
-          data: { isDeleted: true, deletedAt: new Date() },
-        });
-        deletedCount += result.count;
-      }
-
-      // Clear cache
-      await clearUserCache(user.id);
-      invalidateUserAppData(user.id);
-
-      return NextResponse.json({
-        success: true,
-        deletedCount,
-        message: `Successfully deleted ${deletedCount} transaction(s)`,
-      });
-    }
-
-    // Transactions - Restore
-    if (action === 'transactions_restore') {
-      const { transactionIds, filters } = body || {};
-      const { AuthService } = await import('@/lib/auth');
-      const { prisma } = await import('@/lib/db');
-      const authToken = request.cookies.get('auth-token');
-      if (!authToken) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-      const user = await AuthService.getUserFromToken(authToken.value);
-      if (!user || !user.isActive) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-      let restoredCount = 0;
-      if (transactionIds && Array.isArray(transactionIds) && transactionIds.length > 0) {
-        const result = await (prisma as any).transaction.updateMany({
-          where: { id: { in: transactionIds }, userId: user.id, isDeleted: true },
-          data: { isDeleted: false, deletedAt: null },
-        });
-        restoredCount += result.count;
-      }
-      if (filters) {
-        const where: any = { userId: user.id, isDeleted: true };
-        if (filters.bankCode) where.bankCode = filters.bankCode;
-        if (filters.transactionType === 'expense' || filters.transactionType === 'debit') {
-          where.financialCategory = 'EXPENSE';
-          where.debitAmount = { gt: 0 };
-        } else if (filters.transactionType === 'income' || filters.transactionType === 'credit') {
-          where.financialCategory = 'INCOME';
-          where.creditAmount = { gt: 0 };
-        }
-        if (filters.startDate || filters.endDate) {
-          where.transactionDate = {};
-          if (filters.startDate) where.transactionDate.gte = new Date(filters.startDate);
-          if (filters.endDate) where.transactionDate.lte = new Date(filters.endDate);
-        }
-        const result = await (prisma as any).transaction.updateMany({
-          where,
-          data: { isDeleted: false, deletedAt: null },
-        });
-        restoredCount += result.count;
-      }
-
-      return NextResponse.json({
-        success: true,
-        restoredCount,
-        message: `Successfully restored ${restoredCount} transaction(s)`,
-      });
-    }
-
-
-
-    // Transactions - Batch Update
-    if (action === 'transactions_batch_update') {
-      const { userId, updates } = body || {};
-      if (!userId || !Array.isArray(updates) || updates.length === 0) {
-        return NextResponse.json({ error: 'userId and updates array are required' }, { status: 400 });
-      }
-      const { AuthService } = await import('@/lib/auth');
-      const { prisma } = await import('@/lib/db');
-      const { getCanonicalName } = await import('@/lib/entity-mapping-service');
-      const authToken = request.cookies.get('auth-token');
-      if (!authToken) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-      const user = await AuthService.getUserFromToken(authToken.value);
-      if (!user || !user.isActive) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-      if (user.id !== userId && user.role !== 'SUPERUSER') {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-      }
-
-      const transactionIds = updates.map((u: any) => u.id);
-      const existingTransactions = await (prisma as any).transaction.findMany({
-        where: { id: { in: transactionIds }, userId, isDeleted: false },
-        select: { id: true, store: true, personName: true },
-      });
-
-      const existingIds = new Set(existingTransactions.map((t: any) => t.id));
-      const invalidIds = transactionIds.filter((id: string) => !existingIds.has(id));
-      if (invalidIds.length > 0) {
-        return NextResponse.json(
-          { error: `Some transactions not found or don't belong to user`, invalidIds },
-          { status: 404 }
-        );
-      }
-
-      const existingMap = new Map(
-        existingTransactions.map((t: any) => [t.id, { store: t.store, personName: t.personName }])
-      );
-
-      const BATCH_SIZE = 50;
-      const results: Array<{ id: string; success: boolean; error?: string }> = [];
-
-      for (let i = 0; i < updates.length; i += BATCH_SIZE) {
-        const batch = updates.slice(i, i + BATCH_SIZE);
-        const batchPromises = batch.map(async (update: any) => {
-          try {
-            const updateData: any = {};
-            if (update.categoryId !== undefined) updateData.categoryId = update.categoryId || null;
-            if (update.financialCategory !== undefined) {
-              updateData.financialCategory = update.financialCategory.toUpperCase();
-            }
-            if (update.description !== undefined) updateData.description = update.description;
-            if (update.notes !== undefined) updateData.notes = update.notes || null;
-            if (update.autoCategorized !== undefined) updateData.autoCategorized = update.autoCategorized === true;
-
-            if (update.store !== undefined) {
-              const existing = existingMap.get(update.id);
-              if (update.store && update.store !== (existing as any)?.store) {
-                try {
-                  updateData.store = await getCanonicalName(userId, update.store, 'STORE');
-                } catch {
-                  updateData.store = update.store;
-                }
-              } else {
-                updateData.store = update.store || null;
-              }
-            }
-
-            if (update.personName !== undefined) {
-              const existing = existingMap.get(update.id);
-              if (update.personName && update.personName !== (existing as any)?.personName) {
-                try {
-                  updateData.personName = await getCanonicalName(userId, update.personName, 'PERSON');
-                } catch {
-                  updateData.personName = update.personName;
-                }
-              } else {
-                updateData.personName = update.personName || null;
-              }
-            }
-
-            await (prisma as any).transaction.update({
-              where: { id: update.id },
-              data: updateData,
+        let result: unknown;
+        switch (action) {
+          case 'transactions_list':
+            result = await listTransactions(user!.id, body || {});
+            break;
+          case 'transactions_daily_spend':
+            result = await getDailySpend(user!.id, body || {});
+            break;
+          case 'transactions_category_breakdown':
+            result = await getCategoryBreakdown(user!.id, body || {});
+            break;
+          case 'transactions_create':
+            result = await createTransaction(user!.id, body || {});
+            return NextResponse.json(result, { status: 201 });
+          case 'transactions_update':
+            result = await updateTransaction(user!.id, body || {});
+            break;
+          case 'transactions_delete_single':
+            result = await deleteTransaction(user!.id, { id: body?.id });
+            break;
+          case 'transactions_delete_bulk':
+            result = await deleteTransactionsBulk(user!.id, {
+              transactionIds: body?.transactionIds,
+              filters: body?.filters,
             });
-
-            return { id: update.id, success: true };
-          } catch (error: any) {
-            return {
-              id: update.id,
-              success: false,
-              error: error.message || 'Update failed',
-            };
-          }
-        });
-
-        const batchResults = await Promise.allSettled(batchPromises);
-        results.push(
-          ...batchResults.map((result) =>
-            result.status === 'fulfilled' ? result.value : { id: 'unknown', success: false, error: 'Promise rejected' }
-          )
-        );
-      }
-
-      const successCount = results.filter((r) => r.success).length;
-      const failureCount = results.filter((r) => !r.success).length;
-
-      return NextResponse.json({
-        success: true,
-        total: updates.length,
-        succeeded: successCount,
-        failed: failureCount,
-        results,
-      });
-    }
-
-    // Transactions - Auto Categorize (Smart Hybrid)
-    if (action === 'transactions_auto_categorize') {
-      const { AuthService } = await import('@/lib/auth');
-      const { prisma } = await import('@/lib/db');
-      const { categorizeTransactionsBatch } = await import('@/lib/gemini');
-
-      const authToken = request.cookies.get('auth-token');
-      if (!authToken) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-      const user = await AuthService.getUserFromToken(authToken.value);
-      if (!user || !user.isActive) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-      try {
-        // Fetch all categories to build a name->id lookup
-        const allCategories = await (prisma as any).category.findMany({
-          where: { OR: [{ userId: user.id }, { isDefault: true }] }
-        });
-
-        // Build category lookup by name (case-insensitive)
-        const categoryByName = new Map<string, string>();
-        allCategories.forEach((c: any) => {
-          categoryByName.set(c.name.toLowerCase(), c.id);
-        });
-
-        // Find "Other" category ID to EXCLUDE from matching
-        const otherCategoryId = allCategories.find((c: any) =>
-          c.name.toLowerCase() === 'other' || c.name.toLowerCase() === 'miscellaneous'
-        )?.id;
-
-        // DETERMINISTIC RULES ENGINE - Using EXACT category names from database
-        // Categories: salary, freelance, investment, business, other income, housing, food, 
-        // transportation, utilities, entertainment, healthcare, education, shopping, insurance,
-        // other expenses, food & dining, personal care, travel, subscriptions, debt payment, taxes
-        const PATTERN_RULES: Array<[string[], string]> = [
-          // ===== BANK CHARGES & FEES → 'other expenses' =====
-          [['min bal chg', 'minimum balance', 'service charge', 'atm amc', 'uncoll chrg', 'sms chg', 'annual fee', 'maintenance charge', 'eft charge'], 'other expenses'],
-
-          // ===== ATM WITHDRAWAL / CASH → 'other expenses' =====
-          [['atm wdl', 'tran date', 'atm id', 'cash withdrawal', 'self-', '/self'], 'other expenses'],
-
-          // ===== INCOME → 'salary' or 'other income' =====
-          [['credit interest', 'interest credit', 'neft/hdfc', 'word publish'], 'other income'],
-          [['salary', 'credited'], 'salary'],
-
-          // ===== GROCERIES & DAILY NEEDS → 'food' =====
-          [['milk', 'dud', 'dudh', 'aata', 'atta', 'grocery', 'kirana', 'vegetables', 'sabzi', 'fruits', 'eggs', 'anda', 'rice', 'dal', 'sugar', 'tel', 'oil', 'ghee', 'paneer', 'dahi', 'curd', 'aloo', 'pyaz', 'tamatar', 'soyabean', 'mother dairy', 'amul', 'country delight', 'bigbasket', 'blinkit'], 'food'],
-
-          // ===== FOOD & SNACKS → 'food & dining' =====
-          [['paan', 'panipuri', 'chai', 'tea', 'samosa', 'snacks', 'vada', 'poha', 'nashta', 'breakfast', 'lunch', 'dinner', 'hotel', 'dhaba', 'restaurant', 'biryani', 'thali', 'meals', 'frooti', 'cold drink', 'juice', 'dhaniya', 'bhindi', 'momo', 'burger', 'roll', 'shawarma', 'pav bhaji'], 'food & dining'],
-          [['swiggy', 'zomato', 'dominos', 'pizza', 'mcdonalds', 'kfc', 'burger king', 'starbucks', 'cafe', 'subway'], 'food & dining'],
-
-          // ===== SWEETS & BAKERY → 'food & dining' =====
-          [['sweets', 'mithai', 'bakery', 'cake', 'pastry', 'dryfruit', 'dry fruit', 'chocolate', 'dairy milk'], 'food & dining'],
-
-          // ===== MEDICAL / HEALTHCARE → 'healthcare' =====
-          [['medical', 'medico', 'pharmacy', 'medicine', 'chemist', 'hospital', 'clinic', 'doctor', 'apollo', 'medplus', '1mg', 'pharmeasy', 'netmeds', 'diagnostic', 'lab', 'cipladine', 'tablet', 'dawai'], 'healthcare'],
-
-          // ===== UTILITIES & RECHARGE → 'utilities' =====
-          [['recharge', 'gpayrecharge', 'vodaf', 'airtel', 'jio', 'bsnl', 'electricity', 'bijli', 'gas', 'lpg', 'water bill', 'broadband', 'wifi', 'internet', 'dth', 'tata sky', 'dish tv'], 'utilities'],
-
-          // ===== TRANSPORT → 'transportation' =====
-          [['uber', 'ola', 'rapido', 'taxi', 'cab', 'metro', 'railway', 'indian railways', 'irctc', 'bus', 'petrol', 'diesel', 'fuel', 'cng', 'parking', 'toll'], 'transportation'],
-
-          // ===== SHOPPING → 'shopping' =====
-          [['amazon', 'flipkart', 'myntra', 'ajio', 'nykaa', 'meesho', 'bigbasket', 'blinkit', 'zepto', 'instamart', 'jiomart', 'dmart', 'shopping', 'cloth', 'kapda', 'footwear', 'shoe'], 'shopping'],
-
-          // ===== ENTERTAINMENT → 'entertainment' =====
-          [['netflix', 'hotstar', 'spotify', 'prime video', 'youtube', 'bookmyshow', 'cinema', 'pvr', 'inox', 'movie', 'game'], 'entertainment'],
-
-          // ===== SUBSCRIPTIONS → 'subscriptions' =====
-          [['subscription', 'monthly', 'renewal', 'autopay'], 'subscriptions'],
-
-          // ===== GIFTS → 'gifts & donations' =====
-          [['gift', 'rakhi', 'shagun', 'mehendi', 'henna', 'birthday', 'anniversary', 'festival', 'donation', 'charity'], 'gifts & donations'],
-
-          // ===== PERSONAL CARE → 'personal care' =====
-          [['salon', 'parlour', 'haircut', 'beauty', 'wheel', 'dettol', 'soap', 'shampoo', 'gum', 'prints', 'stationery'], 'personal care'],
-
-          // ===== INVESTMENTS → 'investment' =====
-          [['zerodha', 'groww', 'upstox', 'mutual fund', 'sip', 'fd', 'stock', 'trading'], 'investment'],
-
-          // ===== INSURANCE → 'insurance' =====
-          [['insurance', 'lic', 'policy', 'premium'], 'insurance'],
-
-          // ===== EDUCATION → 'education' =====
-          [['school', 'college', 'tuition', 'coaching', 'course', 'training'], 'education'],
-
-          // ===== HOUSING → 'housing' =====
-          [['rent', 'landlord', 'society', 'maintenance', 'flat', 'apartment'], 'housing'],
-
-          // ===== LOANS & EMI → 'debt payment' =====
-          [['emi', 'loan', 'bajaj finserv', 'repayment'], 'debt payment'],
-
-          // ===== TRAVEL → 'travel' =====
-          [['hotel', 'oyo', 'booking', 'airbnb', 'trip', 'vacation', 'holiday', 'flight', 'airline'], 'travel'],
-
-          // ===== TAXES → 'taxes' =====
-          [['tax', 'gst', 'income tax', 'tds'], 'taxes'],
-        ];
-
-        // Category fallback mappings (if pattern name doesn't match, try these)
-        const CATEGORY_FALLBACKS: Record<string, string[]> = {
-          'bank charges': ['bank fees', 'charges', 'fees', 'other'],
-          'cash': ['cash withdrawal', 'atm', 'other'],
-          'income': ['salary', 'earnings', 'other income', 'income'],
-          'groceries': ['grocery', 'food', 'food & dining', 'shopping'],
-          'food & dining': ['food', 'dining', 'restaurants', 'eating out'],
-          'healthcare': ['medical', 'health', 'pharmacy'],
-          'utilities': ['bills', 'recharge', 'mobile'],
-          'transport': ['travel', 'transportation', 'commute'],
-          'shopping': ['personal', 'lifestyle'],
-          'entertainment': ['subscriptions', 'leisure'],
-          'gifts': ['gifts & donations', 'personal'],
-          'personal care': ['lifestyle', 'personal', 'shopping'],
-          'investments': ['savings', 'finance'],
-          'insurance': ['finance', 'other'],
-          'education': ['learning', 'other'],
-          'housing': ['rent', 'home', 'other'],
-          'emi & loans': ['emi', 'loans', 'finance'],
-        };
-
-        // Helper to find category by pattern
-        // Improved: Removes all non-alphanumeric chars for matching (handles "mil k", "pay-tm", "gro.cery")
-        const findCategoryByPattern = (text: string): string | null => {
-          const lowerText = text.toLowerCase();
-          const cleanText = lowerText.replace(/[^a-z0-9]/g, ''); // "mil K!" -> "milk"
-
-          for (const [keywords, categoryName] of PATTERN_RULES) {
-            for (const keyword of keywords) {
-              const cleanKeyword = keyword.replace(/[^a-z0-9]/g, '');
-              if (cleanKeyword.length < 3) continue; // Skip very short keywords to avoid false positives
-
-              // match if clean keyword is found in clean text
-              if (cleanText.includes(cleanKeyword)) {
-                // Found keyword match! Now find category ID
-
-                // 1. Try exact category name match
-                for (const [catName, catId] of categoryByName.entries()) {
-                  if (catName === categoryName.toLowerCase()) {
-                    if (catId !== otherCategoryId) return catId;
-                  }
-                }
-
-                // 2. Try partial category name match
-                for (const [catName, catId] of categoryByName.entries()) {
-                  if (catName.includes(categoryName.toLowerCase()) || categoryName.toLowerCase().includes(catName)) {
-                    if (catId !== otherCategoryId) return catId;
-                  }
-                }
-
-                // 3. Try fallback category names
-                const fallbacks = CATEGORY_FALLBACKS[categoryName] || [];
-                for (const fallback of fallbacks) {
-                  for (const [catName, catId] of categoryByName.entries()) {
-                    if (catName.includes(fallback) || fallback.includes(catName)) {
-                      if (catId !== otherCategoryId) return catId;
-                    }
-                  }
-                }
-              }
-            }
-          }
-          return null;
-        };
-
-        // DEBUG: Log categories available
-
-        // Fetch Batch of Uncategorized
-        const batchSize = 100;
-        const transactions = await (prisma as any).transaction.findMany({
-          where: { userId: user.id, categoryId: null, isDeleted: false },
-          take: batchSize,
-          select: { id: true, description: true, debitAmount: true, creditAmount: true, store: true, upiId: true, personName: true }
-        });
-
-        const totalRemaining = await (prisma as any).transaction.count({
-          where: { userId: user.id, categoryId: null, isDeleted: false }
-        });
-
-        if (transactions.length === 0) {
-          // Debug: Count total and categorized separately
-          const totalTx = await (prisma as any).transaction.count({
-            where: { userId: user.id, isDeleted: false }
-          });
-          const categorizedTx = await (prisma as any).transaction.count({
-            where: { userId: user.id, isDeleted: false, categoryId: { not: null } }
-          });
-
-          return NextResponse.json({
-            processed: 0, updated: 0, rulesMatched: 0, aiMatched: 0, remaining: 0,
-            message: 'No uncategorized transactions found for this user',
-            debug: {
-              userId: user.id,
-              userTransactions: totalTx,
-              userCategorized: categorizedTx,
-              userUncategorized: totalTx - categorizedTx,
-              categories: Array.from(categoryByName.keys()).slice(0, 10)
-            }
-          });
+            break;
+          case 'transactions_restore':
+            result = await restoreTransactions(user!.id, {
+              transactionIds: body?.transactionIds,
+              filters: body?.filters,
+            });
+            break;
+          case 'transactions_batch_update':
+            result = await batchUpdateTransactions(user!.id, { updates: body?.updates });
+            break;
+          case 'transactions_auto_categorize':
+            result = await autoCategorizeTransactions(user!.id);
+            break;
+          case 'transactions_categorize':
+            result = await categorizeTransactionsForUser(user!.id, body?.transactions);
+            break;
+          case 'transactions_categorize_background_status':
+            result = await getCategorizeBackgroundStatus(user!.id, body?.transactionIds);
+            break;
+          default:
+            return NextResponse.json({ error: 'Unknown transaction action' }, { status: 400 });
         }
-
-        // Apply Pattern Matching FIRST (deterministic, no AI needed)
-        const aiBatch: any[] = [];
-        const updates: Array<{ id: string, categoryId: string, notes?: string | null, method: 'HISTORY' | 'RULE' | 'AI' }> = [];
-
-        // 1. PRE-FETCH HISTORICAL MATCHES (BULK)
-        const upiIds = transactions.map((t: { upiId?: string | null }) => t.upiId).filter(Boolean) as string[];
-        const stores = transactions.map((t: { store?: string | null }) => t.store).filter(Boolean) as string[];
-        const personNames = transactions.map((t: { personName?: string | null }) => t.personName).filter(Boolean) as string[];
-
-        const [upiHistory, storeHistory, personHistory] = await Promise.all([
-          upiIds.length > 0 ? (prisma as any).transaction.findMany({
-            where: { userId: user.id, upiId: { in: upiIds }, categoryId: { not: null }, isDeleted: false },
-            orderBy: { transactionDate: 'desc' },
-            select: { upiId: true, categoryId: true, notes: true }
-          }) : [],
-          stores.length > 0 ? (prisma as any).transaction.findMany({
-            where: { userId: user.id, store: { in: stores }, categoryId: { not: null }, isDeleted: false },
-            orderBy: { transactionDate: 'desc' },
-            select: { store: true, categoryId: true, notes: true }
-          }) : [],
-          personNames.length > 0 ? (prisma as any).transaction.findMany({
-            where: { userId: user.id, personName: { in: personNames }, categoryId: { not: null }, isDeleted: false },
-            orderBy: { transactionDate: 'desc' },
-            select: { personName: true, categoryId: true, notes: true }
-          }) : []
-        ]);
-
-        // Build lookup maps (keeping only the most recent/first match for each key)
-        const upiMap = new Map<string, { categoryId: string, notes?: string | null }>();
-        upiHistory.forEach((h: any) => { if (!upiMap.has(h.upiId)) upiMap.set(h.upiId, h); });
-
-        const storeMap = new Map<string, { categoryId: string, notes?: string | null }>();
-        storeHistory.forEach((h: any) => { if (!storeMap.has(h.store)) storeMap.set(h.store, h); });
-
-        const personMap = new Map<string, { categoryId: string, notes?: string | null }>();
-        personHistory.forEach((h: any) => { if (!personMap.has(h.personName)) personMap.set(h.personName, h); });
-
-        // Apply Logic Loop
-        for (const t of transactions) {
-          // 1. HISTORICAL MATCHING (Bulk Lookup)
-          let historicalMatch = null;
-          if (t.upiId) historicalMatch = upiMap.get(t.upiId);
-          if (!historicalMatch && t.store) historicalMatch = storeMap.get(t.store);
-          if (!historicalMatch && t.personName) historicalMatch = personMap.get(t.personName);
-
-          if (historicalMatch) {
-            updates.push({ id: t.id, categoryId: historicalMatch.categoryId, notes: historicalMatch.notes, method: 'HISTORY' });
-            continue;
-          }
-
-          // 2. PATTERN MATCHING (Brand Intelligence)
-          const fullText = ((t.description || '') + ' ' + (t.store || '') + ' ' + (t.personName || '')).toLowerCase();
-          const matchedCategoryId = findCategoryByPattern(fullText);
-
-          if (matchedCategoryId) {
-            updates.push({ id: t.id, categoryId: matchedCategoryId, method: 'RULE' });
-          } else {
-            aiBatch.push(t);
-          }
-        }
-
-        // AI Fallback for truly unmatched (ENABLE for all batches, processing locally limited if needed)
-        // We'll process up to 30 items for AI to prevent token limits, but won't skip entirely
-        if (aiBatch.length > 0) {
-          const aiProcessBatch = aiBatch.slice(0, 40); // Process chunk of 40 max per request to be safe with tokens
-          const categories = allCategories.filter((c: any) =>
-            c.id !== otherCategoryId &&
-            !c.name.toLowerCase().includes('miscellaneous')
+        return NextResponse.json(result);
+      } catch (err) {
+        if (err instanceof TransactionServiceError) {
+        return NextResponse.json(
+            { error: err.message, ...(err.extras ?? {}) },
+            { status: err.status },
           );
-
-          const mappedForAi = aiProcessBatch.map((t: any) => ({
-            id: t.id, description: t.description,
-            amount: Number(t.debitAmount || t.creditAmount), store: t.store || undefined
-          }));
-
-          try {
-            const aiResults = await categorizeTransactionsBatch(mappedForAi, categories.map((c: any) => ({ id: c.id, name: c.name, type: c.type })));
-
-            for (const res of aiResults) {
-              if (res.categoryId && res.confidence > 0.5 && res.categoryId !== otherCategoryId) {
-                updates.push({ id: res.id, categoryId: res.categoryId, method: 'AI' });
-              }
-            }
-          } catch (e) {
-            console.error("AI Batch failed (exception)", e);
-          }
         }
-
-        // Execute Updates
-        let updatedCount = 0;
-        let rulesCount = 0;
-        let aiCount = 0;
-
-        await Promise.all(updates.map(async (u) => {
-          try {
-            await (prisma as any).transaction.update({ 
-               where: { id: u.id }, 
-               data: { 
-                 category: u.categoryId ? { connect: { id: u.categoryId } } : undefined,
-                 notes: u.notes !== undefined ? u.notes : undefined
-               } 
-             });
-            updatedCount++;
-            if (u.method === 'HISTORY') rulesCount++; // History is treated as high-confidence rule
-            else if (u.method === 'RULE') rulesCount++; 
-            else aiCount++;
-          } catch (e) { }
-        }));
-
-        await clearUserCache(user.id);
-      invalidateUserAppData(user.id);
-
-        return NextResponse.json({
-          message: 'Categorization complete',
-          processed: transactions.length,
-          updated: updatedCount,
-          rulesMatched: rulesCount,
-          aiMatched: aiCount,
-          remaining: Math.max(0, totalRemaining - transactions.length),
-          unmatched: aiBatch.length - aiCount,
-          debug: {
-            categoriesAvailable: Array.from(categoryByName.keys()),
-            patternsActive: PATTERN_RULES.length,
-            sampleUnmatched: aiBatch.slice(0, 3).map((t: any) => ({
-              id: t.id.substring(0, 10),
-              desc: (t.description || '').substring(0, 80),
-              store: t.store
-            }))
-          }
-        });
-
-      } catch (err: any) {
-        console.error("Auto categorize error:", err);
-        return NextResponse.json({ error: err.message || 'Auto categorization failed' }, { status: 500 });
+    if (action === 'transactions_auto_categorize') {
+          console.error('Auto categorize error:', err);
+          const message = err instanceof Error ? err.message : 'Auto categorization failed';
+          return NextResponse.json({ error: message }, { status: 500 });
+        }
+        throw err;
       }
-    }
-
-    // Transactions - Categorize
-    if (action === 'transactions_categorize') {
-      const { userId, transactions: transactionsToCategorize } = body || {};
-      if (!userId || !Array.isArray(transactionsToCategorize) || transactionsToCategorize.length === 0) {
-        return NextResponse.json(
-          { error: 'userId and transactions array are required' },
-          { status: 400 }
-        );
-      }
-      const { AuthService } = await import('@/lib/auth');
-      const { categorizeTransactions } = await import('@/lib/transaction-categorization-service');
-      const authToken = request.cookies.get('auth-token');
-      if (!authToken) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-      const actorRecord = authToken ? (await AuthService.getUserFromToken(authToken.value)) as any : null;
-      const actorRole = (actorRecord as { role?: 'USER' | 'SUPERUSER' } | null)?.role;
-      if (!actorRecord || !actorRecord.isActive || (actorRole !== 'SUPERUSER' && actorRecord.id !== userId)) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-      }
-
-      const results = await categorizeTransactions(userId, transactionsToCategorize);
-      return NextResponse.json(results);
-    }
-
-    // Transactions - Categorize Background Status (simplified - just returns status)
-    if (action === 'transactions_categorize_background_status') {
-      const { userId, transactionIds } = body || {};
-      if (!userId || !Array.isArray(transactionIds) || transactionIds.length === 0) {
-        return NextResponse.json(
-          { error: 'userId and transactionIds array are required' },
-          { status: 400 }
-        );
-      }
-      // This is a simplified status check - actual background processing happens in the categorize route
-      // For now, return a placeholder status
-      return NextResponse.json({
-        progress: 0,
-        categorized: 0,
-        total: transactionIds.length,
-        remaining: transactionIds.length,
-      });
     }
 
     // Auth - Login
     if (action === 'auth_login') {
+      const rateLimitResponse = await (await import('@/lib/rate-limit')).rateLimitMiddleware('auth', request);
+      if (rateLimitResponse) return rateLimitResponse;
       const { email, password } = body || {};
       if (!email || !password) {
         return NextResponse.json({ error: 'Email and password are required' }, { status: 400 });
       }
-      const { AuthService } = await import('@/lib/auth');
+      const { AuthService, normalizeEmail } = await import('@/lib/auth');
+      const normalizedEmail = normalizeEmail(email);
       const { writeAuditLog, extractRequestMeta } = await import('@/lib/audit');
-      const result = await AuthService.loginUser(email, password);
+      const { setSessionCookies } = await import('@/lib/session-cookies');
+      const meta = extractRequestMeta(request);
+      try {
+      const result = await AuthService.loginUser(normalizedEmail, password);
+
+      if ('requiresVerification' in result && result.requiresVerification) {
+        return NextResponse.json({
+          success: false,
+          requiresVerification: true,
+          email: result.email,
+          message: 'Verification required. Check your email or phone for a code.',
+        }, { status: 403 });
+      }
+
       const response = NextResponse.json({
         success: true,
-        message: result.user ? 'Login successful' : 'Verification required',
-        user: (result as any).user,
-        requiresVerification: (result as any).requiresVerification
+        message: 'Login successful',
+        user: (result as { user: unknown }).user,
       });
 
-      if (result.user && result.token) {
-        response.cookies.set('auth-token', result.token, {
-          httpOnly: true,
-          secure: true,
-          sameSite: 'none',
-          maxAge: 7 * 24 * 60 * 60,
-          path: '/',
-        });
+      if ('user' in result && result.user && 'token' in result && result.token) {
+          await setSessionCookies(response, {
+            id: result.user.id,
+            email: result.user.email,
+            name: result.user.name,
+            role: result.user.role,
+          });
 
-        const meta = extractRequestMeta(request);
         await writeAuditLog({
           actorId: result.user.id,
           event: 'USER_LOGIN',
@@ -1496,16 +488,31 @@ export async function POST(request: NextRequest) {
         });
       }
       return response;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Invalid email or password';
+        await writeAuditLog({
+          actorId: 'anonymous',
+          event: 'AUTH_LOGIN_FAILED',
+          severity: 'WARN',
+          ipAddress: meta.ipAddress,
+          userAgent: meta.userAgent,
+          message: `Failed login attempt for ${normalizedEmail}`,
+          metadata: { email: normalizedEmail },
+        });
+        return NextResponse.json({ error: message }, { status: 401 });
+      }
     }
 
     // Auth - Register
     if (action === 'auth_register') {
+      const rateLimitResponse = await (await import('@/lib/rate-limit')).rateLimitMiddleware('auth', request);
+      if (rateLimitResponse) return rateLimitResponse;
       const { email, password, name } = body || {};
       if (!email || !password) {
         return NextResponse.json({ error: 'Email and password are required' }, { status: 400 });
       }
-      if (password.length < 6) {
-        return NextResponse.json({ error: 'Password must be at least 6 characters long' }, { status: 400 });
+      if (password.length < 8) {
+        return NextResponse.json({ error: 'Password must be at least 8 characters long' }, { status: 400 });
       }
       const { AuthService } = await import('@/lib/auth');
       try {
@@ -1521,12 +528,11 @@ export async function POST(request: NextRequest) {
 
         // Only set cookie if there's a token (unlikely in new verification flow)
         if ((result as any).token) {
-          response.cookies.set('auth-token', (result as any).token, {
-            httpOnly: true,
-            secure: true,
-            sameSite: 'none',
-            maxAge: 7 * 24 * 60 * 60, // 7 days in seconds
-            path: '/',
+          const { setSessionCookies } = await import('@/lib/session-cookies');
+          await setSessionCookies(response, {
+            id: result.user.id,
+            email: result.user.email,
+            name: result.user.name,
           });
         }
 
@@ -1553,8 +559,23 @@ export async function POST(request: NextRequest) {
 
     // Auth - Logout
     if (action === 'auth_logout') {
+      const { AuthService } = await import('@/lib/auth');
+      const { revokeAllUserRefreshTokens, revokeRefreshToken } = await import('@/lib/refresh-token-service');
+      const { REFRESH_COOKIE, clearSessionCookies } = await import('@/lib/session-cookies');
+      const authToken = request.cookies.get('auth-token');
+      const refreshToken = request.cookies.get(REFRESH_COOKIE);
+      if (authToken) {
+        const sessionUser = await AuthService.getUserFromToken(authToken.value);
+        if (sessionUser?.id) {
+          AuthService.invalidateUserCache(sessionUser.id);
+          await revokeAllUserRefreshTokens(sessionUser.id);
+        }
+      }
+      if (refreshToken?.value) {
+        await revokeRefreshToken(refreshToken.value);
+      }
       const response = NextResponse.json({ message: 'Logged out successfully' });
-      response.cookies.delete('auth-token');
+      clearSessionCookies(response);
       return response;
     }
 
@@ -2385,6 +1406,12 @@ export async function POST(request: NextRequest) {
       const { id, canonicalName, mappedNames } = body || {};
       if (!id) return NextResponse.json({ error: 'Mapping id is required' }, { status: 400 });
       const { prisma } = await import('@/lib/db');
+      const existing = await (prisma as any).entityMapping.findFirst({
+        where: { id, userId: user.id },
+      });
+      if (!existing) {
+        return NextResponse.json({ error: 'Mapping not found' }, { status: 404 });
+      }
       const data: any = {};
       if (canonicalName !== undefined) data.canonicalName = canonicalName.trim();
       if (mappedNames !== undefined) {
@@ -2406,6 +1433,12 @@ export async function POST(request: NextRequest) {
       const { id } = body || {};
       if (!id) return NextResponse.json({ error: 'Mapping id is required' }, { status: 400 });
       const { prisma } = await import('@/lib/db');
+      const existing = await (prisma as any).entityMapping.findFirst({
+        where: { id, userId: user.id },
+      });
+      if (!existing) {
+        return NextResponse.json({ error: 'Mapping not found' }, { status: 404 });
+      }
       await (prisma as any).entityMapping.delete({ where: { id } });
       return NextResponse.json({ success: true });
     }
@@ -2443,8 +1476,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Pincode not found' }, { status: 404 });
     }
 
-    // Clear Cache
+    // Clear Cache — SUPERUSER only
     if (action === 'clear_cache') {
+      if (user?.role !== 'SUPERUSER') {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
       const { stats = false } = body || {};
       const { clearAllCache, getCacheStats } = await import('@/lib/api-cache');
       const { cacheManager } = await import('@/lib/advanced-cache');

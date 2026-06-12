@@ -14,13 +14,7 @@ import {
   Target,
   AlertCircle
 } from 'lucide-react';
-import { ChartContainer } from '@/components/ui/chart-container';
-import {
-  Area,
-  AreaChart,
-  Tooltip,
-  XAxis,
-} from 'recharts';
+import dynamic from 'next/dynamic';
 import type { FinancialSummary } from '@/lib/financial-analysis';
 import type { DashboardBootstrap } from '@/features/dashboard/types';
 import { TakeHomeAnchor } from '@/components/finance/take-home-anchor';
@@ -38,6 +32,11 @@ import { patterns } from '@/design/patterns';
 import { chipVariants } from '@/design/variants';
 import { TaxHintsPanel } from '@/features/financial-health/components/tax-hints-panel';
 import { CashflowForecastPanel } from '@/features/financial-health/components/cashflow-forecast-panel';
+
+const IncomeTrendChart = dynamic(
+  () => import('./income-trend-chart').then((m) => m.IncomeTrendChart),
+  { ssr: false, loading: () => <div className="h-[200px] animate-pulse rounded bg-muted/20" /> },
+);
 
 interface FinancialHealthPageClientProps {
   initialData: FinancialSummary;
@@ -268,31 +267,7 @@ export default function FinancialHealthPageClient({
                 Not enough income history to chart yet.
               </div>
             ) : (
-            <ChartContainer height={isMdUp ? 250 : 200}>
-              <AreaChart data={chartData}>
-                <Tooltip
-                  formatter={(value: number) => formatRupees(value)}
-                  labelFormatter={(label) => `Month ${label}`}
-                  contentStyle={{
-                    backgroundColor: 'var(--card)',
-                    border: '1px solid var(--border)',
-                    borderRadius: '8px',
-                    fontSize: '12px',
-                  }}
-                  cursor={{ stroke: 'var(--border)', strokeWidth: 1 }}
-                />
-                <XAxis dataKey="month" hide />
-                <Area
-                  type="monotone"
-                  dataKey="amount"
-                  stroke="var(--foreground)"
-                  strokeWidth={2}
-                  fillOpacity={0.12}
-                  fill="var(--foreground)"
-                  animationDuration={1000}
-                />
-              </AreaChart>
-            </ChartContainer>
+            <IncomeTrendChart data={chartData} height={isMdUp ? 250 : 200} />
             )}
           </div>
         </div>

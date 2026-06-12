@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
+import { randomInt } from 'crypto';
 import { prisma } from './db';
 import { MailerService } from './mailer-service';
 import { globalCache } from './cache-singleton';
@@ -15,11 +16,70 @@ if (!JWT_REFRESH_SECRET) {
   throw new Error('JWT_REFRESH_SECRET is not defined in environment variables');
 }
 
-const JWT_EXPIRES_IN = 30 * 24 * 60 * 60; // 30 days in seconds
-const JWT_REFRESH_EXPIRES_IN = 30 * 24 * 60 * 60; // 30 days in seconds
+/** Short-lived access token (60 minutes). */
+export const ACCESS_TOKEN_MAX_AGE_SECONDS = 60 * 60;
+/** Legacy alias — refresh cookie max-age. */
+export const AUTH_COOKIE_MAX_AGE_SECONDS = 7 * 24 * 60 * 60;
 
-export const SUPERUSER_EMAIL = 'vishun@finance.com';
-export const SUPERUSER_PHONE = '+918108940178';
+const JWT_EXPIRES_IN = ACCESS_TOKEN_MAX_AGE_SECONDS;
+const OTP_MAX_ATTEMPTS = 5;
+const OTP_LOCKOUT_MS = 15 * 60 * 1000;
+
+export function getSuperuserEmail(): string {
+  return process.env.SUPERUSER_EMAIL ?? 'vishun@finance.com';
+}
+
+export function getSuperuserPhone(): string {
+  return process.env.SUPERUSER_PHONE ?? '';
+}
+
+/** @deprecated Use getSuperuserEmail() */
+export const SUPERUSER_EMAIL = getSuperuserEmail();
+/** @deprecated Use getSuperuserPhone() */
+export const SUPERUSER_PHONE = getSuperuserPhone();
+
+export function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
+
+/** Resolve user by email (exact match, then case-insensitive fallback). */
+export async function findUserByEmail(email: string) {
+  const normalized = normalizeEmail(email);
+  const exact = await prisma.user.findUnique({ where: { email: normalized } });
+  if (exact) return exact;
+
+  return prisma.user.findFirst({
+    where: { email: { equals: normalized, mode: 'insensitive' } },
+  });
+}
+
+/** Deliver OTP via SMS (superuser), email, or dev console fallback. */
+export async function deliverOtpToUser(email: string, otp: string): Promise<void> {
+  const superEmail = normalizeEmail(getSuperuserEmail());
+  const superPhone = getSuperuserPhone();
+  const normalized = normalizeEmail(email);
+
+  if (normalized === superEmail && superPhone) {
+    const { N8nService } = await import('./n8n-service');
+    const smsResult = await N8nService.triggerWorkflow('otp_phone_delivery', {
+      email: normalized,
+      otp,
+      phone: superPhone,
+      provider: 'twilio_sms',
+    });
+    if (smsResult !== null) return;
+  }
+
+  try {
+    await MailerService.sendOTP(normalized, otp);
+  } catch (error) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn('[Auth] SMTP unavailable — OTP logged for dev:', normalized, otp);
+      return;
+    }
+    throw error;
+  }
+}
 
 interface JWTPayload {
   userId: string;
@@ -33,91 +93,120 @@ interface RefreshTokenPayload {
 }
 
 export class AuthService {
-  // AI OPTIMIZATION: Use global singleton cache
-  private static CACHE_TTL = 300000; // 5 minutes
+  private static CACHE_TTL = 300000;
 
-  // Hash password
+  static readonly ACCESS_TOKEN_MAX_AGE_SECONDS = ACCESS_TOKEN_MAX_AGE_SECONDS;
+
+  static invalidateUserCache(userId: string): void {
+    globalCache.delete(`auth_user:${userId}`);
+  }
+
   static async hashPassword(password: string): Promise<string> {
     const salt = await bcrypt.genSalt(10);
-    return await bcrypt.hash(password, salt);
+    return bcrypt.hash(password, salt);
   }
 
-  // Compare password
   static async comparePassword(password: string, hash: string): Promise<boolean> {
-    return await bcrypt.compare(password, hash);
+    return bcrypt.compare(password, hash);
   }
 
-  // Generate OTP
+  static validatePassword(password: string): string | null {
+    if (password.length < 8) return 'Password must be at least 8 characters long';
+    if (!/[A-Za-z]/.test(password) || !/\d/.test(password)) {
+      return 'Password must contain at least one letter and one number';
+    }
+    return null;
+  }
+
   static async generateOTP(email: string): Promise<string> {
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes from now
+    const normalized = normalizeEmail(email);
+    const user = await findUserByEmail(normalized);
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    const otp = randomInt(100000, 1000000).toString();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+    const otpHash = await bcrypt.hash(otp, 10);
 
     await prisma.user.update({
-      where: { email },
+      where: { id: user.id },
       data: {
-        otp,
-        otpExpiresAt: expiresAt
-      }
+        otpHash,
+        otpExpiresAt: expiresAt,
+        otpAttempts: 0,
+        otpLockedUntil: null,
+      },
     });
 
     return otp;
   }
 
-  // Verify OTP
   static async verifyOTP(email: string, otp: string): Promise<boolean> {
-    const user = await prisma.user.findUnique({
-      where: { email }
-    });
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) return false;
 
-    if (!user || user.otp !== otp || !user.otpExpiresAt || user.otpExpiresAt < new Date()) {
+    if (user.otpLockedUntil && user.otpLockedUntil > new Date()) {
       return false;
     }
 
-    // Mark user as verified and clear OTP
+    if (!user.otpHash || !user.otpExpiresAt || user.otpExpiresAt < new Date()) {
+      return false;
+    }
+
+    const valid = await bcrypt.compare(otp, user.otpHash);
+    if (!valid) {
+      const attempts = (user.otpAttempts ?? 0) + 1;
+      const locked = attempts >= OTP_MAX_ATTEMPTS;
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          otpAttempts: attempts,
+          otpLockedUntil: locked ? new Date(Date.now() + OTP_LOCKOUT_MS) : null,
+        },
+      });
+      return false;
+    }
+
     await prisma.user.update({
-      where: { email },
+      where: { id: user.id },
       data: {
-        otp: null,
+        otpHash: null,
         otpExpiresAt: null,
+        otpAttempts: 0,
+        otpLockedUntil: null,
         isVerified: true,
-        status: 'ACTIVE'
-      }
+        status: 'ACTIVE',
+      },
     });
 
     return true;
   }
 
-  // Generate access token
   static generateAccessToken(payload: JWTPayload): string {
     return jwt.sign(payload, JWT_SECRET!, { expiresIn: JWT_EXPIRES_IN });
   }
 
-  // Generate refresh token
   static generateRefreshToken(payload: RefreshTokenPayload): string {
-    return jwt.sign(payload, JWT_REFRESH_SECRET!, { expiresIn: JWT_REFRESH_EXPIRES_IN });
+    return jwt.sign(payload, JWT_REFRESH_SECRET!, { expiresIn: AUTH_COOKIE_MAX_AGE_SECONDS });
   }
 
-  // Verify access token
   static verifyAccessToken(token: string): JWTPayload | null {
     try {
-      const decoded = jwt.verify(token, JWT_SECRET!) as JWTPayload;
-      return decoded;
+      return jwt.verify(token, JWT_SECRET!) as JWTPayload;
     } catch {
       return null;
     }
   }
 
-  // Verify refresh token
   static verifyRefreshToken(token: string): RefreshTokenPayload | null {
     try {
-      const decoded = jwt.verify(token, JWT_REFRESH_SECRET!) as RefreshTokenPayload;
-      return decoded;
+      return jwt.verify(token, JWT_REFRESH_SECRET!) as RefreshTokenPayload;
     } catch {
       return null;
     }
   }
 
-  // Legacy method for backward compatibility
   static generateToken(payload: JWTPayload): string {
     return this.generateAccessToken(payload);
   }
@@ -126,117 +215,81 @@ export class AuthService {
     return this.verifyAccessToken(token);
   }
 
-  // Register new user
   static async registerUser(email: string, password: string, name?: string) {
-    const startTime = Date.now();
+    email = normalizeEmail(email);
+    const passwordError = this.validatePassword(password);
+    if (passwordError) throw new Error(passwordError);
 
-    // Check if user already exists
-    const dbStart1 = Date.now();
-    const existingUser = await prisma.user.findUnique({
-      where: { email }
-    });
+    const existingUser = await findUserByEmail(email);
 
     if (existingUser) {
-      // Check if user is OAuth-only
       if (existingUser.oauthProvider && !existingUser.password) {
         throw new Error('This email is already registered with Google. Please use "Sign in with Google" instead.');
       }
       throw new Error('User already exists with this email');
     }
 
-    // Hash password
     const hashedPassword = await this.hashPassword(password);
 
-    // Create user with UNVERIFIED status
-    const dbStart2 = Date.now();
     const user = await prisma.user.create({
       data: {
         email,
         password: hashedPassword,
         name: name || email.split('@')[0],
         role: 'USER',
-        isVerified: false // Default to unverified
-      }
+        isVerified: false,
+      },
     });
 
-    // Generate OTP for the new user
     const otp = await this.generateOTP(email);
+    await deliverOtpToUser(email, otp);
 
-    // Superuser Redirection Logic: Bypass email and send via SMS (N8n)
-    if (email === SUPERUSER_EMAIL) {
-      const { N8nService } = await import('./n8n-service');
-      await N8nService.triggerWorkflow('otp_phone_delivery', {
-        email,
-        otp,
-        phone: SUPERUSER_PHONE,
-        provider: 'twilio_sms'
-      });
-    } else {
-      // Send OTP email for normal users
-      await MailerService.sendOTP(email, otp);
-    }
-
-
-    // Return user info but NO token
     return {
       user: {
         id: user.id,
         email: user.email,
         name: user.name,
-        isVerified: user.isVerified
+        isVerified: user.isVerified,
       },
-      requiresVerification: true
+      requiresVerification: true,
     };
   }
 
-  // Login user
   static async loginUser(email: string, password: string) {
-    const startTime = Date.now();
-
-    // Check if user exists
-    const dbStart1 = Date.now();
+    email = normalizeEmail(email);
     const user = await prisma.user.findUnique({
       where: { email },
-      include: {
-        preferences: true
-      }
-    });
+      include: { preferences: true },
+    }) ?? await findUserByEmail(email);
 
-    if (!user || !user.password) {
+    if (!user) {
       throw new Error('Invalid email or password');
     }
 
-    // Compare password
+    if (!user.password) {
+      if (user.oauthProvider) {
+        throw new Error(
+          `This account uses ${user.oauthProvider === 'google' ? 'Google' : user.oauthProvider} sign-in. Use Continue with Google or Login with OTP.`,
+        );
+      }
+      throw new Error('Invalid email or password');
+    }
+
     const isMatch = await this.comparePassword(password, user.password);
     if (!isMatch) {
       throw new Error('Invalid email or password');
     }
 
-    // Check verification status
     if (!user.isVerified) {
-      // Generate new OTP
       const otp = await this.generateOTP(user.email);
-      // Resend OTP
-      if (user.email === SUPERUSER_EMAIL) {
-        const { N8nService } = await import('./n8n-service');
-        await N8nService.triggerWorkflow('otp_phone_delivery', {
-          email: user.email,
-          otp,
-          phone: SUPERUSER_PHONE,
-          provider: 'twilio_sms'
-        });
-      } else {
-        await MailerService.sendOTP(user.email, otp);
-      }
+      await deliverOtpToUser(user.email, otp);
       return { requiresVerification: true, email: user.email };
     }
 
-    // Check if user is active
     if (!user.isActive) {
       throw new Error('Account is inactive. Please contact support.');
     }
 
-    // Generate tokens
     const token = this.generateAccessToken({
       userId: user.id,
       email: user.email,
@@ -244,11 +297,9 @@ export class AuthService {
       role: user.role,
     });
 
-    // Update last login
-    const dbStart2 = Date.now();
     await prisma.user.update({
       where: { id: user.id },
-      data: { lastLogin: new Date() }
+      data: { lastLogin: new Date() },
     });
 
     return {
@@ -274,26 +325,18 @@ export class AuthService {
         updatedAt: user.updatedAt,
         role: user.role,
       },
-      token
+      token,
     };
   }
 
-  // Get user by token
   static async getUserFromToken(token: string) {
-    const startTime = Date.now();
     const payload = this.verifyToken(token);
-    if (!payload) {
-      return null;
-    }
+    if (!payload) return null;
 
-    // AI OPTIMIZATION: Persistent Global Cache Check
     const cacheKey = `auth_user:${payload.userId}`;
     const cached = globalCache.get(cacheKey);
-    if (cached) {
-      return cached;
-    }
+    if (cached) return cached;
 
-    const dbStart = Date.now();
     try {
       const user = await prisma.user.findUnique({
         where: { id: payload.userId },
@@ -319,23 +362,15 @@ export class AuthService {
           updatedAt: true,
           role: true,
           status: true,
-        }
+        },
       });
 
-
-      if (!user) {
-        return null;
-      }
-
-
-      // AI OPTIMIZATION: Update Persistent Global Cache
+      if (!user) return null;
       globalCache.set(cacheKey, user, this.CACHE_TTL);
-
       return user;
     } catch (error) {
       const message = error instanceof Error ? error.message : '';
-      if (message.includes('Unknown field \`status\`')) {
-        console.warn('\u26A0\uFE0F GET USER FROM TOKEN - status column missing, falling back to legacy schema');
+      if (message.includes('Unknown field `status`')) {
         const user = await prisma.user.findUnique({
           where: { id: payload.userId },
           select: {
@@ -359,29 +394,39 @@ export class AuthService {
             createdAt: true,
             updatedAt: true,
             role: true,
-          }
+          },
         });
-
-        if (user) {
-          globalCache.set(cacheKey, user, this.CACHE_TTL);
-        }
+        if (user) globalCache.set(cacheKey, user, this.CACHE_TTL);
         return user;
       }
       throw error;
     }
   }
 
-  // Find or create user via OAuth
-  static async findOrCreateOAuthUser(oAuthUser: { email: string; name: string; sub: string; picture?: string; }, provider: string) {
+  static async findOrCreateOAuthUser(
+    oAuthUser: { email: string; name: string; sub: string; picture?: string },
+    provider: string,
+  ): Promise<
+    | { user: Awaited<ReturnType<typeof prisma.user.findUnique>> & object }
+    | { requiresLink: true; email: string; provider: string; sub: string; picture?: string }
+  > {
     const { email, name, sub, picture } = oAuthUser;
+    const normalizedEmail = normalizeEmail(email);
 
-    // Try to find user by email
-    let user = await prisma.user.findUnique({
-      where: { email }
+    const byOAuth = await prisma.user.findFirst({
+      where: { oauthProvider: provider, oauthId: sub },
     });
+    if (byOAuth) return { user: byOAuth };
+
+    let user = await findUserByEmail(normalizedEmail);
 
     if (user) {
-      // If user exists but oauth info wasn't set, update it
+      if (user.password && (!user.oauthProvider || !user.oauthId)) {
+        return { requiresLink: true, email, provider, sub, picture };
+      }
+      if (user.oauthProvider && user.oauthId && user.oauthId !== sub) {
+        throw new Error('OAuth account mismatch for this email');
+      }
       if (!user.oauthProvider || !user.oauthId) {
         user = await prisma.user.update({
           where: { id: user.id },
@@ -390,36 +435,53 @@ export class AuthService {
             oauthId: sub,
             avatarUrl: user.avatarUrl || picture,
             isVerified: true,
-            status: 'ACTIVE'
-          }
+            status: 'ACTIVE',
+          },
         });
       }
-      return user;
+      return { user };
     }
 
-    // Create new user
     user = await prisma.user.create({
       data: {
-        email,
+        email: normalizedEmail,
         name,
         oauthProvider: provider,
         oauthId: sub,
         avatarUrl: picture,
         isVerified: true,
         status: 'ACTIVE',
-        role: 'USER'
-      }
+        role: 'USER',
+      },
     });
 
-    return user;
+    return { user };
   }
 
-  // Generate a JWT token for OAuth user
+  static async linkOAuthAccount(
+    userId: string,
+    provider: string,
+    sub: string,
+    picture?: string,
+  ) {
+    return prisma.user.update({
+      where: { id: userId },
+      data: {
+        oauthProvider: provider,
+        oauthId: sub,
+        avatarUrl: picture,
+        isVerified: true,
+        status: 'ACTIVE',
+      },
+    });
+  }
+
   static generateOAuthToken(payload: { id: string; email: string; name: string | null; role: string }) {
-    return jwt.sign(
-      { userId: payload.id, email: payload.email, name: payload.name, role: payload.role },
-      JWT_SECRET!,
-      { expiresIn: JWT_EXPIRES_IN }
-    );
+    return this.generateAccessToken({
+      userId: payload.id,
+      email: payload.email,
+      name: payload.name,
+      role: payload.role,
+    });
   }
 }

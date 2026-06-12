@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { NavLink } from '@/components/layout/nav-link';
 import { useRouter } from 'next/navigation';
 import { format, differenceInCalendarDays, startOfDay } from 'date-fns';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
@@ -57,7 +58,8 @@ import {
 } from '@/lib/plans-discipline';
 import { useBreakpoint } from '@/hooks/use-breakpoint';
 import { useMobileRefreshRegister } from '@/contexts/MobileRefreshContext';
-import { useRouteBootstrap, clearRouteBootstrap } from '@/hooks/use-route-bootstrap';
+import { useRouteBootstrap, clearAllAppRouteBootstraps } from '@/hooks/use-route-bootstrap';
+import { isDashboardBootstrapEmpty } from '@/lib/bootstrap-utils';
 
 interface DashboardPageProps {
   data: DashboardBootstrap;
@@ -84,7 +86,7 @@ function deadlineDueLabel(dueDate: string) {
 
 export default function DashboardPage({ data: serverData }: DashboardPageProps) {
   const router = useRouter();
-  const data = useRouteBootstrap('/dashboard', serverData);
+  const data = useRouteBootstrap('/dashboard', serverData, { isEmpty: isDashboardBootstrapEmpty });
   const { stats, adherence, disciplineSummary: initialDisciplineSummary, planIncomeContext } = data;
   const { currentMonthStats, incomeBreakdown } = stats;
   const income = currentMonthStats.income;
@@ -165,7 +167,7 @@ export default function DashboardPage({ data: serverData }: DashboardPageProps) 
 
   useMobileRefreshRegister(
     useCallback(async () => {
-      clearRouteBootstrap('/dashboard');
+      clearAllAppRouteBootstraps();
       router.refresh();
     }, [router]),
     '/dashboard',
@@ -227,13 +229,14 @@ export default function DashboardPage({ data: serverData }: DashboardPageProps) 
           >
             {isDarkMode ? <Moon className="size-4" /> : <Sun className="size-4" />}
           </button>
-          <Link
+          <NavLink
             href="/settings"
+            linkClassName="flex shrink-0"
             className="btn-touch flex size-9 items-center justify-center rounded-full border border-border/60 text-muted hover:bg-surface hover:text-foreground"
             aria-label="Settings"
           >
             <Settings className="size-4" />
-          </Link>
+          </NavLink>
         </div>
       </div>
 
@@ -375,6 +378,12 @@ export default function DashboardPage({ data: serverData }: DashboardPageProps) 
           </div>
         )}
       </TabPanelTransition>
+
+      {/* Desktop — search + shortcuts above main grid */}
+      <div className="hidden space-y-4 lg:block">
+        <DashboardSearchBar />
+        <DashboardQuickActionGrid />
+      </div>
 
       {/* Desktop summary */}
       <div className="hidden space-y-3 lg:block">

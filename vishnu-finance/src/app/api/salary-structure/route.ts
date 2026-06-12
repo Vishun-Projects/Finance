@@ -1,36 +1,34 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '../../../lib/db';
+import { NextResponse } from 'next/server';
+import { prisma } from '@/lib/db';
+import { withAuth } from '@/lib/api-auth';
+import { rejectForeignUserId } from '@/lib/api-user-scope';
 
-// Configure route caching - user-specific dynamic data (changes infrequently)
 export const dynamic = 'force-dynamic';
-export const revalidate = 600; // Revalidate every 10 minutes (salary changes rarely)
+export const revalidate = 600;
 
-export async function GET(request: NextRequest) {
+export const GET = withAuth(async (request, user) => {
   try {
     const { searchParams } = new URL(request.url);
-    const userId = searchParams.get('userId');
+    const forbidden = rejectForeignUserId(user, searchParams.get('userId'));
+    if (forbidden) return forbidden;
 
-    if (!userId) {
-      return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
-    }
-
-    // Fetch salary structures from database using type assertion
     const salaryStructures = await (prisma as any).salaryStructure.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' }
+      where: { userId: user.id },
+      orderBy: { createdAt: 'desc' },
     });
 
     return NextResponse.json(salaryStructures);
   } catch (error) {
-    console.error('❌ SALARY STRUCTURE GET - Error:', error);
-    console.error('❌ SALARY STRUCTURE GET - Error details:', JSON.stringify(error, null, 2));
+    console.error('SALARY STRUCTURE GET - Error:', error);
     return NextResponse.json({ error: 'Failed to fetch salary structures' }, { status: 500 });
   }
-}
+});
 
-export async function POST(request: NextRequest) {
+export const POST = withAuth(async (request, user) => {
   try {
     const body = await request.json();
+    const forbidden = rejectForeignUserId(user, body.userId);
+    if (forbidden) return forbidden;
 
     const {
       jobTitle,
@@ -46,24 +44,19 @@ export async function POST(request: NextRequest) {
       department,
       grade,
       notes,
-      userId,
       changeType,
-      changeReason
+      changeReason,
     } = body;
 
-    // Validate required fields
-    if (!jobTitle || !company || !baseSalary || !effectiveDate || !userId) {
+    if (!jobTitle || !company || !baseSalary || !effectiveDate) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-
-    // First, deactivate all existing salary structures for this user
     await (prisma as any).salaryStructure.updateMany({
-      where: { userId: userId, isActive: true },
-      data: { isActive: false }
+      where: { userId: user.id, isActive: true },
+      data: { isActive: false },
     });
 
-    // Create new salary structure in database using type assertion
     const newSalaryStructure = await (prisma as any).salaryStructure.create({
       data: {
         jobTitle,
@@ -79,13 +72,11 @@ export async function POST(request: NextRequest) {
         department: department || null,
         grade: grade || null,
         notes: notes || null,
-        userId: userId,
-        isActive: true
-      }
+        userId: user.id,
+        isActive: true,
+      },
     });
 
-
-    // Always create salary history entry for timeline tracking
     await (prisma as any).salaryHistory.create({
       data: {
         salaryStructureId: newSalaryStructure.id,
@@ -103,29 +94,33 @@ export async function POST(request: NextRequest) {
         grade: newSalaryStructure.grade,
         changeType: changeType || 'NEW_JOB',
         changeReason: changeReason || 'Initial setup',
-        userId: userId
-      }
+        userId: user.id,
+      },
     });
 
     return NextResponse.json(newSalaryStructure);
   } catch (error) {
-    console.error('❌ SALARY STRUCTURE POST - Error:', error);
-    console.error('❌ SALARY STRUCTURE POST - Error details:', JSON.stringify(error, null, 2));
+    console.error('SALARY STRUCTURE POST - Error:', error);
     return NextResponse.json({ error: 'Failed to create salary structure' }, { status: 500 });
   }
-}
+});
 
-export async function PUT(request: NextRequest) {
+export const PUT = withAuth(async (request, user) => {
   try {
     const body = await request.json();
-    // Extract changeType and changeReason separately - they go to SalaryHistory, not SalaryStructure
-    const { id, changeType, changeReason, userId, historyId, ...updateData } = body;
+    const { id, changeType, changeReason, historyId, ...updateData } = body;
 
     if (!id) {
       return NextResponse.json({ error: 'ID is required' }, { status: 400 });
     }
 
-    // Update salary structure in database using type assertion
+    const owned = await (prisma as any).salaryStructure.findFirst({
+      where: { id, userId: user.id },
+    });
+    if (!owned) {
+      return NextResponse.json({ error: 'Salary structure not found' }, { status: 404 });
+    }
+
     const updatedSalaryStructure = await (prisma as any).salaryStructure.update({
       where: { id },
       data: {
@@ -134,79 +129,74 @@ export async function PUT(request: NextRequest) {
         baseSalary: updateData.baseSalary ? parseFloat(updateData.baseSalary) : undefined,
         allowances: updateData.allowances ? JSON.stringify(updateData.allowances) : undefined,
         deductions: updateData.deductions ? JSON.stringify(updateData.deductions) : undefined,
-        employerContributions: updateData.employerContributions ? JSON.stringify(updateData.employerContributions) : undefined,
+        employerContributions: updateData.employerContributions
+          ? JSON.stringify(updateData.employerContributions)
+          : undefined,
         effectiveDate: updateData.effectiveDate ? new Date(updateData.effectiveDate) : undefined,
         endDate: updateData.endDate ? new Date(updateData.endDate) : undefined,
         currency: updateData.currency,
-        location: updateData.location || null,
-        department: updateData.department || null,
-        grade: updateData.grade || null,
-        notes: updateData.notes || null,
-        updatedAt: new Date()
-      }
+        location: updateData.location ?? undefined,
+        department: updateData.department ?? undefined,
+        grade: updateData.grade ?? undefined,
+        notes: updateData.notes ?? undefined,
+        updatedAt: new Date(),
+      },
     });
 
+    const historyData = {
+      jobTitle: updatedSalaryStructure.jobTitle,
+      company: updatedSalaryStructure.company,
+      baseSalary: updatedSalaryStructure.baseSalary,
+      allowances: updatedSalaryStructure.allowances,
+      deductions: updatedSalaryStructure.deductions,
+      employerContributions: updatedSalaryStructure.employerContributions,
+      effectiveDate: updatedSalaryStructure.effectiveDate,
+      endDate: updatedSalaryStructure.endDate,
+      currency: updatedSalaryStructure.currency,
+      location: updatedSalaryStructure.location,
+      department: updatedSalaryStructure.department,
+      grade: updatedSalaryStructure.grade,
+    };
 
-    // Update salary history — specific revision when historyId is provided, else latest for structure
-    if (userId) {
-      const historyData = {
-        jobTitle: updatedSalaryStructure.jobTitle,
-        company: updatedSalaryStructure.company,
-        baseSalary: updatedSalaryStructure.baseSalary,
-        allowances: updatedSalaryStructure.allowances,
-        deductions: updatedSalaryStructure.deductions,
-        employerContributions: updatedSalaryStructure.employerContributions,
-        effectiveDate: updatedSalaryStructure.effectiveDate,
-        endDate: updatedSalaryStructure.endDate,
-        currency: updatedSalaryStructure.currency,
-        location: updatedSalaryStructure.location,
-        department: updatedSalaryStructure.department,
-        grade: updatedSalaryStructure.grade,
-      };
-
-      if (historyId) {
-        const existingHistory = await (prisma as any).salaryHistory.findFirst({
-          where: { id: historyId, salaryStructureId: id, userId },
+    if (historyId) {
+      const existingHistory = await (prisma as any).salaryHistory.findFirst({
+        where: { id: historyId, salaryStructureId: id, userId: user.id },
+      });
+      if (existingHistory) {
+        await (prisma as any).salaryHistory.update({
+          where: { id: historyId },
+          data: {
+            ...historyData,
+            changeType: changeType || existingHistory.changeType,
+            changeReason: changeReason || existingHistory.changeReason,
+          },
         });
-
-        if (existingHistory) {
-          await (prisma as any).salaryHistory.update({
-            where: { id: historyId },
-            data: {
-              ...historyData,
-              changeType: changeType || existingHistory.changeType,
-              changeReason: changeReason || existingHistory.changeReason,
-            },
-          });
-        }
-      } else {
-        const existingHistory = await (prisma as any).salaryHistory.findFirst({
-          where: { salaryStructureId: id },
-          orderBy: { createdAt: 'desc' },
+      }
+    } else {
+      const existingHistory = await (prisma as any).salaryHistory.findFirst({
+        where: { salaryStructureId: id, userId: user.id },
+        orderBy: { createdAt: 'desc' },
+      });
+      if (existingHistory) {
+        await (prisma as any).salaryHistory.update({
+          where: { id: existingHistory.id },
+          data: {
+            ...historyData,
+            changeType: changeType || existingHistory.changeType,
+            changeReason: changeReason || existingHistory.changeReason,
+          },
         });
-
-        if (existingHistory) {
-          await (prisma as any).salaryHistory.update({
-            where: { id: existingHistory.id },
-            data: {
-              ...historyData,
-              changeType: changeType || existingHistory.changeType,
-              changeReason: changeReason || existingHistory.changeReason,
-            },
-          });
-        }
       }
     }
 
     return NextResponse.json(updatedSalaryStructure);
   } catch (error) {
-    console.error('❌ SALARY STRUCTURE PUT - Error:', error);
-    console.error('❌ SALARY STRUCTURE PUT - Error details:', JSON.stringify(error, null, 2));
+    console.error('SALARY STRUCTURE PUT - Error:', error);
     return NextResponse.json({ error: 'Failed to update salary structure' }, { status: 500 });
   }
-}
+});
 
-export async function DELETE(request: NextRequest) {
+export const DELETE = withAuth(async (request, user) => {
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
@@ -215,43 +205,50 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'ID is required' }, { status: 400 });
     }
 
-    // Delete from database using type assertion
-    await (prisma as any).salaryStructure.delete({
-      where: { id }
+    const deleted = await (prisma as any).salaryStructure.deleteMany({
+      where: { id, userId: user.id },
     });
+
+    if (deleted.count === 0) {
+      return NextResponse.json({ error: 'Salary structure not found' }, { status: 404 });
+    }
 
     return NextResponse.json({ message: 'Salary structure deleted successfully' });
   } catch (error) {
-    console.error('❌ SALARY STRUCTURE DELETE - Error:', error);
-    console.error('❌ SALARY STRUCTURE DELETE - Error details:', JSON.stringify(error, null, 2));
+    console.error('SALARY STRUCTURE DELETE - Error:', error);
     return NextResponse.json({ error: 'Failed to delete salary structure' }, { status: 500 });
   }
-}
+});
 
-export async function PATCH(request: NextRequest) {
+export const PATCH = withAuth(async (request, user) => {
   try {
     const body = await request.json();
-    const { id, action, userId } = body;
+    const { id, action } = body;
 
-    if (!id || !userId || action !== 'ACTIVATE') {
+    if (!id || action !== 'ACTIVATE') {
       return NextResponse.json({ error: 'Invalid request parameters' }, { status: 400 });
     }
 
-    // 1. Deactivate all structures for this user
+    const owned = await (prisma as any).salaryStructure.findFirst({
+      where: { id, userId: user.id },
+    });
+    if (!owned) {
+      return NextResponse.json({ error: 'Salary structure not found' }, { status: 404 });
+    }
+
     await (prisma as any).salaryStructure.updateMany({
-      where: { userId },
-      data: { isActive: false }
+      where: { userId: user.id },
+      data: { isActive: false },
     });
 
-    // 2. Activate the requested structure
     const updatedStructure = await (prisma as any).salaryStructure.update({
       where: { id },
-      data: { isActive: true }
+      data: { isActive: true },
     });
 
     return NextResponse.json(updatedStructure);
   } catch (error) {
-    console.error('❌ SALARY STRUCTURE PATCH - Error:', error);
+    console.error('SALARY STRUCTURE PATCH - Error:', error);
     return NextResponse.json({ error: 'Failed to update status' }, { status: 500 });
   }
-}
+});

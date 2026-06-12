@@ -116,7 +116,7 @@ export function NavPillGroup({ children, className, variant = 'pill' }: NavPillG
         <div
           ref={containerRef}
           className={cn(
-            'relative flex justify-center gap-1 overflow-x-auto border-b border-border/60',
+            'relative flex w-full border-b border-border/60',
             className,
           )}
           role="tablist"
@@ -142,7 +142,7 @@ export function NavPillGroup({ children, className, variant = 'pill' }: NavPillG
       <div
         ref={containerRef}
         className={cn(
-          'relative flex gap-0.5 overflow-x-auto rounded-[13px] p-1 glass-thin glass-text',
+          'relative flex gap-0.5 overflow-x-auto rounded-[13px] p-1 glass-chrome glass-chrome-text',
           className,
         )}
       >
@@ -150,7 +150,7 @@ export function NavPillGroup({ children, className, variant = 'pill' }: NavPillG
           <motion.div
             data-nav-indicator="true"
             aria-hidden
-            className="pointer-events-none absolute top-1 bottom-1 z-0 rounded-[var(--radius-pill)] border border-accent bg-accent"
+            className="pointer-events-none absolute top-1 bottom-1 z-0 rounded-[var(--radius-pill)] border border-chrome-border bg-chrome-active"
             initial={false}
             animate={{ left: indicator.left, width: indicator.width }}
             transition={transition}

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { generatePKCE, generateAppleOAuthURL } from '@/lib/oauth';
 import { cookies } from 'next/headers';
 
+const isProduction = process.env.NODE_ENV === 'production';
+
 export async function GET(request: NextRequest) {
   try {
 
@@ -12,8 +14,8 @@ export async function GET(request: NextRequest) {
     const cookieStore = await cookies();
     const cookieOptions = {
       httpOnly: true,
-      secure: true,
-      sameSite: 'none' as const,
+      secure: isProduction,
+      sameSite: isProduction ? ('none' as const) : ('lax' as const),
       maxAge: 10 * 60, // 10 minutes
       path: '/',
     };

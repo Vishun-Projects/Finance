@@ -1,158 +1,48 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { exchangeCodeForTokens, verifyGoogleIdToken } from '@/lib/oauth';
-import { AuthService } from '@/lib/auth';
-import { writeAuditLog, extractRequestMeta } from '@/lib/audit';
-import { prisma } from '@/lib/db';
+import { completeOAuthLogin } from '@/lib/oauth-session';
 
 export async function GET(request: NextRequest) {
-  const startTime = Date.now();
-
   try {
     const searchParams = request.nextUrl.searchParams;
     const code = searchParams.get('code');
     const state = searchParams.get('state');
     const error = searchParams.get('error');
 
-    // Check for OAuth errors
     if (error) {
-      console.error('❌ OAUTH CALLBACK - OAuth error:', error);
-      return NextResponse.redirect(
-        new URL('/auth?tab=login&error=oauth_denied', request.url)
-      );
+      return NextResponse.redirect(new URL('/auth?tab=login&error=oauth_denied', request.url));
     }
 
     if (!code || !state) {
-      console.error('❌ OAUTH CALLBACK - Missing code or state');
-      return NextResponse.redirect(
-        new URL('/auth?tab=login&error=oauth_invalid', request.url)
-      );
+      return NextResponse.redirect(new URL('/auth?tab=login&error=oauth_invalid', request.url));
     }
 
-    // Get stored code_verifier and state from cookies
     const cookieStore = await cookies();
     const storedCodeVerifier = cookieStore.get('oauth_code_verifier')?.value;
     const storedState = cookieStore.get('oauth_state')?.value;
 
-    // Verify state to prevent CSRF
     if (!storedState || !state || !state.startsWith(storedState)) {
-      console.error('❌ OAUTH CALLBACK - State mismatch:', { storedState, state });
-      const errorUrl = new URL('/auth?tab=login&error=oauth_state_mismatch', request.url);
-      return NextResponse.redirect(errorUrl);
+      return NextResponse.redirect(new URL('/auth?tab=login&error=oauth_state_mismatch', request.url));
     }
 
     if (!storedCodeVerifier) {
-      console.error('❌ OAUTH CALLBACK - Code verifier not found');
-      return NextResponse.redirect(
-        new URL('/auth?tab=login&error=oauth_expired', request.url)
-      );
+      return NextResponse.redirect(new URL('/auth?tab=login&error=oauth_expired', request.url));
     }
 
-    // Clear OAuth cookies
     cookieStore.delete('oauth_code_verifier');
     cookieStore.delete('oauth_state');
     cookieStore.delete('oauth_provider');
 
-    // Exchange code for tokens
     const { idToken } = await exchangeCodeForTokens(code, storedCodeVerifier);
-
-    // Verify ID token and get user info
     const googleUser = await verifyGoogleIdToken(idToken);
 
-    // Find or create user
-    const user = await AuthService.findOrCreateOAuthUser(googleUser, 'google');
-
-    if (!user.isActive) {
-      console.error('❌ OAUTH CALLBACK - Account is deactivated');
-      return NextResponse.redirect(
-        new URL('/auth?tab=login&error=account_deactivated', request.url)
-      );
-    }
-
-    // Update last login
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { lastLogin: new Date() }
-    });
-
-    // Generate JWT token
-    const token = AuthService.generateOAuthToken({
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      role: user.role,
-    });
-
-
-    // Superuser Security Enforcement: Force OTP challenge even for OAuth
-    if (user.email === 'vishun@finance.com') {
-      await AuthService.generateOTP(user.email);
-
-      const isMobileString = state.includes(':mobile');
-      const isMobileParam = searchParams.get('platform') === 'mobile';
-      const isMobile = isMobileString || isMobileParam;
-
-      if (isMobile) {
-        const mobileOtpUrl = `https://vishun-finance.vercel.app/oauth-callback?challenge=otp&email=${encodeURIComponent(user.email)}`;
-        return NextResponse.redirect(mobileOtpUrl);
-      }
-
-      return NextResponse.redirect(
-        new URL(`/auth?challenge=otp&email=${encodeURIComponent(user.email)}`, request.url)
-      );
-    }
-
-    // Extract platform from state (standard state:platform)
-    const isMobileString = state.includes(':mobile');
-    const isMobileParam = searchParams.get('platform') === 'mobile';
-    const isMobile = isMobileString || isMobileParam;
-
-
-    if (isMobile) {
-      const mobileRedirectUrl = `https://vishun-finance.vercel.app/oauth-callback?token=${token}`;
-      return NextResponse.redirect(mobileRedirectUrl);
-    }
-
-    // Set auth cookie
-    const response = NextResponse.redirect(
-      new URL(user.role === 'SUPERUSER' ? '/admin' : '/dashboard', request.url)
-    );
-
-    response.cookies.set('auth-token', token, {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'none',
-      maxAge: 7 * 24 * 60 * 60, // 7 days
-      path: '/',
-    });
-
-    // Audit log
-    const meta = extractRequestMeta(request);
-    const isNewUser = user.createdAt &&
-      (Date.now() - new Date(user.createdAt).getTime()) < 5000; // Created within last 5 seconds
-
-    await writeAuditLog({
-      actorId: user.id,
-      event: isNewUser ? 'USER_OAUTH_REGISTER' : 'USER_OAUTH_LOGIN',
-      severity: 'INFO',
-      ipAddress: meta.ipAddress,
-      userAgent: meta.userAgent,
-      message: `${user.email} ${isNewUser ? 'registered' : 'signed in'} with Google OAuth`,
-      metadata: {
-        provider: 'google',
-        oauthId: user.oauthId,
-      },
-    });
-
-    return response;
+    return completeOAuthLogin(request, googleUser, 'google', state, searchParams);
   } catch (error) {
-    console.error('❌ OAUTH CALLBACK - Error:', error);
+    console.error('OAUTH CALLBACK - Error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error('❌ OAUTH CALLBACK - Error details:', errorMessage);
-
     return NextResponse.redirect(
-      new URL(`/auth?tab=login&error=oauth_failed&message=${encodeURIComponent(errorMessage)}`, request.url)
+      new URL(`/auth?tab=login&error=oauth_failed&message=${encodeURIComponent(errorMessage)}`, request.url),
     );
   }
 }
-

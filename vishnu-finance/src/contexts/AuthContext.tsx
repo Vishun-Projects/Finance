@@ -1,7 +1,7 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo, useCallback, useRef } from 'react';
+import { clearRouteBootstrap } from '@/hooks/use-route-bootstrap';
 
 export interface User {
   id: string;
@@ -48,8 +48,6 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
   const [loading, setLoading] = useState(!hasInitialSnapshot);
   const [error, setError] = useState<string | null>(null);
 
-  const router = useRouter();
-
   const checkAuth = useCallback(async () => {
     const startTime = Date.now();
     try {
@@ -73,6 +71,9 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
         }
       } else if (response.status === 401) {
         setUser(null);
+      } else if (response.status === 403) {
+        console.error('[auth] CSRF or origin blocked auth_me — session kept');
+        setError('Session verification blocked. Refresh the page.');
       } else {
         const text = await response.text();
         let errorMessage = `HTTP ${response.status}`;
@@ -87,7 +88,9 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
     } catch (err) {
       console.error('🔐 AUTH CONTEXT - Auth check failed:', err);
       setError(err instanceof Error ? err.message : 'Authentication check failed');
-      setUser(null);
+      if (!(err instanceof Error && err.message.includes('403'))) {
+        setUser(null);
+      }
     } finally {
       setLoading(false);
     }
@@ -128,11 +131,21 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
       } else {
         const text = await response.text();
         let errorMessage = 'Login failed';
+        let requiresVerification = false;
+        let verificationEmail: string | undefined;
         try {
           const errorData = JSON.parse(text);
-          errorMessage = errorData.error || errorMessage;
+          errorMessage = errorData.error || errorData.message || errorMessage;
+          requiresVerification = Boolean(errorData.requiresVerification);
+          verificationEmail = errorData.email;
         } catch (e) {
           errorMessage = `Login failed (HTTP ${response.status})`;
+        }
+        if (requiresVerification) {
+          const err = new Error(errorMessage || 'Verification required');
+          (err as Error & { requiresVerification?: boolean; email?: string }).requiresVerification = true;
+          (err as Error & { requiresVerification?: boolean; email?: string }).email = verificationEmail;
+          throw err;
         }
         setError(errorMessage);
         throw new Error(errorMessage);
@@ -148,26 +161,26 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
     }
   }, []);
 
-  const logout = useCallback(async (): Promise<void> => {
-    try {
-      await fetch('/api/app', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'auth_logout' }),
-      });
-      setUser(null);
-      // Reset theme to light on logout
-      document.documentElement.classList.remove('dark');
-      // Clear any theme-related localStorage if needed
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('theme');
-      }
-      // Redirect to login page
-      router.push('/auth');
-    } catch (err) {
-      console.error('Logout failed:', err);
+  const prevUserIdRef = useRef<string | null>(hasInitialSnapshot ? initialUser?.id ?? null : null);
+
+  useEffect(() => {
+    const nextId = user?.id ?? null;
+    if (prevUserIdRef.current !== null && prevUserIdRef.current !== nextId) {
+      clearRouteBootstrap();
     }
-  }, [router]);
+    prevUserIdRef.current = nextId;
+  }, [user?.id]);
+
+  const logout = useCallback(async (): Promise<void> => {
+    clearRouteBootstrap();
+    setUser(null);
+    document.documentElement.classList.remove('dark');
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('theme');
+    }
+    // Full navigation so Set-Cookie from logout response is applied before auth page loads
+    window.location.href = '/api/auth/logout';
+  }, []);
 
   const refreshUser = useCallback(async (): Promise<void> => {
     await checkAuth();

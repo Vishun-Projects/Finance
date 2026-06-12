@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import { NavLink } from '@/components/layout/nav-link';
 import { mobileExploreItems } from '@/lib/nav-config';
 import { cn } from '@/lib/utils';
 import { hapticLight } from '@/lib/haptics';
@@ -17,7 +17,7 @@ export function DashboardExploreGrid({ className }: DashboardExploreGridProps) {
         {mobileExploreItems.map(({ href, label, icon: Icon }) => {
           const displayLabel = href === '/net-worth' ? 'Assets & debt' : label;
           return (
-          <Link
+          <NavLink
             key={href}
             href={href}
             onClick={() => void hapticLight()}
@@ -27,7 +27,7 @@ export function DashboardExploreGrid({ className }: DashboardExploreGridProps) {
               <Icon className="size-4" />
             </span>
             <span className="text-[9px] font-medium leading-tight text-muted-foreground">{displayLabel}</span>
-          </Link>
+          </NavLink>
         );})}
       </div>
     </section>

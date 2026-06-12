@@ -72,8 +72,10 @@ model User {
   lastLogin            DateTime?
   role                 UserRole              @default(USER)
   status               UserAccountStatus     @default(ACTIVE)
-  otp                  String?
+  otpHash              String?
   otpExpiresAt         DateTime?
+  otpAttempts          Int                   @default(0)
+  otpLockedUntil       DateTime?
   isVerified           Boolean               @default(false)
   accountStatements    AccountStatement[]
   advisorConversations AdvisorConversation[]
@@ -103,8 +105,25 @@ model User {
   casUploads           CasUpload[]
   casHoldings          CasHolding[]
   incomeBudgetPlans    IncomeBudgetPlan[]
+  refreshTokens        RefreshToken[]
 
   @@map("users")
+}
+
+model RefreshToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String
+  familyId  String
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tokenHash])
+  @@index([familyId])
+  @@map("refresh_tokens")
 }
 
 model EducationPost {

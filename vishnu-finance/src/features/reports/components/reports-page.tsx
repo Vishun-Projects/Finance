@@ -32,6 +32,7 @@ export default function ReportsPage() {
       <PageMandate
         title="Reports"
         mandate="Download a CSV of transactions for any month — for your records or tax prep."
+        hideTitleOnMobile
       />
 
       <section className="card-base space-y-4 p-4">

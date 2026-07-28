@@ -34,9 +34,32 @@ const toneBg: Record<NonNullable<QuickActionItem['tone']>, string> = {
 
 interface DashboardQuickActionGridProps {
   className?: string;
+  variant?: 'mobile' | 'desktop';
 }
 
-export function DashboardQuickActionGrid({ className }: DashboardQuickActionGridProps) {
+export function DashboardQuickActionGrid({ className, variant = 'mobile' }: DashboardQuickActionGridProps) {
+  if (variant === 'desktop') {
+    return (
+      <div className={cn('flex flex-wrap gap-2', className)}>
+        {ACTIONS.map(({ icon: Icon, label, href, tone = 'neutral' }) => (
+          <Link
+            key={href}
+            href={href}
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-md bg-surface px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted/50',
+              tone === 'emerald' && 'bg-[var(--success)]/10 text-[var(--success)] hover:bg-[var(--success)]/15',
+              tone === 'red' && 'bg-[var(--danger)]/10 text-[var(--danger)] hover:bg-[var(--danger)]/15',
+              tone === 'blue' && 'bg-[var(--info)]/10 text-[var(--info)] hover:bg-[var(--info)]/15',
+            )}
+          >
+            <Icon className="size-3.5" />
+            {label}
+          </Link>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <section className={cn(className)}>
       <h2 className="mb-3 px-0.5 text-xs font-medium uppercase tracking-wider text-hint">Quick actions</h2>
@@ -50,7 +73,7 @@ export function DashboardQuickActionGrid({ className }: DashboardQuickActionGrid
           >
             <span
               className={cn(
-                'flex size-14 items-center justify-center rounded-full border border-border/60',
+                'flex size-14 items-center justify-center rounded-full',
                 toneBg[tone]
               )}
             >

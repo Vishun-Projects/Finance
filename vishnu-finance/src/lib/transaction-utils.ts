@@ -30,8 +30,10 @@ export interface SortConfig {
 /**
  * Get transaction amount (credit or debit)
  */
-export function getTransactionAmount(transaction: Transaction): number {
-  return transaction.creditAmount > 0 ? transaction.creditAmount : transaction.debitAmount;
+export function getTransactionAmount(transaction: Pick<Transaction, 'creditAmount' | 'debitAmount'>): number {
+  const credit = Number(transaction.creditAmount) || 0;
+  const debit = Number(transaction.debitAmount) || 0;
+  return credit > 0 ? credit : debit;
 }
 
 /**

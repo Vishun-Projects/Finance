@@ -19,7 +19,7 @@ export function LegalAppChrome({ children }: { children: React.ReactNode }) {
         <NavigationIsland />
       </Suspense>
       <main
-        className={`custom-scrollbar min-w-0 flex-1 overflow-y-auto overflow-x-hidden ${isMobile ? 'max-lg:pb-[var(--app-bottom-inset)]' : 'pb-0'}`}
+        className={`custom-scrollbar min-w-0 flex-1 overflow-y-auto overflow-x-hidden ${isMobile ? 'max-lg:pb-[var(--app-scroll-bottom-pad)]' : 'pb-0'}`}
       >
         {children}
       </main>

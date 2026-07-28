@@ -465,7 +465,7 @@ Example response:
 Return ONLY the JSON array, no other text.`;
 
     const model = genAI.getGenerativeModel({
-      model: 'gemma-3-27b-it',
+      model: 'gemini-2.5-flash',
       generationConfig: {
         temperature: 0.3, // Lower temperature for more consistent categorization
         topK: 20,
@@ -2031,18 +2031,22 @@ async function categorizeWithRules(
     }
 
     // Investment (EXPENSE) - distinguish from Investment Returns (INCOME)
-    // Investment expenses: SIP, mutual fund purchase, equity purchase, demat charges
-    // Investment Returns: Dividends, capital gains, returns (handled in INCOME section)
+    // Use word-boundary matches for short tokens — "nse" must not hit "Expenses".
+    const hasInvestToken = (token: string) =>
+      new RegExp(`(?:^|[^a-z0-9])${token}(?:[^a-z0-9]|$)`).test(text);
     if (
       text.includes('mutual fund') ||
-      text.includes('sip') ||
-      text.includes('equity') ||
-      text.includes('stock') ||
-      text.includes('nse') ||
-      text.includes('bse') ||
+      hasInvestToken('sip') ||
+      hasInvestToken('equity') ||
+      hasInvestToken('stock') ||
+      hasInvestToken('nse') ||
+      hasInvestToken('bse') ||
+      hasInvestToken('demat') ||
+      text.includes('zerodha') ||
+      text.includes('groww') ||
+      text.includes('upstox') ||
       (text.includes('investment') && !text.includes('return') && !text.includes('dividend')) ||
-      text.includes('portfolio') ||
-      text.includes('demat')
+      text.includes('portfolio')
     ) {
       return {
         categoryId: null,

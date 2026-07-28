@@ -89,8 +89,31 @@ export async function loadDashboard(
   const deadlinesPromise = loadDeadlinesSafe(userId, preloaded?.deadlines);
   const wishlistPromise = loadWishlistSafe(userId, preloaded?.wishlist);
 
+  const statsPromise = Promise.all([goalsPromise, deadlinesPromise, wishlistPromise]).then(
+    ([goals, deadlines, wishlist]) =>
+      dashboardService.getSimpleStats({
+        userId,
+        startDate,
+        endDate,
+        preloaded: {
+          goals,
+          deadlines: {
+            count: deadlines.pagination?.total ?? deadlines.data.length,
+            items: deadlines.data
+              .filter((d) => !d.isCompleted)
+              .map((d) => ({
+                title: d.title,
+                dueDate: d.dueDate,
+                amount: Number(d.amount) || 0,
+              })),
+          },
+          wishlist,
+        },
+      }),
+  );
+
   const [stats, goals, deadlines, wishlist, planIncomeContext, accountBalance, adherence] = await Promise.all([
-    dashboardService.getSimpleStats({ userId, startDate, endDate }),
+    statsPromise,
     goalsPromise,
     deadlinesPromise,
     wishlistPromise,

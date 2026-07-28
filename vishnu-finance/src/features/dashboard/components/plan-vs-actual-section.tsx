@@ -15,6 +15,7 @@ import { categoryColorVar } from '@/design/tokens';
 import type { BucketAdherence, LineItemAdherence } from '@/lib/plan-adherence-service';
 import { planIncomeSourceLabel, receivedSalarySourceLabel, type PlanIncomeContext, type PlanIncomeSource } from '@/lib/plan-income';
 import { cn, formatRupees } from '@/lib/utils';
+import { useBreakpoint } from '@/hooks/use-breakpoint';
 
 function bucketStatusLabel(status: BucketAdherence['status']) {
   if (status === 'on_track') return 'On track';
@@ -141,6 +142,7 @@ interface PlanVsActualSectionProps {
   maxHeight?: number;
   className?: string;
   budgetPlanName?: string;
+  defaultTab?: 'overview' | 'breakdown';
 }
 
 export function PlanVsActualSection({
@@ -156,13 +158,16 @@ export function PlanVsActualSection({
   maxHeight,
   className,
   budgetPlanName,
+  defaultTab,
 }: PlanVsActualSectionProps) {
   const router = useRouter();
+  const isLgUp = useBreakpoint('lg');
   const totalDelta = actualTotal - plannedTotal;
   const [selectedLineItem, setSelectedLineItem] = useState<LineItemAdherence | null>(null);
   const [showAllBreakdown, setShowAllBreakdown] = useState(false);
   const [budgetSheetOpen, setBudgetSheetOpen] = useState(false);
-  const visibleLineItems = showAllBreakdown ? lineItems : lineItems.slice(0, 5);
+  const resolvedDefaultTab = defaultTab ?? (isLgUp ? 'breakdown' : 'overview');
+  const visibleLineItems = showAllBreakdown || isLgUp ? lineItems : lineItems.slice(0, 5);
 
   return (
     <div className={cn(className)}>
@@ -195,12 +200,12 @@ export function PlanVsActualSection({
           </Button>
         </div>
 
-        <Tabs defaultValue="overview" className="w-full">
-          <TabsList className="mb-4 h-8 w-full shrink-0 justify-start bg-surface max-lg:mb-2 max-lg:h-7">
-            <TabsTrigger value="overview" className="h-7 px-3 text-xs">
+        <Tabs defaultValue={resolvedDefaultTab} className="w-full">
+          <TabsList className="mb-4 h-8 w-full shrink-0 justify-start border-0 bg-surface max-lg:mb-2 max-lg:h-7">
+            <TabsTrigger value="overview" className="h-7 px-3 text-xs shadow-none data-[state=active]:shadow-none">
               Overview
             </TabsTrigger>
-            <TabsTrigger value="breakdown" className="h-7 px-3 text-xs">
+            <TabsTrigger value="breakdown" className="h-7 px-3 text-xs shadow-none data-[state=active]:shadow-none">
               By category
             </TabsTrigger>
           </TabsList>
@@ -224,12 +229,12 @@ export function PlanVsActualSection({
                   />
                 ))}
               </div>
-              {lineItems.length > 5 && (
+              {lineItems.length > 5 && !isLgUp && (
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="mt-2 h-8 w-full text-xs lg:hidden"
+                  className="mt-2 h-8 w-full text-xs"
                   onClick={() => setShowAllBreakdown((v) => !v)}
                 >
                   {showAllBreakdown ? 'Show less' : `Show all ${lineItems.length} items`}

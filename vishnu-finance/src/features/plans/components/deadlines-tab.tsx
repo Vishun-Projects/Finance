@@ -25,7 +25,6 @@ import {
 } from 'lucide-react';
 import { CompactListRow } from '@/components/ui/compact-list-row';
 import { ResponsiveSheet } from '@/components/ui/responsive-sheet';
-import { NavPill, NavPillGroup } from '@/components/ui/nav-pill';
 import { computeDeadlineDiscipline, formatDisciplineCurrency, type DisciplineSummary } from '@/lib/plans-discipline';
 import { DetectedBillsSection } from '@/components/finance/detected-bills-section';
 import type { DetectedRecurringBill } from '@/lib/recurring-detection';
@@ -412,21 +411,39 @@ export default function DeadlinesPageClient({
         ) : null}
 
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <NavPillGroup className="w-full sm:w-auto">
-            <NavPill
-              label="This month"
-              active={scopeFilter === 'this-month'}
+          <div className="flex gap-1 rounded-md bg-surface p-0.5">
+            <button
+              type="button"
               onClick={() => setScopeFilter('this-month')}
-            />
-            <NavPill label="All deadlines" active={scopeFilter === 'all'} onClick={() => setScopeFilter('all')} />
-          </NavPillGroup>
+              className={cn(
+                'h-8 rounded-md px-2.5 text-xs font-medium transition-colors',
+                scopeFilter === 'this-month'
+                  ? 'bg-primary/15 text-primary'
+                  : 'text-muted hover:text-foreground',
+              )}
+            >
+              This month
+            </button>
+            <button
+              type="button"
+              onClick={() => setScopeFilter('all')}
+              className={cn(
+                'h-8 rounded-md px-2.5 text-xs font-medium transition-colors',
+                scopeFilter === 'all'
+                  ? 'bg-primary/15 text-primary'
+                  : 'text-muted hover:text-foreground',
+              )}
+            >
+              All deadlines
+            </button>
+          </div>
           {scopeFilter === 'this-month' && (
             <p className="text-[10px] text-muted">Paid items and past months are hidden</p>
           )}
         </div>
 
-        <section className="card-base overflow-hidden">
-          <div className="border-b border-border px-4 py-3">
+        <section className="overflow-hidden rounded-2xl border border-border/70 bg-card/70">
+          <div className="border-b border-border/50 px-4 py-3">
             <div className="hidden flex-wrap items-center justify-between gap-3 md:flex">
               <div className="flex flex-wrap gap-1">
                 {STATUS_FILTERS.map((s) => (

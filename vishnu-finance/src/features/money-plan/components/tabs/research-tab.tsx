@@ -19,14 +19,13 @@ export function ResearchTab() {
   const [open, setOpen] = useState<string | null>(null);
 
   return (
-    <div>
+    <div className="space-y-3">
       <PlanCallout
         variant="orange"
         title={`Sister's Claim — "₹50k/month hai, bahut late ho gaya"`}
-        className="mb-4"
       >
         <div className="mb-2.5 grid grid-cols-1 gap-2 sm:grid-cols-2">
-          <div className="rounded-md border border-red-500/30 bg-red-500/10 px-2.5 py-2">
+          <div className="rounded-md bg-red-500/10 px-2.5 py-2">
             <div className="mb-1 text-[10px] font-medium text-red-600 dark:text-red-400">
               SISTER KI BAAT (Partial truth)
             </div>
@@ -34,7 +33,7 @@ export function ResearchTab() {
               60+ pe ya pre-existing conditions ke saath ₹50k/month realistic hai. Urgency sahi hai.
             </div>
           </div>
-          <div className="rounded-md border border-green-500/30 bg-green-500/10 px-2.5 py-2">
+          <div className="rounded-md bg-green-500/10 px-2.5 py-2">
             <div className="mb-1 text-[10px] font-medium text-green-700 dark:text-green-400">
               REALITY AT {plan.parents.mummy} &amp; {plan.parents.papa} NOW
             </div>

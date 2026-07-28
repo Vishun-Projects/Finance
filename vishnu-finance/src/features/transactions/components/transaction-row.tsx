@@ -4,7 +4,7 @@ import React from 'react';
 import { Check, Link2, ShoppingCart, Utensils, Zap, ShoppingBag } from 'lucide-react';
 import { Chip } from '@/components/ui/chip';
 import { cn } from '@/lib/utils';
-import { getTransactionDisplayName } from '@/lib/transaction-utils';
+import { getTransactionDisplayName, getTransactionAmount } from '@/lib/transaction-utils';
 import { BrandLogo } from './transaction-brand-logo';
 
 function CategoryIcon({ category, className }: { category: string; className?: string }) {
@@ -148,7 +148,7 @@ export const TransactionRow = React.memo(function TransactionRow({
 }) {
   const isIncome = transaction.financialCategory === 'INCOME';
   const isExpense = transaction.financialCategory === 'EXPENSE';
-  const amount = transaction.creditAmount || transaction.debitAmount || 0;
+  const amount = Number(getTransactionAmount(transaction as Parameters<typeof getTransactionAmount>[0])) || 0;
   const brand = transaction.rawData?.brand;
   const displayName = getTransactionDisplayName({
     description: transaction.description,

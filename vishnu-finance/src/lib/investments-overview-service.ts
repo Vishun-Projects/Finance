@@ -2,31 +2,32 @@ import { subMonths } from 'date-fns';
 import { prisma } from './db';
 import { computeNetWorth } from './net-worth-service';
 
+/** Broker / instrument tokens — matched as whole words (never substrings like "nse" in "Expenses"). */
 const INVESTMENT_KEYWORDS = [
   'sip',
   'zerodha',
   'groww',
   'upstox',
   'mutual fund',
-  'mf ',
   'elss',
   'camsonline',
-  'cams ',
   'kfintech',
   'paytm money',
-  'coin by',
-  'bse',
-  'nse',
+  'coin by zerodha',
   'ppf',
   'nps',
-  'lic ',
   'axis mf',
   'hdfc mf',
   'icici prudential',
   'sbi mf',
   'franklin',
-  'investment',
+  'demat',
+  'cdsl',
+  'nsdl',
 ];
+
+/** Short exchange codes — only count as whole tokens in bank narration. */
+const EXCHANGE_TOKENS = ['nse', 'bse', 'mf'];
 
 export interface InvestmentActivityRow {
   label: string;
@@ -34,6 +35,13 @@ export interface InvestmentActivityRow {
   transactionCount: number;
   lastDate: string;
   source: 'bank_txn' | 'manual_asset';
+}
+
+export interface InvestmentMonthPoint {
+  monthKey: string;
+  label: string;
+  amount: number;
+  count: number;
 }
 
 export interface InvestmentsOverview {
@@ -45,19 +53,28 @@ export interface InvestmentsOverview {
     lastInvestmentDate: string | null;
   };
   activity: InvestmentActivityRow[];
+  monthlyTrend: InvestmentMonthPoint[];
   hasData: boolean;
 }
 
-function haystack(tx: {
+/** Bank narration only — category names like "Other Expenses" must not drive keyword hits. */
+function narration(tx: {
   description: string | null;
   store: string | null;
   personName: string | null;
-  category: { name: string } | null;
 }): string {
-  return [tx.description, tx.store, tx.personName, tx.category?.name]
+  return [tx.description, tx.store, tx.personName]
     .filter(Boolean)
     .join(' ')
     .toLowerCase();
+}
+
+function includesToken(haystack: string, token: string): boolean {
+  const t = token.trim().toLowerCase();
+  if (!t) return false;
+  if (t.includes(' ')) return haystack.includes(t);
+  const escaped = t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`(?:^|[^a-z0-9])${escaped}(?:[^a-z0-9]|$)`).test(haystack);
 }
 
 function isInvestmentTransaction(tx: {
@@ -66,13 +83,13 @@ function isInvestmentTransaction(tx: {
   description: string | null;
   store: string | null;
   personName: string | null;
-  category: { name: string } | null;
 }): boolean {
   const amount = Number(tx.debitAmount) || 0;
   if (amount <= 0) return false;
   if (tx.financialCategory === 'INVESTMENT') return true;
-  const text = haystack(tx);
-  return INVESTMENT_KEYWORDS.some((k) => text.includes(k));
+  const text = narration(tx);
+  if (INVESTMENT_KEYWORDS.some((k) => includesToken(text, k))) return true;
+  return EXCHANGE_TOKENS.some((k) => includesToken(text, k));
 }
 
 function activityLabel(tx: {
@@ -105,7 +122,6 @@ export async function getInvestmentsOverview(userId: string): Promise<Investment
         store: true,
         personName: true,
         financialCategory: true,
-        category: { select: { name: true } },
       },
       orderBy: { transactionDate: 'desc' },
       take: 2000,
@@ -165,7 +181,32 @@ export async function getInvestmentsOverview(userId: string): Promise<Investment
 
   const activity = [...groups.values()].sort((a, b) => b.totalAmount - a.totalAmount).slice(0, 20);
 
-  const monthsWithData = Math.max(1, Math.min(12, investmentTxns.length > 0 ? 12 : 1));
+  const monthMap = new Map<string, { amount: number; count: number }>();
+  for (const tx of investmentTxns) {
+    const d = tx.transactionDate;
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    const cur = monthMap.get(key) ?? { amount: 0, count: 0 };
+    cur.amount += Number(tx.debitAmount) || 0;
+    cur.count += 1;
+    monthMap.set(key, cur);
+  }
+
+  const monthlyTrend: InvestmentMonthPoint[] = [];
+  const cursor = new Date();
+  cursor.setDate(1);
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date(cursor.getFullYear(), cursor.getMonth() - i, 1);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    const point = monthMap.get(key) ?? { amount: 0, count: 0 };
+    monthlyTrend.push({
+      monthKey: key,
+      label: d.toLocaleString('en-IN', { month: 'short', year: '2-digit' }),
+      amount: Math.round(point.amount),
+      count: point.count,
+    });
+  }
+
+  const monthsWithData = Math.max(1, monthlyTrend.filter((m) => m.amount > 0).length);
   const total12m = investmentTxns.reduce((s, t) => s + (Number(t.debitAmount) || 0), 0);
 
   return {
@@ -177,6 +218,7 @@ export async function getInvestmentsOverview(userId: string): Promise<Investment
       lastInvestmentDate: lastInvestmentDate?.toISOString() ?? null,
     },
     activity,
+    monthlyTrend,
     hasData: activity.length > 0,
   };
 }

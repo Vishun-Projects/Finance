@@ -10,6 +10,9 @@ interface MonthAtGlanceKpisProps {
   className?: string;
 }
 
+const shell =
+  'min-w-0 rounded-xl border border-border/70 bg-card/80 p-2.5 sm:p-3';
+
 export function MonthAtGlanceKpis({
   income,
   expenses,
@@ -21,32 +24,32 @@ export function MonthAtGlanceKpis({
   const shownNet = displayNetFlow ?? netFlow;
 
   return (
-    <div className={cn('grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-3', className)}>
-      <div className="card-base card-compact p-4">
-        <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-hint">Income</p>
-        <p className="mt-2 flex items-center gap-1.5 text-lg font-semibold tabular-nums text-[var(--success)] sm:text-xl">
-          <TrendingUp className="size-4" />
+    <div className={cn('grid grid-cols-2 gap-2 sm:grid-cols-2 lg:grid-cols-3', className)}>
+      <div className={shell}>
+        <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted">Income</p>
+        <p className="mt-1 flex items-center gap-1.5 text-base font-semibold tabular-nums text-[var(--success)] sm:text-lg">
+          <TrendingUp className="size-3.5 shrink-0" />
           {formatRupees(income)}
         </p>
       </div>
-      <div className="card-base p-4">
-        <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-hint">Spent</p>
-        <p className="mt-2 flex items-center gap-1.5 text-lg font-semibold tabular-nums text-[var(--danger)] sm:text-xl">
-          <TrendingDown className="size-4" />
+      <div className={shell}>
+        <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted">Spent</p>
+        <p className="mt-1 flex items-center gap-1.5 text-base font-semibold tabular-nums text-[var(--danger)] sm:text-lg">
+          <TrendingDown className="size-3.5 shrink-0" />
           {formatRupees(expenses)}
         </p>
       </div>
-      <div className="card-base col-span-2 p-4 sm:col-span-1 lg:col-span-1">
-        <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-hint">
-          {hasSettlementAdjustment ? 'Net flow (adjusted)' : 'Net flow'}
+      <div className={cn(shell, 'col-span-2 sm:col-span-1')}>
+        <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted">
+          {hasSettlementAdjustment ? 'Net (adjusted)' : 'Net flow'}
         </p>
         <p
           className={cn(
-            'mt-2 flex items-center gap-1.5 text-lg font-semibold tabular-nums sm:text-xl',
-            shownNet >= 0 ? 'text-[var(--success)]' : 'text-[var(--danger)]'
+            'mt-1 flex items-center gap-1.5 text-base font-semibold tabular-nums sm:text-lg',
+            shownNet >= 0 ? 'text-[var(--success)]' : 'text-[var(--danger)]',
           )}
         >
-          <Wallet className="size-4" />
+          <Wallet className="size-3.5 shrink-0" />
           {shownNet >= 0 ? '+' : ''}
           {formatRupees(shownNet)}
         </p>

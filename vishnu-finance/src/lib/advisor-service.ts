@@ -1,28 +1,102 @@
 import { prisma } from './db';
 import { generateResponse } from './gemini';
-import { analyzeUserFinances, formatFinancialSummary, DateRange } from './financial-analysis';
+import {
+  analyzeUserFinances,
+  DateRange,
+  type FinancialSummary,
+} from './financial-analysis';
 import {
   classifyAdvisorIntent,
   validateAdvisorResponse,
   buildAdvisorSystemPreamble,
 } from './advisor-guardrails';
+import {
+  currentMonthDateRange,
+  detectEntitySearchTerms,
+  detectPlanBucketFocus,
+  extractSpecificDatesFromQuery,
+  isSpecificDateLookupQuery,
+  isEntityLookupQuery,
+  shouldDefaultToCurrentMonth,
+  transactionMatchesEntityTerms,
+  wantsAllTimeData,
+} from './advisor-query-filters';
+import { ensureDefaultIncomeBudgetPlan } from './income-budget-service';
+import { buildAdvisorContextPack } from './advisor-context-pack';
+import {
+  detectRequestedFormat,
+  formatInstructionForPrompt,
+  type AdvisorOutputFormat,
+} from './advisor-format';
+import { exportAdvisorMarkdown } from './advisor-export';
+import type { ChartConfig } from '@/lib/advisor-chart-types';
+import type { AdvisorArtifact } from '@/lib/advisor-artifacts/types';
+import {
+  detectAndBuildArtifacts,
+  formatArtifactsPromptBlock,
+  artifactsSystemHint,
+  wantsAnyInteractiveArtifact,
+  isPaceForecastQuery,
+  runForecast,
+} from '@/lib/advisor-artifacts';
+import { GeminiQuotaExceededError } from '@/lib/gemini-quota';
+import { GroqRateLimitError } from '@/lib/groq';
+import { suggestedFollowUps, buildTurnStatus } from '@/lib/advisor-followups';
 
 export interface AdvisorContext {
   userId: string;
   conversationId?: string;
   userMessage: string;
+  /** Streaming callbacks for SSE chat */
+  onToken?: (delta: string) => void;
+  onEvent?: (event: {
+    type: 'status' | 'artifact' | 'meta';
+    data: Record<string, unknown>;
+  }) => void;
+}
+
+export interface AdvisorExportAttachment {
+  format: Exclude<AdvisorOutputFormat, 'chat' | 'table'>;
+  filename: string;
+  mimeType: string;
+  /** Base64 payload for immediate download in the client */
+  base64: string;
 }
 
 export interface AdvisorResponse {
   response: string;
   sources: Array<{
-    type: 'document' | 'internet';
+    type: 'document' | 'internet' | 'chart' | 'interactive';
     id?: string;
     title?: string;
     url?: string;
+    chartConfig?: ChartConfig;
+    kind?: AdvisorArtifact['kind'];
+    payload?: AdvisorArtifact['payload'];
   }>;
   blocked?: boolean;
   intent?: string;
+  requestedFormat?: AdvisorOutputFormat;
+  attachment?: AdvisorExportAttachment;
+  /** @deprecated Prefer artifacts[]; kept for older clients */
+  chartConfig?: ChartConfig;
+  artifacts?: AdvisorArtifact[];
+  provider?: 'gemini' | 'groq';
+  providerNotice?: string;
+  groqRateLimit?: {
+    remainingRequests?: number;
+    limitRequests?: number;
+    remainingTokens?: number;
+    limitTokens?: number;
+    resetRequests?: string;
+    resetTokens?: string;
+    message: string;
+    model?: string;
+  };
+  /** ChatGPT-style suggested next prompts */
+  followUps?: string[];
+  /** Compact status strip for the UI */
+  turnStatus?: string;
 }
 
 /**
@@ -40,17 +114,41 @@ interface TransactionQueryFilters {
 function parseTransactionFiltersFromQuery(query: string): TransactionQueryFilters {
   const lowerQuery = query.toLowerCase();
   const filters: TransactionQueryFilters = {};
+  const specificDates = extractSpecificDatesFromQuery(query);
+  const likelyDateLookup = isSpecificDateLookupQuery(query);
 
   // Parse date range
   const dateRange = parseDateRangeFromQuery(query);
   if (dateRange) {
     filters.dateRange = dateRange;
+  } else if (specificDates.length > 0) {
+    // Load the full span covering requested specific dates; exact-day filter is applied later.
+    filters.dateRange = {
+      startDate: new Date(
+        specificDates[0].getFullYear(),
+        specificDates[0].getMonth(),
+        specificDates[0].getDate(),
+        0,
+        0,
+        0,
+        0,
+      ),
+      endDate: new Date(
+        specificDates[specificDates.length - 1].getFullYear(),
+        specificDates[specificDates.length - 1].getMonth(),
+        specificDates[specificDates.length - 1].getDate(),
+        23,
+        59,
+        59,
+        999,
+      ),
+    };
   }
 
   // Parse amount filters
   // "above ₹15,000", "more than 15000", "over 15k", ">= 15000"
   const amountAboveMatch = lowerQuery.match(/(?:above|more than|over|greater than|>=|>\s*)(?:₹|rs\.?|inr\s*)?(\d+(?:,\d{3})*(?:k|thousand)?)/i);
-  if (amountAboveMatch) {
+  if (amountAboveMatch && !likelyDateLookup) {
     const amount = parseAmount(amountAboveMatch[1]);
     if (amount) {
       filters.minAmount = amount;
@@ -59,7 +157,7 @@ function parseTransactionFiltersFromQuery(query: string): TransactionQueryFilter
 
   // "below ₹10,000", "less than 10000", "under 10k", "<= 10000"
   const amountBelowMatch = lowerQuery.match(/(?:below|less than|under|<=|<\s*)(?:₹|rs\.?|inr\s*)?(\d+(?:,\d{3})*(?:k|thousand)?)/i);
-  if (amountBelowMatch) {
+  if (amountBelowMatch && !likelyDateLookup) {
     const amount = parseAmount(amountBelowMatch[1]);
     if (amount) {
       filters.maxAmount = amount;
@@ -68,7 +166,7 @@ function parseTransactionFiltersFromQuery(query: string): TransactionQueryFilter
 
   // "between ₹5,000 and ₹10,000"
   const amountBetweenMatch = lowerQuery.match(/(?:between|from)\s*(?:₹|rs\.?|inr\s*)?(\d+(?:,\d{3})*(?:k|thousand)?)\s*(?:and|to)\s*(?:₹|rs\.?|inr\s*)?(\d+(?:,\d{3})*(?:k|thousand)?)/i);
-  if (amountBetweenMatch) {
+  if (amountBetweenMatch && !likelyDateLookup) {
     const minAmount = parseAmount(amountBetweenMatch[1]);
     const maxAmount = parseAmount(amountBetweenMatch[2]);
     if (minAmount) filters.minAmount = minAmount;
@@ -113,6 +211,15 @@ function parseAmount(amountStr: string): number | undefined {
 function parseDateRangeFromQuery(query: string): DateRange | undefined {
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  // All-time wins even if the message also says "not just July"
+  if (
+    /(all\s*[- ]?\s*time|alltime|lifetime|entire\s+history|full\s+history|since\s+beginning|\bever\b|across\s+all\s+months|whole\s+history|not\s+just\s+(this\s+month|january|february|march|april|may|june|july|august|september|october|november|december))/i.test(
+      query,
+    )
+  ) {
+    return undefined; // no date filter = all available history
+  }
 
   // Patterns for relative dates
   const patterns = [
@@ -203,7 +310,7 @@ function parseDateRangeFromQuery(query: string): DateRange | undefined {
     },
     // Month names without year: "in January", "during March" (defaults to current year)
     {
-      regex: /(?:in|during|for|explain|analyze)?\s*(january|february|march|april|may|june|july|august|september|october|november|december)(?:\s+(?:data|transactions))?(?!\s+\d{4})/i,
+      regex: /(?:in|during|for|explain|analyze)\s+(january|february|march|april|may|june|july|august|september|october|november|december)(?:\s+(?:data|transactions))?(?!\s+\d{4})/i,
       handler: (match: RegExpMatchArray) => {
         const monthNames = [
           'january', 'february', 'march', 'april', 'may', 'june',
@@ -221,21 +328,21 @@ function parseDateRangeFromQuery(query: string): DateRange | undefined {
         }
       },
     },
-    // "all time", "overall", "since beginning"
-    {
-      regex: /(all time|overall|since beginning|full history|everything)/i,
-      handler: () => {
-        return { startDate: new Date(2000, 0, 1), endDate: new Date(2040, 0, 1) };
-      },
-    },
   ];
 
   for (const pattern of patterns) {
     const match = query.match(pattern.regex);
     if (match) {
       const result = pattern.handler(match);
-      if (result) {
-        return result;
+    if (result) {
+      if (
+        /\b\d{1,2}(?:st|nd|rd|th)?\s+(january|february|march|april|may|june|july|august|september|october|november|december)\b/i.test(
+          query,
+        )
+      ) {
+        return undefined;
+      }
+      return result;
       }
     }
   }
@@ -292,145 +399,540 @@ function parseDateString(dateStr: string): Date | undefined {
   return undefined;
 }
 
+function applyInMemoryTxnFilters(
+  summary: FinancialSummary,
+  opts: {
+    minAmount?: number;
+    maxAmount?: number;
+    transactionType?: 'INCOME' | 'EXPENSE' | 'ALL';
+    specificAmount?: number;
+  },
+): FinancialSummary {
+  let filtered = summary.transactions;
+  if (opts.minAmount) filtered = filtered.filter((t) => t.amount >= opts.minAmount!);
+  if (opts.maxAmount) filtered = filtered.filter((t) => t.amount <= opts.maxAmount!);
+  if (opts.transactionType && opts.transactionType !== 'ALL') {
+    filtered = filtered.filter((t) => t.type === opts.transactionType);
+  }
+  if (opts.specificAmount != null) {
+    const tolerance = opts.specificAmount * 0.1;
+    filtered = filtered.filter(
+      (t) =>
+        Math.abs(t.amount - opts.specificAmount!) <= tolerance ||
+        t.amount === opts.specificAmount,
+    );
+  }
+  if (filtered === summary.transactions) return summary;
+  return {
+    ...summary,
+    transactions: filtered,
+    totalTransactionCount: filtered.length,
+  };
+}
+
+/**
+ * Deterministic ForecastEngine path — no chat amount/type filters, no double window resolve.
+ */
+async function processForecastQuery(args: {
+  userId: string;
+  userMessage: string;
+  requestedFormat: AdvisorOutputFormat;
+  onToken?: (delta: string) => void;
+  onEvent?: AdvisorContext['onEvent'];
+}): Promise<AdvisorResponse> {
+  const { userId, userMessage, requestedFormat, onToken, onEvent } = args;
+  const forecast = await runForecast({ userId, query: userMessage });
+  const artifacts: AdvisorArtifact[] = [forecast.artifact];
+  onEvent?.({
+    type: 'artifact',
+    data: { artifacts, timeline: forecast.timeline },
+  });
+  onEvent?.({
+    type: 'status',
+    data: {
+      turnStatus: buildTurnStatus({
+        forecastMode: true,
+        windowLabel: forecast.window.label,
+        txnCount: undefined,
+      }),
+    },
+  });
+
+  const formatHint = formatInstructionForPrompt(requestedFormat);
+  const intent = 'goal' as const;
+
+  const aiResponse = await generateResponse(userMessage, {
+    financialSummary: [
+      'FORECAST-ONLY CONTEXT from ForecastEngine (authoritative numbers).',
+      forecast.promptBlock,
+    ].join('\n\n'),
+    conversationHistory: undefined,
+    systemPreamble: `${buildAdvisorSystemPreamble()}\n${formatHint}${artifactsSystemHint(artifacts)}\nFORECAST MODE: Narrate ONLY the deterministic timeline numbers. Do not invent ETAs, paces, steps, or moralizing copy. No Needs/Wants/Savings budget tables.`,
+    intent,
+    onToken,
+    filterContext: {
+      searchTerm: 'goal pace forecast timeline',
+      dateRange: {
+        startDate: forecast.window.startDate,
+        endDate: forecast.window.endDate,
+      },
+      appliedLimit: 5000,
+      fullContext: false,
+      allTime: false,
+      chartRequested: false,
+      interactiveRequested: true,
+    } as any,
+  });
+
+  const validated = validateAdvisorResponse(aiResponse.response);
+
+  let attachment: AdvisorExportAttachment | undefined;
+  const downloadable = ['html', 'csv', 'xlsx', 'pdf', 'docx'] as const;
+  if (
+    downloadable.includes(requestedFormat as (typeof downloadable)[number]) &&
+    !validated.blocked
+  ) {
+    try {
+      const exported = await exportAdvisorMarkdown({
+        markdown: validated.response,
+        format: requestedFormat as AdvisorExportAttachment['format'],
+        title: `Advisor forecast ${forecast.window.label}`,
+      });
+      attachment = {
+        format: requestedFormat as AdvisorExportAttachment['format'],
+        filename: exported.filename,
+        mimeType: exported.mimeType,
+        base64: exported.buffer.toString('base64'),
+      };
+    } catch (err) {
+      console.error('Advisor export generation failed:', err);
+    }
+  }
+
+  const sources: AdvisorResponse['sources'] = [
+    ...(aiResponse.sources as AdvisorResponse['sources']),
+    {
+      type: 'chart' as const,
+      title: forecast.artifact.title,
+      chartConfig: forecast.artifact.payload.config,
+      kind: 'chart' as const,
+      payload: forecast.artifact.payload,
+    },
+  ];
+
+  const followUps = suggestedFollowUps({
+    userMessage,
+    intent,
+    isForecast: true,
+  });
+  const turnStatus = buildTurnStatus({
+    forecastMode: true,
+    windowLabel: forecast.window.label,
+    provider: aiResponse.provider,
+    truncated: Boolean(aiResponse.providerNotice?.toLowerCase().includes('truncat')),
+  });
+
+  return {
+    response: validated.response,
+    sources,
+    blocked: validated.blocked,
+    intent,
+    requestedFormat,
+    attachment,
+    chartConfig: forecast.artifact.payload.config,
+    artifacts,
+    provider: aiResponse.provider,
+    providerNotice: aiResponse.providerNotice,
+    groqRateLimit: aiResponse.groqRateLimit,
+    followUps,
+    turnStatus,
+  };
+}
+
 /**
  * Main advisor service that handles user queries
  */
 export async function processAdvisorQuery(context: AdvisorContext): Promise<AdvisorResponse> {
   try {
     const { userId, conversationId, userMessage } = context;
+    const requestedFormat = detectRequestedFormat(userMessage);
 
-    // AI OPTIMIZATION: Smart Filtering & Token Management
-    // Detect if the user is asking about a specific entity (Person/Store) or keyword
-    const extractKeyword = (query: string): string | undefined => {
-      const stopWords = ['income', 'expense', 'transaction', 'transactions', 'spending', 'data', 'summary', 'month', 'year', 'last', 'this', 'total', 'average', 'analyze', 'explain', 'show', 'for', 'about', 'the', 'check', 'find', 'overall', 'related', 'give', 'amount', 'amounts', 'recheck', 'search', 'details', 'detail', 'want', 'just'];
-      const words = query.toLowerCase().replace(/[^a-z\s]/g, '').split(/\s+/).filter(w => w.length >= 3 && !stopWords.includes(w));
+    if (isPaceForecastQuery(userMessage)) {
+      return await processForecastQuery({
+        userId,
+        userMessage,
+        requestedFormat,
+        onToken: context.onToken,
+        onEvent: context.onEvent,
+      });
+    }
 
-      // PRIORITY 1: URL Search Parameter (highest precision if user pastes link)
-      const urlMatch = query.match(/[?&]search=([^&]+)/i);
-      if (urlMatch) return decodeURIComponent(urlMatch[1]).toLowerCase();
-
-      // PRIORITY 2: Pattern: "to [Name]", "paid [Name]", etc.
-      const entityMatch = query.match(/(?:to|from|paid|payout|gave|sent|received from|at|on|for|about|of|named|called|related to)\s+([a-zA-Z]{3,})/i);
-      if (entityMatch) {
-        const candidate = entityMatch[1].toLowerCase();
-        if (!stopWords.includes(candidate)) return candidate;
-      }
-
-      // PRIORITY 2: Quoted strings (highest precision)
-      const quotedMatch = query.match(/"([^"]+)"|'([^']+)'/);
-      if (quotedMatch) return (quotedMatch[1] || quotedMatch[2]).toLowerCase();
-
-      // PRIORITY 3: Capitalized words (likely names/brands)
-      const capitalizedMatch = query.match(/\b[A-Z][a-z]{2,}\b/);
-      if (capitalizedMatch) {
-        const candidate = capitalizedMatch[0].toLowerCase();
-        if (!stopWords.includes(candidate)) return candidate;
-      }
-
-      // PRIORITY 4: The longest non-stopword (likely the core subject)
-      if (words.length > 0) {
-        // Tie-breaker: prefer words that look like proper names (not in stopWords)
-        return words.sort((a, b) => b.length - a.length)[0];
-      }
-
-      return undefined;
-    };
-
-    const keyword = extractKeyword(userMessage);
     const filters = parseTransactionFiltersFromQuery(userMessage);
+    const specificDates = extractSpecificDatesFromQuery(userMessage);
+    const specificDateLookup = isSpecificDateLookupQuery(userMessage);
 
-    // AI OPTIMIZATION: Targeted queries get 3000 limit (safely within token limits for specific searches)
-    // General summaries get 500 recently active transactions
-    const limit = keyword ? 3000 : 500;
+    const historyPromise = conversationId
+      ? (prisma as any).advisorMessage.findMany({
+          where: { conversationId },
+          orderBy: { createdAt: 'asc' },
+          take: 15,
+        })
+      : Promise.resolve([]);
 
-    const financialSummaryPromise = analyzeUserFinances(userId, filters.dateRange, keyword, limit);
     const dashboardPromise = import('@/features/dashboard/loaders').then(({ loadDashboard }) =>
       loadDashboard(userId),
     );
+    const budgetPlanPromise = ensureDefaultIncomeBudgetPlan(userId);
 
-    const historyPromise = conversationId ? (prisma as any).advisorMessage.findMany({
-      where: { conversationId },
-      orderBy: { createdAt: 'asc' },
-      take: 15,
-    }) : Promise.resolve([]);
-
-    // Wait for essential context
-    const [financialSummaryResult, messages, dashboard] = await Promise.all([
-      financialSummaryPromise,
+    const [messages, dashboard, budgetPlan] = await Promise.all([
       historyPromise,
       dashboardPromise,
+      budgetPlanPromise,
     ]);
-    let financialSummary = financialSummaryResult;
 
-    // Step 3: Handle specific amount filters if mentioned (already processed by analyzeUserFinances but we keep for extra safety)
-    const specificAmountMatch = userMessage.match(/(?:₹|rs\.?|inr\s*)?(\d+(?:,\d{3})*(?:k|thousand)?)/i);
-    let specificAmount: number | undefined;
-    if (specificAmountMatch) {
-      specificAmount = parseAmount(specificAmountMatch[1]);
-    }
-
-    if (filters.minAmount || filters.maxAmount || filters.transactionType || specificAmount) {
-      let filteredTransactions = financialSummary.transactions;
-
-      if (filters.minAmount) filteredTransactions = filteredTransactions.filter(t => t.amount >= filters.minAmount!);
-      if (filters.maxAmount) filteredTransactions = filteredTransactions.filter(t => t.amount <= filters.maxAmount!);
-      if (filters.transactionType && filters.transactionType !== 'ALL') {
-        filteredTransactions = filteredTransactions.filter(t => t.type === filters.transactionType);
-      }
-
-      if (specificAmount) {
-        const tolerance = specificAmount * 0.1;
-        filteredTransactions = filteredTransactions.filter(t =>
-          Math.abs(t.amount - specificAmount) <= tolerance || t.amount === specificAmount
-        );
-      }
-
-      financialSummary = {
-        ...financialSummary,
-        transactions: filteredTransactions,
-        totalTransactionCount: filteredTransactions.length,
-      };
-    }
-
-    const { formatAdvisorPlanContext } = await import('@/lib/advisor-plan-context');
-    const financialSummaryText =
-      formatFinancialSummary(financialSummary) + '\n\n' + formatAdvisorPlanContext(dashboard);
     const conversationHistory = messages.map((msg: { role: string; content: string }) => ({
       role: msg.role === 'USER' ? 'user' : 'assistant',
       content: msg.content,
     }));
 
-    const intent = classifyAdvisorIntent(userMessage);
+    const bucketFocus = detectPlanBucketFocus(
+      userMessage,
+      conversationHistory,
+      budgetPlan.buckets,
+      dashboard.adherence.buckets,
+    );
 
-    // Step 4: Generate AI response directly (Zero Document/Internet Overhead)
+    // Plan buckets are never free-text search terms.
+    const entityTerms = bucketFocus
+      ? []
+      : detectEntitySearchTerms(userMessage, conversationHistory);
+    const keyword = entityTerms.length > 0
+      ? [...entityTerms].sort((a, b) => a.length - b.length || a.localeCompare(b))[0]
+      : undefined;
+    const entityLabel = entityTerms.length > 0 ? entityTerms.join(' / ') : undefined;
+
+    const allTime = wantsAllTimeData(userMessage);
+
+    let dateRange: DateRange | undefined = filters.dateRange;
+    if (
+      !allTime &&
+      !dateRange &&
+      !specificDateLookup &&
+      shouldDefaultToCurrentMonth(userMessage, bucketFocus, entityTerms)
+    ) {
+      dateRange = currentMonthDateRange();
+    }
+    if (
+      !allTime &&
+      !dateRange &&
+      !specificDateLookup &&
+      entityTerms.length === 0 &&
+      (requestedFormat !== 'chat' ||
+        /\b(budget|planned|actual|performance|where\s+i\s+was)\b/i.test(userMessage))
+    ) {
+      dateRange = currentMonthDateRange();
+    }
+
+    const interactiveEarly = wantsAnyInteractiveArtifact(userMessage);
+
+    // Entity lookups: load the period fully, then fuzzy-match name variants in memory.
+    // Do NOT Prisma-search a single bad token like "matches" — that empties results.
+    const entityLookup =
+      entityTerms.length > 0 &&
+      (allTime ||
+        isEntityLookupQuery(userMessage, entityTerms) ||
+        !dateRange ||
+        interactiveEarly);
+
+    const limit = entityTerms.length || bucketFocus || dateRange || allTime ? 5000 : 800;
+    let financialSummary = await analyzeUserFinances(
+      userId,
+      dateRange,
+      undefined,
+      limit,
+    );
+
+    const specificAmountMatch = specificDateLookup
+      ? null
+      : userMessage.match(
+          /(?:₹|rs\.?|inr\s*)?(\d+(?:,\d{3})*(?:k|thousand)?)(?!\s*(?:st|nd|rd|th)\b)/i,
+        );
+    const specificAmount = specificAmountMatch
+      ? parseAmount(specificAmountMatch[1])
+      : undefined;
+
+    financialSummary = applyInMemoryTxnFilters(financialSummary, {
+      minAmount: filters.minAmount,
+      maxAmount: filters.maxAmount,
+      transactionType: filters.transactionType,
+      specificAmount,
+    });
+
+    if (specificDateLookup && specificDates.length > 0) {
+      const dayKeys = new Set(
+        specificDates.map((d) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()),
+      );
+      const matched = financialSummary.transactions.filter((t) => {
+        const d = new Date(t.date);
+        const key = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+        return dayKeys.has(key);
+      });
+      const totalIncome = matched
+        .filter((t) => t.type === 'INCOME')
+        .reduce((sum, t) => sum + t.amount, 0);
+      const totalExpenses = matched
+        .filter((t) => t.type === 'EXPENSE')
+        .reduce((sum, t) => sum + t.amount, 0);
+      financialSummary = {
+        ...financialSummary,
+        transactions: matched,
+        totalTransactionCount: matched.length,
+        totalIncome,
+        totalExpenses,
+        netSavings: totalIncome - totalExpenses,
+        searchTerm: `specific dates [${specificDates
+          .map((d) => d.toLocaleDateString('en-IN'))
+          .join(', ')}]`,
+      };
+    }
+
+    let focusKeywordMeta:
+      | {
+          keyword: string;
+          matchingCount: number;
+          matchingExpenseTotal: number;
+          matchingIncomeTotal: number;
+        }
+      | undefined;
+    if (entityTerms.length > 0) {
+      const matching = financialSummary.transactions.filter((t) =>
+        transactionMatchesEntityTerms(t, entityTerms),
+      );
+      const expenseTotal = matching
+        .filter((t) => t.type === 'EXPENSE')
+        .reduce((sum, t) => sum + t.amount, 0);
+      const incomeTotal = matching
+        .filter((t) => t.type === 'INCOME')
+        .reduce((sum, t) => sum + t.amount, 0);
+      focusKeywordMeta = {
+        keyword: entityLabel || keyword || entityTerms[0],
+        matchingCount: matching.length,
+        matchingExpenseTotal: expenseTotal,
+        matchingIncomeTotal: incomeTotal,
+      };
+
+      const periodNote = allTime || !dateRange
+        ? 'all available history'
+        : 'selected period';
+
+      // Always narrow to fuzzy matches for entity questions (even if empty — be honest)
+      if (entityLookup || matching.length > 0) {
+        financialSummary = {
+          ...financialSummary,
+          searchTerm: `entity variants [${entityTerms.join(', ')}] (${periodNote})`,
+          transactions: matching,
+          totalTransactionCount: matching.length,
+          totalExpenses: expenseTotal,
+          totalIncome: incomeTotal,
+          netSavings: incomeTotal - expenseTotal,
+        };
+      }
+    }
+
+    const { formatAdvisorPlanContext } = await import('@/lib/advisor-plan-context');
+    const focusedPack = buildAdvisorContextPack({
+      dashboard,
+      budgetBuckets: budgetPlan.buckets,
+      financialSummary,
+      focus: bucketFocus
+        ? { bucket: bucketFocus }
+        : focusKeywordMeta
+          ? {
+              keyword: focusKeywordMeta.keyword,
+              matchingCount: focusKeywordMeta.matchingCount,
+              matchingExpenseTotal: focusKeywordMeta.matchingExpenseTotal,
+              matchingIncomeTotal: focusKeywordMeta.matchingIncomeTotal,
+            }
+          : undefined,
+    });
+    // Entity/bucket asks: skip the huge plan dump to cut TPM and stay on-topic.
+    const slimIntent = Boolean(bucketFocus || entityTerms.length > 0);
+    const fullPack = slimIntent
+      ? focusedPack
+      : focusedPack + '\n\n' + formatAdvisorPlanContext(dashboard, budgetPlan.buckets);
+
+    const intent = classifyAdvisorIntent(userMessage);
+    const formatHint = formatInstructionForPrompt(requestedFormat);
+    const transactionLookupFirst =
+      specificDateLookup ||
+      (/\b(transaction|transactions|entries|entry|show|list)\b/i.test(userMessage) &&
+        !isPaceForecastQuery(userMessage));
+
+    const artifacts = detectAndBuildArtifacts(userMessage, {
+      transactions: financialSummary.transactions,
+      budgetBuckets: budgetPlan.buckets,
+      entityLabel: entityLabel || keyword,
+      hasDatedWindow: Boolean(dateRange) || !allTime,
+      disciplineSummary: dashboard.disciplineSummary,
+      adherenceBuckets: dashboard.adherence?.buckets,
+    });
+
+    if (artifacts.length > 0) {
+      context.onEvent?.({ type: 'artifact', data: { artifacts } });
+    }
+
+    let artifactPromptBlock = formatArtifactsPromptBlock(artifacts);
+    if (interactiveEarly && artifacts.length === 0) {
+      artifactPromptBlock =
+        '\n\nINTERACTIVE NOTE: User asked for an interactive view but no matching transactions/plan data were found. Say that clearly.';
+    }
+
+    const financialSummaryText = fullPack + artifactPromptBlock;
+    const turnStatusEarly = buildTurnStatus({
+      windowLabel: dateRange
+        ? `${dateRange.startDate?.toLocaleDateString?.('en-IN') || '…'} → ${dateRange.endDate?.toLocaleDateString?.('en-IN') || '…'}`
+        : allTime
+          ? 'all history'
+          : undefined,
+      txnCount: financialSummary.transactions.length,
+      truncated: slimIntent,
+    });
+    context.onEvent?.({ type: 'status', data: { turnStatus: turnStatusEarly } });
+
+    const chartConfig = artifacts.find((a) => a.kind === 'chart')?.payload.config;
+
     const aiResponse = await generateResponse(userMessage, {
       financialSummary: financialSummaryText,
-      conversationHistory: conversationHistory.length > 0 ? conversationHistory : undefined,
-      systemPreamble: buildAdvisorSystemPreamble(),
+      conversationHistory:
+        conversationHistory.length === 0 ? undefined : conversationHistory,
+      systemPreamble: `${buildAdvisorSystemPreamble()}\n${formatHint}${artifactsSystemHint(artifacts)}${
+        transactionLookupFirst
+          ? '\nQUERY GUARDRAIL: This is a transaction lookup intent. Do not force forecast framing, milestone framing, or budget coaching unless explicitly asked.'
+          : ''
+      }`,
       intent,
-      // Pass filtering metadata to help AI understand its "window" into the data
+      onToken: context.onToken,
       filterContext: {
-        searchTerm: keyword,
-        dateRange: filters.dateRange,
-        appliedLimit: limit
-      } as any
+        searchTerm: bucketFocus
+          ? `focus plan bucket: ${bucketFocus.label} (full month data also provided)`
+          : entityTerms.length > 0
+            ? allTime || !dateRange
+              ? `focus entity variants [${entityTerms.join(', ')}] across ALL available history (fuzzy match)`
+              : `focus entity variants [${entityTerms.join(', ')}] (fuzzy match)`
+            : undefined,
+        dateRange: allTime ? undefined : dateRange,
+        appliedLimit: limit,
+        fullContext: !slimIntent,
+        allTime: allTime || (!dateRange && entityTerms.length > 0),
+        chartRequested: artifacts.some((a) => a.kind === 'chart' && a.payload.config),
+        interactiveRequested: artifacts.length > 0 || interactiveEarly,
+      } as any,
     });
 
     const validated = validateAdvisorResponse(aiResponse.response);
 
+    let attachment: AdvisorExportAttachment | undefined;
+    const downloadable = ['html', 'csv', 'xlsx', 'pdf', 'docx'] as const;
+    if (
+      downloadable.includes(requestedFormat as (typeof downloadable)[number]) &&
+      !validated.blocked
+    ) {
+      try {
+        const exported = await exportAdvisorMarkdown({
+          markdown: validated.response,
+          format: requestedFormat as AdvisorExportAttachment['format'],
+          title: `Advisor ${adherenceMonthTitle(dashboard)}`,
+        });
+        attachment = {
+          format: requestedFormat as AdvisorExportAttachment['format'],
+          filename: exported.filename,
+          mimeType: exported.mimeType,
+          base64: exported.buffer.toString('base64'),
+        };
+      } catch (err) {
+        console.error('Advisor export generation failed:', err);
+      }
+    }
+
+    const sources: AdvisorResponse['sources'] = [
+      ...(aiResponse.sources as AdvisorResponse['sources']),
+      ...artifacts.map((artifact) => {
+        if (artifact.kind === 'chart') {
+          return {
+            type: 'chart' as const,
+            title: artifact.title,
+            chartConfig: artifact.payload.config,
+            kind: artifact.kind,
+            payload: artifact.payload,
+          };
+        }
+        return {
+          type: 'interactive' as const,
+          kind: artifact.kind,
+          title: artifact.title,
+          payload: artifact.payload,
+        };
+      }),
+    ];
+
     return {
       response: validated.response,
-      sources: aiResponse.sources as any,
+      sources,
       blocked: validated.blocked,
       intent,
+      requestedFormat,
+      attachment,
+      chartConfig,
+      artifacts,
+      provider: aiResponse.provider,
+      providerNotice: aiResponse.providerNotice,
+      groqRateLimit: aiResponse.groqRateLimit,
+      followUps: suggestedFollowUps({
+        userMessage,
+        intent,
+        entityLabel: entityLabel || keyword,
+        bucketLabel: bucketFocus?.label,
+      }),
+      turnStatus: buildTurnStatus({
+        provider: aiResponse.provider,
+        windowLabel: dateRange
+          ? `${dateRange.startDate?.toLocaleDateString?.('en-IN') || '…'} → ${dateRange.endDate?.toLocaleDateString?.('en-IN') || '…'}`
+          : allTime
+            ? 'all history'
+            : undefined,
+        txnCount: financialSummary.transactions.length,
+        truncated:
+          Boolean(bucketFocus || entityTerms.length) ||
+          Boolean(aiResponse.providerNotice?.toLowerCase().includes('truncat')),
+      }),
     };
   } catch (error) {
     console.error('Error processing advisor query:', error);
-    // Wrap error with more context
+    if (error instanceof GeminiQuotaExceededError || error instanceof GroqRateLimitError) {
+      throw error;
+    }
     if (error instanceof Error) {
-      throw new Error(`Advisor service error: ${error.message}`);
+      const msg = error.message;
+      // Never surface raw provider HTTP dumps (413 TPM bodies, etc.)
+      if (
+        msg.includes('Request too large') ||
+        msg.includes('tokens per minute') ||
+        msg.includes('rate_limit_exceeded') ||
+        msg.includes('Groq API error')
+      ) {
+        throw new Error(
+          'The AI provider hit a free-tier size/rate limit. Try a narrower question (one month or one person), or wait a minute and retry.',
+        );
+      }
+      throw new Error(`Advisor service error: ${msg}`);
     }
     throw new Error('Unknown error occurred while processing advisor query');
   }
+}
+
+function adherenceMonthTitle(dashboard: {
+  adherence: { monthLabel: string };
+}): string {
+  return dashboard.adherence.monthLabel || 'export';
 }
 

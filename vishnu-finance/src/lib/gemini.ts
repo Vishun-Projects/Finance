@@ -9,14 +9,77 @@ if (!GOOGLE_API_KEY) {
 
 export const genAI = new GoogleGenerativeAI(GOOGLE_API_KEY);
 
+/**
+ * Text models known to work with current Google AI keys.
+ * Override primary with GEMINI_MODEL=… in env. Do not use retired ids
+ * (gemini-pro, gemini-1.5-*, gemma-3-*).
+ */
+export const GEMINI_TEXT_MODELS: string[] = [
+  ...(process.env.GEMINI_MODEL?.trim() ? [process.env.GEMINI_MODEL.trim()] : []),
+  'gemini-2.5-flash',
+  'gemini-2.5-flash-lite',
+  'gemini-3.5-flash',
+  'gemini-flash-latest',
+];
+
+export function getPreferredGeminiModel(): string {
+  return GEMINI_TEXT_MODELS[0] ?? 'gemini-2.5-flash';
+}
+
+function isModelUnavailableError(message: string): boolean {
+  const m = message.toLowerCase();
+  return (
+    m.includes('not found') ||
+    m.includes('404') ||
+    m.includes('is not supported') ||
+    m.includes('no longer available') ||
+    m.includes('deprecated')
+  );
+}
+
 // Global flag to track if Gemini quota is exceeded (prevents unnecessary API calls)
-let globalGeminiQuotaExceeded = false;
+import {
+  clearGeminiQuotaBlock,
+  getGeminiQuotaStatus,
+  isGeminiQuotaBlocked,
+  parseGeminiQuotaError,
+  recordGeminiRequest,
+  GeminiQuotaExceededError,
+  type GeminiQuotaStatus,
+} from '@/lib/gemini-quota';
+import {
+  generateGroqChatCompletion,
+  getGroqRateLimitStatus,
+  isGroqConfigured,
+  truncateToTokenBudget,
+  estimateTokens,
+  type GroqRateLimitStatus,
+} from '@/lib/groq';
+import {
+  withAiRetry,
+  isNonRetryableQuotaError,
+  parseRetryAfterMs,
+} from '@/lib/ai-retry';
+
+export type { GeminiQuotaStatus };
+export { getGeminiQuotaStatus, clearGeminiQuotaBlock, getGroqRateLimitStatus };
+
+export type AiProviderId = 'gemini' | 'groq';
+
+export interface GenerateAiResult {
+  response: string;
+  sources: Array<{ type: 'document' | 'internet'; id?: string; title?: string; url?: string }>;
+  provider: AiProviderId;
+  /** Short note shown to the user (e.g. free-tier fallback) */
+  providerNotice?: string;
+  groqRateLimit?: GroqRateLimitStatus;
+}
 
 /**
  * Check if Gemini quota is exceeded
  */
 export function isGeminiQuotaExceeded(error?: any): boolean {
-  if (globalGeminiQuotaExceeded) return true;
+  if (isGeminiQuotaBlocked()) return true;
 
   if (error) {
     const errorString = typeof error === 'string' ? error : JSON.stringify(error).toLowerCase();
@@ -24,13 +87,13 @@ export function isGeminiQuotaExceeded(error?: any): boolean {
       errorString.includes('429') ||
       errorString.includes('quota') ||
       errorString.includes('rate_limit') ||
-      errorString.includes('limit') ||
       errorString.includes('too many requests') ||
-      errorString.includes('input_token_count');
+      errorString.includes('input_token_count') ||
+      errorString.includes('exceeded your current quota');
 
     if (isQuotaError) {
+      parseGeminiQuotaError(error);
       console.warn('🚫 Gemini API quota exceeded detected:', errorString.substring(0, 200));
-      globalGeminiQuotaExceeded = true;
       return true;
     }
   }
@@ -41,7 +104,7 @@ export function isGeminiQuotaExceeded(error?: any): boolean {
  * Reset quota exceeded flag (useful for testing or after quota reset)
  */
 export function resetGeminiQuotaFlag(): void {
-  globalGeminiQuotaExceeded = false;
+  clearGeminiQuotaBlock();
 }
 
 export interface DocumentSearchResult {
@@ -79,13 +142,7 @@ export async function searchDocuments(
   }
 
   try {
-    // AI OPTIMIZATION: Use gemma-3-27b-it as requested (reverted from 2.0-flash)
-    let model;
-    try {
-      model = genAI.getGenerativeModel({ model: 'gemma-3-27b-it' });
-    } catch {
-      model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-    }
+    const model = genAI.getGenerativeModel({ model: getPreferredGeminiModel() });
 
     // Create a prompt to find relevant documents
     const documentList = documents
@@ -205,73 +262,90 @@ function simpleKeywordSearch(
 }
 
 /**
- * Helper function to retry API calls with exponential backoff
+ * Helper function to retry API calls with Retry-After + full-jitter backoff
  */
 export async function retryWithBackoff<T>(
   fn: () => Promise<T>,
   maxRetries: number = 3,
   initialDelay: number = 1000
 ): Promise<T> {
-  let lastError: Error | null = null;
-
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
-    try {
-      return await fn();
-    } catch (error) {
-      lastError = error instanceof Error ? error : new Error(String(error));
-
-      // Check error message and any nested error properties
-      const errorMessage = lastError.message || '';
-      const errorObj = error as any;
-      const status = errorObj?.status || errorObj?.statusCode || errorObj?.response?.status;
-
-      // Check if it's a quota exceeded error (don't retry)
-      const isQuotaExceeded =
-        errorMessage.includes('quota exceeded') ||
-        errorMessage.includes('Quota exceeded') ||
-        errorMessage.includes('exceeded your current quota') ||
-        errorMessage.includes('quotaValue') ||
-        (status === 429 && errorMessage.includes('quota'));
-
-      if (isQuotaExceeded) {
-        // Set global flag to skip all future AI calls
-        globalGeminiQuotaExceeded = true;
-        console.error('🚫 Gemini API quota exceeded. Disabling AI features for this session.');
-        throw lastError;
-      }
-
-      // Check if it's a retryable error (503, 429, or network errors)
-      const isRetryable =
-        status === 503 ||
-        (status === 429 && !isQuotaExceeded) ||
-        errorMessage.includes('503') ||
-        (errorMessage.includes('429') && !isQuotaExceeded) ||
-        errorMessage.includes('overloaded') ||
-        errorMessage.includes('Service Unavailable') ||
-        (errorMessage.includes('rate limit') && !isQuotaExceeded) ||
-        errorMessage.includes('ECONNRESET') ||
-        errorMessage.includes('ETIMEDOUT') ||
-        errorMessage.includes('The model is overloaded');
-
-      if (!isRetryable || attempt === maxRetries - 1) {
-        throw lastError;
-      }
-
-      // Exponential backoff: wait longer with each retry
-      // Add jitter to avoid thundering herd
-      const baseDelay = initialDelay * Math.pow(2, attempt);
-      const jitter = Math.random() * 0.3 * baseDelay; // Add up to 30% jitter
-      const delay = Math.floor(baseDelay + jitter);
-
-      await new Promise(resolve => setTimeout(resolve, delay));
+  try {
+    return await withAiRetry(fn, {
+      maxAttempts: maxRetries,
+      baseMs: initialDelay,
+      capMs: 30_000,
+      shouldRetry: (error) => {
+        if (isNonRetryableQuotaError(error)) return false;
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorObj = error as { status?: number; statusCode?: number };
+        const status = errorObj?.status || errorObj?.statusCode;
+        const isQuotaExceeded =
+          errorMessage.includes('quota exceeded') ||
+          errorMessage.includes('Quota exceeded') ||
+          errorMessage.includes('exceeded your current quota') ||
+          (status === 429 && /quota/i.test(errorMessage));
+        if (isQuotaExceeded) return false;
+        return (
+          status === 503 ||
+          status === 429 ||
+          errorMessage.includes('503') ||
+          errorMessage.includes('429') ||
+          errorMessage.includes('overloaded') ||
+          errorMessage.includes('Service Unavailable') ||
+          errorMessage.includes('rate limit') ||
+          errorMessage.includes('ECONNRESET') ||
+          errorMessage.includes('ETIMEDOUT') ||
+          errorMessage.includes('The model is overloaded')
+        );
+      },
+      getRetryAfterMs: (error) =>
+        parseRetryAfterMs({
+          retryAfterSeconds: (error as { status?: { retryAfterSeconds?: number } })?.status
+            ?.retryAfterSeconds,
+          message: error instanceof Error ? error.message : String(error),
+        }),
+    });
+  } catch (error) {
+    if (error instanceof GeminiQuotaExceededError) throw error;
+    if (isGeminiQuotaExceeded(error) || isNonRetryableQuotaError(error)) {
+      console.error('Gemini API quota exceeded');
+      throw new GeminiQuotaExceededError(parseGeminiQuotaError(error));
     }
+    throw error;
   }
+}
 
-  throw lastError || new Error('Unknown error');
+const GEMINI_MAX_INPUT_TOKENS = Number(process.env.GEMINI_MAX_INPUT_TOKENS) || 24_000;
+
+function fitGeminiFinancialSummary(summary: string | undefined): {
+  text: string | undefined;
+  truncated: boolean;
+} {
+  if (!summary) return { text: undefined, truncated: false };
+  if (estimateTokens(summary) <= Math.floor(GEMINI_MAX_INPUT_TOKENS * 0.72)) {
+    return { text: summary, truncated: false };
+  }
+  return {
+    text: truncateToTokenBudget(summary, Math.floor(GEMINI_MAX_INPUT_TOKENS * 0.72)),
+    truncated: true,
+  };
+}
+
+function isOverloadOrEmptyError(error: unknown): boolean {
+  const msg = error instanceof Error ? error.message : String(error);
+  const lower = msg.toLowerCase();
+  return (
+    lower.includes('503') ||
+    lower.includes('overloaded') ||
+    lower.includes('empty response') ||
+    lower.includes('service unavailable') ||
+    lower.includes('high demand')
+  );
 }
 
 /**
- * Generate AI response with context from documents
+ * Generate AI response with context from documents.
+ * Uses Gemini first; on free-tier quota OR overload falls back to Groq.
  */
 export async function generateResponse(
   userMessage: string,
@@ -286,18 +360,167 @@ export async function generateResponse(
       dateRange?: { startDate?: Date; endDate?: Date };
       appliedLimit?: number;
     };
+    onToken?: (delta: string) => void;
   }
-): Promise<{ response: string; sources: Array<{ type: 'document' | 'internet'; id?: string; title?: string; url?: string }> }> {
-  // Try models in order of preference with fallback
-  const models = ['gemma-3-27b-it', 'gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro'];
+): Promise<GenerateAiResult> {
+  const fitted = fitGeminiFinancialSummary(context.financialSummary);
+  const ctx = {
+    ...context,
+    financialSummary: fitted.text,
+  };
+
+  // Gemini already blocked for the day → go straight to Groq free tier
+  if (isGeminiQuotaBlocked() && isGroqConfigured()) {
+    const result = await generateViaGroqFallback(userMessage, ctx);
+    if (fitted.truncated) {
+      result.providerNotice = `${result.providerNotice || ''} Context truncated to fit token budgets.`.trim();
+    }
+    return result;
+  }
+
+  try {
+    const geminiResult = await generateGeminiResponse(userMessage, ctx);
+    return {
+      ...geminiResult,
+      provider: 'gemini',
+      providerNotice: fitted.truncated
+        ? 'Context truncated to fit Gemini token budget.'
+        : geminiResult.providerNotice,
+    };
+  } catch (error) {
+    const quotaHit =
+      error instanceof GeminiQuotaExceededError || isGeminiQuotaExceeded(error);
+    const overloadHit = isOverloadOrEmptyError(error);
+
+    if ((quotaHit || overloadHit) && isGroqConfigured()) {
+      console.warn(
+        quotaHit
+          ? 'Gemini quota exhausted — falling back to Groq free tier'
+          : 'Gemini overloaded/empty — falling back to Groq free tier',
+      );
+      const result = await generateViaGroqFallback(userMessage, ctx);
+      if (fitted.truncated) {
+        result.providerNotice = `${result.providerNotice || ''} Context truncated to fit token budgets.`.trim();
+      }
+      if (overloadHit && !quotaHit) {
+        result.providerNotice = `Gemini was overloaded — answering with Groq. ${result.providerNotice || ''}`.trim();
+      }
+      return result;
+    }
+
+    if (error instanceof GeminiQuotaExceededError) throw error;
+    if (quotaHit) throw new GeminiQuotaExceededError(parseGeminiQuotaError(error));
+    throw error;
+  }
+}
+
+async function generateViaGroqFallback(
+  userMessage: string,
+  context: {
+    financialSummary?: string;
+    relevantDocuments?: Array<{ id: string; title: string; content: string }>;
+    conversationHistory?: Array<{ role: 'user' | 'assistant'; content: string }>;
+    systemPreamble?: string;
+    intent?: string;
+    filterContext?: {
+      searchTerm?: string;
+      dateRange?: { startDate?: Date; endDate?: Date };
+      appliedLimit?: number;
+    };
+    onToken?: (delta: string) => void;
+  },
+): Promise<GenerateAiResult> {
+  const guardrails = truncateToTokenBudget(context.systemPreamble ?? '', 500);
+  const intentHint = context.intent
+    ? `\nUser intent classification: ${context.intent}. Stay within budgeting/planning scope.`
+    : '';
+
+  let contextText = '';
+  if (context.filterContext) {
+    const { searchTerm, dateRange, appliedLimit } = context.filterContext as {
+      searchTerm?: string;
+      dateRange?: { startDate?: Date; endDate?: Date };
+      appliedLimit?: number;
+      allTime?: boolean;
+    };
+    contextText += '\n\nDATA WINDOW:';
+    if (searchTerm) contextText += `\n- Focus: ${searchTerm}`;
+    if (dateRange?.startDate || dateRange?.endDate) {
+      contextText += `\n- Date Range: ${dateRange.startDate?.toDateString() || '…'} to ${dateRange.endDate?.toDateString() || '…'}`;
+    }
+    if (appliedLimit) contextText += `\n- Txn cap ~${appliedLimit}`;
+  }
+  if (context.financialSummary) {
+    contextText += `\n\nUser's Financial Summary:\n${truncateToTokenBudget(context.financialSummary, 6500)}\n`;
+  }
+
+  const system = truncateToTokenBudget(
+    `${guardrails}${intentHint}
+
+You are a knowledgeable financial advisor for Indian personal finance.
+Use ONLY the provided financial context. Cite numbers from context.
+Prefer compact markdown tables. Never recommend specific stocks/funds.
+When a chart is rendered by the app, summarize it — do not say you cannot chart.
+Keep answers concise.
+Do NOT add repetitive disclaimers. Add at most one brief compliance disclaimer, and only when user explicitly asks investment advice.`,
+    700,
+  );
+
+  const userContent = `${contextText}\n\nUser Question: ${userMessage}\n\nProvide a helpful, accurate response based on the context above.`;
+
+  const { text, rateLimit, modelUsed } = await generateGroqChatCompletion({
+    system,
+    userMessage: userContent,
+    conversationHistory: (context.conversationHistory ?? []).slice(-4).map((m) => ({
+      role: m.role,
+      content: truncateToTokenBudget(m.content, 350),
+    })),
+    temperature: 0.7,
+    onToken: context.onToken,
+  });
+
+  const shortModel = modelUsed.includes('/') ? modelUsed.split('/').pop()! : modelUsed;
+
+  return {
+    response: text,
+    sources: [],
+    provider: 'groq',
+    providerNotice: `Gemini free-tier limit reached — answering with Groq (${shortModel}). Context may be truncated to fit free-tier TPM.`,
+    groqRateLimit: rateLimit,
+  };
+}
+
+async function generateGeminiResponse(
+  userMessage: string,
+  context: {
+    financialSummary?: string;
+    relevantDocuments?: Array<{ id: string; title: string; content: string }>;
+    conversationHistory?: Array<{ role: 'user' | 'assistant'; content: string }>;
+    systemPreamble?: string;
+    intent?: string;
+    filterContext?: {
+      searchTerm?: string;
+      dateRange?: { startDate?: Date; endDate?: Date };
+      appliedLimit?: number;
+    };
+    onToken?: (delta: string) => void;
+  }
+): Promise<{
+  response: string;
+  sources: Array<{ type: 'document' | 'internet'; id?: string; title?: string; url?: string }>;
+  providerNotice?: string;
+}> {
+  // Try models in order of preference with fallback (skip retired ids)
+  const models = GEMINI_TEXT_MODELS;
 
   let lastError: Error | null = null;
 
   for (const modelName of models) {
     try {
       // AI OPTIMIZATION: Check quota before trying next model
-      if (globalGeminiQuotaExceeded) {
-        throw new Error('Gemini API quota already exceeded. Skipping models.');
+      if (isGeminiQuotaBlocked()) {
+        const status = getGeminiQuotaStatus();
+        throw new GeminiQuotaExceededError(status);
       }
 
       return await retryWithBackoff(async () => {
@@ -307,9 +530,12 @@ export async function generateResponse(
             temperature: 0.7,
             topK: 40,
             topP: 0.95,
-            maxOutputTokens: 2048,
+            // Long spend analyses need room; 2048 was truncating mid-sentence.
+            maxOutputTokens: 8192,
           },
         });
+
+        recordGeminiRequest(modelName);
 
         const guardrails = context.systemPreamble ?? '';
         const intentHint = context.intent
@@ -408,51 +634,49 @@ IMPORTANT - DATE RANGE QUERIES:
 IMPORTANT FORMATTING REQUIREMENTS:
 - Always respond in English (not Hindi, Urdu, or mixed languages)
 - Use proper markdown formatting that will render correctly:
-  * Use **bold** for emphasis and section headers (e.g., **Section Title**)
-  * Use bullet points with proper markdown syntax:
-    - Use single dash (-) or asterisk (*) followed by space for bullet points
-    - Each bullet point should be on its own line
-    - Example:
-      - First bullet point
-      - Second bullet point
-  * Use numbered lists (1., 2., 3.) for step-by-step instructions
-  * Use proper line breaks (double newline) between paragraphs
-  * Use code blocks with backticks for specific amounts: \`₹15,000\`
-  * Do NOT use HTML tags or special characters
-- Keep responses well-structured with clear sections separated by blank lines
+  * Use **bold** for emphasis and section headers
+  * Use bullet points (- or *) and numbered lists when helpful
+  * Use proper line breaks between paragraphs
+  * Format currency as ₹X,XXX — backticks around amounts are fine: \`₹15,000\`
+  * For comparisons / planned vs actual / multi-metric answers: use GitHub-flavored MARKDOWN TABLES:
+    | Bucket | Planned | Actual | Variance | Performance |
+    | --- | ---: | ---: | ---: | --- |
+    | Needs | 20000 | 18000 | -2000 | Under (Good) |
+  * Include a header row AND a separator row (| --- | --- |) so tables render
+  * When the user asks for HTML, you may add a fenced \`\`\`html table block in addition to markdown
+  * Do NOT invent Excel/PDF binary content in text — tables in markdown are enough; the app exports files
+- Keep responses well-structured with clear sections
 - Use professional, friendly tone
-- Format currency as ₹X,XXX (Indian Rupee format) - use backticks for amounts: \`₹15,000\`
-- When listing transactions or data, use proper markdown lists:
-  * Each item on a new line starting with - or *
-  * Use consistent indentation
-  * Separate sections with blank lines
-- Example of proper formatting:
-  **Financial Overview:**
-  
-  - **Total Income:** \`₹3,38,981\`
-  - **Total Expenses:** \`₹3,42,516.83\`
-  - **Net Savings:** \`₹-3,535.83\`
-  
-  **Key Insights:**
-  
-  - Your expenses exceed income by \`₹3,535.83\`
-  - Focus on reducing discretionary spending
+- When asked about budget performance, cover ALL plan buckets from structured data (good and bad)
 
-Always prioritize information from provided documents and the user's actual transaction data over general knowledge.`;
+Always prioritize the STRUCTURED USER FINANCE DATA and the user's actual transactions over general knowledge.`;
 
         let contextText = '';
 
         if (context.filterContext) {
-          const { searchTerm, dateRange, appliedLimit } = context.filterContext;
-          contextText += `\n\nACTIVE DATA FILTERS (CURRENT VIEW):`;
-          if (searchTerm) contextText += `\n- Search Term: "${searchTerm}" (Only showing transactions matching this term)`;
-          if (dateRange) {
+          const { searchTerm, dateRange, appliedLimit, allTime } = context.filterContext as {
+            searchTerm?: string;
+            dateRange?: { startDate?: Date; endDate?: Date };
+            appliedLimit?: number;
+            fullContext?: boolean;
+            allTime?: boolean;
+          };
+          contextText += `\n\nDATA WINDOW:`;
+          contextText += `\n- Structured finance pack is provided (buckets, categories, people, stores, transactions).`;
+          if (allTime) {
+            contextText += `\n- Period: ALL AVAILABLE HISTORY (not limited to the current month). Do NOT say data is only for July/this month.`;
+          }
+          if (searchTerm) {
+            contextText += `\n- Focus hint: ${searchTerm}`;
+          }
+          if (dateRange && !allTime) {
             const s = dateRange.startDate ? dateRange.startDate.toDateString() : 'Beginning';
             const e = dateRange.endDate ? dateRange.endDate.toDateString() : 'Latest';
             contextText += `\n- Date Range: ${s} to ${e}`;
           }
-          if (appliedLimit) contextText += `\n- Transaction Limit: Showing up to ${appliedLimit} records`;
-          contextText += `\n\nALWAYS prioritize these search results and active filters when answering. If the user asks for a total for a specific entity, use the search totals provided below.`;
+          if (appliedLimit) {
+            contextText += `\n- Transaction rows capped around ${appliedLimit} (aggregates remain authoritative when present).`;
+          }
         }
 
         if (context.financialSummary) {
@@ -474,13 +698,26 @@ Always prioritize information from provided documents and the user's actual tran
           });
         }
 
-        const prompt = `${systemPrompt}${contextText}\n\nUser Question: ${userMessage}\n\nProvide a helpful, accurate response based on the context above. If you reference a document, mention which one.`;
+        const prompt = `${systemPrompt}${contextText}\n\nUser Question: ${userMessage}\n\nProvide a helpful, accurate response based on the context above. If this is a transaction lookup, list matching transactions first (date, amount, category, counterparty) before interpretation. If you reference a document, mention which one.`;
 
-        const result = await retryWithBackoff(async () => {
-          return await model.generateContent(prompt);
-        }, 1, 1000); // AI OPTIMIZATION: Reduced retries for speed
-        const response = result.response;
-        const text = response.text();
+        let text = '';
+        if (context.onToken) {
+          const streamResult = await retryWithBackoff(async () => {
+            return await model.generateContentStream(prompt);
+          }, 2, 800);
+          for await (const chunk of streamResult.stream) {
+            const delta = chunk.text();
+            if (delta) {
+              text += delta;
+              context.onToken(delta);
+            }
+          }
+        } else {
+          const result = await retryWithBackoff(async () => {
+            return await model.generateContent(prompt);
+          }, 2, 800);
+          text = result.response.text();
+        }
 
         // Validate that we got a response
         if (!text || text.trim().length === 0) {
@@ -508,15 +745,20 @@ Always prioritize information from provided documents and the user's actual tran
       lastError = error instanceof Error ? error : new Error(String(error));
 
       // AI OPTIMIZATION: FAIL FAST if it's a quota error
+      if (lastError instanceof GeminiQuotaExceededError) {
+        throw lastError;
+      }
       if (isGeminiQuotaExceeded(error)) {
         console.error('Model failed due to quota limit. Aborting all further models.');
-        break;
+        throw new GeminiQuotaExceededError(parseGeminiQuotaError(error));
       }
 
-      // If it's not a model availability error, don't try other models
-      if (!lastError.message.includes('not found') &&
+      // Retry next model on availability / overload errors
+      if (
+        !isModelUnavailableError(lastError.message) &&
         !lastError.message.includes('503') &&
-        !lastError.message.includes('overloaded')) {
+        !lastError.message.includes('overloaded')
+      ) {
         throw lastError;
       }
 
@@ -527,13 +769,19 @@ Always prioritize information from provided documents and the user's actual tran
 
   // If all models failed
   console.error('Error generating response with Gemini (all models failed):', lastError);
+  if (lastError instanceof GeminiQuotaExceededError) {
+    throw lastError;
+  }
   if (lastError instanceof Error) {
+    if (isGeminiQuotaExceeded(lastError)) {
+      throw new GeminiQuotaExceededError(parseGeminiQuotaError(lastError));
+    }
     // Check for specific Gemini API errors
     if (lastError.message.includes('API_KEY')) {
       throw new Error('Invalid Google API key. Please check your GOOGLE_API_KEY environment variable.');
     }
-    if (lastError.message.includes('quota') || lastError.message.includes('rate limit')) {
-      throw new Error('API rate limit exceeded. Please try again later.');
+    if (lastError.message.includes('quota') || lastError.message.includes('rate limit') || lastError.message.includes('429')) {
+      throw new GeminiQuotaExceededError(parseGeminiQuotaError(lastError));
     }
     if (lastError.message.includes('503') || lastError.message.includes('overloaded')) {
       throw new Error('Gemini API is currently overloaded. Please try again in a few moments.');
@@ -549,8 +797,7 @@ Always prioritize information from provided documents and the user's actual tran
  */
 export async function searchInternet(query: string): Promise<InternetSearchResult[]> {
   try {
-    // AI OPTIMIZATION: Use gemma-3-27b-it as requested (reverted from 2.0-flash)
-    const model = genAI.getGenerativeModel({ model: 'gemma-3-27b-it' });
+    const model = genAI.getGenerativeModel({ model: getPreferredGeminiModel() });
 
     const prompt = `Given this financial query: "${query}"
 
@@ -671,7 +918,7 @@ export async function categorizeTransactionsBatch(
   JSON ONLY, no markdown, no explanation.`;
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemma-3-27b-it' });
+    const model = genAI.getGenerativeModel({ model: getPreferredGeminiModel() });
     const result = await retryWithBackoff(async () => {
       return await model.generateContent(prompt);
     }, 2, 2000);
@@ -702,7 +949,7 @@ export async function generateImage(prompt: string): Promise<string | null> {
     const enhancedPrompt = `${prompt} . Minimalist, Notion-style linography, clean lines, white background, high contrast, symbolist, no text.`;
 
     // Check if quota is exceeded before trying
-    if (globalGeminiQuotaExceeded) {
+    if (isGeminiQuotaBlocked()) {
       return null;
     }
 

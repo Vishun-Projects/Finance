@@ -226,7 +226,7 @@ If you're not sure, respond with "null" for category.
 Format: {"categoryName": "string or null", "confidence": number}`;
 
     const model = genAI.getGenerativeModel({
-      model: 'gemma-3-27b-it',
+      model: 'gemini-2.5-flash',
       generationConfig: {
         temperature: 0.3,
         topK: 20,

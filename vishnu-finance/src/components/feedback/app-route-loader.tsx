@@ -46,7 +46,7 @@ function DashboardSkeleton() {
           <Skeleton key={i} className="h-20 rounded-md" />
         ))}
       </div>
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
         <Skeleton className="h-96 rounded-md" />
         <div className="space-y-4">
           <Skeleton className="h-52 rounded-md" />

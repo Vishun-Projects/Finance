@@ -176,7 +176,7 @@ export function Card({
   style?: React.CSSProperties;
 }) {
   return (
-    <div className={cn('card-base px-5 py-4 text-foreground', className)} style={style}>
+    <div className={cn('card-base px-4 py-3.5 text-foreground', className)} style={style}>
       {children}
     </div>
   );
@@ -216,7 +216,7 @@ export function ProsCons({ pros, cons }: { pros: string[]; cons: string[] }) {
 
 export function SectionTitle({ children }: { children: ReactNode }) {
   return (
-    <div className="mb-1 mt-5 text-[11px] font-medium uppercase tracking-[0.08em] text-hint">
+    <div className="mb-1.5 mt-4 text-[11px] font-medium uppercase tracking-[0.08em] text-hint">
       {children}
     </div>
   );

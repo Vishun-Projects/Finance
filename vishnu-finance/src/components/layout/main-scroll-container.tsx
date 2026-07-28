@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { Suspense, useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 import { RoutePendingOverlay } from '@/components/layout/route-pending-overlay';
+import { RouteContentFallback } from '@/components/layout/route-content-fallback';
 import { useScrollOwner } from '@/contexts/scroll-owner-context';
 import { getRouteLayoutConfig } from '@/lib/layout-config';
 import { cn } from '@/lib/utils';
@@ -35,11 +36,11 @@ export function MainScrollContainer({ children }: { children: React.ReactNode })
         'relative scrollbar-none flex min-h-0 flex-1 flex-col min-w-0 bg-background overflow-x-hidden',
         isTableScroll
           ? 'max-lg:overflow-hidden max-lg:pb-0 lg:min-h-0 lg:flex-1 lg:overflow-hidden lg:pb-0'
-          : 'scroll-pb-bottom-bar overflow-y-auto max-lg:pb-[var(--app-bottom-inset)] lg:overflow-y-auto lg:pb-0',
+          : 'scroll-pb-bottom-bar overflow-y-auto max-lg:pb-[var(--app-scroll-bottom-pad)] lg:overflow-y-auto lg:pb-0',
       )}
     >
       <RoutePendingOverlay />
-      {children}
+      <Suspense fallback={<RouteContentFallback />}>{children}</Suspense>
     </main>
   );
 }

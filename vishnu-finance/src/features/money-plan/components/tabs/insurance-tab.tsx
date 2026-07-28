@@ -103,16 +103,15 @@ export function InsuranceTab() {
         lo. Budget mein already {fmt(premiums.parentsMummy + premiums.parentsPapa)}/mo set hai.
       </PlanCallout>
 
-      <PlanCard className="mb-4 bg-surface">
-        <div className="mb-2.5 text-[13px] font-medium text-foreground">
-          Your Insurance Cover — All Policies at a Glance
+      <PlanCard className="mb-3 overflow-hidden !p-0 bg-surface/40">
+        <div className="border-b border-border/60 px-3 py-2.5 sm:px-4">
+          <div className="text-[13px] font-medium text-foreground">
+            Your Insurance Cover — All Policies at a Glance
+          </div>
         </div>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 divide-x divide-y divide-border/60">
           {snapshotItems.map((item, i) => (
-            <div
-              key={item.label}
-              className="rounded-lg border border-border bg-card px-3 py-2.5"
-            >
+            <div key={item.label} className="bg-card/50 px-3 py-2.5">
               <div className="mb-1 text-[11px] text-hint">{item.label}</div>
               <div className={cn('text-sm font-semibold', snapshotTextClass[item.variant])}>
                 {item.cover}
@@ -124,14 +123,14 @@ export function InsuranceTab() {
             </div>
           ))}
         </div>
-        <div className="mt-2.5 border-t border-border pt-2 text-[11px] text-hint">
+        <div className="border-t border-border/60 px-3 py-2 text-[11px] text-hint sm:px-4">
           ✓ These figures match the Overview breakdown exactly. Buffer {fmt(scaledPlan.insuranceBuffer)}/mo
           kept for renewal hikes.
         </div>
       </PlanCard>
 
       {plans.map((insurancePlan) => (
-        <PlanCard key={insurancePlan.id} className="mb-3.5">
+        <PlanCard key={insurancePlan.id} className="mb-2.5 last:mb-0">
           <div className="mb-1 flex items-start justify-between">
             <div>
               <div className="text-sm font-medium text-foreground">{insurancePlan.type}</div>
@@ -170,10 +169,10 @@ export function InsuranceTab() {
                 type="button"
                 onClick={() => setOpenCoverage(openCoverage === insurancePlan.id ? null : insurancePlan.id)}
                 className={cn(
-                  'cursor-pointer rounded border border-border px-2.5 py-1 text-[11px] font-medium',
+                  'cursor-pointer rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors',
                   openCoverage === insurancePlan.id
                     ? 'bg-foreground text-primary-foreground'
-                    : 'bg-card text-muted'
+                    : 'bg-surface text-muted hover:text-foreground'
                 )}
               >
                 {openCoverage === insurancePlan.id ? 'Hide' : 'View Coverage'}
@@ -182,10 +181,10 @@ export function InsuranceTab() {
                 type="button"
                 onClick={() => setOpenClaim(openClaim === insurancePlan.id ? null : insurancePlan.id)}
                 className={cn(
-                  'cursor-pointer rounded border border-border px-2.5 py-1 text-[11px] font-medium',
+                  'cursor-pointer rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors',
                   openClaim === insurancePlan.id
                     ? 'bg-[var(--info)] text-primary-foreground'
-                    : 'bg-card text-muted'
+                    : 'bg-surface text-muted hover:text-foreground'
                 )}
               >
                 {openClaim === insurancePlan.id ? 'Hide' : 'How to Claim'}

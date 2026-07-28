@@ -22,13 +22,10 @@ const DEFAULT: RouteLayoutConfig = {
 
 const ROUTE_OVERRIDES: Record<string, Partial<RouteLayoutConfig>> = {
   '/dashboard': { hideGlobalTopBar: true, noTopOffset: true },
-  '/plans': { hideGlobalTopBar: true, noTopOffset: true },
-  '/advisor': { hideGlobalTopBar: true, noTopOffset: true, fullBleed: true },
   '/transactions': {
     scrollMode: 'table',
     tableScrollShell: true,
-    hideGlobalTopBar: true,
-    noTopOffset: true,
+    // Global top bar shows "Transactions"; page chrome sticks under it.
   },
 };
 

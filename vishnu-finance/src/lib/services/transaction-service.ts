@@ -42,7 +42,7 @@ const PATTERN_RULES: Array<[string[], string]> = [
   [['subscription', 'monthly', 'renewal', 'autopay'], 'subscriptions'],
   [['gift', 'rakhi', 'shagun', 'mehendi', 'henna', 'birthday', 'anniversary', 'festival', 'donation', 'charity'], 'gifts & donations'],
   [['salon', 'parlour', 'haircut', 'beauty', 'wheel', 'dettol', 'soap', 'shampoo', 'gum', 'prints', 'stationery'], 'personal care'],
-  [['zerodha', 'groww', 'upstox', 'mutual fund', 'sip', 'fd', 'stock', 'trading'], 'investment'],
+  [['zerodha', 'groww', 'upstox', 'mutual fund', 'sip', 'fixed deposit', 'demat', 'trading'], 'investment'],
   [['insurance', 'lic', 'policy', 'premium'], 'insurance'],
   [['school', 'college', 'tuition', 'coaching', 'course', 'training'], 'education'],
   [['rent', 'landlord', 'society', 'maintenance', 'flat', 'apartment'], 'housing'],

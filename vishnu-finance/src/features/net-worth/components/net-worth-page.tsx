@@ -4,15 +4,21 @@ import { NetWorthSection } from '@/features/settings/components/net-worth-sectio
 import { PageMandate } from '@/components/layout/page-mandate';
 import { patterns } from '@/design/patterns';
 import { cn } from '@/lib/utils';
+import type { NetWorthBreakdown } from '@/lib/net-worth-service';
 
-export default function NetWorthPage() {
+interface NetWorthPageProps {
+  initialData?: NetWorthBreakdown;
+}
+
+export default function NetWorthPage({ initialData }: NetWorthPageProps) {
   return (
     <div className={cn(patterns.pageColumn, 'space-y-6')}>
       <PageMandate
         title="Assets & debt"
         mandate="What you own minus what you owe — not the same as bank balance on Transactions."
+        hideTitleOnMobile
       />
-      <NetWorthSection />
+      <NetWorthSection initialData={initialData} />
     </div>
   );
 }

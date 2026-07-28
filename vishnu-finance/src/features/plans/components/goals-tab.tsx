@@ -13,7 +13,6 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { patterns } from '@/design/patterns';
 import { cn } from '@/lib/utils';
 import {
   ArrowUpRight,
@@ -412,7 +411,7 @@ export default function GoalsPageClient({
         )}
       >
         {disciplineSummary && disciplineSummary.capacity.available > 0 && goals.length > 0 && (
-          <section className="card-base border-[var(--success)]/30 bg-[var(--success)]/5 p-3">
+          <section className="rounded-2xl border border-[var(--success)]/35 bg-[var(--success)]/10 p-3">
             <p className="text-sm font-medium text-foreground">Fund goals from plan headroom</p>
             <p className="mt-1 text-xs text-muted">
               You have {formatDisciplineCurrency(disciplineSummary.capacity.available)} available this month from
@@ -421,8 +420,8 @@ export default function GoalsPageClient({
             <Button
               type="button"
               size="sm"
-              variant="outline"
-              className="mt-2 h-8"
+              variant="ghost"
+              className="mt-2 h-8 bg-surface px-2.5"
               onClick={() => {
                 const behind = goals.find((g) => g.status === 'ACTIVE');
                 if (behind) openContributionDialog(behind);
@@ -457,30 +456,50 @@ export default function GoalsPageClient({
         ) : null}
 
         {!isEmbedded ? (
-          <section className={cn(patterns.cardGrid, 'lg:grid-cols-4')}>
-            <div className="card-base p-4">
-              <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-hint">Total target</p>
-              <p className="mt-2 text-2xl font-medium tabular-nums numeric">{formatCurrency(goalStats.totalTarget)}</p>
-              <p className="mt-1 text-xs text-muted">{goalStats.total} goals</p>
+          <section className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+            <div className="min-w-0 rounded-xl border border-border/70 bg-card/80 p-2.5 sm:p-3">
+              <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted">Total target</p>
+              <p className="mt-1 text-base font-semibold tabular-nums sm:text-lg">{formatCurrency(goalStats.totalTarget)}</p>
+              <p className="mt-0.5 text-[10px] text-muted">{goalStats.total} goals</p>
             </div>
-            <div className="card-base p-4">
-              <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-hint">Saved so far</p>
-              <p className="mt-2 text-2xl font-medium tabular-nums numeric">{formatCurrency(goalStats.totalCurrent)}</p>
-              <p className="mt-1 text-xs text-muted">{goalStats.progressPercent}% progress</p>
+            <div className="min-w-0 rounded-xl border border-border/70 bg-card/80 p-2.5 sm:p-3">
+              <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted">Saved so far</p>
+              <p className="mt-1 text-base font-semibold tabular-nums sm:text-lg">{formatCurrency(goalStats.totalCurrent)}</p>
+              <p className="mt-0.5 text-[10px] text-muted">{goalStats.progressPercent}% progress</p>
             </div>
-            <div className="card-base p-4">
-              <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-hint">Active</p>
-              <p className="mt-2 text-2xl font-medium tabular-nums numeric">{goalStats.active}</p>
+            <div className="min-w-0 rounded-xl border border-border/70 bg-card/80 p-2.5 sm:p-3">
+              <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted">Active</p>
+              <p className="mt-1 text-base font-semibold tabular-nums sm:text-lg">{goalStats.active}</p>
             </div>
-            <div className="card-base p-4">
-              <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-hint">Completed</p>
-              <p className="mt-2 text-2xl font-medium tabular-nums numeric">{goalStats.completed}</p>
+            <div className="min-w-0 rounded-xl border border-border/70 bg-card/80 p-2.5 sm:p-3">
+              <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted">Completed</p>
+              <p className="mt-1 text-base font-semibold tabular-nums sm:text-lg">{goalStats.completed}</p>
             </div>
           </section>
-        ) : null}
+        ) : (
+          <section className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+            <div className="min-w-0 rounded-xl border border-border/70 bg-card/80 p-2.5 sm:p-3">
+              <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted">Saved</p>
+              <p className="mt-1 text-base font-semibold tabular-nums sm:text-lg">{formatCurrency(goalStats.totalCurrent)}</p>
+              <p className="mt-0.5 text-[10px] text-muted">{goalStats.progressPercent}% of target</p>
+            </div>
+            <div className="min-w-0 rounded-xl border border-border/70 bg-card/80 p-2.5 sm:p-3">
+              <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted">Target</p>
+              <p className="mt-1 text-base font-semibold tabular-nums sm:text-lg">{formatCurrency(goalStats.totalTarget)}</p>
+            </div>
+            <div className="min-w-0 rounded-xl border border-border/70 bg-card/80 p-2.5 sm:p-3">
+              <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted">Active</p>
+              <p className="mt-1 text-base font-semibold tabular-nums sm:text-lg">{goalStats.active}</p>
+            </div>
+            <div className="min-w-0 rounded-xl border border-border/70 bg-card/80 p-2.5 sm:p-3">
+              <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted">Done</p>
+              <p className="mt-1 text-base font-semibold tabular-nums sm:text-lg">{goalStats.completed}</p>
+            </div>
+          </section>
+        )}
 
-        <section className="card-base overflow-hidden">
-          <div className="border-b border-border px-4 py-3">
+        <section className="overflow-hidden rounded-2xl border border-border/70 bg-card/70">
+          <div className="border-b border-border/50 px-4 py-3">
             <div className="hidden flex-wrap items-center justify-between gap-3 md:flex">
               <div className="flex flex-wrap gap-1">
                 {STATUS_FILTERS.map((s) => (

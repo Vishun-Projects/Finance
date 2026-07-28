@@ -1,12 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/api-auth';
 import { prisma } from '@/lib/db';
-import { computeNetWorth } from '@/lib/net-worth-service';
+import { computeNetWorth, EMPTY_NET_WORTH } from '@/lib/net-worth-service';
 import { AssetType, LiabilityType } from '@prisma/client';
 
 export const GET = withAuth(async (_request, user) => {
-  const breakdown = await computeNetWorth(user.id);
-  return NextResponse.json(breakdown);
+  try {
+    const breakdown = await computeNetWorth(user.id);
+    return NextResponse.json(breakdown);
+  } catch (error) {
+    console.error('[net-worth] load failed', { userId: user.id, error });
+    return NextResponse.json(EMPTY_NET_WORTH);
+  }
 });
 
 export const POST = withAuth(async (request, user) => {

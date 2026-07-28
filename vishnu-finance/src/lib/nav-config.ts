@@ -10,6 +10,7 @@ import {
   LineChart,
   Landmark,
   FileBarChart,
+  PieChart,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -44,6 +45,7 @@ export const desktopNavSections: NavSection[] = [
       { href: '/investments', label: 'Investments', icon: LineChart },
       { href: '/net-worth', label: 'Net Worth', icon: Landmark },
       { href: '/financial-health', label: 'Health', icon: Heart },
+      { href: '/analytics', label: 'Analytics', icon: PieChart },
       { href: '/reports', label: 'Reports', icon: FileBarChart },
     ],
   },
@@ -69,6 +71,7 @@ export const secondaryRouteTitles: Record<string, string> = {
   '/phase-plan': 'Phase Plan',
   '/net-worth': 'Assets & debt',
   '/reports': 'Reports',
+  '/analytics': 'Analytics',
   '/education/daily-news/history': 'News History',
 };
 

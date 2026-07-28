@@ -24,6 +24,17 @@ export interface NetWorthBreakdown {
   }>;
 }
 
+export const EMPTY_NET_WORTH: NetWorthBreakdown = {
+  totalAssets: 0,
+  totalLiabilities: 0,
+  netWorth: 0,
+  bankBalance: 0,
+  manualAssets: 0,
+  manualLiabilities: 0,
+  assets: [],
+  liabilities: [],
+};
+
 export async function computeNetWorth(userId: string): Promise<NetWorthBreakdown> {
   const [assets, liabilities, bankBalance] = await Promise.all([
     prisma.userAsset.findMany({

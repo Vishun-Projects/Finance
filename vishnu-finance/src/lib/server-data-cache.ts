@@ -15,12 +15,12 @@ export async function loadPlanPreviewCached(userId: string) {
     async () => {
       const [scaledPlan, dashboard] = await Promise.all([
         loadScaledMoneyPlanForUser(userId),
-        loadDashboard(userId),
+        loadDashboardCached(userId),
       ]);
       return toPlanPreviewData(scaledPlan, dashboard as unknown as Parameters<typeof toPlanPreviewData>[1]);
     },
     ['plan-preview', userId],
-    { tags: [userPagesTag(userId), planPreviewTag(userId)], revalidate: 300 },
+    { tags: [userPagesTag(userId), planPreviewTag(userId), `dashboard:${userId}`], revalidate: 300 },
   )();
 }
 
@@ -42,12 +42,12 @@ export async function loadDashboardCached(userId: string) {
 export async function loadPlansPageBootstrapCached(userId: string) {
   return unstable_cache(
     async () => {
-      const [goals, deadlines, wishlist] = await Promise.all([
+      const [goals, deadlines, wishlist, dashboard] = await Promise.all([
         loadGoals(userId),
         loadDeadlines(userId),
         loadWishlist(userId),
+        loadDashboardCached(userId),
       ]);
-      const dashboard = await loadDashboard(userId, { goals, deadlines, wishlist });
       return { goals, deadlines, wishlist, dashboard };
     },
     ['plans-bootstrap', userId],
@@ -80,7 +80,7 @@ export async function loadFinancialHealthBootstrapCached(userId: string) {
     async () => {
       const [summary, dashboard] = await Promise.all([
         analyzeUserFinances(userId),
-        loadDashboard(userId),
+        loadDashboardCached(userId),
       ]);
       return { summary, dashboard: { ...dashboard, monthContext: dashboard.monthContext } };
     },

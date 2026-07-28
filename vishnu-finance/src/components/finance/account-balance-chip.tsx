@@ -19,9 +19,9 @@ export function AccountBalanceChip({
   if (!balance?.amount && balance?.amount !== 0) {
     if (variant === 'kpi') {
       return (
-        <div className={cn('card-base p-4', className)}>
-          <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-hint">Bank balance</p>
-          <p className="mt-2 text-sm text-muted">Upload a statement to see balance</p>
+        <div className={cn('min-w-0 rounded-xl border border-border/70 bg-card/80 p-2.5 sm:p-3', className)}>
+          <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted">Bank balance</p>
+          <p className="mt-1 text-sm text-muted">Upload a statement to see balance</p>
         </div>
       );
     }
@@ -57,13 +57,19 @@ export function AccountBalanceChip({
 
   if (variant === 'kpi') {
     return (
-      <div className={cn('card-base p-4', hasWarning ? 'border-[var(--warning)]/30' : '', className)}>
-        <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-hint">Bank balance</p>
-        <p className="mt-2 flex items-center gap-1.5 text-lg font-semibold tabular-nums text-foreground sm:text-xl">
-          <Landmark className="size-4 shrink-0 text-info" />
+      <div
+        className={cn(
+          'min-w-0 rounded-xl border border-border/70 bg-card/80 p-2.5 sm:p-3',
+          hasWarning && 'border-[var(--warning)]/40',
+          className,
+        )}
+      >
+        <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted">Bank balance</p>
+        <p className="mt-1 flex items-center gap-1.5 text-base font-semibold tabular-nums text-foreground sm:text-lg">
+          <Landmark className="size-3.5 shrink-0 text-info" />
           {formatRupees(balance.amount)}
         </p>
-        <p className="mt-1 text-[10px] text-muted">
+        <p className="mt-0.5 text-[10px] text-muted">
           {asOfLabel && <>As of {asOfLabel}</>}
           {uploadedLabel && <> · PDF {uploadedLabel}</>}
         </p>

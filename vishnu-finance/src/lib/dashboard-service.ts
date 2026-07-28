@@ -14,6 +14,11 @@ interface DashboardStatsParams {
     userId: string;
     startDate: Date;
     endDate: Date;
+    preloaded?: {
+        goals?: Array<{ title: string; targetAmount: unknown; currentAmount: unknown; priority?: string | null; isActive?: boolean }>;
+        deadlines?: { count?: number; items?: Array<{ title: string; dueDate: string; amount: number }> };
+        wishlist?: { data?: Array<{ title: string; estimatedCost?: unknown }> };
+    };
 }
 
 export type { SimpleDashboardData };
@@ -108,7 +113,7 @@ async function computeMonthFinancials(userId: string, monthStart: Date, monthEnd
 }
 
 export class DashboardService {
-    async getSimpleStats({ userId, startDate, endDate }: DashboardStatsParams): Promise<SimpleDashboardData> {
+    async getSimpleStats({ userId, startDate, endDate, preloaded }: DashboardStatsParams): Promise<SimpleDashboardData> {
         const rangeStart = startDate;
         const rangeEnd = endDate;
 
@@ -117,6 +122,10 @@ export class DashboardService {
         if (cached) {
             return cached;
         }
+
+        const goalsFromPreload = preloaded?.goals;
+        const deadlinesFromPreload = preloaded?.deadlines;
+        const wishlistFromPreload = preloaded?.wishlist;
 
         const [
             transactionStats,
@@ -166,8 +175,22 @@ export class DashboardService {
                     };
                 } catch { return { _sum: { creditAmount: 0, debitAmount: 0 }, _count: 0 }; }
             })(),
-            prisma.goal.count({ where: { userId, isActive: true } }).catch(() => 0),
-            (async () => {
+            goalsFromPreload
+              ? goalsFromPreload.filter((g) => g.isActive !== false).length
+              : prisma.goal.count({ where: { userId, isActive: true } }).catch(() => 0),
+            deadlinesFromPreload?.items
+              ? Promise.resolve({
+                  count: deadlinesFromPreload.count ?? deadlinesFromPreload.items.length,
+                  next: deadlinesFromPreload.items[0]
+                    ? {
+                        title: deadlinesFromPreload.items[0].title,
+                        dueDate: new Date(deadlinesFromPreload.items[0].dueDate),
+                        amount: deadlinesFromPreload.items[0].amount,
+                      }
+                    : null,
+                  items: deadlinesFromPreload.items,
+                })
+              : (async () => {
                 try {
                     const deadlines = await prisma.deadline.findMany({
                         where: { userId, isCompleted: false },
@@ -218,7 +241,21 @@ export class DashboardService {
                     return { takeHome: netMonthly, ctc: Number(salary.baseSalary), jobTitle: salary.jobTitle, company: salary.company };
                 } catch { return null; }
             })(),
-            (async () => {
+            goalsFromPreload
+              ? Promise.resolve((() => {
+                  const activeGoals = goalsFromPreload.filter((g) => g.isActive !== false);
+                  return {
+                    activePlans: activeGoals.length,
+                    totalCommitted: activeGoals.reduce((s, p) => s + Number(p.targetAmount || 0), 0),
+                    topPlan: activeGoals[0]?.title || null,
+                    items: activeGoals.map((p) => ({
+                      name: p.title,
+                      targetAmount: Number(p.targetAmount),
+                      currentAmount: Number(p.currentAmount),
+                    })),
+                  };
+                })())
+              : (async () => {
                 try {
                     const goals = await prisma.goal.findMany({
                         where: { userId, isActive: true },
@@ -228,7 +265,17 @@ export class DashboardService {
                     return { activePlans: goals.length, totalCommitted: goals.reduce((s: number, p: any) => s + Number(p.targetAmount || 0), 0), topPlan: goals[0]?.title || null, items: goals.map(p => ({ name: p.title, targetAmount: Number(p.targetAmount), currentAmount: Number(p.currentAmount) })) };
                 } catch { return { activePlans: 0, totalCommitted: 0, topPlan: null, items: [] }; }
             })(),
-            (async () => {
+            wishlistFromPreload?.data
+              ? Promise.resolve({
+                  totalItems: wishlistFromPreload.data.length,
+                  totalCost: wishlistFromPreload.data.reduce((s, i) => s + Number(i.estimatedCost || 0), 0),
+                  topItem: wishlistFromPreload.data[0]?.title || null,
+                  items: wishlistFromPreload.data.map((i) => ({
+                    name: i.title,
+                    estimatedPrice: Number(i.estimatedCost),
+                  })),
+                })
+              : (async () => {
                 try {
                     const items = await (prisma as any).wishlistItem.findMany({ where: { userId }, take: 20 });
                     return { totalItems: items.length, totalCost: items.reduce((s: number, i: any) => s + Number(i.estimatedCost || 0), 0), topItem: items[0]?.title || null, items: items.map((i: any) => ({ name: i.title, estimatedPrice: Number(i.estimatedCost) })) };
@@ -248,7 +295,8 @@ export class DashboardService {
                           creditAmount: true,
                           debitAmount: true,
                           financialCategory: true,
-                        }
+                        },
+                        take: 500,
                     });
                     return data;
                 } catch { return []; }
@@ -287,7 +335,8 @@ export class DashboardService {
                 try {
                     const transactions = await (prisma as any).transaction.findMany({
                         where: { userId, isDeleted: false, financialCategory: 'EXPENSE', transactionDate: { gte: rangeStart, lte: rangeEnd } },
-                        select: { store: true, personName: true, debitAmount: true }
+                        select: { store: true, personName: true, debitAmount: true },
+                        take: 500,
                     });
                     
                     const payeeMap = new Map<string, { amount: number; count: number }>();
@@ -368,7 +417,11 @@ export class DashboardService {
                     store: t.store,
                     personName: t.personName,
                 }),
-                amount: Number(t.creditAmount || 0) > 0 ? Number(t.creditAmount) : -Number(t.debitAmount),
+                amount: (() => {
+                  const credit = Number(t.creditAmount) || 0;
+                  const debit = Number(t.debitAmount) || 0;
+                  return credit > 0 ? credit : -debit;
+                })(),
                 type: Number(t.creditAmount || 0) > 0 ? 'credit' : 'debit',
                 date: t.transactionDate.toISOString().split('T')[0],
                 category: t.category?.name || t.financialCategory || 'Other',

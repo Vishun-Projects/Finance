@@ -194,6 +194,7 @@ export default function FinancialHealthPageClient({
           className="mb-4"
           title="Financial health"
           mandate="Score, trends, and tax hints — a longitudinal view of your finances."
+          hideTitleOnMobile
           metrics={[
             { label: 'Health score', value: String(healthScore) },
             {

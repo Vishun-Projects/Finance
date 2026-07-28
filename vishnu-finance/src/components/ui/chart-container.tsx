@@ -19,11 +19,11 @@ export function ChartContainer({ height = 208, className, children }: ChartConta
   }, []);
 
   if (!mounted) {
-    return <div className={cn('w-full', className)} style={{ height }} aria-hidden />;
+    return <div className={cn('w-full overflow-hidden', className)} style={{ height }} aria-hidden />;
   }
 
   return (
-    <div className={cn('w-full', className)} style={{ height }}>
+    <div className={cn('w-full overflow-hidden', className)} style={{ height }}>
       <ResponsiveContainer width="100%" height={height}>
         {children}
       </ResponsiveContainer>

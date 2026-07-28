@@ -1,14 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { AppRouteLoader } from '@/components/feedback/app-route-loader';
 import { useNavigationPending } from '@/contexts/navigation-pending-context';
-import {
-  DOHERTY_THRESHOLD_MS,
-  getRouteLoaderTitle,
-  getRouteLoaderVariant,
-} from '@/lib/route-loader-variant';
+import { getRouteLoaderTitle, getRouteLoaderVariant } from '@/lib/route-loader-variant';
 import { cn } from '@/lib/utils';
 
 function normalizePath(path: string): string {
@@ -29,21 +24,11 @@ function isNavigatingTo(pathname: string, target: string): boolean {
 export function RoutePendingOverlay() {
   const pathname = usePathname();
   const { pendingHref } = useNavigationPending() ?? {};
-  const [showSkeleton, setShowSkeleton] = useState(false);
-
   const isPending = Boolean(pendingHref && isNavigatingTo(pathname, pendingHref));
 
-  useEffect(() => {
-    if (!isPending || !pendingHref) {
-      setShowSkeleton(false);
-      return;
-    }
-
-    const timer = window.setTimeout(() => setShowSkeleton(true), DOHERTY_THRESHOLD_MS);
-    return () => window.clearTimeout(timer);
-  }, [isPending, pendingHref]);
-
   if (!isPending || !pendingHref) return null;
+
+  const showSkeleton = true;
 
   const variant = getRouteLoaderVariant(pendingHref);
   const title = getRouteLoaderTitle(pendingHref);

@@ -17,11 +17,11 @@ import { DebtPayoffHint } from '@/features/net-worth/components/debt-payoff-hint
 const ASSET_TYPES = ['BANK', 'INVESTMENT', 'PROPERTY', 'VEHICLE', 'GOLD', 'OTHER'] as const;
 const LIABILITY_TYPES = ['LOAN', 'CREDIT_CARD', 'MORTGAGE', 'OTHER'] as const;
 
-export function NetWorthSection() {
+export function NetWorthSection({ initialData }: { initialData?: NetWorthBreakdown | null }) {
   const { formatCurrency } = useCurrency();
   const { success, error: showError } = useToast();
-  const [data, setData] = useState<NetWorthBreakdown | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<NetWorthBreakdown | null>(initialData ?? null);
+  const [loading, setLoading] = useState(initialData == null);
   const [assetName, setAssetName] = useState('');
   const [assetAmount, setAssetAmount] = useState('');
   const [assetType, setAssetType] = useState<string>('OTHER');
@@ -43,8 +43,9 @@ export function NetWorthSection() {
   }, [showError]);
 
   useEffect(() => {
+    if (initialData != null) return;
     void load();
-  }, [load]);
+  }, [initialData, load]);
 
   const addEntry = async (kind: 'asset' | 'liability') => {
     const name = kind === 'asset' ? assetName : liabilityName;

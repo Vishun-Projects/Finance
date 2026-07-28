@@ -15,7 +15,6 @@ import {
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { useToast } from '@/contexts/ToastContext';
 import { cn, formatCompactRupees, toNumber } from '@/lib/utils';
-import { patterns } from '@/design/patterns';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -304,45 +303,45 @@ export default function WishlistPageClient({
         ) : null}
 
         {!isEmbedded ? (
-          <section className={cn(patterns.cardGrid, 'lg:grid-cols-4')}>
-            <div className="card-base p-4">
-              <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-hint">Pending</p>
-              <p className="mt-2 text-2xl font-medium tabular-nums numeric">{wishlistStats.pending}</p>
+          <section className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+            <div className="min-w-0 rounded-xl border border-border/70 bg-card/80 p-2.5 sm:p-3">
+              <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted">Pending</p>
+              <p className="mt-1 text-base font-semibold tabular-nums sm:text-lg">{wishlistStats.pending}</p>
             </div>
-            <div className="card-base p-4">
-              <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-hint">Completed</p>
-              <p className="mt-2 text-2xl font-medium tabular-nums numeric">{wishlistStats.completed}</p>
+            <div className="min-w-0 rounded-xl border border-border/70 bg-card/80 p-2.5 sm:p-3">
+              <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted">Completed</p>
+              <p className="mt-1 text-base font-semibold tabular-nums sm:text-lg">{wishlistStats.completed}</p>
             </div>
-            <div className="card-base p-4">
-              <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-hint">Estimated total</p>
-              <p className="mt-2 text-2xl font-medium tabular-nums numeric">{formatRupees(wishlistStats.totalCost)}</p>
+            <div className="min-w-0 rounded-xl border border-border/70 bg-card/80 p-2.5 sm:p-3">
+              <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted">Estimated total</p>
+              <p className="mt-1 text-base font-semibold tabular-nums sm:text-lg">{formatRupees(wishlistStats.totalCost)}</p>
             </div>
-            <div className="card-base p-4">
-              <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-hint">Set-aside/mo</p>
-              <p className="mt-2 text-2xl font-medium tabular-nums numeric">
+            <div className="min-w-0 rounded-xl border border-border/70 bg-card/80 p-2.5 sm:p-3">
+              <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted">Set-aside/mo</p>
+              <p className="mt-1 text-base font-semibold tabular-nums sm:text-lg">
                 {formatDisciplineCurrency(wishlistStats.monthlyRequired)}
               </p>
             </div>
           </section>
         ) : (
-          <section className={cn(patterns.cardGrid, 'grid-cols-2 lg:grid-cols-4')}>
-            <div className="card-base min-w-0 p-3">
-              <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-hint">Pending</p>
-              <p className="mt-1 text-base font-semibold tabular-nums numeric sm:text-xl">{wishlistStats.pending}</p>
+          <section className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+            <div className="min-w-0 rounded-xl border border-border/70 bg-card/80 p-2.5 sm:p-3">
+              <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted">Pending</p>
+              <p className="mt-1 text-base font-semibold tabular-nums sm:text-lg">{wishlistStats.pending}</p>
             </div>
-            <div className="card-base min-w-0 p-3">
-              <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-hint">Total cost</p>
+            <div className="min-w-0 rounded-xl border border-border/70 bg-card/80 p-2.5 sm:p-3">
+              <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted">Total cost</p>
               <p
-                className="mt-1 text-base font-semibold tabular-nums numeric sm:text-xl"
+                className="mt-1 text-base font-semibold tabular-nums sm:text-lg"
                 title={formatRupees(wishlistStats.totalCost)}
               >
                 {formatCompactRupees(wishlistStats.totalCost)}
               </p>
             </div>
-            <div className="card-base min-w-0 p-3">
-              <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-hint">Set-aside/mo</p>
+            <div className="min-w-0 rounded-xl border border-border/70 bg-card/80 p-2.5 sm:p-3">
+              <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted">Set-aside/mo</p>
               <p
-                className="mt-1 text-base font-semibold tabular-nums numeric sm:text-xl"
+                className="mt-1 text-base font-semibold tabular-nums sm:text-lg"
                 title={formatDisciplineCurrency(wishlistStats.monthlyRequired)}
               >
                 {wishlistStats.monthlyRequired >= 1000
@@ -350,15 +349,15 @@ export default function WishlistPageClient({
                   : formatDisciplineCurrency(wishlistStats.monthlyRequired)}
               </p>
             </div>
-            <div className="card-base min-w-0 p-3">
-              <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-hint">High priority</p>
-              <p className="mt-1 text-base font-semibold tabular-nums numeric sm:text-xl">{wishlistStats.highPriority}</p>
+            <div className="min-w-0 rounded-xl border border-border/70 bg-card/80 p-2.5 sm:p-3">
+              <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted">High priority</p>
+              <p className="mt-1 text-base font-semibold tabular-nums sm:text-lg">{wishlistStats.highPriority}</p>
             </div>
           </section>
         )}
 
-        <section className="card-base overflow-hidden">
-          <div className="border-b border-border px-4 py-3">
+        <section className="overflow-hidden rounded-2xl border border-border/70 bg-card/70">
+          <div className="border-b border-border/50 px-4 py-3">
             <div className="hidden flex-wrap items-center justify-between gap-3 md:flex">
               <div className="flex flex-wrap gap-1">
                 {(['all', 'pending', 'completed'] as const).map((s) => (

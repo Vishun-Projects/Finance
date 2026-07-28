@@ -15,6 +15,7 @@ export function getRouteLoaderVariant(pathname: string): AppRouteLoaderVariant {
   if (pathname.startsWith('/investments')) return 'investments';
   if (pathname.startsWith('/net-worth') || pathname.startsWith('/phase-plan')) return 'net-worth';
   if (pathname.startsWith('/reports')) return 'reports';
+  if (pathname.startsWith('/analytics')) return 'reports';
   if (pathname.startsWith('/education')) return 'education';
   return 'generic';
 }

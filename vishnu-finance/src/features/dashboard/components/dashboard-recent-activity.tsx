@@ -22,19 +22,29 @@ interface RecentTransaction {
 interface DashboardRecentActivityProps {
   transactions: RecentTransaction[];
   className?: string;
+  /** When true, show hint that activity exists elsewhere this month */
+  hasMonthActivity?: boolean;
 }
 
-export function DashboardRecentActivity({ transactions, className }: DashboardRecentActivityProps) {
+export function DashboardRecentActivity({
+  transactions,
+  className,
+  hasMonthActivity = false,
+}: DashboardRecentActivityProps) {
   if (transactions.length === 0) {
     return (
       <section className={cn('card-base p-3', className)}>
         <h2 className="text-sm font-medium text-foreground">Recent activity</h2>
-        <p className="mt-2 text-xs text-muted">No transactions this month.</p>
+        <p className="mt-2 text-xs text-muted">
+          {hasMonthActivity
+            ? 'No recent transactions in this view. Open Transactions for the full list.'
+            : 'No transactions this month.'}
+        </p>
         <Link
           href="/transactions"
           className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-foreground"
         >
-          Add a transaction
+          {hasMonthActivity ? 'View all transactions' : 'Add a transaction'}
           <ArrowRight className="size-3" />
         </Link>
       </section>

@@ -25,7 +25,7 @@ export function DashboardSearchBar({ className }: DashboardSearchBarProps) {
   return (
     <div className={cn('flex items-center gap-2', className)}>
       <form
-        className="flex min-w-0 flex-1 items-center gap-2 rounded-full border border-border bg-card px-3 py-2.5"
+        className="flex min-w-0 flex-1 items-center gap-2 rounded-full bg-surface px-3 py-2.5"
         onSubmit={(e) => {
           e.preventDefault();
           goSearch(query);
@@ -44,7 +44,7 @@ export function DashboardSearchBar({ className }: DashboardSearchBarProps) {
       <button
         type="button"
         onClick={() => goSearch()}
-        className="btn-touch flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-card px-3 py-2.5 text-xs font-medium text-foreground"
+        className="btn-touch flex shrink-0 items-center gap-1.5 rounded-full bg-surface px-3 py-2.5 text-xs font-medium text-foreground hover:bg-muted/50"
       >
         <Calendar className="size-3.5 text-muted" />
         Month

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback, useRef, useOptimistic } from 'react';
 import Link from 'next/link';
-import { Plus, Search, Filter, X, RefreshCw, CheckSquare, Square, Trash2, RotateCw, Tag, Layers, ChevronLeft, ChevronRight, Sparkles, Check, Calendar as CalendarIcon, FileText, Upload, AlertCircle, TrendingUp, ChevronDown, Edit, Download, ArrowUp, ShoppingCart, Utensils, Zap, ShoppingBag, BrainCircuit, Sun, Moon, Link2, MoreHorizontal } from 'lucide-react';
+import { Plus, Search, Filter, X, RefreshCw, CheckSquare, Square, Trash2, RotateCw, Tag, Layers, ChevronLeft, ChevronRight, Sparkles, Check, Calendar as CalendarIcon, FileText, Upload, AlertCircle, TrendingUp, ChevronDown, Edit, Download, ArrowUp, ShoppingCart, Utensils, Zap, ShoppingBag, BrainCircuit, Link2, MoreHorizontal } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { ChartContainer } from '@/components/ui/chart-container';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Cell } from 'recharts';
@@ -13,7 +13,6 @@ import { useToast } from '@/contexts/ToastContext';
 import { Transaction, TransactionCategory } from '@/types';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { useTheme } from '@/contexts/ThemeContext';
 import { format, startOfMonth, subDays } from 'date-fns';
 import { DateRange } from 'react-day-picker';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -28,7 +27,6 @@ import { Chip } from '@/components/ui/chip';
 import { Callout } from '@/components/ui/callout';
 import { useMobileRefreshRegister } from '@/contexts/MobileRefreshContext';
 import { useScrollOwner } from '@/contexts/scroll-owner-context';
-import { NavPill, NavPillGroup } from '@/components/ui/nav-pill';
 import { patterns } from '@/design/patterns';
 import { Combobox } from '@/components/ui/combobox';
 import { Button } from '@/components/ui/button';
@@ -37,7 +35,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { calculateTotalsByCategory, formatCurrency } from '@/lib/transaction-utils';
 import { cn } from '@/lib/utils';
-import { getTransactionDisplayName } from '@/lib/transaction-utils';
+import { getTransactionDisplayName, getTransactionAmount } from '@/lib/transaction-utils';
 import type { ISODateRange } from '@/lib/date-range';
 import DeleteConfirmationDialog from './delete-confirmation-dialog';
 import ParsedTransactionsReviewModal from './parsed-transactions-review-modal';
@@ -50,6 +48,8 @@ import { toLocalISODate } from '@/lib/date-range';
 import { AccountBalanceChip } from '@/components/finance/account-balance-chip';
 import { MonthAtGlanceKpis } from '@/components/finance/month-at-glance-kpis';
 import { PageMandate } from '@/components/layout/page-mandate';
+import { StickyTabBar } from '@/components/ui/sticky-tab-bar';
+import { MobileStickyTabs } from '@/components/ui/mobile-sticky-tabs';
 import { clearAllAppRouteBootstraps, useRouteBootstrap } from '@/hooks/use-route-bootstrap';
 import { usePendingAction } from '@/hooks/use-pending-action';
 import type { CurrentAccountBalance } from '@/lib/account-balance-service';
@@ -100,7 +100,7 @@ export interface TransactionsBootstrap {
   categories?: { id: string; name: string; type: 'INCOME' | 'EXPENSE'; color?: string }[];
   pagination?: { total: number; page: number; pageSize: number; totalPages: number };
   totals?: { income: number; expense: number } | null;
-  range?: ISODateRange;
+  range?: ISODateRange & { range?: string };
   userId?: string;
 }
 
@@ -141,7 +141,6 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
   const { success, error: showError } = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { theme, setTheme, isDark } = useTheme();
 
   const resolvedUserId = user?.id ?? bootstrap?.userId ?? null;
   const activeBootstrap = useRouteBootstrap('/transactions', bootstrap ?? {
@@ -149,7 +148,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
     categories: [],
     totals: null,
     userId: resolvedUserId ?? '',
-  });
+  }, { userId: resolvedUserId });
   const bootstrapRange = activeBootstrap?.range;
 
   // State
@@ -209,7 +208,6 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
     },
     [scrollOwner],
   );
-  const isDarkMode = isDark;
 
 
   // PDF Import state
@@ -254,7 +252,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
   const [importPreviewLoading, setImportPreviewLoading] = useState(false);
   const [categoryOverrides, setCategoryOverrides] = useState<Record<string, string>>({});
 
-  const hasBootstrapTransactionsRef = useRef(Boolean(bootstrap?.transactions?.length));
+  const hasBootstrapTransactionsRef = useRef(activeBootstrap?.range != null);
   const hasBootstrapCategoriesRef = useRef(Boolean(bootstrap?.categories?.length));
   const filterBarRef = useRef<HTMLDivElement | null>(null);
   const selectionToolbarRef = useRef<HTMLDivElement | null>(null);
@@ -764,15 +762,48 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
     fetchCategories();
   }, [resolvedUserId, fetchCategories]);
 
+  const canUseBootstrap = useMemo(() => {
+    if (!activeBootstrap?.range) return false;
+    return (
+      activeBootstrap.range.startDate === startDate &&
+      activeBootstrap.range.endDate === endDate &&
+      activeBootstrap.range.range === quickRange &&
+      financialCategory === 'ALL' &&
+      !currentSearchTerm &&
+      !selectedCategoryId &&
+      amountPreset === 'all' &&
+      !showDeleted &&
+      !lineItemFilter
+    );
+  }, [
+    activeBootstrap?.range,
+    startDate,
+    endDate,
+    quickRange,
+    financialCategory,
+    currentSearchTerm,
+    selectedCategoryId,
+    amountPreset,
+    showDeleted,
+    lineItemFilter,
+  ]);
+
   useEffect(() => {
     if (!resolvedUserId) {
+      return;
+    }
+
+    if (canUseBootstrap && hasBootstrapTransactionsRef.current) {
+      hasBootstrapTransactionsRef.current = false;
+      void fetchDailySpend();
+      void fetchCategoryBreakdown();
       return;
     }
 
     const showSpinner = !hasBootstrapTransactionsRef.current;
     hasBootstrapTransactionsRef.current = false;
     fetchTransactions({ showSpinner });
-  }, [resolvedUserId, fetchTransactions]);
+  }, [resolvedUserId, fetchTransactions, canUseBootstrap, fetchDailySpend, fetchCategoryBreakdown]);
 
   useMobileRefreshRegister(
     useCallback(async () => {
@@ -2170,31 +2201,21 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
     >
 
       {!isLoading && (
-        <div className="safe-top mb-3 flex shrink-0 items-start justify-between gap-2 lg:hidden">
+        <div className="mb-2 shrink-0 lg:mb-3">
           <PageMandate
-            className="min-w-0 flex-1"
+            className="min-w-0"
+            hideTitleOnMobile
             title="Transactions"
-            mandate="All money movement — import, categorize, search, and export."
+            mandate="Import, categorize, search, and export."
             metrics={[
               {
-                label: 'Bank balance',
+                label: 'Bank',
                 value: accountBalance?.amount != null ? formatAmount(accountBalance.amount) : '—',
               },
-              { label: 'Income', value: formatAmount(income), tone: 'success' },
-              { label: 'Expenses', value: formatAmount(expense), tone: 'danger' },
+              { label: 'In', value: formatAmount(income), tone: 'success' },
+              { label: 'Out', value: formatAmount(expense), tone: 'danger' },
             ]}
           />
-          <div className="flex shrink-0 flex-col items-center gap-1 pt-0.5">
-            <button
-              type="button"
-              onClick={() => setTheme(isDarkMode ? 'light' : 'dark')}
-              className="btn-touch flex size-9 items-center justify-center rounded-full border border-border/60 text-muted hover:bg-surface hover:text-foreground"
-              aria-label="Toggle theme"
-              suppressHydrationWarning
-            >
-              {isDarkMode ? <Moon className="size-4" /> : <Sun className="size-4" />}
-            </button>
-          </div>
         </div>
       )}
 
@@ -2204,16 +2225,26 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
           <Input
             type="text"
             placeholder="Search transactions..."
-            className="h-9 rounded-md border-border bg-card pl-9 text-sm"
+            className="h-9 rounded-md border-border/50 bg-background pl-9 text-sm"
             value={localSearch}
             onChange={(e) => handleSearch(e.target.value)}
           />
         </div>
-        <NavPillGroup className="shrink-0">
+        <div className="flex shrink-0 gap-1 rounded-md bg-surface p-0.5">
           {(['daily', 'weekly', 'monthly'] as const).map((p) => (
-            <NavPill key={p} label={p} active={period === p} onClick={() => handlePeriodChange(p)} />
+            <button
+              key={p}
+              type="button"
+              onClick={() => handlePeriodChange(p)}
+              className={cn(
+                'h-8 rounded-md px-2.5 text-xs font-medium capitalize transition-colors',
+                period === p ? 'bg-primary/15 text-primary' : 'text-muted hover:text-foreground',
+              )}
+            >
+              {p}
+            </button>
           ))}
-        </NavPillGroup>
+        </div>
         <Button variant="outline" size="sm" onClick={() => setIsFilterOpen(true)}>
           <Filter className="mr-2 size-3.5" />
           Filters
@@ -2272,23 +2303,23 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
         </Callout>
       )}
 
-      {/* Mobile chrome — shrink-0 so list panel gets remaining height */}
-      <div className="mb-3 flex shrink-0 flex-col gap-2 lg:hidden">
+      {/* Mobile chrome — mandate scrolls; search + period + view tabs stay sticky */}
+      <StickyTabBar underGlobalTopBar className="mb-3 space-y-2 lg:hidden">
         <div className="flex items-center gap-2">
           <div className="relative min-w-0 flex-1">
             <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-hint" />
             <Input
               type="text"
               placeholder="Search transactions..."
-              className="h-9 rounded-md border-border bg-card pl-9 text-sm"
+              className="h-9 rounded-md border-border/50 bg-background pl-9 text-sm"
               value={localSearch}
               onChange={(e) => handleSearch(e.target.value)}
             />
           </div>
           <Button
-            variant="outline"
+            variant="ghost"
             size="sm"
-            className="btn-touch shrink-0 px-2.5"
+            className="btn-touch shrink-0 bg-surface px-2.5"
             onClick={() => setMobileToolsOpen(true)}
             aria-label="More actions"
           >
@@ -2303,37 +2334,32 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
             <Plus className="size-4" />
           </Button>
         </div>
-        <div className="flex w-full flex-col gap-0 lg:hidden">
-          <NavPillGroup variant="segmented" className="w-full -mx-4 px-4">
-            {(['daily', 'weekly', 'monthly'] as const).map((p) => (
-              <NavPill
-                key={p}
-                variant="segmented"
-                label={p}
-                active={period === p}
-                onClick={() => handlePeriodChange(p)}
-              />
-            ))}
-          </NavPillGroup>
-          <NavPillGroup variant="segmented" className="w-full -mx-4 px-4">
-            {(
-              [
-                ['list', 'List'],
-                ['calendar', 'Cal'],
-                ['breakdown', 'Stats'],
-              ] as const
-            ).map(([panel, label]) => (
-              <NavPill
-                key={panel}
-                variant="segmented"
-                label={label}
-                active={mobilePanel === panel}
-                onClick={() => setMobilePanel(panel)}
-              />
-            ))}
-          </NavPillGroup>
+        <div className="flex gap-1 overflow-x-auto scrollbar-none">
+          {(['daily', 'weekly', 'monthly'] as const).map((p) => (
+            <button
+              key={p}
+              type="button"
+              onClick={() => handlePeriodChange(p)}
+              className={cn(
+                'h-7 shrink-0 rounded-md px-2.5 text-xs font-medium capitalize transition-colors',
+                period === p ? 'bg-primary/15 text-primary' : 'bg-surface text-muted hover:text-foreground',
+              )}
+            >
+              {p}
+            </button>
+          ))}
         </div>
-      </div>
+        <MobileStickyTabs
+          sticky={false}
+          tabs={[
+            { id: 'list', label: 'List' },
+            { id: 'calendar', label: 'Calendar', shortLabel: 'Cal' },
+            { id: 'breakdown', label: 'Stats' },
+          ]}
+          activeId={mobilePanel}
+          onChange={(id) => setMobilePanel(id as 'list' | 'calendar' | 'breakdown')}
+        />
+      </StickyTabBar>
 
       <Sheet open={mobileToolsOpen} onOpenChange={setMobileToolsOpen}>
         <SheetContent side="bottom" className={cn(patterns.bottomSheet, 'rounded-t-2xl p-4 lg:hidden')}>
@@ -2355,11 +2381,11 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
             </Button>
           </div>
           {importStatements.length > 0 && (
-            <div className="mt-4 border-t border-border pt-3">
+            <div className="mt-4 border-t border-border/60 pt-3">
               <p className="mb-2 text-xs font-medium text-foreground">Statement imports</p>
               <ul className="max-h-40 space-y-2 overflow-y-auto text-[11px] text-muted">
                 {importStatements.slice(0, 5).map((stmt) => (
-                  <li key={stmt.id} className="rounded-md border border-border bg-surface/40 p-2">
+                  <li key={stmt.id} className="rounded-md border border-border/50 bg-surface/50 p-2">
                     <div className="flex items-center justify-between gap-2">
                       <span className="font-medium text-foreground">{stmt.bankCode}</span>
                       {stmt.isCurrentBalanceSource && (
@@ -2384,33 +2410,33 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
         </SheetContent>
       </Sheet>
 
-      <div className={cn(patterns.cardGrid, 'mb-5 hidden shrink-0 md:grid lg:grid-cols-5')}>
+      <div className="mb-4 hidden shrink-0 gap-2 md:grid md:grid-cols-2 lg:grid-cols-5">
         {isLoading ? (
-          [1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-20 w-full rounded-md" />)
+          [1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-[72px] w-full rounded-xl bg-surface" />)
         ) : (
           <>
             <AccountBalanceChip balance={accountBalance} variant="kpi" />
             <div className="col-span-2 lg:col-span-3">
               <MonthAtGlanceKpis income={income} expenses={expense} netFlow={net} />
             </div>
-            <div className="card-base hidden p-4 md:block">
-              <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-hint">Count</p>
-              <p className="mt-2 text-xl font-medium tabular-nums text-foreground">{count}</p>
+            <div className="hidden min-w-0 rounded-xl border border-border/70 bg-card/80 p-2.5 md:block sm:p-3">
+              <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted">Count</p>
+              <p className="mt-1 text-base font-semibold tabular-nums text-foreground sm:text-lg">{count}</p>
             </div>
           </>
         )}
       </div>
 
-      <div className="transactions-layout-grid grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_17.5rem] xl:grid-cols-[minmax(0,1fr)_19rem]">
+      <div className="transactions-layout-grid grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_17.5rem] xl:grid-cols-[minmax(0,1fr)_19rem]">
         <div className={cn(
           'flex h-full min-h-0 min-w-0 flex-col overflow-hidden',
           mobilePanel !== 'list' && 'hidden lg:flex'
         )}>
-            <section className="card-base hidden h-full min-h-0 flex-col overflow-hidden lg:flex">
+            <section className="hidden h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-border/70 bg-card/70 lg:flex">
               <div className="scrollbar-none min-h-0 flex-1 overflow-x-hidden overflow-y-auto max-lg:scroll-pb-bottom-bar max-lg:pb-bottom-bar">
               <table className="w-full table-fixed text-left text-sm">
-                <thead className="sticky top-0 z-10 bg-surface">
-                  <tr className="border-b border-border">
+                <thead className="sticky top-0 z-10 bg-surface/95 backdrop-blur-sm">
+                  <tr className="border-b border-border/60">
                     {showSelectionMode && (
                       <th className="w-8 px-2 py-2">
                         <button
@@ -2459,9 +2485,9 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
                       return sortedDates.map(dateKey => (
                         <React.Fragment key={dateKey}>
                           {/* Section Header */}
-                          <tr className="bg-surface/80">
+                          <tr className="bg-surface/60">
                             <td colSpan={showSelectionMode ? 5 : 4} className="px-3 py-1.5">
-                              <span className="text-[10px] font-medium uppercase tracking-[0.08em] text-hint">
+                              <span className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted">
                                 {dateKey === 'undated' ? 'Undated' : format(new Date(dateKey), 'EEEE, d MMM yyyy')}
                               </span>
                             </td>
@@ -2518,15 +2544,15 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
               )}
             </section>
 
-            <div className="card-base flex min-h-0 flex-1 flex-col overflow-hidden lg:hidden">
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border/70 bg-card/70 lg:hidden">
               <div
                 ref={mobilePanel === 'list' ? bindPanelScrollRef : undefined}
                 className="scrollbar-none min-h-0 flex-1 overflow-y-auto pb-bottom-bar scroll-pb-bottom-bar"
               >
               {isLoading && !transactions.length ? (
-                <div className="space-y-4 p-4">
+                <div className="space-y-3 p-3">
                   {[1, 2, 3].map((i) => (
-                    <Skeleton key={i} className="h-24 w-full rounded-md" />
+                    <Skeleton key={i} className="h-20 w-full rounded-xl bg-surface" />
                   ))}
                 </div>
               ) : filteredTransactions.length === 0 ? (
@@ -2542,15 +2568,15 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
 
                 return sortedDates.map(dateKey => (
                   <div key={dateKey}>
-                    <div className="border-b border-border bg-surface px-4 py-2">
-                      <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-hint">
+                    <div className="border-b border-border/50 bg-surface/60 px-4 py-2">
+                      <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted">
                         {dateKey === 'undated' ? 'Undated' : format(new Date(dateKey), 'EEEE, MMM d')}
                       </span>
                     </div>
                     {groups[dateKey].map(transaction => {
                       const isIncome = transaction.financialCategory === 'INCOME';
                       const isExpense = transaction.financialCategory === 'EXPENSE';
-                      const amount = transaction.creditAmount || transaction.debitAmount || 0;
+                      const amount = Number(getTransactionAmount(transaction)) || 0;
                       const isSelected = selectedIds.has(transaction.id);
                       const brand = (transaction as any).rawData?.brand;
                       const displayName = getTransactionDisplayName({
@@ -2590,7 +2616,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
               })()}
               </div>
               {hasMoreToLoad && (
-                <div className="shrink-0 border-t border-border p-3">
+                <div className="shrink-0 border-t border-border/60 p-3">
                   <Button
                     variant="outline"
                     className="w-full"
@@ -2607,15 +2633,15 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
         </div>
 
         <aside className={cn(
-          'card-base flex h-full min-h-0 w-full shrink-0 flex-col overflow-hidden',
+          'flex h-full min-h-0 w-full shrink-0 flex-col overflow-hidden rounded-2xl border border-border/70 bg-card/70',
           mobilePanel === 'list' ? 'hidden lg:flex' : 'flex'
         )}>
           {importStatements.length > 0 && (
-            <div className="hidden shrink-0 border-b border-border px-3 py-3 md:block">
-              <p className="mb-2 text-[10px] font-medium uppercase tracking-[0.08em] text-hint">Statement imports</p>
+            <div className="hidden shrink-0 border-b border-border/60 px-3 py-3 md:block">
+              <p className="mb-2 text-[10px] font-medium uppercase tracking-[0.08em] text-muted">Statement imports</p>
               <ul className="max-h-28 space-y-2 overflow-y-auto text-[11px]">
                 {importStatements.slice(0, 4).map((stmt) => (
-                  <li key={stmt.id} className="rounded-md border border-border bg-surface/40 p-2">
+                  <li key={stmt.id} className="rounded-md border border-border/50 bg-surface/50 p-2">
                     <div className="flex items-center justify-between gap-2">
                       <span className="font-medium text-foreground">{stmt.bankCode}</span>
                       {stmt.isCurrentBalanceSource && (
@@ -2662,7 +2688,7 @@ export default function TransactionUnifiedManagement({ bootstrap }: TransactionU
             mobilePanel === 'calendar' && 'hidden lg:flex',
           )}>
           <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-          <div className="flex shrink-0 items-center justify-between border-b border-border px-3 py-2">
+          <div className="flex shrink-0 items-center justify-between border-b border-border/60 px-3 py-2">
             <div>
               <h2 className="text-xs font-medium text-foreground">Breakdown</h2>
               <p className="text-[10px] text-muted">Full period · all transactions</p>
@@ -3369,7 +3395,7 @@ const TransactionRow = React.memo(({
 }) => {
   const isIncome = transaction.financialCategory === 'INCOME';
   const isExpense = transaction.financialCategory === 'EXPENSE';
-  const amount = transaction.creditAmount || transaction.debitAmount || 0;
+  const amount = Number(getTransactionAmount(transaction)) || 0;
   // Resolve display name: rawData.brand → store → personName → description
   const brand = (transaction as any).rawData?.brand;
   const displayName = getTransactionDisplayName({

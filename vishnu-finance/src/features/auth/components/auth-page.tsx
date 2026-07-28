@@ -332,9 +332,9 @@ function AuthPageInner({ initialTab }: AuthPageClientProps) {
   };
 
   return (
-    <div className="flex min-h-0 w-full flex-1 bg-background text-foreground selection:bg-primary/30 selection:text-primary-foreground lg:min-h-screen">
-      {/* Left Panel - Premium Visuals */}
-      <div className="relative hidden w-[60%] lg:flex flex-col justify-between overflow-hidden bg-card/50">
+    <div className="flex min-h-dvh w-full bg-background text-foreground selection:bg-primary/30 selection:text-primary-foreground">
+      {/* Left panel: always light-on-dark — theme tokens make text unreadable on the dark hero image */}
+      <div className="relative hidden w-[60%] lg:flex flex-col justify-between overflow-hidden bg-zinc-950 text-white">
         <div className="absolute inset-0">
           <Image
             src="/premium-auth-bg.png"
@@ -343,15 +343,15 @@ function AuthPageInner({ initialTab }: AuthPageClientProps) {
             className="object-cover opacity-90 scale-105"
             priority
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-background/80 via-background/40 to-transparent" />
-          <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-transparent to-background/20" />
+          <div className="absolute inset-0 bg-gradient-to-r from-zinc-950/85 via-zinc-950/45 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-zinc-950/90 via-transparent to-zinc-950/25" />
         </div>
 
         <a href="/about" className="relative z-10 flex items-center gap-3 p-12 transition-opacity hover:opacity-90">
-          <div className="relative flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl border border-border bg-background/50 shadow-lg backdrop-blur-md">
+          <div className="relative flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl border border-white/15 bg-white/10 shadow-lg backdrop-blur-md">
             <Image src={logoSrc} alt="Logo" width={32} height={32} className="object-contain" />
           </div>
-          <span className="text-xl font-bold tracking-wide text-foreground">{legalConfig.brandName}</span>
+          <span className="text-xl font-bold tracking-wide text-white">{legalConfig.brandName}</span>
         </a>
 
         <div className="relative z-10 p-12 max-w-2xl">
@@ -360,24 +360,24 @@ function AuthPageInner({ initialTab }: AuthPageClientProps) {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2, duration: 0.8 }}
           >
-            <h1 className="text-5xl font-bold leading-tight mb-6 tracking-tight">
-              Master your wealth with <span className="text-primary">precision</span>.
+            <h1 className="mb-6 text-5xl font-bold leading-tight tracking-tight text-white">
+              Master your wealth with <span className="text-amber-300">precision</span>.
             </h1>
-            <p className="text-lg text-muted-foreground mb-8 leading-relaxed max-w-lg">
+            <p className="mb-8 max-w-lg text-lg leading-relaxed text-white/75">
               Experience the next generation of financial intelligence. Track, analyze, and grow your net worth with institutional-grade tools.
             </p>
 
-            <div className="flex gap-6 text-sm text-muted-foreground">
+            <div className="flex gap-6 text-sm text-white/70">
               <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-primary" />
+                <CheckCircle2 className="h-4 w-4 text-amber-300" />
                 <span>Smart Analytics</span>
               </div>
               <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-primary" />
+                <CheckCircle2 className="h-4 w-4 text-amber-300" />
                 <span>Secure Vault</span>
               </div>
               <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-primary" />
+                <CheckCircle2 className="h-4 w-4 text-amber-300" />
                 <span>AI Insights</span>
               </div>
             </div>

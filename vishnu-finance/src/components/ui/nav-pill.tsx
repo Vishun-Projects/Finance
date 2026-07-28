@@ -116,7 +116,7 @@ export function NavPillGroup({ children, className, variant = 'pill' }: NavPillG
         <div
           ref={containerRef}
           className={cn(
-            'relative flex w-full border-b border-border/60',
+            'relative flex w-full border-b border-border/40 dark:border-border/55',
             className,
           )}
           role="tablist"

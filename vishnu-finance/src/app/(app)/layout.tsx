@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { requireUser } from "@/lib/auth/server-auth";
 import { AppPageShell } from "@/components/layout/app-page-shell";
 import { MainScrollContainer } from "@/components/layout/main-scroll-container";
 import { NavigationLoadingListener } from "@/components/layout/navigation-loading-listener";
@@ -12,9 +11,7 @@ export const metadata: Metadata = {
   description: "Personal Finance Management Dashboard",
 };
 
-export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  await requireUser({ redirectTo: "/auth?tab=login" });
-
+export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <NavigationPendingProvider>
       <div className="flex h-screen w-full overflow-hidden bg-background text-foreground">

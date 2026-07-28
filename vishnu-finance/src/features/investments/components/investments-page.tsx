@@ -1,16 +1,12 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import Link from 'next/link';
 import { format } from 'date-fns';
 import {
   Upload,
   Calculator,
   LineChart,
   Info,
-  Wallet,
-  TrendingUp,
-  ArrowRight,
   Search,
   Sparkles,
   Star,
@@ -21,34 +17,28 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
-import { NavPill, NavPillGroup } from '@/components/ui/nav-pill';
 import { Callout } from '@/components/ui/callout';
+import { MobileStickyTabs } from '@/components/ui/mobile-sticky-tabs';
 import { patterns } from '@/design/patterns';
 import { cn, formatCompactRupees, formatRupees } from '@/lib/utils';
 import { useToast } from '@/contexts/ToastContext';
+import { InvestmentsOverviewPanel } from '@/features/investments/components/investments-overview-panel';
+import { TabPanelTransition } from '@/components/motion/tab-panel';
 
 type TabId = 'overview' | 'research' | 'retirement' | 'cas';
 type AmountFormat = 'compact' | 'exact';
 
 const AMOUNT_FORMAT_KEY = 'investmentsAmountFormat:v1';
 
-interface InvestmentsOverview {
-  summary: {
-    investedThisYear: number;
-    avgMonthlySip: number;
-    investmentTransactionCount: number;
-    manualInvestmentAssets: number;
-    lastInvestmentDate: string | null;
-  };
-  activity: Array<{
-    label: string;
-    totalAmount: number;
-    transactionCount: number;
-    lastDate: string;
-    source: 'bank_txn' | 'manual_asset';
-  }>;
-  hasData: boolean;
-}
+const INV_TABS: Array<{ id: TabId; label: string; shortLabel: string }> = [
+  { id: 'overview', label: 'Activity', shortLabel: 'Activity' },
+  { id: 'research', label: 'Research', shortLabel: 'Research' },
+  { id: 'retirement', label: 'Retirement', shortLabel: 'Retire' },
+  { id: 'cas', label: 'Import CAS', shortLabel: 'CAS' },
+];
+
+import type { InvestmentsOverview } from '@/lib/investments-overview-service';
+import type { InvestmentsPageProps } from '@/features/investments/types';
 
 interface RankedScheme {
   scheme_code: string;
@@ -185,7 +175,7 @@ function FundSchemeList({
   }
 
   return (
-    <ul className="divide-y divide-border">
+    <ul className="divide-y divide-border/60">
       {schemes.map((s) => (
         <li key={s.scheme_code} className="px-4 py-3">
           <div className="flex flex-wrap items-start justify-between gap-2">
@@ -230,12 +220,15 @@ function FundSchemeList({
   );
 }
 
-export default function InvestmentsPage() {
+export default function InvestmentsPage({
+  initialOverview = null,
+  initialCasUpload = null,
+}: InvestmentsPageProps = {}) {
   const { success, error: showError } = useToast();
   const { format: amountFormat, setAmountFormat, fmt } = useAmountFormat();
   const [tab, setTab] = useState<TabId>('overview');
-  const [overview, setOverview] = useState<InvestmentsOverview | null>(null);
-  const [overviewLoading, setOverviewLoading] = useState(true);
+  const [overview, setOverview] = useState<InvestmentsOverview | null>(initialOverview);
+  const [overviewLoading, setOverviewLoading] = useState(initialOverview == null);
   const [mfQuery, setMfQuery] = useState('');
   const [mfResults, setMfResults] = useState<RankedScheme[]>([]);
   const [mfBasedOn, setMfBasedOn] = useState<string[]>([]);
@@ -243,7 +236,7 @@ export default function InvestmentsPage() {
   const [mfLoading, setMfLoading] = useState(false);
   const [casUploading, setCasUploading] = useState(false);
   const [casUploadStatus, setCasUploadStatus] = useState<string | null>(null);
-  const [casResult, setCasResult] = useState<CasUploadResult | null>(null);
+  const [casResult, setCasResult] = useState<CasUploadResult | null>(initialCasUpload);
   const [retirement, setRetirement] = useState(defaultRetirement);
   const [projection, setProjection] = useState<{
     yearsToRetirement: number;
@@ -283,8 +276,9 @@ export default function InvestmentsPage() {
   }, [showError]);
 
   useEffect(() => {
+    if (initialOverview != null) return;
     void loadOverview();
-  }, [loadOverview]);
+  }, [initialOverview, loadOverview]);
 
   const loadPersistedCas = useCallback(async () => {
     try {
@@ -311,8 +305,9 @@ export default function InvestmentsPage() {
   }, []);
 
   useEffect(() => {
+    if (initialCasUpload != null) return;
     void loadPersistedCas();
-  }, [loadPersistedCas]);
+  }, [initialCasUpload, loadPersistedCas]);
 
   useEffect(() => {
     if (tab === 'research') void loadSuggestions();
@@ -427,16 +422,15 @@ export default function InvestmentsPage() {
   };
 
   return (
-    <div className={cn(patterns.pageFluid, 'flex flex-col gap-5 pb-8')}>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-hint">Investments</p>
-          <h1 className="text-xl font-semibold text-foreground">Your investments</h1>
-          <p className="mt-1 text-sm text-muted">
-            SIPs and investment payments from your bank statements — plus fund research matched to your activity.
+    <div className={cn(patterns.pageFluid, 'flex flex-col gap-3 pb-8 lg:gap-4')}>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="hidden text-xl font-semibold text-foreground lg:block">Your investments</h1>
+          <p className="text-xs text-muted sm:text-sm lg:mt-1">
+            SIPs from statements, fund research, retirement estimate, and CAS import.
           </p>
         </div>
-        <div className="flex items-center gap-2 shrink-0 rounded-[13px] px-3 py-2 glass-thin glass-text">
+        <div className="flex shrink-0 items-center gap-2 self-start rounded-md bg-surface px-2.5 py-1.5 sm:self-auto">
           <span
             className={cn(
               'text-xs',
@@ -461,152 +455,39 @@ export default function InvestmentsPage() {
         </div>
       </div>
 
-      <NavPillGroup className="w-full max-w-2xl flex-wrap">
-        <NavPill label="Your activity" active={tab === 'overview'} onClick={() => setTab('overview')} />
-        <NavPill label="Fund research" active={tab === 'research'} onClick={() => setTab('research')} />
-        <NavPill label="Retirement" active={tab === 'retirement'} onClick={() => setTab('retirement')} />
-        <NavPill label="Import CAS" active={tab === 'cas'} onClick={() => setTab('cas')} />
-      </NavPillGroup>
+      <MobileStickyTabs
+        tabs={INV_TABS}
+        activeId={tab}
+        onChange={(id) => setTab(id as TabId)}
+        underGlobalTopBar
+      />
 
-      {tab === 'overview' && (
-        <div className="space-y-4">
-          {overviewLoading && (
-            <div className="grid gap-3 sm:grid-cols-3">
-              {[1, 2, 3].map((i) => (
-                <Skeleton key={i} className="h-20 rounded-[var(--radius-md)] bg-surface" />
-              ))}
-            </div>
-          )}
+      <TabPanelTransition panelKey={tab}>
+        {tab === 'overview' ? (
+          <InvestmentsOverviewPanel
+            overview={overview}
+            loading={overviewLoading}
+            fmt={fmt}
+            onOpenResearch={() => setTab('research')}
+            onOpenCas={() => setTab('cas')}
+          />
+        ) : null}
 
-          {!overviewLoading && overview && (
-            <>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <div className="card-base p-4">
-                  <p className="text-[11px] uppercase tracking-wide text-hint">Invested this year</p>
-                  <p className="mt-1 text-lg font-semibold tabular-nums text-foreground">
-                    {fmt(overview.summary.investedThisYear)}
-                  </p>
-                </div>
-                <div className="card-base p-4">
-                  <p className="text-[11px] uppercase tracking-wide text-hint">Avg monthly (12 mo)</p>
-                  <p className="mt-1 text-lg font-semibold tabular-nums text-foreground">
-                    {fmt(overview.summary.avgMonthlySip)}
-                  </p>
-                </div>
-                <div className="card-base p-4">
-                  <p className="text-[11px] uppercase tracking-wide text-hint">Investment payments</p>
-                  <p className="mt-1 text-lg font-semibold tabular-nums text-foreground">
-                    {overview.summary.investmentTransactionCount}
-                  </p>
-                </div>
-                <div className="card-base p-4">
-                  <p className="text-[11px] uppercase tracking-wide text-hint">Manual assets (settings)</p>
-                  <p className="mt-1 text-lg font-semibold tabular-nums text-foreground">
-                    {fmt(overview.summary.manualInvestmentAssets)}
-                  </p>
-                </div>
-              </div>
-
-              {!overview.hasData && (
-                <Callout variant="neutral" title="No investment activity detected yet">
-                  <p className="text-sm text-muted">
-                    Import bank PDFs on Transactions so we can detect SIPs (Zerodha, Groww, CAMS, etc.), or add
-                    investment assets under Settings → Net worth, or upload a CAS statement.
-                  </p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <Button variant="outline" size="sm" asChild>
-                      <Link href="/transactions">Import statements</Link>
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={() => setTab('cas')}>
-                      Upload CAS
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={() => setTab('research')}>
-                      Browse fund research
-                    </Button>
-                  </div>
-                </Callout>
-              )}
-
-              {overview.hasData && (
-                <section className="card-base overflow-hidden">
-                  <div className="border-b border-border px-4 py-3">
-                    <h2 className="text-sm font-medium text-foreground flex items-center gap-2">
-                      <TrendingUp className="size-4 text-primary" />
-                      Where your money went
-                    </h2>
-                    <p className="text-xs text-muted mt-0.5">
-                      Grouped from your transactions
-                      {overview.summary.lastInvestmentDate && (
-                        <> · Last payment {format(new Date(overview.summary.lastInvestmentDate), 'd MMM yyyy')}</>
-                      )}
-                    </p>
-                  </div>
-                  <ul className="divide-y divide-border">
-                    {overview.activity.map((row) => (
-                      <li key={`${row.label}-${row.source}`} className="flex items-center justify-between gap-3 px-4 py-3">
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium text-foreground truncate">{row.label}</p>
-                          <p className="text-xs text-muted">
-                            {row.transactionCount}×
-                            {row.source === 'manual_asset' ? ' · manual entry' : ' · from bank'}
-                            {' · '}
-                            {format(new Date(row.lastDate), 'd MMM yyyy')}
-                          </p>
-                        </div>
-                        <div className="text-right shrink-0">
-                          <p className="text-sm font-semibold tabular-nums text-foreground">
-                            {fmt(row.totalAmount)}
-                          </p>
-                          {row.source === 'bank_txn' && (
-                            <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" asChild>
-                              <Link href={`/transactions?search=${encodeURIComponent(row.label.slice(0, 30))}`}>
-                                View txns
-                                <ArrowRight className="ml-1 size-3" />
-                              </Link>
-                            </Button>
-                          )}
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                </section>
-              )}
-
-              <div className="flex flex-wrap gap-2">
-                <Button variant="outline" size="sm" onClick={() => setTab('research')}>
-                  <Search className="mr-1.5 size-3.5" />
-                  Fund research
-                </Button>
-                <Button variant="outline" size="sm" asChild>
-                  <Link href="/settings">
-                    <Wallet className="mr-1.5 size-3.5" />
-                    Net worth & assets
-                  </Link>
-                </Button>
-                <Button variant="outline" size="sm" asChild>
-                  <Link href="/financial-health">Tax hints (80C)</Link>
-                </Button>
-              </div>
-            </>
-          )}
-        </div>
-      )}
-
-      {tab === 'research' && (
-        <div className="space-y-4">
-          <section className="card-base p-4 sm:p-5">
-            <div className="mb-4 flex items-start gap-2">
-              <Search className="mt-0.5 size-4 shrink-0 text-primary" />
+        {tab === 'research' ? (
+        <div className="space-y-3">
+          <section className="overflow-hidden rounded-2xl border border-border/70 bg-card/70 p-3 sm:p-4">
+            <div className="mb-3 flex items-start gap-2">
+              <Search className="mt-0.5 size-4 shrink-0 text-muted" />
               <div>
-                <h2 className="text-sm font-medium text-foreground">Search mutual funds</h2>
-                <p className="text-xs text-muted">
-                  Results are ranked by fit with your detected investing activity — for research, not advice.
+                <h2 className="text-sm font-semibold text-foreground">Search mutual funds</h2>
+                <p className="text-xs leading-5 text-foreground/65">
+                  Ranked by fit with your investing activity — research only, not advice.
                 </p>
               </div>
             </div>
             <div className="flex flex-col gap-2 sm:flex-row">
               <Input
-                className="h-9 border-border bg-background"
+                className="h-9 border-border/50 bg-background"
                 placeholder="e.g. nifty, elss, large cap…"
                 value={mfQuery}
                 onChange={(e) => setMfQuery(e.target.value)}
@@ -618,21 +499,21 @@ export default function InvestmentsPage() {
             </div>
           </section>
 
-          {mfLoading && mfResults.length === 0 && (
+          {mfLoading && mfResults.length === 0 ? (
             <div className="space-y-2">
               {[1, 2, 3].map((i) => (
-                <Skeleton key={i} className="h-16 rounded-[var(--radius-md)] bg-surface" />
+                <Skeleton key={i} className="h-16 rounded-xl bg-surface" />
               ))}
             </div>
-          )}
+          ) : null}
 
           {!mfLoading || mfResults.length > 0 ? (
-            <section className="card-base overflow-hidden">
-              <div className="border-b border-border px-4 py-3">
-                <h2 className="text-sm font-medium text-foreground flex items-center gap-2">
+            <section className="overflow-hidden rounded-2xl border border-border/70 bg-card/70">
+              <div className="border-b border-border/60 px-3 py-2.5 sm:px-4">
+                <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
                   {mfMode === 'search' ? (
                     <>
-                      <Search className="size-4 text-primary" />
+                      <Search className="size-4 text-muted" />
                       Search results
                       {mfQuery.trim() ? (
                         <span className="font-normal text-muted">for “{mfQuery.trim()}”</span>
@@ -640,18 +521,16 @@ export default function InvestmentsPage() {
                     </>
                   ) : (
                     <>
-                      <Sparkles className="size-4 text-primary" />
+                      <Sparkles className="size-4 text-muted" />
                       Picked for you
                     </>
                   )}
                 </h2>
                 {mfBasedOn.length > 0 ? (
-                  <p className="text-xs text-muted mt-0.5">
-                    Based on: {mfBasedOn.join(', ')}
-                  </p>
+                  <p className="mt-0.5 text-xs text-foreground/65">Based on: {mfBasedOn.join(', ')}</p>
                 ) : (
-                  <p className="text-xs text-muted mt-0.5">
-                    Starter categories — import statements to personalize these picks
+                  <p className="mt-0.5 text-xs text-foreground/65">
+                    Starter categories — import statements to personalize
                   </p>
                 )}
               </div>
@@ -670,32 +549,31 @@ export default function InvestmentsPage() {
           <div className="flex items-start gap-2 text-xs text-muted">
             <Info className="mt-0.5 size-3.5 shrink-0" />
             <span>
-              Public fund directory (mfapi.in). Star rating = fit with your activity (not Morningstar/VR). “Top match
-              for you” is not a recommendation to buy or sell.
+              Public fund directory (mfapi.in). Stars = fit with your activity, not a buy/sell rating.
             </span>
           </div>
         </div>
-      )}
+        ) : null}
 
-      {tab === 'retirement' && (
-        <div className="space-y-4">
-          <section className="card-base p-4 sm:p-5">
-            <div className="mb-4 flex items-start gap-2">
-              <Calculator className="mt-0.5 size-4 shrink-0 text-primary" />
+        {tab === 'retirement' ? (
+        <div className="space-y-3">
+          <section className="overflow-hidden rounded-2xl border border-border/70 bg-card/70 p-3 sm:p-4">
+            <div className="mb-3 flex items-start gap-2">
+              <Calculator className="mt-0.5 size-4 shrink-0 text-muted" />
               <div>
-                <h2 className="text-sm font-medium text-foreground">Retirement savings estimate</h2>
-                <p className="text-xs text-muted">
-                  Enter your own numbers below. Use “Fill from my data” only if you want detected values applied.
+                <h2 className="text-sm font-semibold text-foreground">Retirement savings estimate</h2>
+                <p className="text-xs leading-5 text-foreground/65">
+                  Enter your numbers, or fill from detected activity.
                 </p>
               </div>
             </div>
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-2">
               {RETIREMENT_FIELDS.map(({ key, label, hint }) => (
                 <div key={key} className="space-y-1.5">
                   <Label className="text-xs text-foreground">{label}</Label>
                   <Input
                     type="number"
-                    className="h-9 border-border bg-background text-foreground"
+                    className="h-9 border-border/50 bg-background text-foreground"
                     value={retirement[key]}
                     onChange={(e) =>
                       setRetirement((prev) => ({ ...prev, [key]: Number(e.target.value) }))
@@ -705,8 +583,7 @@ export default function InvestmentsPage() {
                   overview?.summary.avgMonthlySip &&
                   overview.summary.avgMonthlySip !== retirement.monthlySip ? (
                     <p className="text-[10px] text-hint">
-                      Detected avg from bank statements: {fmt(overview.summary.avgMonthlySip)}/mo — not applied
-                      automatically.
+                      Detected avg: {fmt(overview.summary.avgMonthlySip)}/mo — not applied automatically.
                     </p>
                   ) : null}
                   {hint && key !== 'monthlySip' ? <p className="text-[10px] text-hint">{hint}</p> : null}
@@ -716,7 +593,7 @@ export default function InvestmentsPage() {
                 </div>
               ))}
             </div>
-            <div className="mt-4 flex flex-wrap gap-2">
+            <div className="mt-3 flex flex-wrap gap-1.5">
               <Button onClick={() => void runRetirementSim()}>Calculate estimate</Button>
               {overview &&
               (overview.summary.avgMonthlySip > 0 || overview.summary.manualInvestmentAssets > 0) ? (
@@ -727,46 +604,44 @@ export default function InvestmentsPage() {
             </div>
           </section>
 
-          {projection && (
-            <section className="card-base p-4 sm:p-5">
-              <div className="mb-4 flex items-center gap-2">
-                <LineChart className="size-4 text-primary" />
-                <h2 className="text-sm font-medium text-foreground">
-                  At age {retirement.retirementAge} ({projection.yearsToRetirement} years from now)
+          {projection ? (
+            <section className="overflow-hidden rounded-2xl border border-border/70 bg-card/70">
+              <div className="border-b border-border/60 px-3 py-2.5 sm:px-4">
+                <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                  <LineChart className="size-4 text-muted" />
+                  At age {retirement.retirementAge} ({projection.yearsToRetirement} years)
                 </h2>
               </div>
-              <div className="grid gap-4 sm:grid-cols-3">
-                <div>
-                  <p className="text-[11px] uppercase tracking-wide text-hint">Estimated total</p>
-                  <p className="mt-1 text-lg font-semibold tabular-nums">{fmt(projection.projectedTotal)}</p>
+              <div className="grid grid-cols-1 divide-y divide-border/60 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+                <div className="px-3 py-3 sm:px-4">
+                  <p className="text-[10px] uppercase tracking-[0.08em] text-muted">Estimated total</p>
+                  <p className="mt-0.5 text-lg font-semibold tabular-nums">{fmt(projection.projectedTotal)}</p>
                 </div>
-                <div>
-                  <p className="text-[11px] uppercase tracking-wide text-hint">You would invest</p>
-                  <p className="mt-1 text-lg font-semibold tabular-nums">{fmt(projection.totalContributions)}</p>
+                <div className="px-3 py-3 sm:px-4">
+                  <p className="text-[10px] uppercase tracking-[0.08em] text-muted">You invest</p>
+                  <p className="mt-0.5 text-lg font-semibold tabular-nums">{fmt(projection.totalContributions)}</p>
                 </div>
-                <div>
-                  <p className="text-[11px] uppercase tracking-wide text-hint">Estimated growth</p>
-                  <p className="mt-1 text-lg font-semibold tabular-nums text-[var(--success)]">
+                <div className="px-3 py-3 sm:px-4">
+                  <p className="text-[10px] uppercase tracking-[0.08em] text-muted">Est. growth</p>
+                  <p className="mt-0.5 text-lg font-semibold tabular-nums text-[var(--success)]">
                     {fmt(projection.totalGrowth)}
                   </p>
                 </div>
               </div>
             </section>
-          )}
+          ) : null}
         </div>
-      )}
+        ) : null}
 
-      {tab === 'cas' && (
-        <div className="space-y-4">
-          <section className="card-base p-4 sm:p-5">
-            <div className="mb-4 flex items-start gap-2">
-              <Upload className="mt-0.5 size-4 shrink-0 text-primary" />
+        {tab === 'cas' ? (
+        <div className="space-y-3">
+          <section className="overflow-hidden rounded-2xl border border-border/70 bg-card/70 p-3 sm:p-4">
+            <div className="mb-3 flex items-start gap-2">
+              <Upload className="mt-0.5 size-4 shrink-0 text-muted" />
               <div>
-                <h2 className="text-sm font-medium text-foreground">Import CAS statement</h2>
-                <p className="text-xs text-muted">
-                  CAS = Consolidated Account Statement — a single PDF of all your mutual fund holdings from{' '}
-                  <strong className="font-medium text-foreground">MF Central</strong> (mfcentral.in), CAMS, or
-                  KFintech. Parsed on our server when you upload — preview only, not saved yet.
+                <h2 className="text-sm font-semibold text-foreground">Import CAS statement</h2>
+                <p className="text-xs leading-5 text-foreground/65">
+                  Consolidated Account Statement PDF from MF Central, CAMS, or KFintech — preview only.
                 </p>
               </div>
             </div>
@@ -774,29 +649,28 @@ export default function InvestmentsPage() {
               type="file"
               accept="application/pdf"
               disabled={casUploading}
-              className="border-border bg-background file:mr-3 file:rounded-md file:border-0 file:bg-surface file:px-3 file:py-1 file:text-xs file:text-foreground"
+              className="border-border/50 bg-background file:mr-3 file:rounded-md file:border-0 file:bg-surface file:px-3 file:py-1 file:text-xs file:text-foreground"
               onChange={(e) => {
                 const file = e.target.files?.[0];
                 if (file) void uploadCas(file);
               }}
             />
             {casUploading && casUploadStatus ? (
-              <p className="mt-3 text-xs text-muted animate-pulse">{casUploadStatus}</p>
+              <p className="mt-3 animate-pulse text-xs text-muted">{casUploadStatus}</p>
             ) : null}
             <div className="mt-3 flex items-start gap-2 text-xs text-muted">
               <Info className="mt-0.5 size-3.5 shrink-0" />
               <span>
-                Download the latest password-free PDF from MF Central → Consolidated Account Statement. Password-protected
-                or scanned PDFs often fail to parse.
+                Prefer password-free PDFs from MF Central. Password-protected or scanned files often fail.
               </span>
             </div>
           </section>
 
-          {casResult && (
-            <section className="card-base overflow-hidden">
-              <div className="border-b border-border px-4 py-3">
-                <h2 className="text-sm font-medium text-foreground">{casResult.fileName}</h2>
-                <p className="text-xs text-muted mt-0.5">{casResult.message}</p>
+          {casResult ? (
+            <section className="overflow-hidden rounded-2xl border border-border/70 bg-card/70">
+              <div className="border-b border-border/60 px-3 py-2.5 sm:px-4">
+                <h2 className="text-sm font-semibold text-foreground">{casResult.fileName}</h2>
+                <p className="mt-0.5 text-xs text-foreground/65">{casResult.message}</p>
                 <div className="mt-2 flex flex-wrap gap-2 text-[10px] text-muted">
                   {casResult.isLikelyCas ? (
                     <Badge variant="secondary">Likely CAS</Badge>
@@ -809,25 +683,25 @@ export default function InvestmentsPage() {
                 </div>
               </div>
 
-              {casResult.parseWarning && (
-                <div className="border-b border-border px-4 py-3">
+              {casResult.parseWarning ? (
+                <div className="border-b border-border/60 px-3 py-3 sm:px-4">
                   <Callout variant="neutral" title="Could not read holdings">
                     <p className="text-sm text-muted">{casResult.parseWarning}</p>
                   </Callout>
                 </div>
-              )}
+              ) : null}
 
               {casResult.holdings.length > 0 ? (
                 <>
                   {casResult.totalValue != null && casResult.totalValue > 0 ? (
-                    <div className="border-b border-border px-4 py-3">
-                      <p className="text-[11px] uppercase tracking-wide text-hint">Parsed market value</p>
+                    <div className="border-b border-border/60 px-3 py-3 sm:px-4">
+                      <p className="text-[10px] uppercase tracking-[0.08em] text-muted">Parsed market value</p>
                       <p className="text-lg font-semibold tabular-nums">{fmt(casResult.totalValue)}</p>
                     </div>
                   ) : null}
-                  <ul className="divide-y divide-border">
+                  <ul className="divide-y divide-border/60">
                     {casResult.holdings.map((h, i) => (
-                      <li key={`${h.schemeName}-${i}`} className="px-4 py-3">
+                      <li key={`${h.schemeName}-${i}`} className="px-3 py-2.5 sm:px-4">
                         <p className="text-sm font-medium text-foreground">{h.schemeName}</p>
                         <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted">
                           {h.folio ? <span>Folio {h.folio}</span> : null}
@@ -844,15 +718,16 @@ export default function InvestmentsPage() {
                 </>
               ) : (
                 !casResult.parseWarning && (
-                  <p className="px-4 py-6 text-sm text-muted">
+                  <p className="px-3 py-6 text-sm text-muted sm:px-4">
                     No schemes extracted. Re-export from MF Central and upload again.
                   </p>
                 )
               )}
             </section>
-          )}
+          ) : null}
         </div>
-      )}
+        ) : null}
+      </TabPanelTransition>
     </div>
   );
 }

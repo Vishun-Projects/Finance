@@ -28,8 +28,9 @@
   :root {
     /* Clearance for fixed bottom tab bar (mobile) */
     --app-bottom-inset: calc(3.25rem + env(safe-area-inset-bottom));
-    /* Extra gap at scroll end on page-scroll routes (stacked with main padding) */
-    --app-scroll-end-gap: 1.25rem;
+    /* Extra breathing room past the tab bar so last rows/labels can scroll fully into view */
+    --app-scroll-end-gap: 3rem;
+    --app-scroll-bottom-pad: calc(var(--app-bottom-inset) + var(--app-scroll-end-gap));
   }
 
   * {
@@ -103,11 +104,11 @@
   }
 
   .pb-bottom-bar {
-    padding-bottom: var(--app-bottom-inset);
+    padding-bottom: var(--app-scroll-bottom-pad);
   }
 
   .scroll-pb-bottom-bar {
-    scroll-padding-bottom: var(--app-bottom-inset);
+    scroll-padding-bottom: var(--app-scroll-bottom-pad);
   }
 }
 

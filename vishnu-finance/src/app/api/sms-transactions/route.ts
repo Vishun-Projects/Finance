@@ -4,7 +4,7 @@ import { clearUserCache } from '@/lib/api-cache';
 import { invalidateUserAppData } from '@/lib/server-data-cache';
 import { prisma } from '@/lib/db';
 import { generateDedupHash, extractStableReference } from '@/lib/import-dedup';
-import { getCanonicalName } from '@/lib/entity-mapping-service';
+import { getCanonicalName, upsertEntityMapping } from '@/lib/entity-mapping-service';
 
 export const dynamic = 'force-dynamic';
 
@@ -158,7 +158,8 @@ export async function POST(request: NextRequest) {
       const financialCategory =
         String(draft.financialCategory || (creditAmount > 0 ? 'INCOME' : 'EXPENSE')).toUpperCase();
 
-      let personName = draft.personName?.trim() || null;
+      const rawPersonName = draft.personName?.trim() || null;
+      let personName = rawPersonName;
       let store = draft.store?.trim() || null;
       if (personName) {
         personName = await getCanonicalName(user.id, personName, 'PERSON');
@@ -233,6 +234,15 @@ export async function POST(request: NextRequest) {
             transactionId: tx.id,
           },
         });
+
+        // Create entity mapping so future SMS with the same UPI ID auto-resolve
+        if (
+          personName &&
+          rawPersonName &&
+          personName.toLowerCase() !== rawPersonName.toLowerCase()
+        ) {
+          void upsertEntityMapping(user.id, personName, [rawPersonName], 'PERSON').catch(() => {});
+        }
 
         created.push({ smsId: draft.smsId, transactionId: tx.id, deduped: false });
       } catch (err: unknown) {

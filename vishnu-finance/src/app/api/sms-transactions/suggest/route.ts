@@ -61,29 +61,35 @@ async function suggestOne(userId: string, input: SuggestInput): Promise<SuggestR
     entityType === 'store' ? 'STORE' : 'PERSON',
   );
 
-  const where =
+  const orConditions: object[] =
     entityType === 'store'
-      ? {
-          userId,
-          isDeleted: false,
-          OR: [
-            { store: { equals: canonicalName, mode: 'insensitive' as const } },
-            { store: { equals: displayName, mode: 'insensitive' as const } },
-          ],
-        }
-      : {
-          userId,
-          isDeleted: false,
-          OR: [
-            { personName: { equals: canonicalName, mode: 'insensitive' as const } },
-            { personName: { equals: displayName, mode: 'insensitive' as const } },
-          ],
-        };
+      ? [
+          { store: { equals: canonicalName, mode: 'insensitive' as const } },
+          { store: { equals: displayName, mode: 'insensitive' as const } },
+        ]
+      : [
+          { personName: { equals: canonicalName, mode: 'insensitive' as const } },
+          { personName: { equals: displayName, mode: 'insensitive' as const } },
+        ];
+
+  // Also search by raw name in description (handles UPI IDs stored in SMS body)
+  if (displayName.includes('@') || displayName.match(/\d{5,}/)) {
+    orConditions.push(
+      { description: { contains: displayName, mode: 'insensitive' as const } },
+    );
+  }
+  // If canonical differs from display, also search by canonical in personName
+  if (canonicalName.toLowerCase() !== displayName.toLowerCase()) {
+    orConditions.push(
+      { personName: { equals: displayName, mode: 'insensitive' as const } },
+    );
+  }
 
   const existing = await prisma.transaction.findMany({
-    where,
+    where: { userId, isDeleted: false, OR: orConditions },
     select: {
       categoryId: true,
+      personName: true,
       category: { select: { id: true, name: true } },
     },
     take: 80,
@@ -91,11 +97,21 @@ async function suggestOne(userId: string, input: SuggestInput): Promise<SuggestR
   });
 
   const history = new Map<string, { id: string; name: string; count: number }>();
+  let resolvedName = canonicalName;
   for (const row of existing) {
     if (!row.category) continue;
     const prev = history.get(row.category.id);
     if (prev) prev.count++;
     else history.set(row.category.id, { id: row.category.id, name: row.category.name, count: 1 });
+    // Prefer a human-readable name from existing transactions over the raw UPI ID
+    if (
+      row.personName &&
+      !row.personName.includes('@') &&
+      resolvedName === canonicalName &&
+      canonicalName === displayName
+    ) {
+      resolvedName = row.personName;
+    }
   }
 
   if (history.size === 0) {
@@ -104,7 +120,7 @@ async function suggestOne(userId: string, input: SuggestInput): Promise<SuggestR
       bucket: 'new',
       entityType,
       displayName,
-      canonicalName,
+      canonicalName: resolvedName,
       suggestedCategoryId: null,
       suggestedCategoryName: null,
       categories: [],
@@ -122,7 +138,7 @@ async function suggestOne(userId: string, input: SuggestInput): Promise<SuggestR
     bucket,
     entityType,
     displayName,
-    canonicalName,
+    canonicalName: resolvedName,
     suggestedCategoryId: categories[0].categoryId,
     suggestedCategoryName: categories[0].categoryName,
     categories,

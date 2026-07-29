@@ -6,37 +6,49 @@ import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.PixelFormat;
 import android.graphics.Typeface;
+import android.graphics.drawable.AdaptiveIconDrawable;
+import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
 import android.provider.Settings;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewConfiguration;
 import android.view.WindowManager;
+import android.view.animation.OvershootInterpolator;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import com.vishnu.finance.MainActivity;
 import com.vishnu.finance.R;
 
 /**
- * Floating logo bubble with unread badge and drag/snap behavior.
- * Runs with WindowManager only (no sticky foreground notification).
+ * Floating logo bubble with unread badge, drag/snap, entry animation, and long-press menu.
+ * Uses WindowManager only — no sticky foreground notification.
  */
 public final class BankSmsBubbleController {
-    private static final int BUBBLE_DP = 56;
-    private static final int BADGE_DP = 20;
-    private static final int SCREEN_MARGIN_DP = 12;
+    private static final int BUBBLE_DP = 52;
+    private static final int BADGE_DP = 18;
+    private static final int BADGE_OFFSET_DP = -3;
+    private static final int SCREEN_MARGIN_DP = 8;
     private static final int START_TOP_DP = 120;
+    private static final int MENU_ITEM_HEIGHT_DP = 44;
 
     private static WindowManager windowManager;
     private static FrameLayout bubbleView;
     private static TextView badgeView;
     private static WindowManager.LayoutParams layoutParams;
     private static int touchSlop = -1;
+    private static boolean isFirstShow = true;
+
+    private static FrameLayout menuView;
+    private static WindowManager.LayoutParams menuParams;
 
     private BankSmsBubbleController() {}
 
@@ -50,6 +62,7 @@ public final class BankSmsBubbleController {
     }
 
     public static synchronized void remove() {
+        dismissMenu();
         if (windowManager != null && bubbleView != null) {
             try {
                 windowManager.removeView(bubbleView);
@@ -59,6 +72,7 @@ public final class BankSmsBubbleController {
         bubbleView = null;
         badgeView = null;
         layoutParams = null;
+        isFirstShow = true;
     }
 
     private static void showOrUpdate(Context app, int count) {
@@ -68,6 +82,7 @@ public final class BankSmsBubbleController {
         if (windowManager == null) return;
 
         if (bubbleView == null) {
+            isFirstShow = true;
             bubbleView = buildBubbleView(app);
             layoutParams = buildLayoutParams(app);
             try {
@@ -78,50 +93,86 @@ public final class BankSmsBubbleController {
                 layoutParams = null;
                 return;
             }
+            if (isFirstShow) {
+                animateEntry(bubbleView);
+                isFirstShow = false;
+            }
         }
         if (badgeView != null) {
-            badgeView.setText(formatCount(count));
+            String text = formatCount(count);
+            if (!text.equals(badgeView.getText().toString())) {
+                badgeView.setText(text);
+                badgeView.animate().scaleX(1.3f).scaleY(1.3f).setDuration(120)
+                    .withEndAction(() -> badgeView.animate().scaleX(1f).scaleY(1f).setDuration(120).start())
+                    .start();
+            }
         }
     }
 
+    private static void animateEntry(View view) {
+        view.setScaleX(0.5f);
+        view.setScaleY(0.5f);
+        view.setAlpha(0f);
+        view.animate()
+            .scaleX(1f).scaleY(1f).alpha(1f)
+            .setDuration(300)
+            .setInterpolator(new OvershootInterpolator(1.2f))
+            .start();
+    }
+
+    @SuppressLint("UseCompatLoadingForDrawables")
     private static FrameLayout buildBubbleView(Context app) {
         int bubblePx = dp(app, BUBBLE_DP);
         int badgePx = dp(app, BADGE_DP);
 
         FrameLayout root = new FrameLayout(app);
-        FrameLayout.LayoutParams rootLp = new FrameLayout.LayoutParams(bubblePx, bubblePx);
-        root.setLayoutParams(rootLp);
+        root.setLayoutParams(new FrameLayout.LayoutParams(
+            bubblePx + dp(app, 6), bubblePx + dp(app, 6)
+        ));
+        root.setClipChildren(false);
+        root.setClipToPadding(false);
         root.setClickable(true);
         root.setFocusable(false);
 
         ImageView logo = new ImageView(app);
-        logo.setImageResource(R.mipmap.ic_launcher_round);
+        Drawable icon = app.getPackageManager().getApplicationIcon(app.getApplicationInfo());
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && icon instanceof AdaptiveIconDrawable) {
+            logo.setImageDrawable(((AdaptiveIconDrawable) icon).getForeground());
+        } else {
+            logo.setImageDrawable(icon);
+        }
         logo.setScaleType(ImageView.ScaleType.CENTER_CROP);
         GradientDrawable bubbleBg = new GradientDrawable();
-        bubbleBg.setColor(0xF0212226);
+        bubbleBg.setColor(0xFF1A1D21);
         bubbleBg.setShape(GradientDrawable.OVAL);
-        bubbleBg.setStroke(dp(app, 1), 0x40FFFFFF);
+        bubbleBg.setStroke(dp(app, 1), 0x30FFFFFF);
         logo.setBackground(bubbleBg);
         logo.setClipToOutline(true);
-        logo.setElevation(dp(app, 6));
-        root.addView(logo, new FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.MATCH_PARENT,
-            FrameLayout.LayoutParams.MATCH_PARENT
-        ));
+        logo.setElevation(dp(app, 8));
+        FrameLayout.LayoutParams logoLp = new FrameLayout.LayoutParams(bubblePx, bubblePx);
+        logoLp.gravity = Gravity.CENTER;
+        root.addView(logo, logoLp);
 
         TextView badge = new TextView(app);
         badge.setTextColor(Color.WHITE);
-        badge.setTextSize(10f);
+        badge.setTextSize(9f);
         badge.setTypeface(Typeface.DEFAULT_BOLD);
         badge.setGravity(Gravity.CENTER);
+        badge.setIncludeFontPadding(false);
+        badge.setPadding(dp(app, 2), 0, dp(app, 2), 0);
         GradientDrawable badgeBg = new GradientDrawable();
         badgeBg.setColor(0xFFE53935);
-        badgeBg.setShape(GradientDrawable.OVAL);
+        badgeBg.setCornerRadius(badgePx / 2f);
         badge.setBackground(badgeBg);
-        FrameLayout.LayoutParams badgeLp = new FrameLayout.LayoutParams(badgePx, badgePx);
+        badge.setElevation(dp(app, 10));
+        badge.setMinWidth(badgePx);
+        badge.setMinHeight(badgePx);
+        FrameLayout.LayoutParams badgeLp = new FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.WRAP_CONTENT, badgePx
+        );
         badgeLp.gravity = Gravity.TOP | Gravity.END;
-        badgeLp.topMargin = dp(app, 1);
-        badgeLp.rightMargin = dp(app, 1);
+        badgeLp.topMargin = dp(app, BADGE_OFFSET_DP);
+        badgeLp.rightMargin = dp(app, BADGE_OFFSET_DP);
         root.addView(badge, badgeLp);
         badgeView = badge;
 
@@ -163,6 +214,7 @@ public final class BankSmsBubbleController {
             if (layoutParams == null || windowManager == null) return false;
             switch (event.getActionMasked()) {
                 case MotionEvent.ACTION_DOWN:
+                    dismissMenu();
                     moved[0] = false;
                     downAt[0] = System.currentTimeMillis();
                     downX[0] = layoutParams.x;
@@ -191,9 +243,7 @@ public final class BankSmsBubbleController {
                         snapToEdge(app);
                         BankSmsStore.setBubblePosition(app, layoutParams.x, layoutParams.y);
                     } else if (pressMs >= ViewConfiguration.getLongPressTimeout()) {
-                        // User explicitly closes floating bubble.
-                        BankSmsStore.setOverlayEnabled(app, false);
-                        remove();
+                        showMenu(app);
                     } else {
                         openReview(app);
                     }
@@ -202,6 +252,96 @@ public final class BankSmsBubbleController {
                     return false;
             }
         });
+    }
+
+    private static void showMenu(Context app) {
+        dismissMenu();
+        if (windowManager == null || layoutParams == null) return;
+
+        int type = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
+            ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+            : WindowManager.LayoutParams.TYPE_PHONE;
+
+        String[] labels = {"Hide bubble", "Open Settings", "Stop alerts"};
+        Runnable[] actions = {
+            () -> {
+                dismissMenu();
+                BankSmsStore.setOverlayEnabled(app, false);
+                remove();
+            },
+            () -> {
+                dismissMenu();
+                openReview(app);
+            },
+            () -> {
+                dismissMenu();
+                BankSmsStore.setAutoReadEnabled(app, false);
+                BankSmsStore.setOverlayEnabled(app, false);
+                BankSmsAlertNotifier.cancel(app);
+                remove();
+            },
+        };
+
+        LinearLayout menu = new LinearLayout(app);
+        menu.setOrientation(LinearLayout.VERTICAL);
+        GradientDrawable menuBg = new GradientDrawable();
+        menuBg.setColor(0xF5222529);
+        menuBg.setCornerRadius(dp(app, 12));
+        menuBg.setStroke(dp(app, 1), 0x30FFFFFF);
+        menu.setBackground(menuBg);
+        menu.setElevation(dp(app, 12));
+        menu.setPadding(0, dp(app, 4), 0, dp(app, 4));
+
+        for (int i = 0; i < labels.length; i++) {
+            TextView item = new TextView(app);
+            item.setText(labels[i]);
+            item.setTextColor(i == labels.length - 1 ? 0xFFEF5350 : Color.WHITE);
+            item.setTextSize(14f);
+            item.setPadding(dp(app, 16), dp(app, 10), dp(app, 24), dp(app, 10));
+            item.setGravity(Gravity.CENTER_VERTICAL);
+            final int idx = i;
+            item.setOnClickListener(v -> actions[idx].run());
+            menu.addView(item, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                dp(app, MENU_ITEM_HEIGHT_DP)
+            ));
+        }
+
+        menuView = new FrameLayout(app);
+        menuView.addView(menu);
+
+        menuParams = new WindowManager.LayoutParams(
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            type,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+            PixelFormat.TRANSLUCENT
+        );
+        menuParams.gravity = Gravity.TOP | Gravity.START;
+        int bubblePx = dp(app, BUBBLE_DP);
+        boolean onLeft = layoutParams.x + bubblePx / 2 < getDisplayWidth(app) / 2;
+        menuParams.x = onLeft ? layoutParams.x + bubblePx + dp(app, 4) : layoutParams.x - dp(app, 160);
+        menuParams.y = layoutParams.y;
+
+        try {
+            windowManager.addView(menuView, menuParams);
+        } catch (Exception e) {
+            menuView = null;
+        }
+
+        new Handler(Looper.getMainLooper()).postDelayed(BankSmsBubbleController::dismissMenu, 5000);
+    }
+
+    private static void dismissMenu() {
+        if (windowManager != null && menuView != null) {
+            try {
+                windowManager.removeView(menuView);
+            } catch (Exception ignored) {
+            }
+        }
+        menuView = null;
+        menuParams = null;
     }
 
     private static void snapToEdge(Context app) {
@@ -237,16 +377,10 @@ public final class BankSmsBubbleController {
     }
 
     private static int getDisplayWidth(Context app) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            return app.getResources().getDisplayMetrics().widthPixels;
-        }
         return app.getResources().getDisplayMetrics().widthPixels;
     }
 
     private static int getDisplayHeight(Context app) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            return app.getResources().getDisplayMetrics().heightPixels;
-        }
         return app.getResources().getDisplayMetrics().heightPixels;
     }
 

@@ -271,14 +271,25 @@ export function SmsReviewPanel({ onClose, onChanged }: SmsReviewPanelProps) {
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-base font-semibold truncate">
-                    {suggest?.canonicalName || current.personName || current.description}
+                    {(() => {
+                      const canonical = suggest?.canonicalName;
+                      const raw = current.personName;
+                      if (canonical && canonical !== raw) return canonical;
+                      if (raw && !raw.includes('@') && !raw.match(/^\d{5,}/)) return raw;
+                      return current.description?.split(/\s+/).slice(0, 6).join(' ') || raw || 'Transaction';
+                    })()}
                   </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
+                  {current.personName && (
+                    <p className="mt-0.5 text-xs text-muted-foreground truncate">
+                      {current.personName.includes('@') ? 'UPI ' : ''}{current.personName}
+                    </p>
+                  )}
+                  <p className="mt-0.5 text-xs text-muted-foreground">
                     {new Date(current.transactionDateMs || current.receivedAt).toLocaleString()}
                     {current.transactionId ? ` · ref ${current.transactionId}` : ''}
                   </p>
                   {current.personName && (
-                    <p className="mt-1 text-xs text-muted-foreground truncate">{current.description}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground truncate">{current.description}</p>
                   )}
                 </div>
                 <p

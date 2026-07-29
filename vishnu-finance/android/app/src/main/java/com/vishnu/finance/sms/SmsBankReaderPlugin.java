@@ -61,8 +61,13 @@ public class SmsBankReaderPlugin extends Plugin {
     @PluginMethod
     public void checkPermissions(PluginCall call) {
         JSObject result = new JSObject();
-        result.put("sms", getPermissionState("sms").toString().toLowerCase(Locale.US));
+        PermissionState state = getPermissionState("sms");
+        result.put("sms", state.toString().toLowerCase(Locale.US));
         result.put("overlay", canDrawOverlays());
+        result.put(
+            "restrictedLikely",
+            state != PermissionState.GRANTED && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+        );
         call.resolve(result);
     }
 
@@ -81,8 +86,41 @@ public class SmsBankReaderPlugin extends Plugin {
     @PermissionCallback
     private void smsPermsCallback(PluginCall call) {
         JSObject result = new JSObject();
-        result.put("sms", getPermissionState("sms").toString().toLowerCase(Locale.US));
+        PermissionState state = getPermissionState("sms");
+        result.put("sms", state.toString().toLowerCase(Locale.US));
         result.put("overlay", canDrawOverlays());
+        // Android 13+ sideload: Allow is greyed out until "Allow restricted settings"
+        result.put(
+            "restrictedLikely",
+            state != PermissionState.GRANTED && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+        );
+        call.resolve(result);
+    }
+
+    @PluginMethod
+    public void openAppSettings(PluginCall call) {
+        Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+        intent.setData(Uri.parse("package:" + getContext().getPackageName()));
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        getContext().startActivity(intent);
+        JSObject result = new JSObject();
+        result.put("opened", true);
+        call.resolve(result);
+    }
+
+    @PluginMethod
+    public void openSmsSettings(PluginCall call) {
+        // Best-effort: app details is where HyperOS exposes "Allow restricted settings"
+        Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+        intent.setData(Uri.parse("package:" + getContext().getPackageName()));
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        getContext().startActivity(intent);
+        JSObject result = new JSObject();
+        result.put("opened", true);
+        result.put(
+            "hint",
+            "If Allow is greyed out: App info → ⋮ → Allow restricted settings, then Permissions → SMS → Allow"
+        );
         call.resolve(result);
     }
 
@@ -229,11 +267,17 @@ public class SmsBankReaderPlugin extends Plugin {
 
     static boolean looksLikeOtp(String body) {
         String lower = body.toLowerCase(Locale.US);
-        if (lower.contains("do not share") || lower.contains("don't share")) return true;
+        boolean hasTxn =
+            lower.contains("sent rs")
+                || lower.contains("debited")
+                || lower.contains("credited")
+                || lower.contains("spent")
+                || lower.contains("paid");
+        if (lower.contains("do not share") || lower.contains("don't share")) {
+            if (!hasTxn) return true;
+        }
         if (lower.contains("one time password") || lower.contains("otp")) {
-            if (!lower.contains("debited") && !lower.contains("credited") && !lower.contains("spent")) {
-                return true;
-            }
+            if (!hasTxn) return true;
         }
         return false;
     }

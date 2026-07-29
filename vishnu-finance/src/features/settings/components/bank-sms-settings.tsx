@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
-import { MessageSquareText, RefreshCw } from 'lucide-react';
+import { MessageSquareText, RefreshCw, Settings2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import {
@@ -15,6 +15,7 @@ import {
 import {
   checkSmsBankPermissions,
   isSmsBankReaderSupported,
+  openSmsAppSettings,
   requestSmsBankPermissions,
   requestSmsOverlayPermission,
   startSmsBackgroundSync,
@@ -36,6 +37,7 @@ export function BankSmsSettings() {
   const [pendingCount, setPendingCount] = useState(0);
   const [smsGranted, setSmsGranted] = useState(false);
   const [overlayGranted, setOverlayGranted] = useState(false);
+  const [restrictedLikely, setRestrictedLikely] = useState(false);
   const [busy, setBusy] = useState(false);
   const [showReview, setShowReview] = useState(false);
 
@@ -45,6 +47,7 @@ export function BankSmsSettings() {
     const perms = await checkSmsBankPermissions();
     setSmsGranted(perms?.sms === 'granted');
     setOverlayGranted(Boolean(perms?.overlay));
+    setRestrictedLikely(Boolean(perms?.restrictedLikely) || perms?.sms === 'denied');
   };
 
   useEffect(() => {
@@ -89,10 +92,12 @@ export function BankSmsSettings() {
     try {
       const perms = await requestSmsBankPermissions();
       if (perms?.sms !== 'granted') {
-        toast.error('SMS permission is required');
+        setRestrictedLikely(Boolean(perms?.restrictedLikely) || true);
+        toast.error('SMS blocked by Android — unlock restricted settings first');
         return;
       }
       setSmsGranted(true);
+      setRestrictedLikely(false);
       patchSettings({ autoReadEnabled: true });
       await startSmsBackgroundSync();
       const result = await syncBankSmsInbox({ notify: true });
@@ -179,6 +184,51 @@ export function BankSmsSettings() {
           />
         </SettingsGroup>
       </div>
+
+      {!smsGranted && (
+        <div className="space-y-1.5">
+          <SettingsSectionHeader>Unlock SMS permission</SettingsSectionHeader>
+          <SettingsFieldGroup bordered className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              On HyperOS / Android 13+, sideloaded apps block SMS until you allow restricted
+              settings. “Allow” stays greyed out until you do this:
+            </p>
+            <ol className="list-decimal space-y-1.5 pl-4 text-sm text-foreground">
+              <li>Open App info (button below)</li>
+              <li>Tap the ⋮ menu (top right)</li>
+              <li>Enable <span className="font-medium">Allow restricted settings</span></li>
+              <li>Go to Permissions → SMS → Allow</li>
+              <li>Return here and turn on Enable sync</li>
+            </ol>
+            {restrictedLikely && (
+              <p className="text-xs text-warning">
+                Android reported a restricted / denied SMS state for this install.
+              </p>
+            )}
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                size="sm"
+                className="btn-touch"
+                onClick={() => void openSmsAppSettings()}
+              >
+                <Settings2 className="mr-2 size-4" />
+                Open App info
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                className="btn-touch"
+                disabled={busy}
+                onClick={() => void handleEnableAutoRead(true)}
+              >
+                Retry SMS permission
+              </Button>
+            </div>
+          </SettingsFieldGroup>
+        </div>
+      )}
 
       <div className="space-y-1.5">
         <SettingsSectionHeader>Status</SettingsSectionHeader>

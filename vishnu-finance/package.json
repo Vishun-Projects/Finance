@@ -32,7 +32,9 @@
     "test:watch": "vitest",
     "cap:sync": "npx cap sync android",
     "cap:open": "npx cap open android",
-    "cap:run": "npx cap run android"
+    "cap:run": "npx cap run android",
+    "cap:apk": "cd android && ./gradlew assembleDebug",
+    "cap:install-sms": "bash scripts/adb-install-sms.sh"
   },
   "dependencies": {
     "@capacitor/android": "^7.4.4",

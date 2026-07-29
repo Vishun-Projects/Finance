@@ -15,12 +15,15 @@ export type SmsBankPermissions = {
   sms: SmsPermissionState | string;
   overlay: boolean;
   openedSettings?: boolean;
+  restrictedLikely?: boolean;
 };
 
 type SmsBankReaderPlugin = {
   checkPermissions(): Promise<SmsBankPermissions>;
   requestPermissions(): Promise<SmsBankPermissions>;
   requestOverlayPermission(): Promise<{ overlay: boolean; openedSettings?: boolean }>;
+  openAppSettings(): Promise<{ opened: boolean }>;
+  openSmsSettings(): Promise<{ opened: boolean; hint?: string }>;
   getRecentBankSms(options: { sinceMs?: number; limit?: number }): Promise<{ messages: BankSmsMessage[] }>;
   startBackgroundSync(): Promise<{ running: boolean }>;
   stopBackgroundSync(): Promise<{ running: boolean }>;
@@ -66,6 +69,19 @@ export async function requestSmsOverlayPermission(): Promise<boolean> {
     return Boolean(again.overlay);
   } catch {
     return false;
+  }
+}
+
+export async function openSmsAppSettings(): Promise<void> {
+  if (!isSmsBankReaderSupported()) return;
+  try {
+    await SmsBankReader.openSmsSettings();
+  } catch {
+    try {
+      await SmsBankReader.openAppSettings();
+    } catch {
+      /* ignore */
+    }
   }
 }
 

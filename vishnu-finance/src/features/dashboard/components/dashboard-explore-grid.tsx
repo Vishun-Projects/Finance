@@ -68,6 +68,7 @@ export function DashboardExploreGrid({ className }: DashboardExploreGridProps) {
               <NavLink
                 key={href}
                 href={href}
+                prefetch={false}
                 onClick={() => void hapticLight()}
                 className="btn-touch flex w-[4.5rem] shrink-0 flex-col items-center gap-1.5 text-center"
               >

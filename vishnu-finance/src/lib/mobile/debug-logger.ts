@@ -10,6 +10,28 @@ interface LogEntry {
     id: string;
 }
 
+function safeSerialize(arg: unknown): string {
+    try {
+        if (arg instanceof Error) {
+            return arg.stack || arg.message || String(arg);
+        }
+        if (typeof arg === 'object' && arg !== null) {
+            return JSON.stringify(arg, (_key, value) => {
+                if (typeof value === 'bigint') return String(value);
+                if (typeof value === 'function') return `[Function ${value.name || 'anonymous'}]`;
+                return value;
+            });
+        }
+        return String(arg);
+    } catch {
+        try {
+            return Object.prototype.toString.call(arg);
+        } catch {
+            return '[Unserializable]';
+        }
+    }
+}
+
 class DebugLogger {
     private logs: LogEntry[] = [];
     private listeners: ((logs: LogEntry[]) => void)[] = [];
@@ -18,6 +40,13 @@ class DebugLogger {
 
     init() {
         if (typeof window === 'undefined' || this.isInitialized) return;
+
+        // Avoid monkey-patching console in production — circular React/Capacitor
+        // objects in console.error can throw via JSON.stringify and crash the app.
+        if (process.env.NODE_ENV === 'production') {
+            this.isInitialized = true;
+            return;
+        }
 
         const originalLog = console.log;
         const originalWarn = console.warn;
@@ -42,34 +71,42 @@ class DebugLogger {
     }
 
     private addEntry(type: LogType, args: any[]) {
-        const message = args
-            .map(arg => (typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)))
-            .join(' ');
+        try {
+            const message = args.map(safeSerialize).join(' ');
 
-        const entry: LogEntry = {
-            id: Math.random().toString(36).substring(7),
-            type,
-            message,
-            data: args.length > 1 ? args.slice(1) : undefined,
-            timestamp: new Date().toLocaleTimeString(),
-        };
+            const entry: LogEntry = {
+                id: Math.random().toString(36).substring(7),
+                type,
+                message,
+                data: args.length > 1 ? args.slice(1) : undefined,
+                timestamp: new Date().toLocaleTimeString(),
+            };
 
-        this.logs = [entry, ...this.logs].slice(0, this.maxLogs);
-        this.notify();
+            this.logs = [entry, ...this.logs].slice(0, this.maxLogs);
+            this.notify();
+        } catch {
+            // Never let logging crash the app
+        }
     }
 
     logNetwork(method: string, url: string, status?: number, error?: string, body?: any) {
-        const message = `[NETWORK] ${method} ${url} ${status || (error ? 'FAILED' : 'PENDING')}`;
-        const entry: LogEntry = {
-            id: Math.random().toString(36).substring(7),
-            type: 'network',
-            message,
-            data: { status, error, body },
-            timestamp: new Date().toLocaleTimeString(),
-        };
+        if (process.env.NODE_ENV === 'production') return;
 
-        this.logs = [entry, ...this.logs].slice(0, this.maxLogs);
-        this.notify();
+        try {
+            const message = `[NETWORK] ${method} ${url} ${status || (error ? 'FAILED' : 'PENDING')}`;
+            const entry: LogEntry = {
+                id: Math.random().toString(36).substring(7),
+                type: 'network',
+                message,
+                data: { status, error, body },
+                timestamp: new Date().toLocaleTimeString(),
+            };
+
+            this.logs = [entry, ...this.logs].slice(0, this.maxLogs);
+            this.notify();
+        } catch {
+            // ignore
+        }
     }
 
     subscribe(listener: (logs: LogEntry[]) => void) {

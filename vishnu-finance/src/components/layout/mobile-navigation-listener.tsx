@@ -27,15 +27,13 @@ export function MobileNavigationListener() {
                 await StatusBar.setStyle({ style: Style.Dark });
                 await StatusBar.setBackgroundColor({ color: '#000000' });
 
-                // Hide Splash Screen after hydration
-                setTimeout(() => {
-                    SplashScreen.hide({ fadeOutDuration: 400 });
-                }, 800);
+                // Hide splash as soon as the WebView has hydrated
+                void SplashScreen.hide({ fadeOutDuration: 250 }).catch(() => {});
 
-                // Fallback for safety
+                // Safety fallback if hide above fails
                 setTimeout(() => {
-                    SplashScreen.hide();
-                }, 3000);
+                    void SplashScreen.hide().catch(() => {});
+                }, 1200);
 
                 // Configure Keyboard
                 if (Capacitor.getPlatform() === 'ios') {
@@ -53,8 +51,7 @@ export function MobileNavigationListener() {
             setIsAppPaused(!isActive);
 
             if (!isActive) {
-                // Trigger haptic feedback when backgrounded
-                Haptics.impact({ style: ImpactStyle.Medium });
+                void Haptics.impact({ style: ImpactStyle.Medium }).catch(() => {});
             }
         });
 
@@ -63,15 +60,15 @@ export function MobileNavigationListener() {
           const openOverlay = document.querySelector('[data-state="open"][role="dialog"]');
           if (openOverlay) {
             document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-            void Haptics.impact({ style: ImpactStyle.Light });
+            void Haptics.impact({ style: ImpactStyle.Light }).catch(() => {});
             return;
           }
 
           if (canGoBack) {
-            void Haptics.impact({ style: ImpactStyle.Light });
+            void Haptics.impact({ style: ImpactStyle.Light }).catch(() => {});
             window.history.back();
           } else {
-            App.minimizeApp();
+            void App.minimizeApp().catch(() => {});
           }
         });
 
@@ -81,10 +78,16 @@ export function MobileNavigationListener() {
             try {
                 const url = new URL(data.url);
 
+                if (url.host === 'sms-review' || url.pathname.includes('sms-review')) {
+                    void Haptics.impact({ style: ImpactStyle.Light }).catch(() => {});
+                    router.push('/settings?section=bank-sms&review=1');
+                    return;
+                }
+
                 if (url.host === 'oauth-callback' || url.pathname === '/oauth-callback' || url.pathname.includes('oauth-callback')) {
                     const code = url.searchParams.get('code');
                     if (code) {
-                        Haptics.notification({ type: 'success' as any });
+                        void Haptics.notification({ type: 'success' as any }).catch(() => {});
 
                         const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://vishun-finance.vercel.app';
                         const exchangeRes = await fetch(`${apiUrl.replace(/\/$/, '')}/api/auth/mobile-session`, {
@@ -112,11 +115,31 @@ export function MobileNavigationListener() {
             }
         });
 
+        // 5. Bank SMS catch-up when app resumes (Android opt-in only)
+        let smsSyncTimer: ReturnType<typeof setTimeout> | null = null;
+        const maybeSyncBankSms = () => {
+          void import('@/lib/sms-bank/sync').then(async (mod) => {
+            await mod.startBankSmsClientListeners();
+            await mod.syncBankSmsInbox({ notify: true });
+          }).catch(() => {});
+        };
+        if (Capacitor.getPlatform() === 'android') {
+          smsSyncTimer = setTimeout(maybeSyncBankSms, 1500);
+        }
+
+        const smsResumeListener = App.addListener('appStateChange', ({ isActive }) => {
+          if (isActive && Capacitor.getPlatform() === 'android') {
+            maybeSyncBankSms();
+          }
+        });
+
         // Clean up listeners
         return () => {
             pauseListener.then(h => h.remove());
             backButtonListener.then(h => h.remove());
             appUrlListener.then(h => h.remove());
+            smsResumeListener.then(h => h.remove());
+            if (smsSyncTimer) clearTimeout(smsSyncTimer);
         };
     }, [router]);
 

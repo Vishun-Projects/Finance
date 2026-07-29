@@ -17,11 +17,13 @@ const config: CapacitorConfig = {
     adjustMarginsForEdgeToEdge: 'auto'
   },
   plugins: {
+    // Keep native HTTP/cookie patches OFF for remote Next.js (server.url).
+    // Patching window.fetch breaks RSC / Server Actions in Android WebView.
     CapacitorHttp: {
-      enabled: true,
+      enabled: false,
     },
     CapacitorCookies: {
-      enabled: true,
+      enabled: false,
     },
     SplashScreen: {
       launchShowDuration: 2000,

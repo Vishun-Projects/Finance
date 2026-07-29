@@ -20,6 +20,7 @@ import { Chip } from '@/components/ui/chip';
 import { cn, formatRupees } from '@/lib/utils';
 import { getTransactionDisplayName } from '@/lib/transaction-utils';
 import type { ImportPreviewResult } from '@/lib/import-preview-service';
+import { SmsPdfReconcilePanel } from '@/features/transactions/components/sms-pdf-reconcile-panel';
 import {
   Select,
   SelectContent,
@@ -270,6 +271,11 @@ export default function ParsedTransactionsReviewModal({
                         ))}
                       </ul>
                     </div>
+                  )}
+
+                  {(importPreview.reconcile?.matched?.length > 0 ||
+                    importPreview.reconcile?.smsOnly?.length > 0) && (
+                    <SmsPdfReconcilePanel reconcile={importPreview.reconcile} />
                   )}
                 </>
               )}

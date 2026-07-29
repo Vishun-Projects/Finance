@@ -1,3 +1,4 @@
+import { cache } from 'react';
 import { prisma } from './db';
 import { getCachedData, setCachedData, CACHE_TTL } from './api-cache';
 import type { SimpleDashboardData } from '@/types/dashboard';
@@ -23,101 +24,101 @@ interface DashboardStatsParams {
 
 export type { SimpleDashboardData };
 
-async function computeMonthFinancials(userId: string, monthStart: Date, monthEnd: Date) {
-  const dateFilter = { gte: monthStart, lte: monthEnd };
-  const [incomeAgg, expenseAgg, incomeTransactions, expenseTransactions, settlementLookup] = await Promise.all([
-    prisma.transaction.aggregate({
-      where: {
-        userId,
-        isDeleted: false,
-        financialCategory: 'INCOME',
-        transactionDate: dateFilter,
-      },
-      _sum: { creditAmount: true },
-    }),
-    prisma.transaction.aggregate({
-      where: {
-        userId,
-        isDeleted: false,
-        financialCategory: 'EXPENSE',
-        transactionDate: dateFilter,
-      },
-      _sum: { debitAmount: true },
-    }),
-    prisma.transaction.findMany({
-      where: {
-        userId,
-        isDeleted: false,
-        financialCategory: 'INCOME',
-        transactionDate: dateFilter,
-      },
-      select: {
-        id: true,
-        creditAmount: true,
-        description: true,
-        personName: true,
-        store: true,
-        category: { select: { name: true } },
-      },
-    }),
-    prisma.transaction.findMany({
-      where: {
-        userId,
-        isDeleted: false,
-        financialCategory: 'EXPENSE',
-        transactionDate: dateFilter,
-      },
-      select: {
-        id: true,
-        debitAmount: true,
-      },
-    }),
-    loadSettlementLookup(userId, monthStart, monthEnd),
-  ]);
+type MonthFinancials = {
+  income: number;
+  expenses: number;
+  netFlow: number;
+  adjustedIncome: number;
+  adjustedExpenses: number;
+  adjustedNetFlow: number;
+  incomeBreakdown: { salary: number; family: number; other: number; total: number };
+  transactionCount: number;
+};
 
-  const incomeBreakdown = computeIncomeBreakdown(
-    incomeTransactions.map((tx) => ({
-      creditAmount: Number(tx.creditAmount) || 0,
-      categoryName: tx.category?.name ?? null,
-      description: tx.description,
-      personName: tx.personName,
-      store: tx.store,
-    })),
-  );
+/** Single month scan shared within a request (dedupes stats vs duplicate aggregates). */
+export const loadMonthFinancialsCached = cache(
+  async (userId: string, monthStartIso: string, monthEndIso: string): Promise<MonthFinancials> => {
+    const monthStart = new Date(monthStartIso);
+    const monthEnd = new Date(monthEndIso);
+    const dateFilter = { gte: monthStart, lte: monthEnd };
 
-  const income = Number(incomeAgg._sum.creditAmount || 0);
-  const expenses = Number(expenseAgg._sum.debitAmount || 0);
-  incomeBreakdown.total = income;
+    const [incomeTransactions, expenseTransactions, settlementLookup] = await Promise.all([
+      prisma.transaction.findMany({
+        where: {
+          userId,
+          isDeleted: false,
+          financialCategory: 'INCOME',
+          transactionDate: dateFilter,
+        },
+        select: {
+          id: true,
+          creditAmount: true,
+          description: true,
+          personName: true,
+          store: true,
+          category: { select: { name: true } },
+        },
+      }),
+      prisma.transaction.findMany({
+        where: {
+          userId,
+          isDeleted: false,
+          financialCategory: 'EXPENSE',
+          transactionDate: dateFilter,
+        },
+        select: {
+          id: true,
+          debitAmount: true,
+        },
+      }),
+      loadSettlementLookup(userId, monthStart, monthEnd),
+    ]);
 
-  const adjustedIncome = incomeTransactions.reduce(
-    (sum, tx) =>
-      sum + getEffectiveIncomeAmount(Number(tx.creditAmount) || 0, tx.id, settlementLookup),
-    0,
-  );
+    const incomeBreakdown = computeIncomeBreakdown(
+      incomeTransactions.map((tx) => ({
+        creditAmount: Number(tx.creditAmount) || 0,
+        categoryName: tx.category?.name ?? null,
+        description: tx.description,
+        personName: tx.personName,
+        store: tx.store,
+      })),
+    );
 
-  const adjustedExpenses = expenseTransactions.reduce(
-    (sum, tx) =>
-      sum + getEffectiveExpenseAmount(Number(tx.debitAmount) || 0, tx.id, settlementLookup),
-    0,
-  );
+    const income = incomeTransactions.reduce((sum, tx) => sum + (Number(tx.creditAmount) || 0), 0);
+    const expenses = expenseTransactions.reduce((sum, tx) => sum + (Number(tx.debitAmount) || 0), 0);
+    incomeBreakdown.total = income;
 
-  return {
-    income,
-    expenses,
-    netFlow: income - expenses,
-    adjustedIncome,
-    adjustedExpenses,
-    adjustedNetFlow: adjustedIncome - adjustedExpenses,
-    incomeBreakdown,
-  };
-}
+    const adjustedIncome = incomeTransactions.reduce(
+      (sum, tx) =>
+        sum + getEffectiveIncomeAmount(Number(tx.creditAmount) || 0, tx.id, settlementLookup),
+      0,
+    );
+
+    const adjustedExpenses = expenseTransactions.reduce(
+      (sum, tx) =>
+        sum + getEffectiveExpenseAmount(Number(tx.debitAmount) || 0, tx.id, settlementLookup),
+      0,
+    );
+
+    return {
+      income,
+      expenses,
+      netFlow: income - expenses,
+      adjustedIncome,
+      adjustedExpenses,
+      adjustedNetFlow: adjustedIncome - adjustedExpenses,
+      incomeBreakdown,
+      transactionCount: incomeTransactions.length + expenseTransactions.length,
+    };
+  },
+);
 
 export class DashboardService {
     async getSimpleStats({ userId, startDate, endDate, preloaded }: DashboardStatsParams): Promise<SimpleDashboardData> {
         const rangeStart = startDate;
         const rangeEnd = endDate;
 
-        const cacheKey = `dashboard_stats:${userId}:${rangeStart.toISOString()}:${rangeEnd.toISOString()}`;
+        const cacheKey = `dashboard_stats_v2:${userId}:${rangeStart.toISOString()}:${rangeEnd.toISOString()}`;
         const cached = await getCachedData(cacheKey);
         if (cached) {
             return cached;
@@ -127,56 +128,31 @@ export class DashboardService {
         const deadlinesFromPreload = preloaded?.deadlines;
         const wishlistFromPreload = preloaded?.wishlist;
 
+        const monthIsoStart = rangeStart.toISOString();
+        const monthIsoEnd = rangeEnd.toISOString();
+
         const [
-            transactionStats,
+            currentMonthStatsResult,
             activeGoalsCount,
             deadlinesData,
             recentTransactions,
             salaryInfo,
             plansInfo,
             wishlistInfo,
-            netWorthStats,
-            transactionTotalsData,
             categoryBreakdownRaw,
-            currentMonthStatsResult,
-            topPayeesResult
         ] = await Promise.all([
-            (async () => {
-                try {
-                    const [incomeAgg, expenseAgg, count] = await Promise.all([
-                      prisma.transaction.aggregate({
-                        where: {
-                          userId,
-                          isDeleted: false,
-                          financialCategory: 'INCOME',
-                          transactionDate: { gte: rangeStart, lte: rangeEnd },
-                        },
-                        _sum: { creditAmount: true },
-                      }),
-                      prisma.transaction.aggregate({
-                        where: {
-                          userId,
-                          isDeleted: false,
-                          financialCategory: 'EXPENSE',
-                          transactionDate: { gte: rangeStart, lte: rangeEnd },
-                        },
-                        _sum: { debitAmount: true },
-                      }),
-                      prisma.transaction.count({
-                        where: { userId, isDeleted: false, transactionDate: { gte: rangeStart, lte: rangeEnd } },
-                      }),
-                    ]);
-                    return {
-                      _sum: {
-                        creditAmount: incomeAgg._sum.creditAmount,
-                        debitAmount: expenseAgg._sum.debitAmount,
-                      },
-                      _count: count,
-                    };
-                } catch { return { _sum: { creditAmount: 0, debitAmount: 0 }, _count: 0 }; }
-            })(),
+            loadMonthFinancialsCached(userId, monthIsoStart, monthIsoEnd).catch(() => ({
+              income: 0,
+              expenses: 0,
+              netFlow: 0,
+              adjustedIncome: 0,
+              adjustedExpenses: 0,
+              adjustedNetFlow: 0,
+              incomeBreakdown: { salary: 0, family: 0, other: 0, total: 0 },
+              transactionCount: 0,
+            })),
             goalsFromPreload
-              ? goalsFromPreload.filter((g) => g.isActive !== false).length
+              ? Promise.resolve(goalsFromPreload.filter((g) => g.isActive !== false).length)
               : prisma.goal.count({ where: { userId, isActive: true } }).catch(() => 0),
             deadlinesFromPreload?.items
               ? Promise.resolve({
@@ -209,23 +185,19 @@ export class DashboardService {
                     };
                 } catch { return { count: 0, next: null, items: [] }; }
             })(),
+            prisma.transaction.findMany({
+                where: { userId, isDeleted: false, transactionDate: { gte: rangeStart, lte: rangeEnd } },
+                select: {
+                    id: true, description: true, creditAmount: true, debitAmount: true,
+                    financialCategory: true, transactionDate: true, store: true, personName: true,
+                    category: { select: { name: true } }
+                },
+                orderBy: { transactionDate: 'desc' },
+                take: 10
+            }).catch(() => []),
             (async () => {
                 try {
-                    return await (prisma as any).transaction.findMany({
-                        where: { userId, isDeleted: false, transactionDate: { gte: rangeStart, lte: rangeEnd } },
-                        select: {
-                            id: true, description: true, creditAmount: true, debitAmount: true,
-                            financialCategory: true, transactionDate: true, store: true, personName: true,
-                            category: { select: { name: true } }
-                        },
-                        orderBy: { transactionDate: 'desc' },
-                        take: 10
-                    });
-                } catch { return []; }
-            })(),
-            (async () => {
-                try {
-                    const salary = await (prisma as any).salaryStructure.findFirst({
+                    const salary = await prisma.salaryStructure.findFirst({
                         where: { userId, isActive: true },
                         orderBy: [
                             { effectiveDate: 'desc' },
@@ -235,8 +207,8 @@ export class DashboardService {
                     if (!salary) return null;
                     const allowances = typeof salary.allowances === 'string' ? JSON.parse(salary.allowances || '{}') : (salary.allowances || {});
                     const deductions = typeof salary.deductions === 'string' ? JSON.parse(salary.deductions || '{}') : (salary.deductions || {});
-                    const totalAllowances = Object.values(allowances).reduce((sum: number, val: any) => sum + (Number(val) || 0), 0);
-                    const totalDeductions = Object.values(deductions).reduce((sum: number, val: any) => sum + (Number(val) || 0), 0);
+                    const totalAllowances = Object.values(allowances).reduce((sum: number, val: unknown) => sum + (Number(val) || 0), 0);
+                    const totalDeductions = Object.values(deductions).reduce((sum: number, val: unknown) => sum + (Number(val) || 0), 0);
                     const netMonthly = (Number(salary.baseSalary) / 12) + totalAllowances - totalDeductions;
                     return { takeHome: netMonthly, ctc: Number(salary.baseSalary), jobTitle: salary.jobTitle, company: salary.company };
                 } catch { return null; }
@@ -262,7 +234,16 @@ export class DashboardService {
                         select: { title: true, targetAmount: true, currentAmount: true, priority: true },
                         take: 20
                     });
-                    return { activePlans: goals.length, totalCommitted: goals.reduce((s: number, p: any) => s + Number(p.targetAmount || 0), 0), topPlan: goals[0]?.title || null, items: goals.map(p => ({ name: p.title, targetAmount: Number(p.targetAmount), currentAmount: Number(p.currentAmount) })) };
+                    return {
+                      activePlans: goals.length,
+                      totalCommitted: goals.reduce((s, p) => s + Number(p.targetAmount || 0), 0),
+                      topPlan: goals[0]?.title || null,
+                      items: goals.map((p) => ({
+                        name: p.title,
+                        targetAmount: Number(p.targetAmount),
+                        currentAmount: Number(p.currentAmount),
+                      })),
+                    };
                 } catch { return { activePlans: 0, totalCommitted: 0, topPlan: null, items: [] }; }
             })(),
             wishlistFromPreload?.data
@@ -277,128 +258,73 @@ export class DashboardService {
                 })
               : (async () => {
                 try {
-                    const items = await (prisma as any).wishlistItem.findMany({ where: { userId }, take: 20 });
-                    return { totalItems: items.length, totalCost: items.reduce((s: number, i: any) => s + Number(i.estimatedCost || 0), 0), topItem: items[0]?.title || null, items: items.map((i: any) => ({ name: i.title, estimatedPrice: Number(i.estimatedCost) })) };
+                    const items = await prisma.wishlistItem.findMany({ where: { userId }, take: 20 });
+                    return {
+                      totalItems: items.length,
+                      totalCost: items.reduce((s, i) => s + Number(i.estimatedCost || 0), 0),
+                      topItem: items[0]?.title || null,
+                      items: items.map((i) => ({ name: i.title, estimatedPrice: Number(i.estimatedCost) })),
+                    };
                 } catch { return { totalItems: 0, totalCost: 0, topItem: null, items: [] }; }
             })(),
             (async () => {
                 try {
-                    return await (prisma as any).transaction.aggregate({ where: { userId, isDeleted: false }, _sum: { creditAmount: true, debitAmount: true } });
-                } catch { return { _sum: { creditAmount: 0, debitAmount: 0 } }; }
-            })(),
-            (async () => {
-                try {
-                    const data = await (prisma as any).transaction.findMany({
-                        where: { userId, isDeleted: false, transactionDate: { gte: rangeStart, lte: rangeEnd } },
-                        select: {
-                          transactionDate: true,
-                          creditAmount: true,
-                          debitAmount: true,
-                          financialCategory: true,
-                        },
-                        take: 500,
-                    });
-                    return data;
-                } catch { return []; }
-            })(),
-            (async () => {
-                try {
-                    const data = await (prisma as any).transaction.groupBy({
+                    const data = await prisma.transaction.groupBy({
                         by: ['categoryId'],
-                        where: { userId, isDeleted: false, transactionDate: { gte: rangeStart, lte: rangeEnd }, financialCategory: 'EXPENSE' },
+                        where: {
+                          userId,
+                          isDeleted: false,
+                          transactionDate: { gte: rangeStart, lte: rangeEnd },
+                          financialCategory: 'EXPENSE',
+                        },
                         _sum: { debitAmount: true }
                     });
 
-                    const categoryIds = data.map((item: any) => item.categoryId).filter(Boolean);
-                    const categories = await (prisma as any).category.findMany({
+                    const categoryIds = data.map((item) => item.categoryId).filter(Boolean) as string[];
+                    if (categoryIds.length === 0) return [];
+
+                    const categories = await prisma.category.findMany({
                         where: { id: { in: categoryIds } },
                         select: { id: true, name: true }
                     });
-                    const catMap = new Map(categories.map((c: any) => [c.id, c.name]));
+                    const catMap = new Map(categories.map((c) => [c.id, c.name]));
 
-                    return data.map((item: any) => ({
-                        name: catMap.get(item.categoryId) || 'Uncategorized',
+                    return data.map((item) => ({
+                        name: (item.categoryId && catMap.get(item.categoryId)) || 'Uncategorized',
                         amount: Number(item._sum.debitAmount || 0)
                     }));
                 } catch { return []; }
             })(),
-            computeMonthFinancials(userId, rangeStart, rangeEnd).catch(() => ({
-              income: 0,
-              expenses: 0,
-              netFlow: 0,
-              adjustedIncome: 0,
-              adjustedExpenses: 0,
-              adjustedNetFlow: 0,
-              incomeBreakdown: { salary: 0, family: 0, other: 0, total: 0 },
-            })),
-            (async () => {
-                try {
-                    const transactions = await (prisma as any).transaction.findMany({
-                        where: { userId, isDeleted: false, financialCategory: 'EXPENSE', transactionDate: { gte: rangeStart, lte: rangeEnd } },
-                        select: { store: true, personName: true, debitAmount: true },
-                        take: 500,
-                    });
-                    
-                    const payeeMap = new Map<string, { amount: number; count: number }>();
-                    transactions.forEach((t: any) => {
-                        const name = t.store || t.personName || 'Various';
-                        if (name === 'Various' && !t.store && !t.personName) return;
-                        const existing = payeeMap.get(name) || { amount: 0, count: 0 };
-                        existing.amount += Number(t.debitAmount || 0);
-                        existing.count += 1;
-                        payeeMap.set(name, existing);
-                    });
-
-                    return Array.from(payeeMap.entries())
-                        .map(([name, stats]) => ({ name, ...stats }))
-                        .sort((a, b) => b.amount - a.amount)
-                        .slice(0, 5);
-                } catch { return []; }
-            })()
         ]);
 
-        const totalIncome = Number(transactionStats._sum?.creditAmount || 0);
-        const totalExpenses = Number(transactionStats._sum?.debitAmount || 0);
+        const totalIncome = currentMonthStatsResult.income;
+        const totalExpenses = currentMonthStatsResult.expenses;
         const netSavings = totalIncome - totalExpenses;
-        const totalNetWorth = Number(netWorthStats._sum?.creditAmount || 0) - Number(netWorthStats._sum?.debitAmount || 0);
+        // Avoid all-time full-table aggregate on first paint; month net is enough for overview.
+        const totalNetWorth = currentMonthStatsResult.adjustedNetFlow;
+
+        const monthName = rangeStart.toLocaleDateString('en-US', { month: 'short' });
+        const monthlyTrends = [
+          {
+            month: monthName,
+            income: totalIncome,
+            expenses: totalExpenses,
+            savings: netSavings,
+            credits: totalIncome,
+            debits: totalExpenses,
+          },
+        ];
+
+        const topPayees: SimpleDashboardData['topPayees'] = [];
 
         const dynamicInsights = buildDynamicInsights({
             categoryBreakdown: categoryBreakdownRaw as SimpleDashboardData['categoryBreakdown'],
-            topPayees: topPayeesResult as SimpleDashboardData['topPayees'],
+            topPayees,
             totalExpenses,
             monthIncome: currentMonthStatsResult.income,
             monthExpenses: currentMonthStatsResult.expenses,
             monthNet: currentMonthStatsResult.netFlow,
         });
-
-        const trendsMap = new Map<string, { income: number; expenses: number; savings: number; credits: number; debits: number }>();
-        (transactionTotalsData as any[]).forEach(t => {
-            const d = new Date(t.transactionDate);
-            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-
-            const existing = trendsMap.get(key) || { income: 0, expenses: 0, savings: 0, credits: 0, debits: 0, name: d.toLocaleDateString('en-US', { month: 'short' }) };
-            const credit = t.financialCategory === 'INCOME' ? Number(t.creditAmount || 0) : 0;
-            const debit = t.financialCategory === 'EXPENSE' ? Number(t.debitAmount || 0) : 0;
-
-            existing.income += credit;
-            existing.expenses += debit;
-            existing.credits += credit;
-            existing.debits += debit;
-            existing.savings = existing.income - existing.expenses;
-
-            trendsMap.set(key, existing);
-        });
-
-        const monthlyTrends = Array.from(trendsMap.entries())
-            .sort((a, b) => a[0].localeCompare(b[0]))
-            .map(([_, val]: [any, any]) => ({
-                month: val.name,
-                income: val.income,
-                expenses: val.expenses,
-                savings: val.savings,
-                credits: val.credits,
-                debits: val.debits
-            }));
 
         const result: SimpleDashboardData = {
             totalIncome,
@@ -410,7 +336,7 @@ export class DashboardService {
             savingsRate: totalIncome > 0 ? (netSavings / totalIncome) * 100 : 0,
             upcomingDeadlines: deadlinesData?.count || 0,
             activeGoals: activeGoalsCount,
-            recentTransactions: (recentTransactions || []).map((t: any) => ({
+            recentTransactions: (recentTransactions || []).map((t) => ({
                 id: t.id,
                 title: getTransactionDisplayName({
                     description: t.description,
@@ -430,9 +356,9 @@ export class DashboardService {
                 personName: t.personName || null,
                 description: t.description || null,
             })),
-            totalTransactionsCount: transactionStats._count || 0,
+            totalTransactionsCount: currentMonthStatsResult.transactionCount || 0,
             monthlyTrends,
-            categoryBreakdown: categoryBreakdownRaw as any[],
+            categoryBreakdown: categoryBreakdownRaw as SimpleDashboardData['categoryBreakdown'],
             financialHealthScore: 0,
             categoryStats: {},
             salaryInfo: salaryInfo || null,
@@ -458,7 +384,7 @@ export class DashboardService {
               adjustedNetFlow: currentMonthStatsResult.adjustedNetFlow,
             },
             incomeBreakdown: currentMonthStatsResult.incomeBreakdown,
-            topPayees: topPayeesResult || [],
+            topPayees,
             dynamicInsights: dynamicInsights.slice(0, 2)
         };
 

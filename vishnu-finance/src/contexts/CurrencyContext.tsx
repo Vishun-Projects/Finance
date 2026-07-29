@@ -123,44 +123,60 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
 
   // Load user's preferred currency from localStorage or default to INR
   useEffect(() => {
-    const savedCurrency = localStorage.getItem('selectedCurrency');
-    if (savedCurrency && CURRENCY_SYMBOLS[savedCurrency]) {
-      setSelectedCurrency(savedCurrency);
+    try {
+      const savedCurrency = localStorage.getItem('selectedCurrency');
+      if (savedCurrency && CURRENCY_SYMBOLS[savedCurrency]) {
+        setSelectedCurrency(savedCurrency);
+      }
+    } catch {
+      // WebView / private mode can throw on storage access
     }
   }, []);
 
   // Save currency preference to localStorage
   useEffect(() => {
-    localStorage.setItem('selectedCurrency', selectedCurrency);
+    try {
+      localStorage.setItem('selectedCurrency', selectedCurrency);
+    } catch {
+      // ignore quota / SecurityError in Capacitor WebView
+    }
   }, [selectedCurrency]);
 
-  // Fetch exchange rates every 60 seconds
-  // Fetch exchange rates once on mount
-useEffect(() => {
-  const fetchExchangeRates = async () => {
-    try {
-      setIsLoading(true);
-      setError(null);
+  // Defer FX fetch until a non-INR currency is selected (INR needs no rates)
+  useEffect(() => {
+    if (selectedCurrency === 'INR') return;
 
-      const response = await fetch('/api/currency-rates');
-      if (!response.ok) {
-        throw new Error('Failed to fetch exchange rates');
+    let cancelled = false;
+    const fetchExchangeRates = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+
+        const response = await fetch('/api/currency-rates');
+        if (!response.ok) {
+          throw new Error('Failed to fetch exchange rates');
+        }
+
+        const data = await response.json();
+        if (!cancelled) {
+          setExchangeRates(data.rates);
+          setLastUpdated(new Date());
+        }
+      } catch (err) {
+        if (!cancelled) {
+          console.error('Error fetching exchange rates:', err);
+          setError(err instanceof Error ? err.message : 'Failed to fetch exchange rates');
+        }
+      } finally {
+        if (!cancelled) setIsLoading(false);
       }
+    };
 
-      const data = await response.json();
-      setExchangeRates(data.rates);
-      setLastUpdated(new Date());
-    } catch (err) {
-      console.error('Error fetching exchange rates:', err);
-      setError(err instanceof Error ? err.message : 'Failed to fetch exchange rates');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Fetch immediately (only once)
-  fetchExchangeRates();
-}, []);
+    void fetchExchangeRates();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedCurrency]);
 
 
   const getCurrencySymbol = useCallback((currency: string): string => {

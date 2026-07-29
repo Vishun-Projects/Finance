@@ -176,7 +176,11 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
     setUser(null);
     document.documentElement.classList.remove('dark');
     if (typeof window !== 'undefined') {
-      localStorage.removeItem('theme');
+      try {
+        localStorage.removeItem('theme');
+      } catch {
+        // ignore
+      }
     }
     // Full navigation so Set-Cookie from logout response is applied before auth page loads
     window.location.href = '/api/auth/logout';

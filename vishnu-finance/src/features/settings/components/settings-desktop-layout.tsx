@@ -15,7 +15,7 @@ import {
 } from '@/features/settings/components/settings-nav-config';
 
 const PRIMARY_SECTION_IDS: SettingsSectionId[] = ['profile', 'appearance', 'notifications', 'categories'];
-const ADVANCED_SECTION_IDS: SettingsSectionId[] = ['security', 'networth', 'documentation'];
+const ADVANCED_SECTION_IDS: SettingsSectionId[] = ['security', 'bank-sms', 'networth', 'documentation'];
 
 type SettingsDesktopLayoutProps = {
   activeSection: string;

@@ -47,6 +47,24 @@ export async function loadGoals(userId: string): Promise<Goal[]> {
   }
 }
 
+/** Dashboard overview needs goal fields only — skip contribution history. */
+export async function loadGoalsLite(userId: string): Promise<Goal[]> {
+  if (!userId) {
+    return [];
+  }
+
+  try {
+    const goals = await prisma.goal.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+    });
+    return toJson(goals) as Goal[];
+  } catch (error) {
+    console.error('[goals] lite fetch failed', { userId, error });
+    throw error;
+  }
+}
+
 export async function loadDeadlines(userId: string): Promise<DeadlinesResponse> {
   if (!userId) {
     return EMPTY_DEADLINES;

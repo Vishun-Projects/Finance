@@ -1,6 +1,5 @@
 'use client';
 
-import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { hapticLight } from '@/lib/haptics';
 import { cn } from '@/lib/utils';
@@ -15,11 +14,10 @@ interface MobileBottomNavProps {
 export function MobileBottomNav({ items, activeByHref }: MobileBottomNavProps) {
   const router = useRouter();
 
-  useEffect(() => {
-    for (const item of items) {
-      void router.prefetch(item.href);
-    }
-  }, [items, router]);
+  const prefetchTab = (href: string) => {
+    // Intent-only: never storm heavy RSC bootstraps on mount while dashboard is loading
+    void router.prefetch(href);
+  };
 
   return (
     <nav
@@ -35,6 +33,7 @@ export function MobileBottomNav({ items, activeByHref }: MobileBottomNavProps) {
             <BottomNavLink
               key={item.href}
               href={item.href}
+              prefetch={false}
               linkClassName="flex min-w-0 flex-1"
               data-bottom-nav-active={isActive ? 'true' : 'false'}
               onClick={() => void hapticLight()}
@@ -42,6 +41,12 @@ export function MobileBottomNav({ items, activeByHref }: MobileBottomNavProps) {
                 'btn-touch flex h-full w-full flex-col items-center justify-center gap-0.5 px-1 text-[10px] font-medium transition-colors active:scale-[0.97]',
                 isActive ? 'text-foreground' : 'text-muted-foreground',
               )}
+              onPointerEnter={() => {
+                if (!isActive) prefetchTab(item.href);
+              }}
+              onTouchStart={() => {
+                if (!isActive) prefetchTab(item.href);
+              }}
             >
               <Icon className="size-5 shrink-0" strokeWidth={isActive ? 2.25 : 1.75} />
               <span className="max-w-full truncate">{item.label}</span>

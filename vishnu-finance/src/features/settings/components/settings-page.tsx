@@ -17,6 +17,7 @@ import { SecuritySettings } from '@/features/settings/components/security-settin
 import { CategoriesSettings } from '@/features/settings/components/categories-settings';
 import { PortalSettings } from '@/features/settings/components/portal-settings';
 import { NetWorthSection } from '@/features/settings/components/net-worth-section';
+import { BankSmsSettings } from '@/features/settings/components/bank-sms-settings';
 import { SettingsLegalPanel } from '@/features/settings/components/settings-legal-panel';
 import { SettingsDesktopLayout } from '@/features/settings/components/settings-desktop-layout';
 import {
@@ -24,7 +25,7 @@ import {
   getSettingsTabLabel,
 } from '@/features/settings/components/settings-mobile-nav';
 import type { SettingsSectionId, LegalDocHref } from '@/features/settings/components/settings-nav-config';
-import { getLegalDocLabel } from '@/features/settings/components/settings-nav-config';
+import { getLegalDocLabel, isLegalDocId } from '@/features/settings/components/settings-nav-config';
 import type { UserDocumentSummary } from '@/types/documents';
 import type { UserPreferencesPayload } from '@/features/settings/types';
 import type { UserProfilePayload } from '@/features/settings/loaders-profile';
@@ -180,21 +181,81 @@ export default function SettingsPageClient({
     setActiveTab(tab);
   };
 
+  const pushSettingsSectionHistory = (sectionKey: string) => {
+    if (typeof window === 'undefined') return;
+    const url = new URL(window.location.href);
+    url.searchParams.set('section', sectionKey);
+    window.history.pushState({ settingsSection: sectionKey }, '', url.pathname + url.search);
+  };
+
   const handleMobileTabSelect = (tab: string) => {
     setActiveLegalDoc(null);
     setActiveTab(tab as SettingsSectionId);
     setMobileInSection(true);
+    pushSettingsSectionHistory(tab);
   };
 
   const handleLegalDocChange = (href: LegalDocHref) => {
     setActiveLegalDoc(href);
     setMobileInSection(true);
+    pushSettingsSectionHistory(href);
   };
 
-  const handleMobileBack = () => {
+  const exitSettingsSection = () => {
+    if (typeof window === 'undefined') return;
+    const url = new URL(window.location.href);
+    if (url.searchParams.has('section') || window.history.state?.settingsSection) {
+      // Let popstate sync UI (also covers Android hardware back)
+      window.history.back();
+      return;
+    }
     setMobileInSection(false);
     setActiveLegalDoc(null);
+    url.searchParams.delete('section');
+    window.history.replaceState({}, '', url.pathname + url.search);
   };
+
+  // Android / browser back: return to settings list instead of leaving /settings
+  useEffect(() => {
+    if (!isMobile) return;
+
+    const onPopState = () => {
+      const url = new URL(window.location.href);
+      const section = url.searchParams.get('section');
+      if (!section) {
+        setMobileInSection(false);
+        setActiveLegalDoc(null);
+        return;
+      }
+      if (isLegalDocId(section)) {
+        setActiveLegalDoc(section);
+        setMobileInSection(true);
+        return;
+      }
+      setActiveLegalDoc(null);
+      setActiveTab(section as SettingsSectionId);
+      setMobileInSection(true);
+    };
+
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, [isMobile]);
+
+  // Deep link / query: open section on first load (e.g. bank-sms review)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const url = new URL(window.location.href);
+    const section = url.searchParams.get('section');
+    if (!section) return;
+    if (isLegalDocId(section)) {
+      setActiveLegalDoc(section);
+      setMobileInSection(true);
+      return;
+    }
+    setActiveLegalDoc(null);
+    setActiveTab(section as SettingsSectionId);
+    setMobileInSection(true);
+  }, []);
 
   useEffect(() => {
     if (!isMobile) {
@@ -217,7 +278,7 @@ export default function SettingsPageClient({
         <button
           type="button"
           className="btn-touch flex size-9 shrink-0 items-center justify-center rounded-md border border-border text-foreground"
-          onClick={handleMobileBack}
+          onClick={exitSettingsSection}
           aria-label="Back to Settings"
         >
           <ArrowLeft className="size-4" />
@@ -289,6 +350,8 @@ export default function SettingsPageClient({
             onPrivacyChange={(next) => setPrivacy((prev) => ({ ...prev, ...next }))}
           />
         );
+      case 'bank-sms':
+        return <BankSmsSettings />;
       case 'categories':
         return <CategoriesSettings />;
       case 'networth':

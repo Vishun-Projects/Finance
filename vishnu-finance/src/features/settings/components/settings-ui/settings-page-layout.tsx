@@ -10,7 +10,7 @@ export function SettingsPageLayout({
   className?: string;
 }) {
   return (
-    <div className={cn('space-y-5 lg:space-y-6 lg:pb-16', className)}>
+    <div className={cn('space-y-5 pb-6 lg:space-y-6 lg:pb-16', className)}>
       {children}
     </div>
   );

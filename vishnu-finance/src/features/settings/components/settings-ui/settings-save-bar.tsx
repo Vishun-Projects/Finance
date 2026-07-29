@@ -18,7 +18,9 @@ export function SettingsSaveBar({
   secondaryAction?: React.ReactNode;
 }) {
   return (
-    <div className="sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-20 -mx-1 space-y-3 px-3 py-3 glass-mobile-bar glass-chrome-text lg:static lg:mx-0 lg:px-0 lg:py-0">
+    // Stay in document flow — sticky bottom was floating mid-viewport over form fields
+    // on mobile (especially Capacitor WebView). Main scroll already pads for the tab bar.
+    <div className="mt-2 space-y-3 border-t border-border pt-4 lg:mt-0 lg:border-t-0 lg:pt-0">
       {saved && (
         <Callout variant="success" title="Saved" icon={<CheckCircle className="size-5" />}>
           Your changes were saved successfully.

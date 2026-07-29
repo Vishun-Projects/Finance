@@ -9,6 +9,9 @@ interface BottomNavLinkProps {
   linkClassName?: string;
   children: ReactNode;
   onClick?: () => void;
+  onPointerEnter?: () => void;
+  onTouchStart?: () => void;
+  prefetch?: boolean;
   'data-bottom-nav-active'?: string;
 }
 

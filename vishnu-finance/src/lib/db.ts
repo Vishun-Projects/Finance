@@ -28,8 +28,8 @@ const getDatabaseUrl = () => {
     url = appendQueryParam(url, 'pgbouncer', 'true')
   }
 
-  // Serverless: 1 conn per warm instance — pooler multiplexes to Postgres
-  const connectionLimit = isProduction ? '1' : '5'
+  // Serverless: small pool per warm instance — pooler multiplexes to Postgres
+  const connectionLimit = isProduction ? '5' : '5'
   url = appendQueryParam(url, 'connection_limit', connectionLimit)
   url = appendQueryParam(url, 'pool_timeout', '30')
 

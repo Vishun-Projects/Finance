@@ -20,79 +20,72 @@ export default function FetchInterceptor() {
 
     if (isInterceptedRef.current) return;
 
+    // Remote server.url WebViews already share origin with the API — only rewrite
+    // relative URLs when the document itself is on a local Capacitor origin.
+    if (!isNative) return;
+
     if (!originalFetchRef.current) {
       originalFetchRef.current = window.fetch.bind(window);
     }
 
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://vishun-finance.vercel.app';
 
-    window.fetch = async (...args) => {
-      let resource = args[0];
-      let config = args[1] ? { ...args[1] } : {};
-      const method = config.method || 'GET';
+    window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+      let resource: RequestInfo | URL = input;
+      const method =
+        init?.method ||
+        (typeof Request !== 'undefined' && input instanceof Request ? input.method : 'GET');
 
       let url = 'Unknown URL';
       if (typeof resource === 'string') {
         url = resource;
       } else if (resource instanceof URL) {
         url = resource.toString();
-      } else if (resource instanceof Request) {
+      } else if (typeof Request !== 'undefined' && resource instanceof Request) {
         url = resource.url;
       }
 
-      debugLogger.logNetwork(method, url);
+      debugLogger.logNetwork(String(method), url);
 
-      if (isNative) {
-        const currentOrigin = typeof window !== 'undefined' ? window.location.origin : '';
-        const isLocalOrigin =
-          currentOrigin.includes('localhost') ||
-          currentOrigin.startsWith('file://') ||
-          currentOrigin.startsWith('capacitor://');
+      const currentOrigin = window.location.origin;
+      const isLocalOrigin =
+        currentOrigin.includes('localhost') ||
+        currentOrigin.startsWith('file://') ||
+        currentOrigin.startsWith('capacitor://');
 
-        if (isLocalOrigin) {
-          const cleanApiUrl = apiUrl.endsWith('/') ? apiUrl.slice(0, -1) : apiUrl;
+      if (isLocalOrigin) {
+        const cleanApiUrl = apiUrl.endsWith('/') ? apiUrl.slice(0, -1) : apiUrl;
 
-          if (typeof resource === 'string' && resource.startsWith('/')) {
-            resource = `${cleanApiUrl}${resource}`;
-          } else if (resource instanceof URL && resource.origin === window.location.origin) {
-            resource = new URL(resource.pathname + resource.search, cleanApiUrl);
-          } else if (
-            resource instanceof Request &&
-            (resource.url.startsWith('/') ||
-              resource.url.startsWith('file://') ||
-              resource.url.startsWith('capacitor://'))
-          ) {
-            const urlObj = new URL(resource.url, window.location.origin);
-            if (urlObj.origin === window.location.origin) {
-              const newUrl = `${cleanApiUrl}${urlObj.pathname}${urlObj.search}`;
-              resource = new Request(newUrl, resource);
-            }
+        if (typeof resource === 'string' && resource.startsWith('/')) {
+          resource = `${cleanApiUrl}${resource}`;
+        } else if (resource instanceof URL && resource.origin === window.location.origin) {
+          resource = new URL(resource.pathname + resource.search, cleanApiUrl);
+        } else if (
+          typeof Request !== 'undefined' &&
+          resource instanceof Request &&
+          (resource.url.startsWith('/') ||
+            resource.url.startsWith('file://') ||
+            resource.url.startsWith('capacitor://'))
+        ) {
+          const urlObj = new URL(resource.url, window.location.origin);
+          if (urlObj.origin === window.location.origin) {
+            const newUrl = `${cleanApiUrl}${urlObj.pathname}${urlObj.search}`;
+            resource = new Request(newUrl, resource);
           }
         }
       }
 
       try {
-        const response = await originalFetchRef.current!(resource, config);
+        // Preserve init exactly (including undefined) so Request bodies / RSC stay intact
+        const response = init === undefined
+          ? await originalFetchRef.current!(resource)
+          : await originalFetchRef.current!(resource, init);
 
-        try {
-          const clonedRes = response.clone();
-          const contentType = clonedRes.headers.get('content-type');
-          const logBodies = process.env.NODE_ENV !== 'production';
-
-          if (logBodies && contentType && contentType.includes('application/json')) {
-            const body = await clonedRes.json().catch(() => 'JSON parse failed');
-            debugLogger.logNetwork(method, url, response.status, undefined, body);
-          } else {
-            debugLogger.logNetwork(method, url, response.status);
-          }
-        } catch {
-          debugLogger.logNetwork(method, url, response.status, 'Body read failed');
-        }
-
+        debugLogger.logNetwork(String(method), url, response.status);
         return response;
       } catch (error: unknown) {
         const message = error instanceof Error ? error.message : 'Network error';
-        debugLogger.logNetwork(method, url, undefined, message);
+        debugLogger.logNetwork(String(method), url, undefined, message);
         throw error;
       }
     };

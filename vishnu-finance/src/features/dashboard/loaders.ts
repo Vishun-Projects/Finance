@@ -2,7 +2,7 @@ import { dashboardService } from '@/lib/dashboard-service';
 import { getPlanAdherence } from '@/lib/plan-adherence-service';
 import type { DashboardBootstrap } from '@/features/dashboard/types';
 import { getCurrentMonthRange, parseLocalDateEnd, parseLocalDateStart } from '@/lib/date-range';
-import { loadGoals, loadDeadlines, loadWishlist } from '@/features/plans/loaders';
+import { loadGoalsLite, loadDeadlines, loadWishlist } from '@/features/plans/loaders';
 import { computeDisciplineSummary } from '@/lib/plans-discipline';
 import { loadPlanIncomeContext } from '@/lib/plan-income';
 import { getCurrentAccountBalance } from '@/lib/account-balance-service';
@@ -42,7 +42,7 @@ const EMPTY_WISHLIST: WishlistResponse = {
 async function loadGoalsSafe(userId: string, preloaded?: Goal[]): Promise<Goal[]> {
   if (preloaded) return preloaded;
   try {
-    return await loadGoals(userId);
+    return await loadGoalsLite(userId);
   } catch (error) {
     console.error('[dashboard] goals load failed', { userId, error });
     return [];
@@ -84,22 +84,22 @@ export async function loadDashboard(
   const endDate = parseLocalDateEnd(monthRange.endDate);
 
   const planIncomeContextPromise = loadPlanIncomeContext(userId);
-
   const goalsPromise = loadGoalsSafe(userId, preloaded?.goals);
   const deadlinesPromise = loadDeadlinesSafe(userId, preloaded?.deadlines);
   const wishlistPromise = loadWishlistSafe(userId, preloaded?.wishlist);
 
-  const statsPromise = Promise.all([goalsPromise, deadlinesPromise, wishlistPromise]).then(
-    ([goals, deadlines, wishlist]) =>
-      dashboardService.getSimpleStats({
-        userId,
-        startDate,
-        endDate,
-        preloaded: {
-          goals,
+  // Stats start immediately — do not wait for goals/deadlines/wishlist first.
+  // When preloaded entities exist, pass them; otherwise getSimpleStats uses light queries.
+  const statsPromise = dashboardService.getSimpleStats({
+    userId,
+    startDate,
+    endDate,
+    preloaded: preloaded
+      ? {
+          goals: preloaded.goals,
           deadlines: {
-            count: deadlines.pagination?.total ?? deadlines.data.length,
-            items: deadlines.data
+            count: preloaded.deadlines.pagination?.total ?? preloaded.deadlines.data.length,
+            items: preloaded.deadlines.data
               .filter((d) => !d.isCompleted)
               .map((d) => ({
                 title: d.title,
@@ -107,44 +107,45 @@ export async function loadDashboard(
                 amount: Number(d.amount) || 0,
               })),
           },
-          wishlist,
-        },
+          wishlist: preloaded.wishlist,
+        }
+      : undefined,
+  });
+
+  const adherencePromise = planIncomeContextPromise.then(async (ctx) => {
+    try {
+      return await getPlanAdherence(userId, ctx.planScale);
+    } catch (error) {
+      console.error('[dashboard] plan adherence load failed', { userId, error });
+      return {
+        buckets: [],
+        lineItems: [],
+        plannedTotal: 0,
+        actualTotal: 0,
+        overallScore: 0,
+        goals: [],
+        goalsOnTrack: 0,
+        activeGoals: 0,
+        monthLabel: new Date().toLocaleDateString('en-IN', { month: 'long', year: 'numeric' }),
+        planBaseIncome: ctx.planScale.baseIncome,
+        planIncomeSource: ctx.planScale.source,
+      };
+    }
+  });
+
+  const [stats, goals, deadlines, wishlist, planIncomeContext, accountBalance, adherence] =
+    await Promise.all([
+      statsPromise,
+      goalsPromise,
+      deadlinesPromise,
+      wishlistPromise,
+      planIncomeContextPromise,
+      getCurrentAccountBalance(userId).catch((error) => {
+        console.error('[dashboard] account balance load failed', { userId, error });
+        return null;
       }),
-  );
-
-  const [stats, goals, deadlines, wishlist, planIncomeContext, accountBalance, adherence] = await Promise.all([
-    statsPromise,
-    goalsPromise,
-    deadlinesPromise,
-    wishlistPromise,
-    planIncomeContextPromise,
-    getCurrentAccountBalance(userId).catch((error) => {
-      console.error('[dashboard] account balance load failed', { userId, error });
-      return null;
-    }),
-    planIncomeContextPromise.then(async (ctx) => {
-      try {
-        return await getPlanAdherence(userId, ctx.planScale);
-      } catch (error) {
-        console.error('[dashboard] plan adherence load failed', { userId, error });
-        return {
-          buckets: [],
-          lineItems: [],
-          plannedTotal: 0,
-          actualTotal: 0,
-          overallScore: 0,
-          goals: [],
-          goalsOnTrack: 0,
-          activeGoals: 0,
-          monthLabel: new Date().toLocaleDateString('en-IN', { month: 'long', year: 'numeric' }),
-          planBaseIncome: ctx.planScale.baseIncome,
-          planIncomeSource: ctx.planScale.source,
-        };
-      }
-    }),
-  ]);
-
-  const planIncome = planIncomeContext.planScale;
+      adherencePromise,
+    ]);
 
   const disciplineSummary = computeDisciplineSummary(
     goals,

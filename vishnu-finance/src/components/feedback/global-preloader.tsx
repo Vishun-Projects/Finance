@@ -22,11 +22,10 @@ export default function GlobalPreloader({ loadingMessage = "Initializing systems
 
   useEffect(() => {
     if (currentLoadingMessage === "Engine starting..." && Capacitor.isNativePlatform()) {
-      Haptics.impact({ style: ImpactStyle.Heavy });
+      void Haptics.impact({ style: ImpactStyle.Heavy }).catch(() => {});
       setEngineStarted(true);
-      // Keep it visible for a moment even if isLoading turns false
       setShowIntro(true);
-      setTimeout(() => setShowIntro(false), 3000);
+      setTimeout(() => setShowIntro(false), 600);
     }
   }, [currentLoadingMessage]);
 

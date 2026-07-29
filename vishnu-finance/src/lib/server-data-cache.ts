@@ -34,7 +34,7 @@ export function userPagesTag(userId: string) {
 export async function loadDashboardCached(userId: string) {
   return unstable_cache(
     () => loadDashboard(userId),
-    ['dashboard-bootstrap', userId],
+    ['dashboard-bootstrap-v2', userId],
     { tags: [userPagesTag(userId), `dashboard:${userId}`], revalidate: 300 },
   )();
 }

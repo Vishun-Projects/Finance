@@ -106,8 +106,27 @@ model User {
   casHoldings          CasHolding[]
   incomeBudgetPlans    IncomeBudgetPlan[]
   refreshTokens        RefreshToken[]
+  smsImportReceipts    SmsImportReceipt[]
 
   @@map("users")
+}
+
+model SmsImportReceipt {
+  id            String   @id @default(cuid())
+  userId        String
+  smsStableId   String
+  status        String
+  transactionId String?
+  sender        String?
+  receivedAt    DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, smsStableId])
+  @@index([userId, status])
+  @@index([transactionId])
+  @@map("sms_import_receipts")
 }
 
 model RefreshToken {

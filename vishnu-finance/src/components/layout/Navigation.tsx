@@ -31,10 +31,10 @@ import { NavLink } from '@/components/layout/nav-link';
 export default function Navigation() {
   const { user, logout } = useAuth();
   const { setTheme, isLoading, isDark } = useTheme();
-  const { actions: pageActions } = usePageHeader();
+  const { actions: pageActions, backAction, title: headerTitle } = usePageHeader();
   const pathname = usePathname();
   const isDarkMode = !isLoading && isDark;
-  const pageTitle = getPageTitle(pathname);
+  const pageTitle = headerTitle || getPageTitle(pathname);
   const hideMobileTopBar = hideGlobalTopBar(pathname);
 
   const activeByHref = useMemo(() => {
@@ -129,7 +129,8 @@ export default function Navigation() {
           hideMobileTopBar ? 'pointer-events-none invisible h-0 opacity-0' : 'visible h-12 opacity-100',
         )}
       >
-        <div className="min-w-0 flex-1">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          {backAction}
           <h1 className="truncate text-base font-medium tracking-tight text-foreground">{pageTitle}</h1>
         </div>
         <div className="flex shrink-0 items-center gap-1">

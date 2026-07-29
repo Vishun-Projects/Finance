@@ -29,7 +29,10 @@
     "test": "npm run test:vitest && npm run test:legacy",
     "test:vitest": "vitest run",
     "test:legacy": "tsx --test tests/account-balance-service.test.ts tests/import-preview-service.test.ts tests/income-breakdown.test.ts tests/plan-income.test.ts tests/transaction-settlement.test.ts tests/utils.test.ts tests/security-smoke.test.ts tests/forecast-engine.test.ts tests/ai-reliability.test.ts",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "cap:sync": "npx cap sync android",
+    "cap:open": "npx cap open android",
+    "cap:run": "npx cap run android"
   },
   "dependencies": {
     "@capacitor/android": "^7.4.4",

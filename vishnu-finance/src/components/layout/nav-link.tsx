@@ -12,6 +12,8 @@ interface NavLinkProps {
   linkClassName?: string;
   children: ReactNode;
   onClick?: () => void;
+  onPointerEnter?: () => void;
+  onTouchStart?: () => void;
   prefetch?: boolean;
   'aria-label'?: string;
   'data-bottom-nav-active'?: string;
@@ -49,6 +51,8 @@ export function NavLink({
   linkClassName,
   children,
   onClick,
+  onPointerEnter,
+  onTouchStart,
   prefetch = true,
   'aria-label': ariaLabel,
   'data-bottom-nav-active': dataActive,
@@ -67,6 +71,8 @@ export function NavLink({
       aria-label={ariaLabel}
       data-bottom-nav-active={dataActive}
       onClick={handleClick}
+      onPointerEnter={onPointerEnter}
+      onTouchStart={onTouchStart}
       className={cn('outline-none', linkClassName)}
     >
       <LinkPendingContent href={href} className={className}>

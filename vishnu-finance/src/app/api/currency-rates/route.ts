@@ -1,9 +1,16 @@
 import { NextResponse } from 'next/server';
 import { getCachedRates, setCachedRates, isCacheValid } from '@/lib/currency-rates-cache';
 
-// Configure route caching - external API data
-export const dynamic = 'force-dynamic';
 export const revalidate = 300; // Revalidate every 5 minutes
+
+function withCacheHeaders(body: Record<string, unknown>, status = 200) {
+  return NextResponse.json(body, {
+    status,
+    headers: {
+      'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
+    },
+  });
+}
 
 export async function GET() {
   try {
@@ -12,7 +19,7 @@ export async function GET() {
     // Return cached rates if they're still fresh
     if (isCacheValid()) {
       const cachedRates = getCachedRates();
-      return NextResponse.json({
+      return withCacheHeaders({
         rates: cachedRates,
         lastUpdated: new Date(now).toISOString(),
         source: 'cache'
@@ -26,7 +33,7 @@ export async function GET() {
       // If all sources fail, return cached rates or default rates
       const cachedRates = getCachedRates();
       if (Object.keys(cachedRates).length > 0) {
-        return NextResponse.json({
+        return withCacheHeaders({
           rates: cachedRates,
           lastUpdated: new Date(now).toISOString(),
           source: 'fallback_cache'
@@ -34,7 +41,7 @@ export async function GET() {
       }
       
       // Return default rates if no cache available
-      return NextResponse.json({
+      return withCacheHeaders({
         rates: getDefaultRates(),
         lastUpdated: new Date().toISOString(),
         source: 'default'
@@ -44,7 +51,7 @@ export async function GET() {
     // Update cache
     setCachedRates(rates, now);
 
-    return NextResponse.json({
+    return withCacheHeaders({
       rates,
       lastUpdated: new Date().toISOString(),
       source: 'api'
@@ -56,14 +63,14 @@ export async function GET() {
     // Return cached rates or default rates on error
     const cachedRates = getCachedRates();
     if (Object.keys(cachedRates).length > 0) {
-      return NextResponse.json({
+      return withCacheHeaders({
         rates: cachedRates,
         lastUpdated: new Date().toISOString(),
         source: 'error_fallback'
       });
     }
     
-    return NextResponse.json({
+    return withCacheHeaders({
       rates: getDefaultRates(),
       lastUpdated: new Date().toISOString(),
       source: 'error_default'

@@ -1,4 +1,9 @@
-import { generateDedupHash, areDescriptionsSimilar, buildInFileDedupKey } from './import-dedup';
+import {
+  generateDedupHash,
+  areDescriptionsSimilar,
+  buildInFileDedupKey,
+  extractStableReference,
+} from './import-dedup';
 import { prisma } from '@/lib/db';
 import { toLocalISODate } from './date-range';
 import { getCurrentAccountBalance } from '@/lib/account-balance-service';
@@ -6,6 +11,25 @@ import {
   enrichStatementMetadataFromRecords,
   type StatementMetadata,
 } from '@/lib/account-statement';
+
+function isSmsSourcedRaw(rawData: unknown): boolean {
+  if (!rawData || typeof rawData !== 'object') return false;
+  return (rawData as { source?: string }).source === 'sms';
+}
+
+function pdfNotesCandidate(record: ImportPreviewRecord): string | null {
+  const notes = record.notes?.trim();
+  if (notes) return notes;
+  const desc = record.description?.trim();
+  if (!desc) return null;
+  // Prefer commodity-like trailing notes after common separators
+  const parts = desc.split(/\s[-–—|]\s/);
+  if (parts.length > 1) {
+    const tail = parts[parts.length - 1]?.trim();
+    if (tail && tail.length >= 3 && tail.length <= 120) return tail;
+  }
+  return null;
+}
 
 export interface ImportPreviewRecord {
   date?: string;
@@ -20,6 +44,7 @@ export interface ImportPreviewRecord {
   balance?: number | string;
   accountNumber?: string;
   bankCode?: string;
+  notes?: string;
 }
 
 export interface ImportPreviewDuplicate {
@@ -48,6 +73,26 @@ export interface ImportPreviewPayee {
   suggestedCategoryName?: string | null;
 }
 
+export interface ImportReconcileMatch {
+  pdfIndex: number;
+  existingId: string;
+  transactionId: string | null;
+  matchType: 'transactionId' | 'stableRef';
+  pdfDescription: string;
+  existingDescription: string;
+  /** Propose filling empty SMS notes from PDF narration/notes */
+  enrichNotes: string | null;
+  sourceIsSms: boolean;
+}
+
+export interface ImportReconcileSmsOnly {
+  existingId: string;
+  date: string;
+  description: string;
+  amount: number;
+  transactionId: string | null;
+}
+
 export interface ImportPreviewResult {
   statementPeriod: { start: string | null; end: string | null };
   overlap: {
@@ -63,6 +108,11 @@ export interface ImportPreviewResult {
     parsedClosing: number | null;
     lastStoredBalance: number | null;
     latestImportAt: string | null;
+  };
+  reconcile: {
+    matched: ImportReconcileMatch[];
+    smsOnly: ImportReconcileSmsOnly[];
+    enrichableNotes: number;
   };
 }
 
@@ -151,6 +201,8 @@ export async function buildImportPreview(
       dedupHash: true,
       store: true,
       personName: true,
+      notes: true,
+      rawData: true,
       category: { select: { id: true, name: true } },
     },
   });
@@ -357,6 +409,75 @@ export async function buildImportPreview(
 
   const currentBalance = await getCurrentAccountBalance(userId);
 
+  // Reference-first SMS ↔ PDF reconcile (never auto-overwrites amounts)
+  const existingByTxnId = new Map<string, (typeof existing)[number]>();
+  const existingByStableRef = new Map<string, (typeof existing)[number]>();
+  for (const e of existing) {
+    const tid = e.transactionId?.trim();
+    if (tid) existingByTxnId.set(tid.toUpperCase(), e);
+    const stable = extractStableReference(e.description || '');
+    if (stable) existingByStableRef.set(stable.toUpperCase(), e);
+  }
+
+  const matchedPdfIndices = new Set<number>();
+  const matchedExistingIds = new Set<string>();
+  const reconcileMatched: ImportReconcileMatch[] = [];
+
+  for (const index of uniqueIndices) {
+    const record = records[index];
+    const pdfRef =
+      (record.transactionId && String(record.transactionId).trim().toUpperCase()) ||
+      extractStableReference(record.description || '') ||
+      null;
+    if (!pdfRef) continue;
+
+    const match =
+      existingByTxnId.get(pdfRef) ||
+      existingByStableRef.get(pdfRef) ||
+      null;
+    if (!match) continue;
+
+    matchedPdfIndices.add(index);
+    matchedExistingIds.add(match.id);
+
+    const sourceIsSms = isSmsSourcedRaw(match.rawData);
+    const pdfNotes = pdfNotesCandidate(record);
+    const existingNotesEmpty = !match.notes || !String(match.notes).trim();
+    const enrichNotes =
+      sourceIsSms && existingNotesEmpty && pdfNotes ? pdfNotes : null;
+
+    reconcileMatched.push({
+      pdfIndex: index,
+      existingId: match.id,
+      transactionId: match.transactionId,
+      matchType: match.transactionId?.trim().toUpperCase() === pdfRef ? 'transactionId' : 'stableRef',
+      pdfDescription: (record.description || '').slice(0, 160),
+      existingDescription: (match.description || '').slice(0, 160),
+      enrichNotes,
+      sourceIsSms,
+    });
+  }
+
+  const periodStart = statementPeriod.start ? new Date(statementPeriod.start) : null;
+  const periodEnd = statementPeriod.end ? new Date(statementPeriod.end) : null;
+  const smsOnly: ImportReconcileSmsOnly[] = [];
+
+  for (const e of existing) {
+    if (!isSmsSourcedRaw(e.rawData)) continue;
+    if (matchedExistingIds.has(e.id)) continue;
+    if (periodStart && periodEnd) {
+      const d = new Date(e.transactionDate);
+      if (d < periodStart || d > periodEnd) continue;
+    }
+    smsOnly.push({
+      existingId: e.id,
+      date: toLocalISODate(new Date(e.transactionDate)),
+      description: (e.description || '').slice(0, 120),
+      amount: Number(e.creditAmount) || Number(e.debitAmount) || 0,
+      transactionId: e.transactionId,
+    });
+  }
+
   return {
     statementPeriod,
     overlap,
@@ -372,6 +493,11 @@ export async function buildImportPreview(
       parsedClosing: enriched?.closingBalance ?? metadata?.closingBalance ?? null,
       lastStoredBalance: currentBalance.amount,
       latestImportAt: currentBalance.importedAt,
+    },
+    reconcile: {
+      matched: reconcileMatched.slice(0, 100),
+      smsOnly: smsOnly.slice(0, 50),
+      enrichableNotes: reconcileMatched.filter((m) => Boolean(m.enrichNotes)).length,
     },
   };
 }

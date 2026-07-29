@@ -63,11 +63,13 @@ const nextConfig: NextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              scriptSrc,
+              // blob: + wasm-unsafe-eval needed for Capacitor bridge / Next client runtime in WebView
+              `${scriptSrc} blob: 'wasm-unsafe-eval'`,
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "img-src 'self' data: blob: https:",
               "font-src 'self' data: https://fonts.gstatic.com",
-              "connect-src 'self' https: wss:",
+              "connect-src 'self' https: wss: capacitor: https://localhost http://localhost",
+              "worker-src 'self' blob:",
               "frame-ancestors 'self'",
               "base-uri 'self'",
               "form-action 'self'",

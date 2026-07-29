@@ -269,17 +269,24 @@ export async function loadPlanIncomeContext(userId: string): Promise<PlanIncomeC
   const currentRange = getCurrentMonthRange();
   const lastRange = getPreviousMonthRange();
 
-  const activeSalaryTakeHome = await fetchActiveSalaryTakeHome(userId);
+  // Salary + both month credit scans in parallel (salary take-home used only for matching)
+  const activeSalaryTakeHomePromise = fetchActiveSalaryTakeHome(userId);
 
-  const [currentMonthSalaryReceived, lastMonthSalaryReceived] = await Promise.all([
-    fetchSalaryCreditsInRange(
-      userId,
-      currentRange.startDate,
-      currentRange.endDate,
-      activeSalaryTakeHome,
-    ),
-    fetchSalaryCreditsInRange(userId, lastRange.startDate, lastRange.endDate, activeSalaryTakeHome),
-  ]);
+  const [activeSalaryTakeHome, currentMonthSalaryReceived, lastMonthSalaryReceived] =
+    await Promise.all([
+      activeSalaryTakeHomePromise,
+      activeSalaryTakeHomePromise.then((takeHome) =>
+        fetchSalaryCreditsInRange(
+          userId,
+          currentRange.startDate,
+          currentRange.endDate,
+          takeHome,
+        ),
+      ),
+      activeSalaryTakeHomePromise.then((takeHome) =>
+        fetchSalaryCreditsInRange(userId, lastRange.startDate, lastRange.endDate, takeHome),
+      ),
+    ]);
 
   const planScale = resolvePlanBaseIncome({
     salaryTakeHome: activeSalaryTakeHome,

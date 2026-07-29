@@ -9,6 +9,8 @@ public final class BankSmsStore {
     private static final String KEY_OVERLAY = "overlay_enabled";
     private static final String KEY_PENDING = "pending_count";
     private static final String KEY_LAST_ONESHOT = "last_oneshot_alert_id";
+    private static final String KEY_BUBBLE_X = "bubble_x";
+    private static final String KEY_BUBBLE_Y = "bubble_y";
 
     private BankSmsStore() {}
 
@@ -55,5 +57,20 @@ public final class BankSmsStore {
 
     public static void setLastOneShotAlertId(Context context, String alertId) {
         prefs(context).edit().putString(KEY_LAST_ONESHOT, alertId).apply();
+    }
+
+    public static int getBubbleX(Context context, int fallback) {
+        return prefs(context).getInt(KEY_BUBBLE_X, fallback);
+    }
+
+    public static int getBubbleY(Context context, int fallback) {
+        return prefs(context).getInt(KEY_BUBBLE_Y, fallback);
+    }
+
+    public static void setBubblePosition(Context context, int x, int y) {
+        prefs(context).edit()
+            .putInt(KEY_BUBBLE_X, Math.max(0, x))
+            .putInt(KEY_BUBBLE_Y, Math.max(0, y))
+            .apply();
     }
 }

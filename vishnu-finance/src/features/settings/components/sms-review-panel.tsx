@@ -244,8 +244,8 @@ export function SmsReviewPanel({ onClose, onChanged }: SmsReviewPanelProps) {
   });
 
   return (
-    <div className="fixed inset-0 z-[60] flex flex-col bg-background/95 backdrop-blur-sm">
-      <div className="flex items-center justify-between border-b border-border px-4 py-3">
+    <div className="fixed inset-0 z-[70] flex flex-col bg-background/92 backdrop-blur-lg">
+      <div className="flex items-center justify-between border-b border-border/70 bg-background/85 px-4 py-3">
         <div>
           <h2 className="text-base font-semibold">Review bank alert</h2>
           <p className="text-xs text-muted-foreground">
@@ -265,7 +265,7 @@ export function SmsReviewPanel({ onClose, onChanged }: SmsReviewPanelProps) {
           <p className="text-sm text-muted-foreground">All caught up.</p>
         ) : (
           <div className="mx-auto w-full max-w-md space-y-4">
-            <div className="rounded-xl border border-border bg-muted/20 p-4 space-y-3">
+            <div className="rounded-2xl border border-border/80 bg-background/88 p-4 shadow-lg space-y-3">
               <p className="text-sm font-medium text-foreground">Is this entry correct to log?</p>
 
               <div className="flex items-start justify-between gap-3">
@@ -291,7 +291,7 @@ export function SmsReviewPanel({ onClose, onChanged }: SmsReviewPanelProps) {
               </div>
 
               {!fixing && (
-                <div className="rounded-lg bg-background/60 px-3 py-2 text-sm">
+                <div className="rounded-lg border border-border/60 bg-background/92 px-3 py-2 text-sm">
                   {suggest?.bucket === 'known' && suggest.suggestedCategoryName ? (
                     <p className="text-muted-foreground">
                       Will use <span className="font-medium text-foreground">{suggest.suggestedCategoryName}</span>
@@ -315,10 +315,10 @@ export function SmsReviewPanel({ onClose, onChanged }: SmsReviewPanelProps) {
                           }));
                         }}
                       >
-                        <SelectTrigger className="h-10">
+                        <SelectTrigger className="h-10 bg-background">
                           <SelectValue placeholder="Choose category" />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="max-h-72 bg-background/98">
                           {(suggest.categories.length
                             ? suggest.categories.map((c) => ({
                                 id: c.categoryId,
@@ -356,10 +356,10 @@ export function SmsReviewPanel({ onClose, onChanged }: SmsReviewPanelProps) {
                           }));
                         }}
                       >
-                        <SelectTrigger className="h-10">
+                        <SelectTrigger className="h-10 bg-background">
                           <SelectValue placeholder="Choose category" />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="max-h-72 bg-background/98">
                           {categories
                             .filter(
                               (c) =>
@@ -439,10 +439,10 @@ export function SmsReviewPanel({ onClose, onChanged }: SmsReviewPanelProps) {
                         setEdit({ ...edit, financialCategory: value, categoryId: '' })
                       }
                     >
-                      <SelectTrigger className="mt-1 h-10">
+                      <SelectTrigger className="mt-1 h-10 bg-background">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="max-h-72 bg-background/98">
                         <SelectItem value="EXPENSE">Expense</SelectItem>
                         <SelectItem value="INCOME">Income</SelectItem>
                       </SelectContent>
@@ -454,10 +454,10 @@ export function SmsReviewPanel({ onClose, onChanged }: SmsReviewPanelProps) {
                       value={edit.categoryId}
                       onValueChange={(value) => setEdit({ ...edit, categoryId: value })}
                     >
-                      <SelectTrigger className="mt-1 h-10">
+                      <SelectTrigger className="mt-1 h-10 bg-background">
                         <SelectValue placeholder="Choose category" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="max-h-72 bg-background/98">
                         {filteredCategories.map((c) => (
                           <SelectItem key={c.id} value={c.id}>
                             {c.name}
@@ -479,7 +479,7 @@ export function SmsReviewPanel({ onClose, onChanged }: SmsReviewPanelProps) {
             </div>
 
             {!fixing ? (
-              <div className="space-y-2">
+              <div className="space-y-2 rounded-xl border border-border/60 bg-background/90 p-2.5 shadow-sm">
                 <Button
                   type="button"
                   size="lg"
@@ -514,7 +514,7 @@ export function SmsReviewPanel({ onClose, onChanged }: SmsReviewPanelProps) {
                 </div>
               </div>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-2 rounded-xl border border-border/60 bg-background/90 p-2.5 shadow-sm">
                 <Button
                   type="button"
                   size="lg"

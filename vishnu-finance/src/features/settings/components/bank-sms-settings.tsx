@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
-import { Bell, MessageSquareText, RefreshCw } from 'lucide-react';
+import { BatteryCharging, Bell, MessageSquareText, RefreshCw, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import {
@@ -14,8 +14,12 @@ import {
 } from '@/features/settings/components/settings-ui';
 import {
   checkNotificationAccess,
+  checkBackgroundReliability,
   checkSmsBankPermissions,
   isSmsBankReaderSupported,
+  openAppSettings,
+  openAutoStartSettings,
+  openBatteryOptimizationSettings,
   openNotificationAccessSettings,
   requestSmsOverlayPermission,
   startSmsBackgroundSync,
@@ -38,6 +42,12 @@ export function BankSmsSettings() {
   const [notificationAccess, setNotificationAccess] = useState(false);
   const [overlayGranted, setOverlayGranted] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [reliability, setReliability] = useState<{
+    overlay: boolean;
+    notificationAccess: boolean;
+    manufacturer: string;
+    batteryOptimizationsIgnored: boolean;
+  } | null>(null);
 
   const refresh = async () => {
     setSettings(getBankSmsSettings());
@@ -46,6 +56,8 @@ export function BankSmsSettings() {
     setNotificationAccess(access);
     const perms = await checkSmsBankPermissions();
     setOverlayGranted(Boolean(perms?.overlay));
+    const rel = await checkBackgroundReliability();
+    setReliability(rel);
   };
 
   useEffect(() => {
@@ -145,6 +157,33 @@ export function BankSmsSettings() {
       setBusy(false);
     }
   };
+
+  const reliabilitySteps = [
+    {
+      label: 'Notification access enabled',
+      done: Boolean(reliability?.notificationAccess),
+      action: () => openNotificationAccessSettings(),
+      cta: 'Open Notification access',
+    },
+    {
+      label: 'Overlay permission enabled',
+      done: Boolean(reliability?.overlay),
+      action: () => requestSmsOverlayPermission(),
+      cta: 'Enable overlay',
+    },
+    {
+      label: 'Battery optimization unrestricted',
+      done: Boolean(reliability?.batteryOptimizationsIgnored),
+      action: () => openBatteryOptimizationSettings(),
+      cta: 'Open battery settings',
+    },
+    {
+      label: 'Auto-start / background allowed',
+      done: false,
+      action: () => openAutoStartSettings(),
+      cta: `Open ${reliability?.manufacturer || 'device'} startup settings`,
+    },
+  ];
 
   if (!supported && Capacitor.isNativePlatform()) {
     return (
@@ -278,6 +317,65 @@ export function BankSmsSettings() {
           <p className="text-xs text-muted-foreground">
             Captures new alerts going forward. Tap the floating bubble (or a new-alert
             notification) to review immediately — no need to dig through Settings.
+          </p>
+        </SettingsFieldGroup>
+      </div>
+
+      <div className="space-y-1.5">
+        <SettingsSectionHeader>Background reliability setup</SettingsSectionHeader>
+        <SettingsFieldGroup bordered className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            No permanent notification is used. Complete these once so the floating bubble remains
+            available when the app is in background.
+          </p>
+          <div className="space-y-2">
+            {reliabilitySteps.map((step) => (
+              <div
+                key={step.label}
+                className="flex items-center justify-between gap-2 rounded-lg border border-border/70 bg-background/70 px-3 py-2"
+              >
+                <div className="flex items-center gap-2">
+                  <ShieldCheck
+                    className={`size-4 ${step.done ? 'text-success' : 'text-muted-foreground'}`}
+                  />
+                  <span className="text-sm">{step.label}</span>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={step.done ? 'ghost' : 'secondary'}
+                  className="btn-touch"
+                  onClick={() => void step.action()}
+                >
+                  {step.done ? 'Done' : step.cta}
+                </Button>
+              </div>
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              className="btn-touch"
+              onClick={() => void refresh()}
+            >
+              <RefreshCw className="mr-2 size-4" />
+              Re-check status
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="btn-touch"
+              onClick={() => void openAppSettings()}
+            >
+              <BatteryCharging className="mr-2 size-4" />
+              Open app settings
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Tip: after opening recent apps, lock Vishnu Finance if your device supports lock/pin.
           </p>
         </SettingsFieldGroup>
       </div>

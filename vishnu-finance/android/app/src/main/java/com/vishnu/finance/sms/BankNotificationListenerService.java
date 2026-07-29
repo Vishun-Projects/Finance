@@ -69,6 +69,9 @@ public class BankNotificationListenerService extends NotificationListenerService
     public void onListenerConnected() {
         super.onListenerConnected();
         instance = this;
+        if (BankSmsStore.isAutoReadEnabled(this) && BankSmsStore.isOverlayEnabled(this)) {
+            BankSmsBubbleController.update(this, BankSmsStore.getPendingCount(this));
+        }
     }
 
     @Override

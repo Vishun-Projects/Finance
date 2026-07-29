@@ -3,6 +3,7 @@ package com.vishnu.finance.sms;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Build;
+import android.os.PowerManager;
 import android.provider.Settings;
 import android.service.notification.StatusBarNotification;
 
@@ -119,6 +120,63 @@ public class SmsBankReaderPlugin extends Plugin {
         JSObject result = new JSObject();
         result.put("opened", true);
         call.resolve(result);
+    }
+
+    @PluginMethod
+    public void checkBackgroundReliability(PluginCall call) {
+        JSObject result = new JSObject();
+        result.put("overlay", canDrawOverlays());
+        result.put("notificationAccess", BankNotificationListenerService.isNotificationAccessEnabled(getContext()));
+        result.put("manufacturer", Build.MANUFACTURER != null ? Build.MANUFACTURER : "unknown");
+        result.put("batteryOptimizationsIgnored", isIgnoringBatteryOptimizations());
+        call.resolve(result);
+    }
+
+    @PluginMethod
+    public void openBatteryOptimizationSettings(PluginCall call) {
+        Intent intent = new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        try {
+            getContext().startActivity(intent);
+            JSObject result = new JSObject();
+            result.put("opened", true);
+            call.resolve(result);
+        } catch (Exception e) {
+            openAppSettings(call);
+        }
+    }
+
+    @PluginMethod
+    public void openAutoStartSettings(PluginCall call) {
+        String manufacturer = Build.MANUFACTURER == null ? "" : Build.MANUFACTURER.toLowerCase(Locale.US);
+        Intent intent = new Intent();
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+
+        // OEM-specific best-effort paths.
+        if (manufacturer.contains("xiaomi") || manufacturer.contains("redmi") || manufacturer.contains("poco")) {
+            intent.setComponent(new android.content.ComponentName("com.miui.securitycenter", "com.miui.permcenter.autostart.AutoStartManagementActivity"));
+        } else if (manufacturer.contains("oppo")) {
+            intent.setComponent(new android.content.ComponentName("com.coloros.safecenter", "com.coloros.safecenter.permission.startup.StartupAppListActivity"));
+        } else if (manufacturer.contains("vivo")) {
+            intent.setComponent(new android.content.ComponentName("com.vivo.permissionmanager", "com.vivo.permissionmanager.activity.BgStartUpManagerActivity"));
+        } else if (manufacturer.contains("samsung")) {
+            intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+            intent.setData(Uri.parse("package:" + getContext().getPackageName()));
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        } else {
+            intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+            intent.setData(Uri.parse("package:" + getContext().getPackageName()));
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        }
+
+        try {
+            getContext().startActivity(intent);
+            JSObject result = new JSObject();
+            result.put("opened", true);
+            call.resolve(result);
+        } catch (Exception e) {
+            openAppSettings(call);
+        }
     }
 
     @PluginMethod
@@ -275,6 +333,17 @@ public class SmsBankReaderPlugin extends Plugin {
     private boolean canDrawOverlays() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return true;
         return Settings.canDrawOverlays(getContext());
+    }
+
+    private boolean isIgnoringBatteryOptimizations() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return true;
+        try {
+            PowerManager pm = (PowerManager) getContext().getSystemService(android.content.Context.POWER_SERVICE);
+            if (pm == null) return false;
+            return pm.isIgnoringBatteryOptimizations(getContext().getPackageName());
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     static boolean isBankSender(String address) {

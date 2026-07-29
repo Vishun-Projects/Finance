@@ -26,6 +26,14 @@ type SmsBankReaderPlugin = {
   checkNotificationAccess(): Promise<{ enabled: boolean }>;
   openNotificationAccessSettings(): Promise<{ opened: boolean }>;
   requestOverlayPermission(): Promise<{ overlay: boolean; openedSettings?: boolean }>;
+  checkBackgroundReliability(): Promise<{
+    overlay: boolean;
+    notificationAccess: boolean;
+    manufacturer?: string;
+    batteryOptimizationsIgnored?: boolean;
+  }>;
+  openBatteryOptimizationSettings(): Promise<{ opened: boolean }>;
+  openAutoStartSettings(): Promise<{ opened: boolean }>;
   openAppSettings(): Promise<{ opened: boolean }>;
   openSmsSettings(): Promise<{ opened: boolean; hint?: string }>;
   getRecentBankSms(options: { sinceMs?: number; limit?: number }): Promise<{ messages: BankSmsMessage[] }>;
@@ -43,6 +51,13 @@ type SmsBankReaderPlugin = {
     eventName: 'smsReviewRequested',
     listenerFunc: () => void,
   ): Promise<PluginListenerHandle>;
+};
+
+export type BackgroundReliabilityState = {
+  overlay: boolean;
+  notificationAccess: boolean;
+  manufacturer: string;
+  batteryOptimizationsIgnored: boolean;
 };
 
 const SmsBankReader = registerPlugin<SmsBankReaderPlugin>('SmsBankReader');
@@ -108,6 +123,48 @@ export async function requestSmsOverlayPermission(): Promise<boolean> {
 
 export async function openSmsAppSettings(): Promise<void> {
   await openNotificationAccessSettings();
+}
+
+export async function openAppSettings(): Promise<void> {
+  if (!isSmsBankReaderSupported()) return;
+  try {
+    await SmsBankReader.openAppSettings();
+  } catch {
+    /* ignore */
+  }
+}
+
+export async function checkBackgroundReliability(): Promise<BackgroundReliabilityState | null> {
+  if (!isSmsBankReaderSupported()) return null;
+  try {
+    const result = await SmsBankReader.checkBackgroundReliability();
+    return {
+      overlay: Boolean(result.overlay),
+      notificationAccess: Boolean(result.notificationAccess),
+      manufacturer: result.manufacturer || 'unknown',
+      batteryOptimizationsIgnored: Boolean(result.batteryOptimizationsIgnored),
+    };
+  } catch {
+    return null;
+  }
+}
+
+export async function openBatteryOptimizationSettings(): Promise<void> {
+  if (!isSmsBankReaderSupported()) return;
+  try {
+    await SmsBankReader.openBatteryOptimizationSettings();
+  } catch {
+    /* ignore */
+  }
+}
+
+export async function openAutoStartSettings(): Promise<void> {
+  if (!isSmsBankReaderSupported()) return;
+  try {
+    await SmsBankReader.openAutoStartSettings();
+  } catch {
+    /* ignore */
+  }
 }
 
 export async function getRecentBankSms(options?: {

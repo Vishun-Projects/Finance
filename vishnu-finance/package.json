@@ -34,7 +34,8 @@
     "cap:open": "npx cap open android",
     "cap:run": "npx cap run android",
     "cap:apk": "cd android && ./gradlew assembleDebug",
-    "cap:install-sms": "bash scripts/adb-install-sms.sh"
+    "cap:install-sms": "bash scripts/adb-install-bank-alerts.sh",
+    "cap:install-bank-alerts": "bash scripts/adb-install-bank-alerts.sh"
   },
   "dependencies": {
     "@capacitor/android": "^7.4.4",

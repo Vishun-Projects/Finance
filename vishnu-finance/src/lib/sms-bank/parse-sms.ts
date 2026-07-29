@@ -1,6 +1,6 @@
 import { extractStableReference } from '@/lib/import-dedup-refs';
 import {
-  isIndianBankSmsSender,
+  isBankAlertSource,
   looksLikeOtpOnlySms,
   looksLikeUpcomingOrMandateSms,
 } from './allowlist';
@@ -201,7 +201,7 @@ export function parseBankSms(input: {
   body: string;
   date: number;
 }): ParsedBankSmsDraft | null {
-  if (!isIndianBankSmsSender(input.address)) return null;
+  if (!isBankAlertSource(input.address, input.body)) return null;
   if (!input.body?.trim() || looksLikeOtpOnlySms(input.body)) return null;
   // Skip mandate / future autopay notices — not completed txs
   if (looksLikeUpcomingOrMandateSms(input.body)) return null;

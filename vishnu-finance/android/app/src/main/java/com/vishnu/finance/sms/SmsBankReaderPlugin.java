@@ -1,47 +1,32 @@
 package com.vishnu.finance.sms;
 
-import android.Manifest;
-import android.content.ContentResolver;
 import android.content.Intent;
-import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
 import android.provider.Settings;
-import android.provider.Telephony;
+import android.service.notification.StatusBarNotification;
 
 import androidx.core.content.ContextCompat;
 
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
-import com.getcapacitor.PermissionState;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
-import com.getcapacitor.annotation.Permission;
-import com.getcapacitor.annotation.PermissionCallback;
 
 import java.util.Locale;
 import java.util.regex.Pattern;
 
-@CapacitorPlugin(
-    name = "SmsBankReader",
-    permissions = {
-        @Permission(
-            alias = "sms",
-            strings = {
-                Manifest.permission.READ_SMS,
-                Manifest.permission.RECEIVE_SMS
-            }
-        )
-    }
-)
+@CapacitorPlugin(name = "SmsBankReader")
 public class SmsBankReaderPlugin extends Plugin {
     private static final Pattern BANK_SENDER = Pattern.compile(
-        // Match bank/PSP codes inside DLT IDs — do not hardcode BT/BZ/BV prefixes
         "(?i).*(HDFC|SBI|ICICI|AXIS|KOTAK|BOI|PNB|YESB|IDFC|FEDERAL|INDUS|INDBNK|INDIANB|UNION|CANARA|BOB|CBI|UCO|IOB|RBL|BANDHAN|AU\\s?BANK|NPCI|PHONPE|PHONEPE|GPAY|PAYTM|BHIM|AIRTEL\\s?PAY|AMAZONP).*|"
-            // Any 2-letter operator prefix + bank-like token (VK-HDFCBK, BT-INDBNK-S, etc.)
             + "(?i)^[A-Z]{2}-[A-Z0-9]{4,}(?:-[A-Z0-9]+)?$"
+    );
+
+    private static final Pattern TXN_HINT = Pattern.compile(
+        "(?i)(sent\\s+rs|credited|debited|avl\\s*bal|available\\s+balance|\\brrn\\b|upi|neft|imps)"
     );
 
     private static SmsBankReaderPlugin instance;
@@ -60,40 +45,47 @@ public class SmsBankReaderPlugin extends Plugin {
 
     @PluginMethod
     public void checkPermissions(PluginCall call) {
+        boolean notificationAccess = BankNotificationListenerService.isNotificationAccessEnabled(getContext());
         JSObject result = new JSObject();
-        PermissionState state = getPermissionState("sms");
-        result.put("sms", state.toString().toLowerCase(Locale.US));
+        result.put("sms", notificationAccess ? "granted" : "denied");
+        result.put("notificationAccess", notificationAccess);
         result.put("overlay", canDrawOverlays());
-        result.put(
-            "restrictedLikely",
-            state != PermissionState.GRANTED && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
-        );
+        result.put("restrictedLikely", false);
         call.resolve(result);
     }
 
     @PluginMethod
     public void requestPermissions(PluginCall call) {
-        if (getPermissionState("sms") == PermissionState.GRANTED) {
-            JSObject result = new JSObject();
-            result.put("sms", "granted");
-            result.put("overlay", canDrawOverlays());
-            call.resolve(result);
-            return;
+        // Notification access cannot be granted via runtime dialog — open settings.
+        boolean enabled = BankNotificationListenerService.isNotificationAccessEnabled(getContext());
+        if (!enabled) {
+            Intent intent = new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            getContext().startActivity(intent);
         }
-        requestPermissionForAlias("sms", call, "smsPermsCallback");
+        JSObject result = new JSObject();
+        result.put("sms", enabled ? "granted" : "denied");
+        result.put("notificationAccess", enabled);
+        result.put("overlay", canDrawOverlays());
+        result.put("openedSettings", !enabled);
+        call.resolve(result);
     }
 
-    @PermissionCallback
-    private void smsPermsCallback(PluginCall call) {
+    @PluginMethod
+    public void checkNotificationAccess(PluginCall call) {
+        boolean enabled = BankNotificationListenerService.isNotificationAccessEnabled(getContext());
         JSObject result = new JSObject();
-        PermissionState state = getPermissionState("sms");
-        result.put("sms", state.toString().toLowerCase(Locale.US));
-        result.put("overlay", canDrawOverlays());
-        // Android 13+ sideload: Allow is greyed out until "Allow restricted settings"
-        result.put(
-            "restrictedLikely",
-            state != PermissionState.GRANTED && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
-        );
+        result.put("enabled", enabled);
+        call.resolve(result);
+    }
+
+    @PluginMethod
+    public void openNotificationAccessSettings(PluginCall call) {
+        Intent intent = new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        getContext().startActivity(intent);
+        JSObject result = new JSObject();
+        result.put("opened", true);
         call.resolve(result);
     }
 
@@ -110,17 +102,13 @@ public class SmsBankReaderPlugin extends Plugin {
 
     @PluginMethod
     public void openSmsSettings(PluginCall call) {
-        // Best-effort: app details is where HyperOS exposes "Allow restricted settings"
-        Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
-        intent.setData(Uri.parse("package:" + getContext().getPackageName()));
+        // Compat alias → notification access settings
+        Intent intent = new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS);
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         getContext().startActivity(intent);
         JSObject result = new JSObject();
         result.put("opened", true);
-        result.put(
-            "hint",
-            "If Allow is greyed out: App info → ⋮ → Allow restricted settings, then Permissions → SMS → Allow"
-        );
+        result.put("hint", "Enable Vishnu Finance under Notification access");
         call.resolve(result);
     }
 
@@ -144,56 +132,35 @@ public class SmsBankReaderPlugin extends Plugin {
         call.resolve(result);
     }
 
+    /** Active notification drawer catch-up (not full SMS inbox). */
     @PluginMethod
     public void getRecentBankSms(PluginCall call) {
-        if (getPermissionState("sms") != PermissionState.GRANTED) {
-            call.reject("SMS permission not granted");
+        getRecentBankNotifications(call);
+    }
+
+    @PluginMethod
+    public void getRecentBankNotifications(PluginCall call) {
+        if (!BankNotificationListenerService.isNotificationAccessEnabled(getContext())) {
+            call.reject("Notification access not granted");
             return;
         }
 
-        long sinceMs = call.getLong("sinceMs", 0L);
-        int limit = Math.min(Math.max(call.getInt("limit", 100), 1), 300);
-
+        int limit = Math.min(Math.max(call.getInt("limit", 50), 1), 100);
         JSArray messages = new JSArray();
-        ContentResolver resolver = getContext().getContentResolver();
-        Uri uri = Telephony.Sms.Inbox.CONTENT_URI;
-        String selection = Telephony.Sms.DATE + " > ?";
-        String[] args = new String[]{String.valueOf(sinceMs)};
-        String sort = Telephony.Sms.DATE + " DESC";
 
-        try (Cursor cursor = resolver.query(
-            uri,
-            new String[]{
-                Telephony.Sms._ID,
-                Telephony.Sms.ADDRESS,
-                Telephony.Sms.BODY,
-                Telephony.Sms.DATE
-            },
-            selection,
-            args,
-            sort
-        )) {
-            if (cursor != null) {
-                int idIdx = cursor.getColumnIndexOrThrow(Telephony.Sms._ID);
-                int addrIdx = cursor.getColumnIndexOrThrow(Telephony.Sms.ADDRESS);
-                int bodyIdx = cursor.getColumnIndexOrThrow(Telephony.Sms.BODY);
-                int dateIdx = cursor.getColumnIndexOrThrow(Telephony.Sms.DATE);
-                while (cursor.moveToNext() && messages.length() < limit) {
-                    String address = cursor.getString(addrIdx);
-                    if (!isBankSender(address)) continue;
-                    String body = cursor.getString(bodyIdx);
-                    if (body == null || looksLikeOtp(body)) continue;
-
-                    JSObject row = new JSObject();
-                    row.put("id", cursor.getString(idIdx));
-                    row.put("address", address);
-                    row.put("body", body);
-                    row.put("date", cursor.getLong(dateIdx));
-                    messages.put(row);
+        try {
+            // Active notifications are only available from the listener service instance.
+            // Bridge asks listener via static helper when connected; otherwise return empty.
+            StatusBarNotification[] active = BankNotificationListenerService.getActiveBankNotifications();
+            if (active != null) {
+                for (StatusBarNotification sbn : active) {
+                    if (messages.length() >= limit) break;
+                    JSObject row = toMessage(sbn);
+                    if (row != null) messages.put(row);
                 }
             }
         } catch (Exception e) {
-            call.reject("Failed to read SMS inbox: " + e.getMessage());
+            call.reject("Failed to read notifications: " + e.getMessage());
             return;
         }
 
@@ -202,8 +169,41 @@ public class SmsBankReaderPlugin extends Plugin {
         call.resolve(result);
     }
 
+    private JSObject toMessage(StatusBarNotification sbn) {
+        if (sbn == null || sbn.isOngoing()) return null;
+        String pkg = sbn.getPackageName();
+        if (!BankNotificationListenerService.isAllowedPackage(pkg)) return null;
+        android.app.Notification n = sbn.getNotification();
+        if (n == null || n.extras == null) return null;
+
+        CharSequence titleCs = n.extras.getCharSequence(android.app.Notification.EXTRA_TITLE);
+        CharSequence textCs = n.extras.getCharSequence(android.app.Notification.EXTRA_TEXT);
+        CharSequence bigCs = n.extras.getCharSequence(android.app.Notification.EXTRA_BIG_TEXT);
+        String title = titleCs != null ? titleCs.toString().trim() : "";
+        String text = textCs != null ? textCs.toString().trim() : "";
+        String big = bigCs != null ? bigCs.toString().trim() : "";
+        String body = !big.isEmpty() ? big : text;
+        if (body.isEmpty()) return null;
+        if (!title.isEmpty() && !body.contains(title) && title.length() < 80) {
+            body = title + "\n" + body;
+        }
+        if (!TXN_HINT.matcher(body).find()) return null;
+        if (looksLikeOtp(body)) return null;
+        if (BankNotificationListenerService.looksLikeUpcoming(body)) return null;
+
+        long when = sbn.getPostTime() > 0 ? sbn.getPostTime() : System.currentTimeMillis();
+        JSObject row = new JSObject();
+        row.put("id", pkg + ":" + sbn.getId() + ":" + when);
+        row.put("address", !title.isEmpty() ? title : pkg);
+        row.put("body", body);
+        row.put("date", when);
+        row.put("packageName", pkg);
+        return row;
+    }
+
     @PluginMethod
     public void startBackgroundSync(PluginCall call) {
+        BankSmsStore.setAutoReadEnabled(getContext(), true);
         Intent intent = new Intent(getContext(), BankSmsForegroundService.class);
         intent.setAction(BankSmsForegroundService.ACTION_START);
         ContextCompat.startForegroundService(getContext(), intent);
@@ -214,6 +214,7 @@ public class SmsBankReaderPlugin extends Plugin {
 
     @PluginMethod
     public void stopBackgroundSync(PluginCall call) {
+        BankSmsStore.setAutoReadEnabled(getContext(), false);
         Intent intent = new Intent(getContext(), BankSmsForegroundService.class);
         intent.setAction(BankSmsForegroundService.ACTION_STOP);
         getContext().startService(intent);
@@ -251,6 +252,7 @@ public class SmsBankReaderPlugin extends Plugin {
         JSObject result = new JSObject();
         result.put("available", true);
         result.put("platform", "android");
+        result.put("captureMode", "notification_listener");
         call.resolve(result);
     }
 

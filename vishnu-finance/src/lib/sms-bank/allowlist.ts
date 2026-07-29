@@ -59,6 +59,46 @@ export function isIndianBankSmsSender(address: string | null | undefined): boole
   return false;
 }
 
+/** Notification titles / packages that may carry bank alerts. */
+export function isBankAlertSource(address: string | null | undefined, body?: string): boolean {
+  if (isIndianBankSmsSender(address)) return true;
+  if (!address && !body) return false;
+
+  const src = (address || '').toLowerCase();
+  if (
+    src.includes('bank') ||
+    src.includes('indian') ||
+    src.includes('hdfc') ||
+    src.includes('sbi') ||
+    src.includes('icici') ||
+    src.includes('axis') ||
+    src.includes('kotak') ||
+    src.includes('phonepe') ||
+    src.includes('gpay') ||
+    src.includes('paytm') ||
+    src.includes('upi') ||
+    src.includes('messaging') ||
+    src.includes('messages') ||
+    /\b[a-z]{2}-[a-z0-9]{4,}/i.test(address || '')
+  ) {
+    return true;
+  }
+
+  if (body) {
+    const lower = body.toLowerCase();
+    if (
+      /\bsent\s+rs/i.test(body) ||
+      lower.includes('credited') ||
+      lower.includes('debited') ||
+      /\brrn\b/i.test(body)
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 /** Upcoming autopay / mandate notices are not completed transactions. */
 export function looksLikeUpcomingOrMandateSms(body: string): boolean {
   const lower = body.toLowerCase();

@@ -118,10 +118,10 @@ export function PrivacyContent() {
           files you import, and related metadata
         </li>
         <li>
-          <strong>Bank SMS (Android, opt-in):</strong> when you enable Bank SMS auto-read in the mobile app,
-          Indian bank/UPI alert messages are scanned on your device. OTP and non-bank messages are ignored.
-          Structured drafts are uploaded only after you confirm (Yes). We store import receipts and
-          transaction fields you accept — not full SMS inboxes.
+          <strong>Bank alerts (Android, opt-in):</strong> when you enable Bank alert sync in the mobile
+          app, the app may read bank/UPI transaction alerts from the notification shade (Notification
+          access). OTP and non-transaction notices are ignored. Structured drafts are uploaded only
+          after you confirm (Yes). We do not request SMS inbox permission.
         </li>
         <li>
           <strong>Usage data:</strong> app interactions, device/browser type, IP address, cookies for session

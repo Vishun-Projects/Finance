@@ -124,14 +124,10 @@ public class BankNotificationListenerService extends NotificationListenerService
         payload.put("packageName", pkg);
 
         BankSmsStore.incrementPendingCount(this);
+        int pending = BankSmsStore.getPendingCount(this);
         SmsBankReaderPlugin.emitSmsReceived(payload);
-
-        if (BankSmsStore.isOverlayEnabled(this)) {
-            android.content.Intent overlay = new android.content.Intent(this, BankSmsOverlayService.class);
-            overlay.setAction(BankSmsOverlayService.ACTION_UPDATE);
-            overlay.putExtra(BankSmsOverlayService.EXTRA_COUNT, BankSmsStore.getPendingCount(this));
-            androidx.core.content.ContextCompat.startForegroundService(this, overlay);
-        }
+        BankSmsBubbleController.update(this, pending);
+        BankSmsAlertNotifier.notifyNewItem(this, id, pending);
     }
 
     /** Active notifications from the connected listener (null if not bound). */

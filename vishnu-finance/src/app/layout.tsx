@@ -13,6 +13,7 @@ import { ThemeProvider } from "@/contexts/ThemeContext";
 import { CurrencyProvider } from "@/contexts/CurrencyContext";
 
 import { MobileNavigationListener } from '@/components/layout/mobile-navigation-listener';
+import { SmsReviewOverlayHost } from '@/features/settings/components/sms-review-overlay-host';
 
 import { ToastProvider } from "@/contexts/ToastContext";
 
@@ -202,6 +203,8 @@ export default async function RootLayout({
                     <Toaster />
 
                     <MobileNavigationListener />
+
+                    <SmsReviewOverlayHost />
 
                     <SpeedInsights />
 

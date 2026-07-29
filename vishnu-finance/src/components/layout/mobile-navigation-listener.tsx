@@ -80,7 +80,7 @@ export function MobileNavigationListener() {
 
                 if (url.host === 'sms-review' || url.pathname.includes('sms-review')) {
                     void Haptics.impact({ style: ImpactStyle.Light }).catch(() => {});
-                    router.push('/settings?section=bank-sms&review=1');
+                    void import('@/lib/sms-bank/review-events').then((m) => m.openSmsReview());
                     return;
                 }
 

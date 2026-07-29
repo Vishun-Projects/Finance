@@ -81,16 +81,10 @@
 
         <service
             android:name=".sms.BankSmsForegroundService"
-            android:exported="false"
-            android:foregroundServiceType="dataSync" />
+            android:exported="false" />
 
         <service
             android:name=".sms.BankSmsOverlayService"
-            android:exported="false"
-            android:foregroundServiceType="specialUse">
-            <property
-                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Floating pending bank alert review count" />
-        </service>
+            android:exported="false" />
     </application>
 </manifest>

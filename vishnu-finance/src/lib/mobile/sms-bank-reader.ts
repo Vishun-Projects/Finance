@@ -34,9 +34,14 @@ type SmsBankReaderPlugin = {
   stopBackgroundSync(): Promise<{ running: boolean }>;
   setOverlayCount(options: { count: number; enabled: boolean }): Promise<{ count: number; enabled: boolean }>;
   isNativeAvailable(): Promise<{ available: boolean; platform: string; captureMode?: string }>;
+  consumeReviewRequest(): Promise<{ pending: boolean }>;
   addListener(
     eventName: 'bankSmsReceived',
     listenerFunc: (event: BankSmsMessage) => void,
+  ): Promise<PluginListenerHandle>;
+  addListener(
+    eventName: 'smsReviewRequested',
+    listenerFunc: () => void,
   ): Promise<PluginListenerHandle>;
 };
 
@@ -163,5 +168,26 @@ export async function addBankSmsReceivedListener(
     return await SmsBankReader.addListener('bankSmsReceived', listener);
   } catch {
     return null;
+  }
+}
+
+export async function addSmsReviewRequestedListener(
+  listener: () => void,
+): Promise<PluginListenerHandle | null> {
+  if (!isSmsBankReaderSupported()) return null;
+  try {
+    return await SmsBankReader.addListener('smsReviewRequested', listener);
+  } catch {
+    return null;
+  }
+}
+
+export async function consumeSmsReviewRequest(): Promise<boolean> {
+  if (!isSmsBankReaderSupported()) return false;
+  try {
+    const result = await SmsBankReader.consumeReviewRequest();
+    return Boolean(result.pending);
+  } catch {
+    return false;
   }
 }

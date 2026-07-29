@@ -4,6 +4,7 @@ import { clearUserCache } from '@/lib/api-cache';
 import { invalidateUserAppData } from '@/lib/server-data-cache';
 import { prisma } from '@/lib/db';
 import { generateDedupHash, extractStableReference } from '@/lib/import-dedup';
+import { getCanonicalName } from '@/lib/entity-mapping-service';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,8 +15,10 @@ type SmsDraftInput = {
   creditAmount?: number;
   debitAmount?: number;
   financialCategory?: string;
+  categoryId?: string | null;
   transactionId?: string | null;
   personName?: string | null;
+  store?: string | null;
   accountNumber?: string | null;
   transferType?: string | null;
   balance?: number | null;
@@ -155,6 +158,30 @@ export async function POST(request: NextRequest) {
       const financialCategory =
         String(draft.financialCategory || (creditAmount > 0 ? 'INCOME' : 'EXPENSE')).toUpperCase();
 
+      let personName = draft.personName?.trim() || null;
+      let store = draft.store?.trim() || null;
+      if (personName) {
+        personName = await getCanonicalName(user.id, personName, 'PERSON');
+      }
+      if (store) {
+        store = await getCanonicalName(user.id, store, 'STORE');
+      }
+
+      const categoryId = draft.categoryId?.trim() || null;
+      if (categoryId) {
+        const cat = await prisma.category.findFirst({
+          where: {
+            id: categoryId,
+            OR: [{ userId: user.id }, { isDefault: true }],
+          },
+          select: { id: true },
+        });
+        if (!cat) {
+          skipped.push({ smsId: draft.smsId, reason: 'bad_category' });
+          continue;
+        }
+      }
+
       try {
         const tx = await prisma.transaction.create({
           data: {
@@ -164,8 +191,10 @@ export async function POST(request: NextRequest) {
             creditAmount,
             debitAmount,
             financialCategory: financialCategory as 'INCOME' | 'EXPENSE' | 'TRANSFER' | 'INVESTMENT' | 'OTHER',
+            categoryId,
             transactionId: ref,
-            personName: draft.personName || null,
+            personName,
+            store,
             accountNumber: draft.accountNumber || null,
             transferType: draft.transferType || null,
             balance: draft.balance != null ? Number(draft.balance) : null,
@@ -181,7 +210,7 @@ export async function POST(request: NextRequest) {
                 : null,
               receivedAt: draft.receivedAt || null,
             },
-            autoCategorized: false,
+            autoCategorized: Boolean(categoryId),
             isDeleted: false,
           },
           select: { id: true },

@@ -28,8 +28,8 @@ import {
   saveBankSmsSettings,
   type BankSmsSettings,
 } from '@/lib/sms-bank/pending-queue';
+import { openSmsReview } from '@/lib/sms-bank/review-events';
 import { syncBankSmsInbox, syncOverlayBubble } from '@/lib/sms-bank/sync';
-import { SmsReviewPanel } from '@/features/settings/components/sms-review-panel';
 
 export function BankSmsSettings() {
   const supported = isSmsBankReaderSupported();
@@ -38,7 +38,6 @@ export function BankSmsSettings() {
   const [notificationAccess, setNotificationAccess] = useState(false);
   const [overlayGranted, setOverlayGranted] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [showReview, setShowReview] = useState(false);
 
   const refresh = async () => {
     setSettings(getBankSmsSettings());
@@ -51,18 +50,19 @@ export function BankSmsSettings() {
 
   useEffect(() => {
     void refresh();
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      if (params.get('review') === '1' || params.get('smsReview') === '1') {
-        setShowReview(true);
-      }
-    }
 
     const onResume = () => {
       void refresh();
     };
     document.addEventListener('visibilitychange', onResume);
-    return () => document.removeEventListener('visibilitychange', onResume);
+    const onReviewClose = () => {
+      void refresh();
+    };
+    window.addEventListener('sms-review:close', onReviewClose);
+    return () => {
+      document.removeEventListener('visibilitychange', onResume);
+      window.removeEventListener('sms-review:close', onReviewClose);
+    };
   }, []);
 
   const patchSettings = (patch: Partial<BankSmsSettings>) => {
@@ -99,7 +99,6 @@ export function BankSmsSettings() {
       if (!access) {
         await openNotificationAccessSettings();
         toast.message('Enable Vishnu Finance under Notification access, then return here');
-        // Re-check after a short delay in case user granted quickly
         await new Promise((r) => setTimeout(r, 800));
         access = await checkNotificationAccess();
         setNotificationAccess(access);
@@ -182,8 +181,8 @@ export function BankSmsSettings() {
             disabled={busy}
           />
           <SettingsToggleRow
-            label="Floating count bubble"
-            hint="Shows pending review count over other apps (off by default)"
+            label="Floating bubble"
+            hint="Show floating bubble when alerts need review (no permanent notification)"
             checked={settings.overlayEnabled}
             onCheckedChange={(checked) => void handleOverlay(checked)}
             disabled={busy || !settings.autoReadEnabled}
@@ -198,11 +197,13 @@ export function BankSmsSettings() {
           <SettingsFieldGroup bordered className="space-y-3">
             <p className="text-sm text-muted-foreground">
               No SMS permission needed. Turn on Notification access so Vishnu Finance can read
-              bank/UPI alerts as they appear (same approach as modern expense apps).
+              bank/UPI alerts as they appear.
             </p>
             <ol className="list-decimal space-y-1.5 pl-4 text-sm text-foreground">
               <li>Tap Open Notification access</li>
-              <li>Find <span className="font-medium">Vishnu Finance</span></li>
+              <li>
+                Find <span className="font-medium">Vishnu Finance</span>
+              </li>
               <li>Enable the toggle</li>
               <li>Return here and turn on Enable sync</li>
             </ol>
@@ -255,10 +256,10 @@ export function BankSmsSettings() {
               size="sm"
               className="btn-touch"
               disabled={pendingCount === 0}
-              onClick={() => setShowReview(true)}
+              onClick={() => openSmsReview()}
             >
               <MessageSquareText className="mr-2 size-4" />
-              Review {pendingCount > 0 ? `(${pendingCount})` : ''}
+              Review pending {pendingCount > 0 ? `(${pendingCount})` : ''}
             </Button>
             <Button
               type="button"
@@ -275,24 +276,11 @@ export function BankSmsSettings() {
             </Button>
           </div>
           <p className="text-xs text-muted-foreground">
-            Captures new alerts going forward (not your full SMS history). Upload a monthly PDF on
-            Transactions to verify by bank reference.
+            Captures new alerts going forward. Tap the floating bubble (or a new-alert
+            notification) to review immediately — no need to dig through Settings.
           </p>
         </SettingsFieldGroup>
       </div>
-
-      {showReview && (
-        <SmsReviewPanel
-          onClose={() => {
-            setShowReview(false);
-            void refresh();
-          }}
-          onChanged={() => {
-            setPendingCount(countPendingSms());
-            void syncOverlayBubble();
-          }}
-        />
-      )}
     </SettingsPageLayout>
   );
 }

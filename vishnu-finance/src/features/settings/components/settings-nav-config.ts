@@ -17,7 +17,7 @@ export const SETTINGS_SECTIONS = [
   { id: 'appearance', label: 'Appearance', description: 'Theme and display', icon: Palette },
   { id: 'notifications', label: 'Alerts', description: 'Push and email alerts', icon: Bell },
   { id: 'security', label: 'Security', description: 'Password and privacy', icon: Shield },
-  { id: 'bank-sms', label: 'Bank SMS', description: 'Android SMS import & review', icon: Smartphone },
+  { id: 'bank-sms', label: 'Bank SMS', description: 'Android bank alerts & review', icon: Smartphone },
   { id: 'categories', label: 'Categories', description: 'Transaction categories', icon: Tag },
   { id: 'networth', label: 'Net worth', description: 'Assets & liabilities', icon: Wallet },
   { id: 'documentation', label: 'Portal', description: 'Documents & exports', icon: FileText },

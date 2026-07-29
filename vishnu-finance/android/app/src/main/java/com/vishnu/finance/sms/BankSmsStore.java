@@ -8,6 +8,7 @@ public final class BankSmsStore {
     private static final String KEY_AUTO = "auto_read_enabled";
     private static final String KEY_OVERLAY = "overlay_enabled";
     private static final String KEY_PENDING = "pending_count";
+    private static final String KEY_LAST_ONESHOT = "last_oneshot_alert_id";
 
     private BankSmsStore() {}
 
@@ -46,5 +47,13 @@ public final class BankSmsStore {
 
     public static void incrementPendingCount(Context context) {
         setPendingCount(context, getPendingCount(context) + 1);
+    }
+
+    public static String getLastOneShotAlertId(Context context) {
+        return prefs(context).getString(KEY_LAST_ONESHOT, null);
+    }
+
+    public static void setLastOneShotAlertId(Context context, String alertId) {
+        prefs(context).edit().putString(KEY_LAST_ONESHOT, alertId).apply();
     }
 }

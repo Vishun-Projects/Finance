@@ -6,8 +6,6 @@ import android.os.Build;
 import android.provider.Settings;
 import android.service.notification.StatusBarNotification;
 
-import androidx.core.content.ContextCompat;
-
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
@@ -30,17 +28,40 @@ public class SmsBankReaderPlugin extends Plugin {
     );
 
     private static SmsBankReaderPlugin instance;
+    private static volatile boolean reviewRequestedPending = false;
 
     @Override
     public void load() {
         instance = this;
         BankSmsStore.init(getContext());
+        if (reviewRequestedPending) {
+            notifyListeners("smsReviewRequested", new JSObject());
+            reviewRequestedPending = false;
+        }
     }
 
     public static void emitSmsReceived(JSObject payload) {
         if (instance != null) {
             instance.notifyListeners("bankSmsReceived", payload);
         }
+    }
+
+    public static void emitReviewRequested() {
+        if (instance != null) {
+            instance.notifyListeners("smsReviewRequested", new JSObject());
+            reviewRequestedPending = false;
+        } else {
+            reviewRequestedPending = true;
+        }
+    }
+
+    @PluginMethod
+    public void consumeReviewRequest(PluginCall call) {
+        boolean pending = reviewRequestedPending;
+        reviewRequestedPending = false;
+        JSObject result = new JSObject();
+        result.put("pending", pending);
+        call.resolve(result);
     }
 
     @PluginMethod
@@ -203,10 +224,8 @@ public class SmsBankReaderPlugin extends Plugin {
 
     @PluginMethod
     public void startBackgroundSync(PluginCall call) {
+        // Notification Listener captures alerts; no sticky FGS.
         BankSmsStore.setAutoReadEnabled(getContext(), true);
-        Intent intent = new Intent(getContext(), BankSmsForegroundService.class);
-        intent.setAction(BankSmsForegroundService.ACTION_START);
-        ContextCompat.startForegroundService(getContext(), intent);
         JSObject result = new JSObject();
         result.put("running", true);
         call.resolve(result);
@@ -215,9 +234,8 @@ public class SmsBankReaderPlugin extends Plugin {
     @PluginMethod
     public void stopBackgroundSync(PluginCall call) {
         BankSmsStore.setAutoReadEnabled(getContext(), false);
-        Intent intent = new Intent(getContext(), BankSmsForegroundService.class);
-        intent.setAction(BankSmsForegroundService.ACTION_STOP);
-        getContext().startService(intent);
+        BankSmsBubbleController.remove();
+        BankSmsAlertNotifier.cancel(getContext());
         JSObject result = new JSObject();
         result.put("running", false);
         call.resolve(result);
@@ -230,15 +248,13 @@ public class SmsBankReaderPlugin extends Plugin {
         BankSmsStore.setOverlayEnabled(getContext(), enabled);
         BankSmsStore.setPendingCount(getContext(), count);
 
-        if (enabled && canDrawOverlays()) {
-            Intent intent = new Intent(getContext(), BankSmsOverlayService.class);
-            intent.setAction(BankSmsOverlayService.ACTION_UPDATE);
-            intent.putExtra(BankSmsOverlayService.EXTRA_COUNT, count);
-            ContextCompat.startForegroundService(getContext(), intent);
+        if (enabled && canDrawOverlays() && count > 0) {
+            BankSmsBubbleController.update(getContext(), count);
         } else {
-            Intent intent = new Intent(getContext(), BankSmsOverlayService.class);
-            intent.setAction(BankSmsOverlayService.ACTION_STOP);
-            getContext().startService(intent);
+            BankSmsBubbleController.remove();
+            if (count <= 0) {
+                BankSmsAlertNotifier.cancel(getContext());
+            }
         }
 
         JSObject result = new JSObject();

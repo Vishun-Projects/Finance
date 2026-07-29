@@ -1,6 +1,7 @@
-/** Indian bank / UPI SMS sender allowlist (expandable). */
+/** Indian bank / UPI SMS sender allowlist — match bank codes, not carrier prefixes. */
 
-const EXPLICIT_SENDERS = [
+/** Core bank / PSP codes found inside DLT sender IDs (e.g. BT-INDBNK-S, VK-HDFCBK). */
+const BANK_CODES = [
   'HDFCBK',
   'SBIINB',
   'SBIBNK',
@@ -13,10 +14,12 @@ const EXPLICIT_SENDERS = [
   'IDFCFB',
   'FEDBNK',
   'INDBNK',
+  'INDIANB',
+  'INDUSB',
   'UNIONB',
   'CANBNK',
   'BOBSMS',
-  'CBISBI',
+  'CBISMS',
   'UCOBNK',
   'IOBBANK',
   'RBLBNK',
@@ -32,8 +35,15 @@ const EXPLICIT_SENDERS = [
   'AIRTELP',
 ] as const;
 
-const SENDER_PREFIX = /^(VK|AX|VM|JD|AD|CP)-/i;
-const BANKISH = /XX-[A-Z0-9]{4,}/i;
+/**
+ * DLT-style sender: optional 2-letter operator prefix + bank code + optional suffix.
+ * Examples: BT-INDBNK-S, BZ-INDBNK-S, VK-HDFCBK, AX-ICICIB, VM-BOIIND
+ * Does NOT hardcode BT/BZ/BV — any 2-letter prefix is accepted.
+ */
+const DLT_SENDER_RE = /^[A-Z]{2}-[A-Z0-9]{4,}(?:-[A-Z0-9]+)?$/i;
+
+/** Fallback: XX-BANKXX style without requiring known code list. */
+const GENERIC_BANK_SENDER_RE = /^[A-Z]{2}-[A-Z]{3,}(?:-[A-Z0-9]+)?$/i;
 
 export function normalizeSmsSender(address: string): string {
   return address.trim().replace(/^\+91/, '').toUpperCase();
@@ -42,15 +52,29 @@ export function normalizeSmsSender(address: string): string {
 export function isIndianBankSmsSender(address: string | null | undefined): boolean {
   if (!address) return false;
   const cleaned = normalizeSmsSender(address);
-  if (EXPLICIT_SENDERS.some((s) => cleaned.includes(s))) return true;
-  if (SENDER_PREFIX.test(cleaned) && cleaned.length >= 6) return true;
-  if (BANKISH.test(cleaned)) return true;
+
+  if (BANK_CODES.some((code) => cleaned.includes(code))) return true;
+  if (DLT_SENDER_RE.test(cleaned)) return true;
+  if (GENERIC_BANK_SENDER_RE.test(cleaned)) return true;
+  return false;
+}
+
+/** Upcoming autopay / mandate notices are not completed transactions. */
+export function looksLikeUpcomingOrMandateSms(body: string): boolean {
+  const lower = body.toLowerCase();
+  if (lower.includes('will be debited')) return true;
+  if (lower.includes('autopay') && (lower.includes('pause mandate') || lower.includes('towards'))) {
+    return true;
+  }
+  if (lower.includes('mandate') && lower.includes('will be')) return true;
+  if (lower.includes('scheduled') && lower.includes('debit')) return true;
   return false;
 }
 
 export function looksLikeOtpOnlySms(body: string): boolean {
   const lower = body.toLowerCase();
   const hasTxn =
+    /\bsent\s+rs/i.test(body) ||
     lower.includes('debited') ||
     lower.includes('credited') ||
     lower.includes('spent') ||

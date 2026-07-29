@@ -38,8 +38,10 @@ import java.util.regex.Pattern;
 )
 public class SmsBankReaderPlugin extends Plugin {
     private static final Pattern BANK_SENDER = Pattern.compile(
-        "(?i).*(HDFC|SBI|ICICI|AXIS|KOTAK|BOI|PNB|YESB|IDFC|FEDERAL|INDUS|UNION|CANARA|BOB|CBI|UCO|IOB|RBL|BANDHAN|AU\\s?BANK|NPCI|PHONPE|PHONEPE|GPAY|PAYTM|BHIM|AIRTEL\\s?PAY|AMAZONP).*|"
-            + "(?i)^(VK|AX|VM|JD|AD|CP)-[A-Z0-9]{2,}$"
+        // Match bank/PSP codes inside DLT IDs — do not hardcode BT/BZ/BV prefixes
+        "(?i).*(HDFC|SBI|ICICI|AXIS|KOTAK|BOI|PNB|YESB|IDFC|FEDERAL|INDUS|INDBNK|INDIANB|UNION|CANARA|BOB|CBI|UCO|IOB|RBL|BANDHAN|AU\\s?BANK|NPCI|PHONPE|PHONEPE|GPAY|PAYTM|BHIM|AIRTEL\\s?PAY|AMAZONP).*|"
+            // Any 2-letter operator prefix + bank-like token (VK-HDFCBK, BT-INDBNK-S, etc.)
+            + "(?i)^[A-Z]{2}-[A-Z0-9]{4,}(?:-[A-Z0-9]+)?$"
     );
 
     private static SmsBankReaderPlugin instance;

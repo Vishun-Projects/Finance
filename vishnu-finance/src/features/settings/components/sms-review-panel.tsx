@@ -46,7 +46,7 @@ export function SmsReviewPanel({ onClose, onChanged }: SmsReviewPanelProps) {
             {
               smsId: item.smsId,
               description: item.description,
-              transactionDate: item.receivedAt,
+              transactionDate: item.transactionDateMs || item.receivedAt,
               creditAmount: item.creditAmount,
               debitAmount: item.debitAmount,
               financialCategory: item.financialCategory,
